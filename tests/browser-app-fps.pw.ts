@@ -487,6 +487,7 @@ interface RoomWorkerMeterReading {
 	readonly kinds?: Readonly<
 		Record<string, { count: number; totalMs: number; maxMs: number; heavyFrames: number; heavyMs: number }>
 	>;
+	readonly latency?: Readonly<Record<string, readonly number[]>>;
 }
 
 interface RoomWorkerRtcReading {
@@ -519,13 +520,16 @@ function roomWorkerReading(
 	}, action);
 }
 
-function distribution(values: readonly number[]): Readonly<{ count: number; p50: number; p99: number; max: number; mean: number }> {
+function distribution(
+	values: readonly number[]
+): Readonly<{ count: number; p50: number; p95: number; p99: number; max: number; mean: number }> {
 	const sorted = [...values].sort((a, b) => a - b);
 	const at = (q: number): number => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
 	const round = (value: number): number => Math.round(value * 1_000) / 1_000;
 	return {
 		count: sorted.length,
 		p50: round(at(0.5)),
+		p95: round(at(0.95)),
 		p99: round(at(0.99)),
 		max: round(sorted[sorted.length - 1] ?? 0),
 		mean: round(sorted.reduce((sum, value) => sum + value, 0) / Math.max(1, sorted.length)),
@@ -558,6 +562,11 @@ async function roomWorkerSummary(pages: ReadonlyMap<Role, Page>, playMs: number)
 				.sort((a, b) => b.heavyMs - a.heavyMs)
 				.slice(0, 24),
 			heavyFrames: meter.library.filter((value) => value > 0.5).length,
+			// A movement's bridge stages (ms): move post to worker handling; transient held for credit,
+			// sent to handled, handled to its rendering frame.
+			latency: Object.fromEntries(
+				Object.entries(meter.latency ?? {}).map(([stage, values]) => [stage, distribution(values)])
+			),
 			libraryP99WithinHalfMs: distribution(meter.library).p99 <= 0.5,
 			dataChannels: {
 				...rtc,

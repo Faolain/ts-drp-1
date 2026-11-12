@@ -10,6 +10,7 @@ import {
 	createRoomWorkerClient,
 	type RoomWorkerClient,
 	type RoomWorkerClientOptions,
+	type RoomWorkerMeasure,
 	type RoomWorkerPageStorage,
 } from "./client.js";
 import { RoomWorkerUnsupported } from "./errors.js";
@@ -24,6 +25,7 @@ export {
 	type CommandMap,
 	type RoomWorkerClient,
 	type RoomWorkerClientOptions,
+	type RoomWorkerMeasure,
 	type RoomWorkerPageStorage,
 	type RoomWorkerSendRefusal,
 	type RoomWorkerState,
@@ -45,7 +47,7 @@ export interface OpenRoomWorkerOptions<Commands extends CommandMap = CommandMap>
 	readonly meter?: RoomWorkerMeter;
 }
 
-export interface RoomWorkerMeter {
+export interface RoomWorkerMeter extends Partial<RoomWorkerMeasure> {
 	/** A worker message was handled; `kind` is its protocol kind, refined by stream, hook or RTC operation. */
 	message(kind: string, ms: number): void;
 	/** A message was posted to the worker; `kind` as for message. */

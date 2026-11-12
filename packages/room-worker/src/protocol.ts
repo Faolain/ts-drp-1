@@ -21,8 +21,10 @@ export type PageMessage = Header &
 				hooks: readonly string[];
 				storage: readonly (readonly [string, string])[] | null;
 				diagnostics: boolean;
+				/** The page measures bridge latency: streams and commands carry their times. */
+				measure: boolean;
 		  }>
-		| Readonly<{ k: "call" | "send"; id: number; name: string; args: readonly unknown[] }>
+		| Readonly<{ k: "call" | "send"; id: number; name: string; args: readonly unknown[]; t?: number }>
 		| Readonly<{ k: "credit"; name: string }>
 		| Readonly<{ k: "host-result"; id: number; ok: true; value: unknown }>
 		| Readonly<{ k: "host-result"; id: number; ok: false; error: WireError }>
@@ -37,8 +39,9 @@ export type WorkerMessage = Header &
 		| Readonly<{ k: "result"; id: number; ok: true; value: unknown }>
 		| Readonly<{ k: "result"; id: number; ok: false; error: WireError }>
 		| Readonly<{ k: "refused"; id: number; name: string; error: WireError }>
-		| Readonly<{ k: "stream"; name: string; value: unknown }>
+		| Readonly<{ k: "stream"; name: string; value: unknown; t?: readonly [number, number] }>
 		| Readonly<{ k: "diagnostic"; name: string; value: unknown }>
+		| Readonly<{ k: "measure"; name: string; value: readonly number[] }>
 		| Readonly<{
 				k: "host-call";
 				id: number;
@@ -68,6 +71,11 @@ function exact(value: Record<string, unknown>, fields: readonly string[]): boole
 	);
 }
 
+/** A measurement time: milliseconds since the epoch (timeOrigin + now), finite. */
+const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const isTimes = (value: unknown, count: number): value is number[] =>
+	Array.isArray(value) && value.length === count && value.every(isTime);
+
 const isId = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0;
 const isArgs = (value: unknown): value is unknown[] => Array.isArray(value) && value.length <= ROOM_WORKER_MAX_ARGS;
 const isString = (value: unknown, max = 1024): value is string => typeof value === "string" && value.length <= max;
@@ -87,7 +95,7 @@ export function parsePageMessage(value: unknown, session: number): PageMessage |
 	if (!header(value, session)) return undefined;
 	switch (value.k) {
 		case "init":
-			return exact(value, ["contract", "init", "hooks", "storage", "diagnostics"]) &&
+			return exact(value, ["contract", "init", "hooks", "storage", "diagnostics", "measure"]) &&
 				isRecord(value.contract) &&
 				isString(value.contract.name, 128) &&
 				Number.isSafeInteger(value.contract.version) &&
@@ -99,12 +107,16 @@ export function parsePageMessage(value: unknown, session: number): PageMessage |
 							(entry) =>
 								Array.isArray(entry) && entry.length === 2 && isString(entry[0]) && typeof entry[1] === "string"
 						))) &&
-				typeof value.diagnostics === "boolean"
+				typeof value.diagnostics === "boolean" &&
+				typeof value.measure === "boolean"
 				? (value as PageMessage)
 				: undefined;
 		case "call":
 		case "send":
-			return exact(value, ["id", "name", "args"]) && isId(value.id) && isCommandName(value.name) && isArgs(value.args)
+			return (exact(value, ["id", "name", "args"]) || (exact(value, ["id", "name", "args", "t"]) && isTime(value.t))) &&
+				isId(value.id) &&
+				isCommandName(value.name) &&
+				isArgs(value.args)
 				? (value as PageMessage)
 				: undefined;
 		case "credit":
@@ -151,8 +163,20 @@ export function parseWorkerMessage(value: unknown, session: number): WorkerMessa
 				? (value as WorkerMessage)
 				: undefined;
 		case "stream":
+			return (exact(value, ["name", "value"]) || (exact(value, ["name", "value", "t"]) && isTimes(value.t, 2))) &&
+				isCommandName(value.name)
+				? (value as WorkerMessage)
+				: undefined;
 		case "diagnostic":
 			return exact(value, ["name", "value"]) && isCommandName(value.name) ? (value as WorkerMessage) : undefined;
+		case "measure":
+			return exact(value, ["name", "value"]) &&
+				isString(value.name, 128) &&
+				Array.isArray(value.value) &&
+				value.value.length <= 8 &&
+				value.value.every(isTime)
+				? (value as WorkerMessage)
+				: undefined;
 		case "host-call":
 			return exact(value, ["id", "hook", "handle", "method", "args"]) &&
 				isId(value.id) &&

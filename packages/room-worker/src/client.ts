@@ -49,6 +49,16 @@ export interface RoomWorkerPageStorage {
 	remove(key: string): void;
 }
 
+/** Bridge latency, per stream value and per command (measurement only). */
+export interface RoomWorkerMeasure {
+	/** A stream value: emitted by the app, sent by the worker, received by the page. */
+	stream(name: string, emittedAt: number, sentAt: number, receivedAt: number): void;
+	/** A command: posted by the page, handled by the worker. */
+	command(name: string, postedAt: number, handledAt: number): void;
+}
+
+const measureNow = (): number => performance.timeOrigin + performance.now();
+
 export interface RoomWorkerClientOptions<Commands extends CommandMap = CommandMap> {
 	readonly contract: RoomWorkerContract;
 	readonly port: RoomWorkerPort;
@@ -62,6 +72,11 @@ export interface RoomWorkerClientOptions<Commands extends CommandMap = CommandMa
 	frame?(callback: () => void): void;
 	readonly maxInFlight?: number;
 	readonly maxHandles?: number;
+	/**
+	 * Measures bridge latency; without it no message carries times. Times are milliseconds since the
+	 * epoch (timeOrigin + now) on each side. Measurement only.
+	 */
+	readonly measure?: RoomWorkerMeasure;
 	/** Receives the worker's diagnostics; without it the worker sends none. */
 	onDiagnostic?(name: string, value: unknown): void;
 	/** Receives the worker's RTC bridge messages (page.ts). */
@@ -369,6 +384,7 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 	};
 
 	function onMessage(event: MessageEvent): void {
+		const receivedAt = options.measure === undefined ? 0 : measureNow();
 		const message = parseWorkerMessage(event.data, session);
 		if (message === undefined || stopped) return;
 		switch (message.k) {
@@ -399,7 +415,13 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 				return;
 			}
 			case "stream":
-				if (contractEntry(contract.streams, message.name) !== undefined) deliver(message.name, message.value);
+				if (contractEntry(contract.streams, message.name) === undefined) return;
+				if (message.t !== undefined) options.measure?.stream(message.name, message.t[0], message.t[1], receivedAt);
+				deliver(message.name, message.value);
+				return;
+			case "measure":
+				if (message.name.startsWith("command:") && message.value.length === 2)
+					options.measure?.command(message.name.slice(8), message.value[0] as number, message.value[1] as number);
 				return;
 			case "diagnostic":
 				options.onDiagnostic?.(message.name, message.value);
@@ -447,6 +469,7 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 		storage:
 			options.storage === undefined ? null : options.storage.entries.map(([key, value]) => [key, value] as const),
 		diagnostics: options.onDiagnostic !== undefined,
+		measure: options.measure !== undefined,
 	});
 
 	return {
@@ -468,7 +491,11 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 			const id = nextId++;
 			return new Promise((resolve, reject) => {
 				pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-				dispatch({ ...header, k: "call", id, name, args });
+				dispatch(
+					options.measure === undefined
+						? { ...header, k: "call", id, name, args }
+						: { ...header, k: "call", id, name, args, t: measureNow() }
+				);
 			});
 		},
 		send<Name extends keyof Commands & string>(name: Name, ...args: Args<Commands[Name]>): number {
@@ -478,7 +505,11 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 			if (spec?.kind !== "send") throw new TypeError(`room worker command ${name} is not a send command`);
 			spec.validate?.(...(args as never[]));
 			const id = nextId++;
-			dispatch({ ...header, k: "send", id, name, args });
+			dispatch(
+				options.measure === undefined
+					? { ...header, k: "send", id, name, args }
+					: { ...header, k: "send", id, name, args, t: measureNow() }
+			);
 			return id;
 		},
 		latest: (stream) => latestValues.get(stream),

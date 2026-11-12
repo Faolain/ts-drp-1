@@ -83,6 +83,15 @@ export interface GridRoomWorkerControl {
 }
 
 /**
+ * Where a movement's time goes between the page and the worker (ms):
+ * - `moveHop`: the page posting a move to the worker handling it (its queue included);
+ * - `transientPacing`: the worker holding an emitted transient value for the page's frame credit;
+ * - `transientHop`: the worker sending a transient value to the page handling it;
+ * - `transientFrameWait`: the page handling a transient value to its rendering frame.
+ */
+export type GridRoomWorkerLatencyStage = "moveHop" | "transientPacing" | "transientHop" | "transientFrameWait";
+
+/**
  * One message kind's share of the library cost: its handlings and posts, and what it spent in frames
  * whose library cost exceeded half a millisecond.
  */
@@ -101,6 +110,7 @@ export interface GridRoomWorkerMeter {
 		render: readonly number[];
 		dropped: number;
 		kinds: Readonly<Record<string, GridRoomWorkerMeterKind>>;
+		latency: Readonly<Record<GridRoomWorkerLatencyStage, readonly number[]>>;
 	}>;
 	reset(): void;
 }
@@ -173,6 +183,17 @@ function createBridgeMeter(): BridgeMeter {
 	type Kind = { count: number; totalMs: number; maxMs: number; heavyFrames: number; heavyMs: number };
 	const kinds = new Map<string, Kind>();
 	const frameKinds = new Map<string, number>();
+	const latency: Record<GridRoomWorkerLatencyStage, number[]> = {
+		moveHop: [],
+		transientPacing: [],
+		transientHop: [],
+		transientFrameWait: [],
+	};
+	const sample = (stage: GridRoomWorkerLatencyStage, ms: number): void => {
+		if (latency[stage].length < METER_FRAME_LIMIT) latency[stage].push(Math.max(0, ms));
+	};
+	// When the newest unrendered transient value was handled (timeOrigin + now), for the frame wait.
+	let transientReceivedAt: number | undefined;
 	const charge = (kind: string, ms: number): void => {
 		library += ms;
 		let entry = kinds.get(kind);
@@ -225,19 +246,41 @@ function createBridgeMeter(): BridgeMeter {
 		render(draw) {
 			renderInMessage += timed(draw);
 		},
-		renderFrame: (callback) => (time) => void timed(() => callback(time)),
+		renderFrame: (callback) => (time) => {
+			if (transientReceivedAt !== undefined) {
+				sample("transientFrameWait", performance.timeOrigin + performance.now() - transientReceivedAt);
+				transientReceivedAt = undefined;
+			}
+			timed(() => callback(time));
+		},
+		stream(name, emittedAt, sentAt, receivedAt) {
+			if (name !== "transient") return;
+			sample("transientPacing", sentAt - emittedAt);
+			sample("transientHop", receivedAt - sentAt);
+			transientReceivedAt = receivedAt;
+		},
+		command(name, postedAt, handledAt) {
+			if (name === "move") sample("moveHop", handledAt - postedAt);
+		},
 		control: {
 			read: () => ({
 				library: [...libraryFrames],
 				render: [...renderFrames],
 				dropped,
 				kinds: Object.fromEntries([...kinds].map(([kind, entry]) => [kind, { ...entry }])),
+				latency: {
+					moveHop: [...latency.moveHop],
+					transientPacing: [...latency.transientPacing],
+					transientHop: [...latency.transientHop],
+					transientFrameWait: [...latency.transientFrameWait],
+				},
 			}),
 			reset: () => {
 				libraryFrames.length = 0;
 				renderFrames.length = 0;
 				kinds.clear();
 				frameKinds.clear();
+				for (const values of Object.values(latency)) values.length = 0;
 				dropped = 0;
 			},
 		},

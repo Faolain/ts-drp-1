@@ -103,7 +103,12 @@ interface Stream {
 	pending: boolean;
 	value: unknown;
 	transfer: Transferable[];
+	/** When the pending value was emitted (measurement only). */
+	emittedAt: number;
 }
+
+/** Milliseconds since the epoch, comparable between the page and its worker (measurement only). */
+const measureNow = (): number => performance.timeOrigin + performance.now();
 
 interface HostPending {
 	resolve(value: unknown): void;
@@ -136,7 +141,9 @@ export function createRoomWorkerServer(options: RoomWorkerServerOptions): RoomWo
 	const waiting: PageMessage[] = [];
 	const streams = new Map<string, Stream>();
 	for (const name of Object.keys(app.contract.streams))
-		streams.set(name, { credit: true, pending: false, value: undefined, transfer: [] });
+		streams.set(name, { credit: true, pending: false, value: undefined, transfer: [], emittedAt: 0 });
+	// The page measures bridge latency (its meter is on): streams and commands carry their times.
+	let measure = false;
 	const hostPending = new Map<number, HostPending>();
 	let nextHostCall = 1;
 	let nextAbort = 1;
@@ -176,7 +183,12 @@ export function createRoomWorkerServer(options: RoomWorkerServerOptions): RoomWo
 		const transfer = entry.transfer;
 		entry.pending = false;
 		entry.transfer = [];
-		post({ ...header(), k: "stream", name, value: entry.value }, transfer);
+		post(
+			measure
+				? { ...header(), k: "stream", name, value: entry.value, t: [entry.emittedAt, measureNow()] }
+				: { ...header(), k: "stream", name, value: entry.value },
+			transfer
+		);
 	};
 	// Read-your-writes: before a call's result, the page gets every stream value pending now.
 	const flush = (): void => {
@@ -292,6 +304,7 @@ export function createRoomWorkerServer(options: RoomWorkerServerOptions): RoomWo
 				entry.value = value;
 				entry.transfer = transfer;
 				entry.pending = true;
+				if (measure) entry.emittedAt = measureNow();
 				if (entry.credit) {
 					entry.credit = false;
 					sendStream(stream, entry);
@@ -323,6 +336,8 @@ export function createRoomWorkerServer(options: RoomWorkerServerOptions): RoomWo
 
 	// --- commands --------------------------------------------------------------------------------
 	const command = (message: Extract<PageMessage, { k: "call" | "send" }>): void => {
+		if (measure && message.t !== undefined)
+			post({ ...header(), k: "measure", name: `command:${message.name}`, value: [message.t, measureNow()] });
 		const refuse = (error: unknown): void => {
 			flush();
 			if (message.k === "call")
@@ -463,6 +478,7 @@ export function createRoomWorkerServer(options: RoomWorkerServerOptions): RoomWo
 			const message = parsePageMessage(event.data, candidate as number);
 			if (message?.k !== "init") return;
 			session = candidate as number;
+			measure = message.measure;
 			if ((options.missing ?? []).length > 0) {
 				post({ p: ROOM_WORKER_PROTOCOL, s: 0, k: "booted", missing: options.missing ?? [] });
 				closed = true;
