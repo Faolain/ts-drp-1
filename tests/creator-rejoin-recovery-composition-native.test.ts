@@ -23,6 +23,30 @@ const message = (clientOperationId: string) => ({action: "message", clientOperat
 const fixture = () => chatSharesRoomFixture({members: ["genesis"], format: "window",
 	genesisStateBytes: createShippingChatWindowGenesisStateBytes});
 
+/**
+ * peer-1's unconsumed hand-back records and frontier-resolved entries (read after unresolvedAcceptedWork(),
+ * which awaits the drain). A retained move the creator's signed frontier in the installed checkpoint proves
+ * never admitted (v3-live frontierRetainedResolution: its epoch is closed, it is above the frontier's
+ * terminalThrough and fence-guarded, and the author has been a member continuously since before it) is no
+ * longer unknown: its row is resolved with a signed expiry (sourceResolutionKind "frontier") and its move
+ * is handed back to the application exactly once, in a durable record kept until the move is reissued.
+ * @param f - The room fixture.
+ * @returns The hand-backs (clientOperationId and source epoch) and the frontier-resolved entries.
+ */
+async function frontierHandBacks(f: Awaited<ReturnType<typeof fixture>>) {
+	const store = await createNodeV3RoomStorageHost({directory: f.directory, initialization: () => "reopen"}).openIssuance("peer-1");
+	try {
+		const plan = await store.readSettlementPlan({objectId: f.objectId, author: f.identities[1]!.author});
+		return {
+			handBacks: (plan?.handBacks ?? []).filter(record => record.reissueSequence === null).map(record => ({
+				sourceSequence: record.sourceSequence, sourceEpoch: record.sourceEpoch,
+				clientOperationId: (decodeCanonical(record.exactCanonicalOperationBytes) as Record<string, unknown>).clientOperationId})),
+			resolved: (plan?.entries ?? []).filter(entry => entry.sourceResolutionKind === "frontier").map(entry => ({
+				sourceSequence: entry.sourceSequence, disposition: entry.disposition, signed: entry.sourceResolutionDigest?.byteLength})),
+		};
+	} finally {await store.close();}
+}
+
 describe("native recovery across ordinary and checkpoint histories", () => {
 	it.each([{targets: [1, 3, 5, 7]}, {targets: [2, 3, 5, 7]}, {targets: [1, 2, 4, 5, 7, 9]},
 		{targets: [1, 2, 3, 4, 5]}])("preserves install history $targets", async ({targets}) => {
@@ -110,25 +134,47 @@ describe("native recovery across ordinary and checkpoint histories", () => {
 		await creator.room.issue({action: "acl", kind: "revoke", group: "writer", target: f.identities[1]!.author});
 		expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();
 		await f.install(member);
+		const omitted = (await f.issuedAfter(1, committed.commit.authorSequence)).find(row =>
+			JSON.stringify(decodeCanonical(row.commit.envelope.canonicalPreimageBytes)).includes("omitted-before-revocation"))!;
+		// Revoking only Writer leaves a genesis-admin a member, so the creator's frontier keeps its
+		// admissionEpoch (0) and proves the omitted row never admitted: epoch 0 is closed, terminalThrough is
+		// the committed row's sequence and the omitted row is the next one. A genesis member's revocation
+		// removes it from the frontier, and after same-key readmission its pre-removal row belongs to an
+		// older incarnation (admissionEpoch 2): nothing proves it, so it stays unknown.
+		const provable = role === "genesis-admin";
 		const unknown = await member.room.unresolvedAcceptedWork();
-		expect(unknown).toMatchObject([{commitment: "unknown", operations: [message("omitted-before-revocation")]}]);
-		expect(unknown).toHaveLength(1);
+		const given = await frontierHandBacks(f);
+		if (provable) {
+			expect(unknown).toEqual([]);
+			expect(given).toEqual({
+				handBacks: [{sourceSequence: omitted.commit.authorSequence, sourceEpoch: 0, clientOperationId: "omitted-before-revocation"}],
+				resolved: [{sourceSequence: omitted.commit.authorSequence, disposition: "expire", signed: 32}]});
+		} else {
+			expect(unknown).toMatchObject([{sourceSequence: omitted.commit.authorSequence, commitment: "unknown",
+				operations: [message("omitted-before-revocation")]}]);
+			expect(unknown).toHaveLength(1);
+			expect(given).toEqual({handBacks: [], resolved: []});
+		}
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("omitted-before-revocation");
 		const store = await createNodeV3RoomStorageHost({directory: f.directory, initialization: () => "reopen"}).openIssuance("peer-1");
 		try {const plan = await store.readSettlementPlan({objectId: f.objectId, author: f.identities[1]!.author});
 			const completed = plan?.entries.find(entry => entry.sourceSequence === committed.commit.authorSequence);
 			expect(completed).toMatchObject({disposition: "committed", replacementSequence: null});
 			expect(completed?.sourceContextDigest).toHaveLength(32);
 			expect(completed?.sourceResolutionDigest).toHaveLength(32);
-			expect(plan?.sourceContexts).toHaveLength(2);}
+			// The retained source context and the completion proof; a frontier resolution adds its signed expiry.
+			expect(plan?.sourceContexts).toHaveLength(provable ? 3 : 2);}
 		finally {await store.close();}
 		await f.stop(member); member = await f.open(1, {reopen: true, promote: true});
 		expect(await member.room.unresolvedAcceptedWork()).toEqual(unknown);
+		expect((await frontierHandBacks(f)).handBacks).toEqual(given.handBacks);
 		await expect(member.room.issue(message("revoked-cannot-write"))).rejects.toThrow();
 		await creator.room.issue({action: "acl", kind: "grant", group: "writer", target: f.identities[1]!.author});
 		expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();
 		await f.install(member);
 		await member.room.issue(message("fresh-after-completion-readmission"));
 		expect(await member.room.unresolvedAcceptedWork()).toEqual(unknown);
+		expect((await frontierHandBacks(f)).handBacks).toEqual(given.handBacks);
 		const later = await f.issuedAfter(1, committed.commit.authorSequence);
 		for (const row of later) expect(JSON.stringify(decodeCanonical(row.commit.envelope.canonicalPreimageBytes))).not.toContain("committed-before-revocation");
 	}, 120_000);
@@ -392,13 +438,19 @@ describe("native recovery across ordinary and checkpoint histories", () => {
 		} else await expect(afterReopen).rejects.toThrow(/V3_ROOM_NOT_YET_CURRENT/u);
 		expect(member.room.authority()?.epoch).toBe(2);
 		const unresolved = await member.room.unresolvedAcceptedWork();
-		// The held move was signed in the installed epoch (never in the stale one), so only the move
-		// from before the interrupted install is unresolved.
-		expect(unresolved.flatMap(row => row.operations).map(operation => Reflect.get(operation as object, "clientOperationId")))
-			.toEqual(["accepted-before-intent"]);
+		// The held move was signed in the installed epoch (never in the stale one), so only the move from
+		// before the interrupted install was retained. The creator never received it: the frontier of the
+		// recovered epoch-2 checkpoint (terminalThrough null, the author's epoch-0 fence before it) proves it
+		// never admitted, so it is handed back, not left unknown, and the obsolete source is never reused.
+		expect(unresolved).toEqual([]);
+		const given = await frontierHandBacks(f);
+		expect(given.handBacks).toMatchObject([{sourceEpoch: 0, clientOperationId: "accepted-before-intent"}]);
+		expect(given.resolved).toMatchObject([{sourceSequence: given.handBacks[0]?.sourceSequence, disposition: "expire", signed: 32}]);
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("accepted-before-intent");
 		await f.stop(member); member = await f.open(1, {reopen: true, promote: true, ...hold});
 		expect(member.room.authority()?.epoch).toBe(2);
 		expect(await member.room.unresolvedAcceptedWork()).toEqual(unresolved);
+		expect((await frontierHandBacks(f)).handBacks).toEqual(given.handBacks);
 		const fresh = member.room.issue(message("fresh-after-second-reopen"));
 		if (phase === "source-custody") await fresh;
 		else await expect(fresh).rejects.toThrow(/V3_ROOM_NOT_YET_CURRENT/u);
