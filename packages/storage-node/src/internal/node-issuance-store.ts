@@ -1071,7 +1071,7 @@ class NodeIssuanceImplementation {
 			issuanceReadCounts[kind].fullReads += 1;
 			return read();
 		};
-		if (true || !this.#memoReserved()) return full();
+		if (!this.#memoReserved()) return full();
 		const memo = this.#censusMemo;
 		memo.begin(this.#database);
 		try {
@@ -1083,7 +1083,7 @@ class NodeIssuanceImplementation {
 	// The same, opening its own read transaction (for reads that run as single statements).
 	// `read(opened)`: opened is true when this call opened the transaction the read runs in.
 	#memoTransaction<T>(kind: IssuanceReadKind, key: string, read: (opened: boolean) => T): T {
-		if (true || !this.#memoReserved() || (this.#database as { isTransaction?: boolean }).isTransaction === true) {
+		if (!this.#memoReserved() || (this.#database as { isTransaction?: boolean }).isTransaction === true) {
 			issuanceReadCounts[kind].reads += 1;
 			issuanceReadCounts[kind].fullReads += 1;
 			return read(false);
@@ -1806,86 +1806,86 @@ class NodeIssuanceImplementation {
 			this.#database.exec("BEGIN");
 			const pageKey = JSON.stringify([parsed.scope ?? null, parsed.afterKey, parsed.limit]);
 			const page = this.#memoLoad("page", pageKey, () => {
-			const lineageRows = iterateSqliteRows(
-				statement(this.#database, "SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages")
-			);
-			// Even unused foreign lineages remain part of global validation.
-			for (const raw of lineageRows) {
-				const row = copyLineageRow(raw);
-				if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
-			}
-			const issuedRows = iterateSqliteRows(
-				statement(
+				const lineageRows = iterateSqliteRows(
+					statement(this.#database, "SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages")
+				);
+				// Even unused foreign lineages remain part of global validation.
+				for (const raw of lineageRows) {
+					const row = copyLineageRow(raw);
+					if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
+				}
+				const issuedRows = iterateSqliteRows(
+					statement(
+						this.#database,
+						"SELECT i.object_id,i.author,i.author_sequence,i.canonical_preimage,i.digest,i.signature," +
+							"o.digest AS outbox_digest,o.publish_state,l.next AS lineage_next,l.exhausted AS lineage_exhausted," +
+							"l.pruned_through_author_sequence AS lineage_watermark FROM issued_records AS i " +
+							"LEFT JOIN issuance_outbox AS o ON o.object_id=i.object_id AND o.author=i.author AND o.author_sequence=i.author_sequence " +
+							"LEFT JOIN lineages AS l ON l.object_id=i.object_id AND l.author=i.author"
+					)
+				);
+				const records: { issued: NativeIssuedRow; publishState: "pending" | "published" }[] = [];
+				for (const raw of issuedRows) {
+					const issued = copyIssuedRow(raw);
+					if (issued === undefined) throw this.#latchCorruption("stored issued record is malformed");
+					const row = copyOutboxRow({
+						object_id: raw.object_id,
+						author: raw.author,
+						author_sequence: raw.author_sequence,
+						digest: raw.outbox_digest,
+						publish_state: raw.publish_state,
+					});
+					if (row === undefined) throw this.#latchCorruption("stored outbox row is malformed");
+					if (!bytesEqual(issued.digest, row.digest)) {
+						throw this.#latchCorruption("outbox has no matching issued record");
+					}
+					const lineage = copyLineageRow({
+						object_id: raw.object_id,
+						author: raw.author,
+						next: raw.lineage_next,
+						exhausted: raw.lineage_exhausted,
+						pruned_through_author_sequence: raw.lineage_watermark,
+					});
+					if (
+						lineage === undefined ||
+						!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
+						durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
+					) {
+						throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
+					}
+					const key = this.#issuedKey(issued);
+					if (
+						(parsed.scope !== undefined && !this.#sameScope(issued, parsed.scope)) ||
+						(parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(key, parsed.afterKey) <= 0)
+					)
+						continue;
+					// SQLite BINARY order is not the shared UTF-16 order. Select the
+					// smallest requested page without retaining or sorting all history.
+					let low = 0,
+						high = records.length;
+					while (low < high) {
+						const middle = Math.floor((low + high) / 2);
+						const prior = records[middle];
+						if (prior === undefined) throw new Error("outbox page selection changed");
+						if (compareDurableIssuanceCompoundKeys(this.#issuedKey(prior.issued), key) < 0) low = middle + 1;
+						else high = middle;
+					}
+					if (low < parsed.limit) {
+						records.splice(low, 0, { issued, publishState: row.publishState });
+						if (records.length > parsed.limit) records.pop();
+					}
+				}
+				const orphan = configuredStatement(
 					this.#database,
-					"SELECT i.object_id,i.author,i.author_sequence,i.canonical_preimage,i.digest,i.signature," +
-						"o.digest AS outbox_digest,o.publish_state,l.next AS lineage_next,l.exhausted AS lineage_exhausted," +
-						"l.pruned_through_author_sequence AS lineage_watermark FROM issued_records AS i " +
-						"LEFT JOIN issuance_outbox AS o ON o.object_id=i.object_id AND o.author=i.author AND o.author_sequence=i.author_sequence " +
-						"LEFT JOIN lineages AS l ON l.object_id=i.object_id AND l.author=i.author"
-				)
-			);
-			const records: { issued: NativeIssuedRow; publishState: "pending" | "published" }[] = [];
-			for (const raw of issuedRows) {
-				const issued = copyIssuedRow(raw);
-				if (issued === undefined) throw this.#latchCorruption("stored issued record is malformed");
-				const row = copyOutboxRow({
-					object_id: raw.object_id,
-					author: raw.author,
-					author_sequence: raw.author_sequence,
-					digest: raw.outbox_digest,
-					publish_state: raw.publish_state,
-				});
-				if (row === undefined) throw this.#latchCorruption("stored outbox row is malformed");
-				if (!bytesEqual(issued.digest, row.digest)) {
-					throw this.#latchCorruption("outbox has no matching issued record");
-				}
-				const lineage = copyLineageRow({
-					object_id: raw.object_id,
-					author: raw.author,
-					next: raw.lineage_next,
-					exhausted: raw.lineage_exhausted,
-					pruned_through_author_sequence: raw.lineage_watermark,
-				});
-				if (
-					lineage === undefined ||
-					!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
-					durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
-				) {
-					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
-				}
-				const key = this.#issuedKey(issued);
-				if (
-					(parsed.scope !== undefined && !this.#sameScope(issued, parsed.scope)) ||
-					(parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(key, parsed.afterKey) <= 0)
-				)
-					continue;
-				// SQLite BINARY order is not the shared UTF-16 order. Select the
-				// smallest requested page without retaining or sorting all history.
-				let low = 0,
-					high = records.length;
-				while (low < high) {
-					const middle = Math.floor((low + high) / 2);
-					const prior = records[middle];
-					if (prior === undefined) throw new Error("outbox page selection changed");
-					if (compareDurableIssuanceCompoundKeys(this.#issuedKey(prior.issued), key) < 0) low = middle + 1;
-					else high = middle;
-				}
-				if (low < parsed.limit) {
-					records.splice(low, 0, { issued, publishState: row.publishState });
-					if (records.length > parsed.limit) records.pop();
-				}
-			}
-			const orphan = configuredStatement(
-				this.#database,
-				"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
-					"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
-					"WHERE i.object_id IS NULL LIMIT 1"
-			).get();
-			if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
-			return records.map(({ issued, publishState }) => ({
-				commit: cloneDurableIssueCommit(issuedCommit(issued)),
-				publishState,
-			}));
+					"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
+						"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
+						"WHERE i.object_id IS NULL LIMIT 1"
+				).get();
+				if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
+				return records.map(({ issued, publishState }) => ({
+					commit: cloneDurableIssueCommit(issuedCommit(issued)),
+					publishState,
+				}));
 			});
 			this.#database.exec("COMMIT");
 			return page;
