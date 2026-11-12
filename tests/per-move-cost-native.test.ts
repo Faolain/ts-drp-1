@@ -24,7 +24,7 @@
 // prepare, so the per-connection statement cache stays native), and the canonical codec's public
 // call counts and bytes (@ts-drp/canonical/instrumentation: every importer, dist packages included),
 // Ed25519 verifications computed or answered by the exact-byte memo (@ts-drp/protocol-v3/instrumentation,
-// source and dist instances),
+// source and dist instances; those made by the own-fence row authentication are also counted apart),
 // bytes hashed (SHA-256 updates: @noble/hashes HashMD, the codec's hash, and node:crypto Hash) and rows read.
 //
 // PERMOVE_TIMING=1 installs NO seam at all and reports process CPU (user+system) and wall time of the
@@ -200,7 +200,15 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 			["source", observeEd25519Verifications],
 			["dist", distVerifications],
 		] as const) {
-			observe((outcome) => bump(`${outcome === "computed" ? "verify" : "verifyMemo"}.${instance}`));
+			observe((outcome) => {
+				bump(`${outcome === "computed" ? "verify" : "verifyMemo"}.${instance}`);
+				// Reported, not asserted: the share made by scanOwnFences' own-fence row authentication.
+				const limit = Error.stackTraceLimit;
+				Error.stackTraceLimit = 80;
+				const stack = new Error().stack ?? "";
+				Error.stackTraceLimit = limit;
+				if (stack.includes("authenticateOwnFenceRow")) bump(outcome === "computed" ? "fenceVerify" : "fenceVerifyMemo");
+			});
 			restores.push(() => observe(undefined));
 		}
 		// Bytes hashed: every SHA-256 update of the codec's @noble/hashes (the ESM instance every
@@ -376,6 +384,8 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		verifies: (per["verify.source"] ?? 0) + (per["verify.dist"] ?? 0),
 		verifiesDist: per["verify.dist"] ?? 0,
 		verifyMemoHits: (per["verifyMemo.source"] ?? 0) + (per["verifyMemo.dist"] ?? 0),
+		ownFenceVerifies: per.fenceVerify ?? 0,
+		ownFenceVerifyMemoHits: per.fenceVerifyMemo ?? 0,
 	});
 	const WRITER_MOVE = ["writer.issue", "creator.admit"];
 	// The creator issues nothing; anything it publishes back is delivered and counted in writer.receive.
