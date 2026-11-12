@@ -79,17 +79,18 @@ it("never resolves retained work on an own fence row whose signature does not ve
 	expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("offline-accepted");
 }, 120_000);
 
-// RED. Between installs, a drain rescans the own fence rows (scanOwnFences) without the install's
+// Between installs, a drain rescans the own fence rows (scanOwnFences) without the install's
 // authentication. A re-admitted member (admissionEpoch 2) issues a move at epoch 2 and the creator admits
-// it. Its fence stays withheld (the earlier incarnation's move is unknown retained work), so epoch 2 has
-// no own fence. The creator's frontier stays terminalThrough null: contiguity from slot 0 never reaches
-// this move. After a skip install the move is retained and unprovable ("displaced", not guarded), which
-// is correct: it was admitted. Then the stored preimage of the member's own epoch-0 fence is rewritten to
-// claim epoch 2, mid-session (the digest and signature bytes are left as they were, so they no longer
-// match). The next drain reads that unauthenticated row as an epoch-2 fence before the move, classifies
-// the admitted move "never-admitted", signs an expiry and hands the move back. Reissuing it applies the
-// move twice. Expected: no decision rests on the forged row (refuse, or leave the move retained), and the
-// move is applied at most once.
+// it. Before ce972d7f its epoch-2 fence was withheld (the earlier incarnation's move is unknown retained
+// work), the move stayed unprovable after a skip install, and a forged epoch-2 fence below it (the
+// member's epoch-0 fence rewritten mid-session) made the next drain classify the admitted move
+// "never-admitted", sign an expiry and hand it back: reissuing it applied it twice (the G5 RED).
+// Since ce972d7f the epoch-2 install fences over the earlier incarnation's work before the move (the
+// move is held until it does), so the creator's frontier proves the move committed at the skip install,
+// before any forgery. This stays as the end-to-end guard: the forgery, whatever it claims, changes no
+// decision (the plan is unchanged, nothing is handed back, the move is applied once) and the next reopen
+// still replays and authenticates every own row. The decisive check that every reported own fence row
+// is authenticated, independent of call order, is own-fence-scan-authentication-native.
 it("never hands back an admitted move on an own fence row forged mid-session", async () => {
 	const f = await chatSharesRoomFixture({members: ["genesis"], format: "window",
 		genesisStateBytes: createShippingChatWindowGenesisStateBytes});
@@ -101,13 +102,21 @@ it("never hands back an admitted move on an own fence row forged mid-session", a
 	await f.install(member);
 	await creator.room.issue({action: "acl", kind: "grant", group: "writer", target: author});
 	expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();
+	// Everything the readmitted member signs from its epoch-2 install on: since ce972d7f that install
+	// (its drain) fences over the earlier incarnation's unprovable work, and the move depends on that
+	// fence, so the creator is offered both, in order, as the member's own outbox publishes them.
+	const before = required((await f.issuedAfter(1, null)).at(-1)).commit.authorSequence;
 	await f.install(member);
 	expect(member.room.authority().epoch).toBe(2);
-	const before = required((await f.issuedAfter(1, null)).at(-1)).commit.authorSequence;
 	await member.room.issue(message("after-readmission"));
-	const moved = required((await f.issuedAfter(1, before)).find(row =>
+	const epoch2 = await f.issuedAfter(1, before);
+	const moved = required(epoch2.find(row =>
 		JSON.stringify(decodeCanonical(row.commit.envelope.canonicalPreimageBytes)).includes("after-readmission")));
-	expect(await creator.receive(await f.issuedAfter(1, before), 1, 10_000)).toBe(true);
+	console.error(`OWN_FENCE_EPOCH2 ${JSON.stringify(epoch2.map(row => {
+		const value = decodeCanonical(row.commit.envelope.canonicalPreimageBytes) as {epoch: number; authorSequence: number; operation?: Record<string, unknown>};
+		return [value.authorSequence, value.epoch, value.operation?.action, value.operation?.fenceSequence ?? null];
+	}))}`);
+	expect(await creator.receive(epoch2, 1, 10_000)).toBe(true);
 	const applied = () => creator.room.projection().messages.filter(row => row.clientOperationId === "after-readmission").length;
 	expect(applied(), "the creator admitted the move at epoch 2").toBe(1);
 	for (let step = 0; step < 2; step++) {expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();}
@@ -117,10 +126,18 @@ it("never hands back an admitted move on an own fence row forged mid-session", a
 		const store = await createNodeV3RoomStorageHost({directory: f.directory, initialization: () => "reopen"}).openIssuance("peer-1");
 		try {return await store.readSettlementPlan({objectId: f.objectId, author});} finally {await store.close();}
 	};
-	// Unprovable before the forgery: it stays retained, nothing handed back.
+	// Before the forgery: the creator's frontier proved the admitted move committed (the epoch-2 own fence
+	// carries terminalThrough past it), so it is not retained, and nothing is handed back.
 	const unresolved = await member.room.unresolvedAcceptedWork();
-	expect(unresolved.map(row => row.sourceSequence)).toContain(moved.commit.authorSequence);
-	expect(((await plan())?.handBacks ?? []).map(record => record.sourceSequence)).not.toContain(moved.commit.authorSequence);
+	const planBefore = await plan();
+	console.error(`OWN_FENCE_BEFORE_FORGERY ${JSON.stringify({moved: moved.commit.authorSequence,
+		unresolved: unresolved.map(row => [row.sourceSequence, row.sourceEpoch, row.disposition, row.commitment]),
+		handBacks: (planBefore?.handBacks ?? []).map(record => record.sourceSequence),
+		frontierResolved: (planBefore?.entries ?? []).filter(entry => entry.sourceResolutionKind === "frontier").map(entry => entry.sourceSequence)})}`);
+	expect(unresolved.map(row => row.sourceSequence)).not.toContain(moved.commit.authorSequence);
+	expect((planBefore?.entries ?? []).filter(entry => entry.sourceSequence === moved.commit.authorSequence)
+		.map(entry => entry.sourceResolutionKind)).toEqual(["frontier"]);
+	expect((planBefore?.handBacks ?? []).map(record => record.sourceSequence)).not.toContain(moved.commit.authorSequence);
 	// Forge: the member's own epoch-0 fence now claims epoch 2 (fenceSequence = its own sequence, below the move).
 	const key = createHash("sha256").update(JSON.stringify(["issuance", "peer-1"])).digest("hex");
 	const database = new DatabaseSync(join(f.directory, `${key}.sqlite.drp-issuance-v1.sqlite`));
@@ -148,9 +165,10 @@ it("never hands back an admitted move on an own fence row forged mid-session", a
 		await member.room.issue(required(row.operations[0]), {handBack: row.handBack});
 		await creator.receive(await f.issuedAfter(1, moved.commit.authorSequence), 1, 10_000).catch(() => false);
 	}
-	expect({handBacks: given.length, frontierResolved: (after?.entries ?? []).some(entry =>
-		entry.sourceSequence === moved.commit.authorSequence && entry.sourceResolutionKind === "frontier")},
-	"no decision rests on the forged fence").toEqual({handBacks: 0, frontierResolved: false});
+	// No decision rests on the forged fence: nothing is handed back and the stored plan (every entry's
+	// disposition and resolution, and its hand-back records) is exactly what it was before the forgery.
+	expect({handBacks: given.length, listed: listed.length, plan: after}, "no decision rests on the forged fence")
+		.toEqual({handBacks: 0, listed: 0, plan: planBefore});
 	expect(applied(), "the move is applied at most once").toBe(1);
 	// The next transition that drains (a reopen) replays and authenticates every own row first.
 	await f.stop(member);
