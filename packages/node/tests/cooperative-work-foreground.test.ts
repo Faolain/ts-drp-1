@@ -166,8 +166,9 @@ describe("host-level foreground priority", () => {
 		// Rollover windows (or issue drains) back to back: each next registration starts before
 		// the previous one releases, and every segment keeps turning, so neither the idle window
 		// nor the hard bound resumes the walk. A deferred turn waits only for the cohort it
-		// found, so each released segment admits one more walk turn: STEPS turns finish within
-		// STEPS + 1 segments. Counted in segments, not time.
+		// found, so each released segment admits one more walk turn. The entry turn and each of
+		// the STEPS turns wait for one release, and this loop sees completion one segment later:
+		// at most STEPS + 2 segments. Counted in segments, not time.
 		const STEPS = 8;
 		let turns = 0;
 		const walk = runInBackgroundLane(async () => {
@@ -195,7 +196,7 @@ describe("host-level foreground priority", () => {
 		current();
 		await walk;
 		expect(turns).toBe(STEPS);
-		expect(segments).toBeLessThanOrEqual(STEPS + 1);
+		expect(segments).toBeLessThanOrEqual(STEPS + 2);
 	});
 
 	it("does not defer background work when no foreground work is registered", async () => {
