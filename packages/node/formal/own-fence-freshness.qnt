@@ -137,7 +137,7 @@ module ownFenceFreshness {
   def handedBy(r: int -> str): Set[int] = r.keys().filter(s => r.get(s) == "handBack").map(s => local.get(s).id)
   // The store covers the frontier: next > T, and with gapCheck every own sequence at or below T
   // is present.
-  def covers: bool = lnext > cT and (not(mu.gapCheck) or 0.to(cT).forall(s => present(s)))
+  def covers: bool = lnext > cT and (not(mu.gapCheck) or SEQS.forall(s => s > cT or present(s)))
 
   // Install of the creator's current successor: resolve, then sign the epoch fence at next.
   action install = all {
