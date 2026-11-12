@@ -32,8 +32,14 @@
 // carry (bounded; one refused at the bound is named to repair) and re-offers them to the same-
 // epoch successor, also after it is live.
 //
+// The carry's end: once the epoch changes, a late row of the old plane is refused and named to
+// repair (a refusing tombstone until the predecessor's last job settles), never carried across and
+// never silently dropped.
+//
 // Broken controls:
 //   snapshotOnly    - the carry is a snapshot of pending at deactivation; a row in flight is lost;
+//   noTombstone     - after the epoch-change end a late row finds no carry and is silently dropped;
+//   forwardAcrossEpoch - after the epoch-change end a late row is still carried, into the next epoch;
 //   releaseAdmitted - the successor starts without the newest admitted row;
 //   trustedCarry    - carried rows enter the successor's index directly, parents unchecked;
 //   noDedupe        - a carried row the successor already holds is admitted again;
@@ -64,8 +70,8 @@ module planeRecoveryPendingCarry {
 
   pure val MOVES = 1.to(NW)
 
-  type Mutants = { dropPending: bool, snapshotOnly: bool, releaseAdmitted: bool, trustedCarry: bool, noDedupe: bool, carryAcrossEpoch: bool }
-  pure val SOUND: Mutants = { dropPending: false, snapshotOnly: false, releaseAdmitted: false, trustedCarry: false, noDedupe: false, carryAcrossEpoch: false }
+  type Mutants = { dropPending: bool, snapshotOnly: bool, noTombstone: bool, forwardAcrossEpoch: bool, releaseAdmitted: bool, trustedCarry: bool, noDedupe: bool, carryAcrossEpoch: bool }
+  pure val SOUND: Mutants = { dropPending: false, snapshotOnly: false, noTombstone: false, forwardAcrossEpoch: false, releaseAdmitted: false, trustedCarry: false, noDedupe: false, carryAcrossEpoch: false }
   pure val BASE: Mutants = { ...SOUND, dropPending: true, snapshotOnly: true }
 
   var issued: int
@@ -100,6 +106,8 @@ module planeRecoveryPendingCarry {
   action init = initWith(SOUND)
   action initBase = initWith(BASE)
   action initSnapshotOnly = initWith({ ...SOUND, snapshotOnly: true })
+  action initNoTombstone = initWith({ ...SOUND, noTombstone: true })
+  action initForwardAcrossEpoch = initWith({ ...SOUND, forwardAcrossEpoch: true })
   action initReleaseAdmitted = initWith({ ...SOUND, releaseAdmitted: true })
   action initTrustedCarry = initWith({ ...SOUND, trustedCarry: true })
   action initNoDedupe = initWith({ ...SOUND, noDedupe: true })
@@ -169,15 +177,20 @@ module planeRecoveryPendingCarry {
 
   // A job captured by a deactivated predecessor ends (dropped before authentication, or retained
   // onto the revoked plane). SOUND collects it into the carry (refused at the bound and named to
-  // repair: LOST); snapshotOnly loses it with no hint.
+  // repair: LOST); snapshotOnly loses it with no hint. After the epoch closed (the carry's
+  // epoch-change end) SOUND's tombstone refuses it and names it to repair (LOST).
   action lateVerdict(i: int): bool = all {
-    phase != CLOSED, not(settled), stale.contains(i),
+    not(settled), stale.contains(i),
     stale' = stale.exclude(Set(i)),
-    if (mutants.snapshotOnly) all { net' = net.set(i, DROPPED), carried' = carried }
-    else if (carried.size() < MAX_PENDING) all { net' = net.set(i, ARRIVED), carried' = carried.union(Set(i)) }
-    else all { net' = net.set(i, LOST), carried' = carried },
+    if (phase == CLOSED)
+      if (mutants.noTombstone) all { net' = net.set(i, DROPPED), carried' = carried, crossEpoch' = crossEpoch }
+      else if (mutants.forwardAcrossEpoch) all { net' = net.set(i, ARRIVED), carried' = carried.union(Set(i)), crossEpoch' = true }
+      else all { net' = net.set(i, LOST), carried' = carried, crossEpoch' = crossEpoch }
+    else if (mutants.snapshotOnly) all { net' = net.set(i, DROPPED), carried' = carried, crossEpoch' = crossEpoch }
+    else if (carried.size() < MAX_PENDING) all { net' = net.set(i, ARRIVED), carried' = carried.union(Set(i)), crossEpoch' = crossEpoch }
+    else all { net' = net.set(i, LOST), carried' = carried, crossEpoch' = crossEpoch },
     issued' = issued, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, phase' = phase,
-    fifo' = fifo, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
+    fifo' = fifo, losses' = losses, recoveries' = recoveries, settled' = settled, mutants' = mutants,
   }
 
   // A copy the receiver already holds is sent again (a republication, the sweep).
@@ -226,7 +239,7 @@ module planeRecoveryPendingCarry {
   action epochClose: bool = all {
     phase == LIVE, not(settled),
     phase' = CLOSED,
-    crossEpoch' = mutants.carryAcrossEpoch and (pend.union(carried)).size() > 0,
+    crossEpoch' = (mutants.carryAcrossEpoch and (pend.union(carried)).size() > 0),
     issued' = issued, net' = net, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, carried' = carried,
     fifo' = fifo, stale' = stale, losses' = losses, recoveries' = recoveries, settled' = settled, mutants' = mutants,
   }
@@ -346,6 +359,26 @@ module planeRecoveryPendingCarry {
     .then(lateVerdict(2))
     .then(all { assert(not(heldNotDropped)), settle })
     .then(all { assert(not(allLand)), stutter })
+  // The epoch closes while w2 is still in the predecessor's FIFO: the tombstone refuses it and names
+  // it to repair (the author's settlement work in the next epoch), never carried, never dropped.
+  run tombstoneRefusesTest = init
+    .then(issue).then(capture(1))
+    .then(beginRecover).then(endRecover)
+    .then(epochClose)
+    .then(lateVerdict(1))
+    .then(all { assert(net.get(1) == LOST and carried == Set() and all_), stutter })
+  run noTombstoneDropsTest = initNoTombstone
+    .then(issue).then(capture(1))
+    .then(beginRecover).then(endRecover)
+    .then(epochClose)
+    .then(lateVerdict(1))
+    .then(all { assert(not(heldNotDropped)), stutter })
+  run forwardAcrossEpochTest = initForwardAcrossEpoch
+    .then(issue).then(capture(1))
+    .then(beginRecover).then(endRecover)
+    .then(epochClose)
+    .then(lateVerdict(1))
+    .then(all { assert(not(epochBound)), stutter })
   run carryAcrossEpochTest = initCarryAcrossEpoch
     .then(issue).then(lose(1))
     .then(issue).then(deliver(2))
