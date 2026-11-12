@@ -3541,6 +3541,7 @@ describe("CURRENT job phases reuse only identical same-schedule journal widths",
 				const ${map}; currentJobProofEnvelopeByteLengths;`, {
 				currentContinuation: inputPhases === undefined ? undefined : {nativeJobPhases: inputPhases},
 				currentContinuationAppends, nativeObservations, AHE_BOUNDED_READ_LIMITS, LIVE_JOURNAL_RETIREMENT_LIMITS,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 				capture: {journal: {canonicalRows: Uint8Array.of(seed), control: {revision: seed}}, snapshot: {}, ahe: {},
 					floorImage: {}, snapshotInventory: {scopes: [], owner: "owner"}, signingRows: [new Uint8Array(17), new Uint8Array(29)]},
 				immediateJournalAppend: {immediate: seed}, unsignedJournalSuccessor: {successor: seed},
@@ -3968,13 +3969,14 @@ describe("issuance journal postimages stay native-point bounds, not current proo
 			maintenanceEncodedWidth: (width: number) => new Uint8Array(width),
 			maintenanceCanonicalWidth: (value: unknown) => encodeCanonical(value).byteLength,
 			LIVE_JOURNAL_RETIREMENT_LIMITS,
+			CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 		});
 		expect(immediate).toEqual([101]);
 		expect(nativeObservations).toEqual([4,5,6].map((rowCount, index) => ({width: encodeCanonical({
 			control: { revision: 10 + index },
 			image: { imageDigest: "d".repeat(64), scopeCount: 3, rowCount, byteCharge: 900 + rowCount },
 			canonicalRows: new Uint8Array(300 + rowCount),
-		}).byteLength, maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes})));
+		}).byteLength, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}))); // The journal carrier's encode cap.
 		// This executes the original routing/constructor, not native lifetime or
 		// complete forecast conformance. The affected persistent-worker test owns that evidence.
 	});
@@ -5118,6 +5120,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 			turnoverControl: null,
 			closedRetirementEqual: (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b),
 			AHE_BOUNDED_READ_LIMITS: { maxUnionBytes: 262144 },
+			CLOSED_RETIREMENT_BYTES: { maxBytes: 262144, maxItems: 65_536, maxDepth: 128 },
 		});
 		expect(result.selection).toBeDefined();
 		expect(result.projected.revision).toBe(8);
@@ -5231,6 +5234,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 				finalJournalCapacity: undefined,
 				AHE_BOUNDED_READ_LIMITS,
 				LIVE_JOURNAL_RETIREMENT_LIMITS,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 				objectId: "room",
 				futureSnapshotTurnover: { retiringScopes: [snapshotScope75(3)] },
 				futureSnapshotPriorWrapperWidth: beforeWidth,

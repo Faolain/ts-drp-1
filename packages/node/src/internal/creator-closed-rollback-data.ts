@@ -14853,8 +14853,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			if (!isRecord(value)) throw new TypeError("ORDINARY_SUCCESSOR_OBSERVATION_UNAVAILABLE");
 			return record(value);
 		});
-		if (successorObservations.some((value, index) => value.byteLength > (index === 0
-			? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes : AHE_BOUNDED_READ_LIMITS.maxUnionBytes))) return undefined;
+		// Each observation is one carrier the job encodes with closedRetirementBytes: the same cap.
+		if (successorObservations.some(value => value.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes)) return undefined;
 		const successorJobs = current.successorFenceCount === 0 ? [] : [1, 2].map(index => {
 			const censusWidth = runtimeEnvelopeTerms[index]!;
 			return sum(...creatorSuccessorJobProofEnvelopePartsForSizing({base: lifetimeBase("successorJob"), unsignedPreimage: fencePreimage,
@@ -17675,7 +17675,12 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 				canonicalRows: maintenanceEncodedWidth(capacity?.canonicalRowsBytes ?? phase.canonicalRowsBytes,
 					undefined, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes),
 			});
-			nativeObservations.push({width: wrapperWidth, maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes});
+			// Each phase's wrapper is the journal observation carrier a later acquisition (the close, the
+			// adoption's settlement fence, the successor's first own move) encodes with closedRetirementBytes.
+			// The after-successor phases already carry the close's membership row, the successor's scope
+			// header, its fence and the adoption reserve fence's row, so bounding them by that encode cap is
+			// the journal headroom this admission leaves for the mandatory close/adoption rows.
+			nativeObservations.push({width: wrapperWidth, maxBytes: CLOSED_RETIREMENT_BYTES.maxBytes});
 		}
 		const manifest = decodeSnapshotManifest({
 			exactCanonicalManifestBytes: input.exactCanonicalSnapshotManifestBytes,
@@ -19029,7 +19034,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 						control: maintenanceParticipants[1],
 						image: journalImage,
 						canonicalRows: maintenanceEncodedWidth(finalJournal.canonicalRowsBytes),
-					}, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes);
+					}, CLOSED_RETIREMENT_BYTES.maxBytes); // The journal observation carrier's encode cap.
 					observe({ control: maintenanceParticipants[0], image: sourceSnapshotImage });
 					return sourceWidths;
 				};
@@ -19797,8 +19802,8 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 									snapshotInventory: { scopes: capture.snapshotInventory.scopes, owner: capture.snapshotInventory.owner },
 								}).map(maintenanceCanonicalWidth);
 								nativeObservations.push({width: phaseCensusWidth, maxBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES});
-								for (const [index, width] of observations.entries()) nativeObservations.push({width,
-									maxBytes: index === 0 ? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes : AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+								// Each observation is one carrier the job encodes with closedRetirementBytes: the same cap.
+								for (const width of observations) nativeObservations.push({width, maxBytes: CLOSED_RETIREMENT_BYTES.maxBytes});
 								// Prior local PREs may be read/authenticated as standalone source
 								// leaves despite also appearing inside the complete native census.
 								// Only the immediate PRE has genuine bytes for SAME-owner identity;
@@ -19912,7 +19917,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 								// bounds and the complete proof envelope use their original SAME-U.
 								nativeObservations.push({width: phaseCensusWidth, maxBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES});
 								for (const [index, width] of [...observations, signingControlFrame, aheControlFrame].entries())
-									nativeObservations.push({width, maxBytes: index === 0 ? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes :
+									nativeObservations.push({width, maxBytes: index === 0 ? CLOSED_RETIREMENT_BYTES.maxBytes :
 									AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
 								return maintenanceWidthSum([
 									fullFutureBase,
