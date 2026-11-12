@@ -53,7 +53,7 @@ async function room(directory: string, reopen: boolean) {
 
 /** The number of these blocks a creator alone places before the state limit refuses the next one. */
 async function capacity(): Promise<number> {
-	const fixture = await readinessHoldRoom({ writers: 0 });
+	const fixture = await readinessHoldRoom({ writers: 1 });
 	const creator = await fixture.open(0);
 	for (let ordinal = 0; ; ordinal++) {
 		try {
