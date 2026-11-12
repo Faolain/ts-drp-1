@@ -80,15 +80,21 @@ describe("D.108d1b: a restored same-author device never re-signs an admitted slo
 		const installed = await f.install(member).then(
 			() => true,
 			(error: unknown) => {
-				// Fail closed, surfaced: the settlement fence refuses before signing.
+				// Fail closed, surfaced: the install refuses once the successor (and its creator-signed
+				// frontier) authenticates, before signing.
 				expect(String((error as Error).message)).toContain("V3_LOCAL_LINEAGE_BEHIND_FRONTIER");
 				return false;
 			}
 		);
 		expect(await conflicting()).toEqual([]);
-		// The installed plane (epoch 2, authenticated frontier) refuses ordinary work too.
-		expect(member.room.authority()?.epoch).toBe(2);
-		await expect(member.room.issue(message("bob-after-install"))).rejects.toThrow(/V3_LOCAL_LINEAGE_BEHIND_FRONTIER/u);
+		// G6: the refusal comes before adoption (it used to come at the settlement fence, after the
+		// install had adopted epoch 2 and rewritten the settlement plan). The device keeps its backup's
+		// epoch and refuses ordinary work too.
+		expect(installed).toBe(false);
+		expect(member.room.authority()?.epoch ?? 0).toBe(0);
+		await expect(member.room.issue(message("bob-after-install"))).rejects.toThrow(
+			/V3_LOCAL_LINEAGE_BEHIND_FRONTIER|behind-frontier|not-active/u
+		);
 		expect(await conflicting()).toEqual([]);
 		if (installed) {
 			// Had the install proceeded without re-signing, the cold reopen (checkpoint
