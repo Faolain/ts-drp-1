@@ -15,13 +15,14 @@ import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixture
 //   delete-row: f's issued record and outbox entry deleted (write triggers bypassed), later rows kept;
 //   suffix: f and every later own row deleted and the lineage lowered to f (one store only);
 //   restore: the whole device restored from a backup taken before the epoch-1 install;
-//   restore-undelivered: as restore, but f never reached the creator.
+//   restore-undelivered: as restore, but f never reached the creator;
+//   restore-fence-only: as restore, but only f reached the creator (not m1's replacement after it).
 // For each, the probe records the reopen, the install of the creator's current successor, an issue
 // after it, and m1's fate (accepted on the creator, listed as given back, or neither).
 
 afterEach(async () => expect(await closeChatSharesRooms()).toEqual([]));
 
-type Loss = "delete-row" | "suffix" | "restore" | "restore-undelivered";
+type Loss = "delete-row" | "suffix" | "restore" | "restore-undelivered" | "restore-fence-only";
 const FENCE = "$drp.author-fence.v1";
 const message = (clientOperationId: string) => ({
 	action: "message",
@@ -81,8 +82,9 @@ async function probe(loss: Loss) {
 	});
 	log("epoch-1-fence", fence === undefined ? null : describeRow(fence));
 	const epoch1 = rows1.filter((row) => preimageOf(row).epoch === 1);
-	if (loss !== "restore-undelivered" && epoch1.length > 0)
-		log("creator-receives-epoch-1-rows", await creator.receive(epoch1, 1));
+	const delivered = loss === "restore-fence-only" ? epoch1.filter((row) => row === fence) : epoch1;
+	if (loss !== "restore-undelivered" && delivered.length > 0)
+		log("creator-receives-epoch-1-rows", { rows: delivered.map(describeRow), accepted: await creator.receive(delivered, 1) });
 	await f.stop(member);
 	expect((await creator.room.sealEpoch()).ok).toBe(true);
 	await creator.room.adoptCreatorSuccessor();
@@ -133,6 +135,7 @@ async function probe(loss: Loss) {
 	const current = after.filter((row) => preimageOf(row).epoch === (creator.room.authority()?.epoch ?? 0));
 	if (current.length > 0) log("creator-receives-current", await creator.receive(current, 1, 20_000));
 	log("creator-accepted-m1-final", acceptedOperation(creator, author, "m1"));
+	log("creator-accepted-m2-final", acceptedOperation(creator, author, "m2"));
 	const status = member.room.settlementStatus?.();
 	const givenBack = (status?.undelivered ?? []).some((entry) =>
 		entry.operations.some((operation) => operation.clientOperationId === "m1")
@@ -146,7 +149,7 @@ function acceptedOperation(peer: { room: { projection(): unknown } }, _author: s
 	return JSON.stringify(peer.room.projection()).includes(`"${id}"`);
 }
 
-it.each(["delete-row", "suffix", "restore", "restore-undelivered"] as const)(
+it.each(["delete-row", "suffix", "restore", "restore-undelivered", "restore-fence-only"] as const)(
 	"G6 probe: own fence lost by %s",
 	async (loss) => {
 		const result = await probe(loss);
