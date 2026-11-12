@@ -783,6 +783,9 @@ export function createV3ZoneApi(
 						epoch: context.epoch,
 						objectId: context.objectId,
 						maxEntries: PARAMETERS.maxEpochVertices,
+						...(context.maxApplicationStateBytes === undefined
+							? {}
+							: { maxApplicationStateBytes: context.maxApplicationStateBytes }),
 						...(context.authenticatedApplicationStateBytes === undefined
 							? {}
 							: { authenticatedApplicationStateBytes: context.authenticatedApplicationStateBytes }),

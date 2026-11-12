@@ -375,6 +375,15 @@ const PROVENANCE_KEYS = [
 	"signerSetDigest",
 ] as const;
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
+/**
+ * The room's reviewed application state limit, in canonical bytes (with at most 16,384 items and
+ * depth 16). No room's parameters declare a limit, so every room takes 32,768 bytes: the bound the
+ * room's genesis and migration checks and the shipped applications' own state bounds already state.
+ * The plane's fold machine carries it, and admission refuses any vertex whose fold would pass it
+ * (`applicationStateAdmits`), so a seal's fold never refuses. maxSnapshotBytes bounds the snapshot
+ * carrier, not the state.
+ */
+export const ROOM_APPLICATION_STATE_BYTES = 32_768;
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
@@ -778,7 +787,8 @@ export type V3LocalIssueResult =
 				| "issuance-rejected"
 				| "admission-rejected"
 				| "journal-rejected"
-				| "graph-rejected";
+				| "graph-rejected"
+				| "application-state-limit";
 			readonly detail: string;
 	  }>;
 
@@ -4714,7 +4724,7 @@ function resolveOrdinaryIssuanceRuntimeHold(value: unknown, owners: CreatorSnaps
 				...(typeof action === "string" ? {action} : {}), control}),
 			blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 				exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
 				catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 					runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 					canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -8425,6 +8435,21 @@ async function handleV3IngressWithSource(
 				);
 	if (reservation === null) {
 		ingressFailureLog("admission-rejected");
+		return false;
+	}
+	if (
+		!alreadyAccepted &&
+		!controlOperation &&
+		!applicationStateAdmits(registration, {
+			digest: authenticated.digest,
+			author: authenticated.author,
+			dependencies: authenticated.vertex.dependencies,
+			operation: authenticated.vertex.operation as Readonly<Record<string, unknown>>,
+			byteCharge: authenticated.byteCharge,
+		})
+	) {
+		releaseOperationReservation(reservation);
+		ingressFailureLog("admission-rejected", "application-state-limit");
 		return false;
 	}
 	let maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined;
@@ -12769,7 +12794,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		parameters: ObjectFreeze({...registration.payload.parameters}),
 		blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 			exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-			maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
 			catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 				runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 				canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -16421,6 +16446,19 @@ async function issueOneVertex(
 	const admittedFrontier = localAdmittedFrontier(registration, scope);
 	let commit: unknown;
 	let capacityRejected = false;
+	let stateLimitRejected = false;
+	const stateBoundAdmits = (bytes: Uint8Array, author: string): boolean => {
+		if (controlOperation) return true;
+		const unsigned = decodeCanonical(bytes);
+		const unsignedDependencies = ownDataValue(unsigned, "dependencies");
+		return applicationStateAdmits(registration, {
+			digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+			author,
+			dependencies: ArrayIsArray(unsignedDependencies) ? (unsignedDependencies as string[]) : [],
+			operation,
+			byteCharge: bytes.byteLength,
+		});
+	};
 	let cryptoEntered = false;
 	let signerResolved = false;
 	let terminalTransactionStarted = false;
@@ -16496,6 +16534,10 @@ async function issueOneVertex(
 										capacityRejected = true;
 										throw new TypeError("v3 local issue graph is at capacity");
 									}
+									if (!stateBoundAdmits(bytes, selectedScope.author)) {
+										stateLimitRejected = true;
+										throw new TypeError("v3 local operation would pass the room's application state limit");
+									}
 									if (registration.creatorMaintenanceBound) {
 										const consumer = registration.creatorMaintenanceAdmission;
 										if (consumer === undefined || maintenanceAdmission !== undefined)
@@ -16534,6 +16576,10 @@ async function issueOneVertex(
 					) {
 						capacityRejected = true;
 						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					if (candidateRow !== undefined && !stateBoundAdmits(candidateRow.canonicalPreimageBytes, selectedScope.author)) {
+						stateLimitRejected = true;
+						throw new TypeError("v3 local operation would pass the room's application state limit");
 					}
 					return candidateCommit;
 				};
@@ -16629,7 +16675,7 @@ async function issueOneVertex(
 			if (issuanceOutcomeUnknown || cryptoEntered) {
 				// Durable entered debt is not disproved by this callback's entry count.
 				registration.operationAdmissionHalted = true;
-			} else if (!terminalTransactionStarted || capacityRejected) {
+			} else if (!terminalTransactionStarted || capacityRejected || stateLimitRejected) {
 				releaseOperationReservation(reservation);
 			} else if (reservation !== undefined) {
 				registration.operationAdmissionHalted = true;
@@ -16646,6 +16692,11 @@ async function issueOneVertex(
 			}
 			return capacityRejected
 				? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+				: stateLimitRejected
+					? localIssueFailure(
+							"application-state-limit",
+							`v3 local operation would pass the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes)`
+						)
 				: signerResolved
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
 					: localIssueFailure(
@@ -21771,6 +21822,83 @@ function resolvePostAdoptionCensusSizing(
 }
 
 /**
+ * Whether this epoch's application fold, with one more non-control vertex, stays within the room's
+ * application state limit. It folds exactly what the seal folds (the admitted epoch graph plus the
+ * candidate, in the derived projection order, on a fork of the plane's machine, whose limits are the
+ * room's), so a vertex this admits can never make the seal's fold refuse. Authorization and the
+ * application's own admission are judged elsewhere; only the state bound is judged here.
+ * @param registration - The current plane.
+ * @param candidate - The candidate vertex: its digest, author, dependencies, operation and byte charge.
+ * @returns False only when the fold passes the room's state limit.
+ */
+function applicationStateAdmits(
+	registration: V3PlaneRegistration,
+	candidate: Readonly<{
+		digest: string;
+		author: string;
+		dependencies: readonly string[];
+		operation: Readonly<Record<string, unknown>>;
+		byteCharge: number;
+	}>
+): boolean {
+	const base = registration.blueprintMachine;
+	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
+	const vertices = copyCloseVertices(registration.closeVertices);
+	const authors = copyCloseAuthors(registration.closeAuthors);
+	if (vertices === undefined || authors === undefined || vertices.has(candidate.digest)) return true;
+	const charges = new IntrinsicMap(registration.closeCharges);
+	vertices.set(
+		candidate.digest,
+		ObjectFreeze({
+			hash: candidate.digest,
+			kind: "drp-vertex",
+			objectId: registration.payload.provenance.objectId,
+			epoch: registration.payload.provenance.epoch,
+			anchor: registration.payload.provenance.anchorDigest,
+			dependencies: [...candidate.dependencies],
+			operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+		})
+	);
+	authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+	charges.set(candidate.digest, candidate.byteCharge);
+	let projection: ReturnType<typeof deriveApplicationProjectionOrder>;
+	try {
+		const index = new CausalityIndex(vertices, topologicalOrder(vertices, registration.payload.provenance.anchorDigest), {
+			initialByteCharges: charges,
+			maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+			maxEpochVertices: registration.payload.parameters.maxEpochVertices,
+		});
+		projection = deriveApplicationProjectionOrder(
+			registration.payload,
+			vertices,
+			new IntrinsicSet(registration.controlVertices),
+			index
+		);
+	} catch {
+		// Graph capacity and shape are judged by their own checks, not by this bound.
+		return true;
+	}
+	if (projection === undefined) return true;
+	try {
+		foldBlueprintEpoch({
+			anchorHash: registration.payload.provenance.anchorDigest,
+			// The fold stages on its own fork and is never adopted: the plane's machine is unchanged.
+			machine: base,
+			vertices: projection.vertices,
+			authorize: () => true,
+			executionContext: ({ hash }) => {
+				const identity = authors.get(hash);
+				if (identity === undefined) throw new TypeError("application state bound author is unavailable");
+				return ObjectFreeze({ author: identity.author });
+			},
+		});
+	} catch (error) {
+		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") return false;
+	}
+	return true;
+}
+
+/**
  * Pure sizing data from the original prepared issuer, never an admitted vertex.
  * @param registration - Original captured registration facts.
  * @param exactCanonicalUnsignedVertexBytes - Original captured unsigned facts.
@@ -21997,7 +22125,7 @@ function importCreatorSuccessorInitialMachine(
 			return undefined;
 		}
 		return new BlueprintStateMachine({
-			maxApplicationStateBytes: recovered.prepared.parameters.maxSnapshotBytes,
+			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
 			exactCanonicalInitialStateBytes,
 			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
 			expectedInitialStateDigest: input.expectedApplicationStateDigest,
@@ -22093,7 +22221,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		let machine: BlueprintStateMachine;
 		try {
 			machine = new BlueprintStateMachine({
-				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes,
+				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
 				exactCanonicalInitialStateBytes: initialStateBytes,
 				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
 				expectedInitialStateDigest: initialStateDigest,

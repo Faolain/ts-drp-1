@@ -80,6 +80,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
+	ROOM_APPLICATION_STATE_BYTES,
 	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3CreatorSupersededVertex,
@@ -638,6 +639,8 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 				admissionEpoch: number,
 				terminalThrough: number | null,
 			])[];
+			/** The room's application state limit in canonical bytes; the room refuses any operation past it. */
+			readonly maxApplicationStateBytes?: number;
 		}>
 	): V3OperationAdmissionPolicy;
 	readonly databaseName: string;
@@ -2869,7 +2872,9 @@ function createRoomOperationAdmissionPolicy(
 	context: Parameters<NonNullable<CreateV3RoomSessionInput["createOperationAdmissionPolicy"]>>[0]
 ): V3OperationAdmissionPolicy {
 	const authority = migrationInviteAuthority(material);
-	const applicationPolicy = input.createOperationAdmissionPolicy?.(context);
+	const applicationPolicy = input.createOperationAdmissionPolicy?.(
+		Object.freeze({ ...context, maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES })
+	);
 	let inherited = false;
 	let migrationPrefixOnly = context.epoch === 0 && context.authenticatedApplicationStateBytes === undefined;
 	const imports: Readonly<Record<string, unknown>>[] = [];
@@ -3689,14 +3694,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	const { invite, material, settlementProfile } = captureInvite(input.creatorInvite);
 	const ownedSettlementPolicy = localSettlementPolicy(input.application, material);
-	// A successor's projection base comes from the native plane, which bounds application state by
-	// the room's maxSnapshotBytes (with at most 16,384 items); the room accepts every state it seals.
-	const successorStateMaxBytes = Reflect.get(
-		decodeCanonical(material.exactCanonicalParametersCarrierBytes) as object,
-		"maxSnapshotBytes"
-	) as unknown;
-	if (!Number.isSafeInteger(successorStateMaxBytes) || (successorStateMaxBytes as number) < 32_768)
-		throw new TypeError("v3 room snapshot bound is invalid");
+	// A successor's projection base comes from the native plane, whose fold carries the room's
+	// application state limit and whose admission refuses any operation past it (with at most 16,384
+	// items); the room accepts every state it seals.
+	const successorStateMaxBytes = ROOM_APPLICATION_STATE_BYTES;
 	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
@@ -4476,7 +4477,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
 			projectionBaseResult.exactCanonicalApplicationStateBytes,
 			"migration",
-			successorStateMaxBytes as number
+			successorStateMaxBytes
 		);
 		if (
 			projectionBaseResult.objectId !== input.objectId ||
@@ -4503,7 +4504,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const projectedStateBytes = normalizeApplicationStateBytes(
 			Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
 			"migration",
-			successorStateMaxBytes as number
+			successorStateMaxBytes
 		);
 		if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
 			throw new TypeError("v3 room successor projection state differs");
