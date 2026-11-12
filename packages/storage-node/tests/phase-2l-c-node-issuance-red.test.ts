@@ -57,7 +57,9 @@ const raceFixture = new URL("./fixtures/phase-2l-c-node-race-child.mjs", import.
 // Current native catalog (ea4eb158, SCHEMA_VERSION 5): lineages gains pending_unsigned, and
 // retirement_controls plus twelve owner-fence triggers guard every product table. Spelled out
 // here, independently of the product constants, so any catalog drift fails this file.
-const ISSUANCE_SCHEMA_VERSION = 5;
+// fix/maintenance-image-capacity: SCHEMA_VERSION 6 adds retirement_plan_before (one side row per
+// object with the completed control-2 preparation's BEFORE plan images, rule A); no new trigger.
+const ISSUANCE_SCHEMA_VERSION = 6;
 const CURRENT_LINEAGES_DDL =
 	"CREATE TABLE lineages (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  next INTEGER NOT NULL CHECK(next BETWEEN 0 AND 9007199254740991),\n  exhausted INTEGER NOT NULL CHECK(exhausted IN (0,1)),\n  pruned_through_author_sequence INTEGER CHECK(pruned_through_author_sequence IS NULL OR pruned_through_author_sequence BETWEEN 0 AND 9007199254740991),\n  pending_unsigned BLOB CHECK(pending_unsigned IS NULL OR (typeof(pending_unsigned) = 'blob' AND length(pending_unsigned) > 0)),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID";
 const RETIREMENT_CONTROLS_DDL =
@@ -86,6 +88,7 @@ const CURRENT_ISSUANCE_TABLE_DDL = Object.freeze([
 	PHASE_2L_C_DDL.issuance_outbox,
 	PHASE_2L_C_V3_DDL.settlement_plans,
 	RETIREMENT_CONTROLS_DDL,
+	"CREATE TABLE retirement_plan_before (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID",
 ] as const);
 
 const admissionObserverFixture = new URL("./fixtures/phase-2l-c-node-admission-observer-child.mjs", import.meta.url);

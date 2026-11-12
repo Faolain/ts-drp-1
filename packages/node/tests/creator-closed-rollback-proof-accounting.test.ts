@@ -4636,11 +4636,14 @@ const sizingProtectedRecords = unique(
 		node.name.text === "protectedRecords" &&
 		node.getText(parsed).includes("vertexDigest")
 );
+// fix/maintenance-image-capacity: the native statement destructures {floorEpoch, protectedRecords}.
 const nativeProtectedRecords = unique(
 	(node): node is ts.VariableDeclaration =>
 		ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) &&
-		node.name.text === "protectedRecords" &&
+		(ts.isIdentifier(node.name)
+			? node.name.text === "protectedRecords"
+			: ts.isObjectBindingPattern(node.name) &&
+				node.name.elements.some((element) => element.name.getText(parsed) === "protectedRecords")) &&
 		node.getText(parsed).includes("closedIssuanceProtectedRecordsForRetirement")
 );
 function issuanceProtectedRecordsForSource(sourceEpoch: number): {
@@ -4680,7 +4683,8 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 		digest: vertexDigest,
 		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE: 2,
 	});
-	const native = execute(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
+	const native = execute(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
+		issuanceRetirementFloor: () => 0,
 		// 8f21d1fd/07252cc7: retirement reads the (possibly restored) issuanceRows
 		// and the exact retirement intent labels, not nativeIssuance.rows.
 		issuanceRows: {
