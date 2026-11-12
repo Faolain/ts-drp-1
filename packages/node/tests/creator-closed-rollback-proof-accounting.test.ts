@@ -8151,7 +8151,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 		expect(readout).toBeDefined(); expect(Object.keys(readout!)).toEqual([]); expect(Object.isFrozen(readout)).toBe(true);
 		const facts = f.resolve(readout, f.proof, f.unsignedBytes)!;
 		expect(facts.current.candidate.exactCanonicalUnsignedVertexBytes).toEqual(f.unsignedBytes);
-		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(268435456); // No fixture-size theorem.
+		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(32_768); // The room's application state limit, never the snapshot bound.
 		expect(facts.current.parameters.snapshotChunkBytes).toBe(65536); // Exact supplied original parameter, never a fixed inferred chunk size.
 		expect(facts.current.successorFenceCount).toBe(0); expect(facts.current.nativeCounts.lineages).toBe(1);
 		expect(facts.current.blueprint.catalog.exactArtifactBytes).toEqual(Uint8Array.of(9));
