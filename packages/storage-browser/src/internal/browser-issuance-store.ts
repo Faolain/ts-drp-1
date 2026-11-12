@@ -225,6 +225,7 @@ function issuanceWriteTurn(transaction: IDBTransaction): {
 interface NativeSettlementPlan extends DurableIssueScope {
 	readonly sourceContexts?: SettlementPlan["sourceContexts"];
 	readonly handBacks?: SettlementPlan["handBacks"];
+	readonly memberFrontier?: SettlementPlan["memberFrontier"];
 	readonly entries: readonly (SettlementPlanEntry & {
 		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
 	})[];
@@ -471,9 +472,11 @@ function copyNativeOutbox(value: unknown): NativeOutboxRecord | undefined {
 function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
 	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
+	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision",
-			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : [])]) ||
+			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
+			...(hasMemberFrontier ? ["memberFrontier"] : [])]) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId
 	) {
@@ -484,6 +487,7 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 			entries: value.entries,
 			...(hasContexts ? {sourceContexts: value.sourceContexts} : {}),
 			...(hasHandBacks ? {handBacks: value.handBacks} : {}),
+			...(hasMemberFrontier ? {memberFrontier: value.memberFrontier} : {}),
 			fenceSequence: value.fenceSequence,
 			revision: value.revision,
 			scope,
@@ -499,6 +503,7 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 		entries: detached.entries,
 		...(detached.sourceContexts === undefined ? {} : {sourceContexts: detached.sourceContexts}),
 		...(detached.handBacks === undefined ? {} : {handBacks: detached.handBacks}),
+		...(detached.memberFrontier === undefined ? {} : {memberFrontier: detached.memberFrontier}),
 		fenceSequence: detached.fenceSequence,
 		revision: detached.revision,
 	};

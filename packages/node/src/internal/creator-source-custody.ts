@@ -53,6 +53,33 @@ const verified = new WeakMap<object, CreatorSourceCustodyIdentity>();
  * writer count. A fence keeps only its own single successor reserve. */
 export const CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE = 2;
 
+/**
+ * Exact widths of the last-member frontier records member installs authenticated, by successor anchor.
+ * The record is the same for every author of that install (anchor, settlement record, Cut and commit QC
+ * of the close), so the width is a fact of the anchor. Sizing charges it (G21) and a removing close
+ * persists a frontier only when its width is registered here, so nothing uncharged is ever written. Every
+ * plane open re-registers it (install and recovery both open the member capability). Bounded: the oldest
+ * entry is dropped past the limit; a dropped anchor then persists no frontier (the removed author's
+ * later install refuses, closed), it never under-charges.
+ */
+const MEMBER_FRONTIER_WIDTHS_LIMIT = 4096;
+const memberFrontierWidths = new Map<string, number>();
+const memberFrontierWidthKey = (trust: CurrentAnchorTrust): string => `${trust.objectId}\n${trust.currentAnchorDigest}`;
+
+/** Registers the exact width of the member frontier authenticated under `trust` (its successor anchor). */
+export function recordCreatorMemberFrontierWidth(trust: CurrentAnchorTrust, width: number): void {
+	if (!Number.isSafeInteger(width) || width < 1) return;
+	const key = memberFrontierWidthKey(trust);
+	memberFrontierWidths.delete(key);
+	memberFrontierWidths.set(key, width);
+	while (memberFrontierWidths.size > MEMBER_FRONTIER_WIDTHS_LIMIT) memberFrontierWidths.delete(memberFrontierWidths.keys().next().value!);
+}
+
+/** The registered member frontier width for `trust`'s anchor, or undefined when none was authenticated. */
+export function creatorMemberFrontierWidth(trust: CurrentAnchorTrust): number | undefined {
+	return memberFrontierWidths.get(memberFrontierWidthKey(trust));
+}
+
 /** The current source anchor and ACL are immutable, so their actual widths
  * bound custody for any accepted operation in this epoch. Parameters use the
  * registered complete domain. This creates no context, reference or plan. */
@@ -108,8 +135,12 @@ export function creatorSourceCustodyGeometryForSizing(trust: CurrentAnchorTrust,
 	const varuintWidth = (value: number): number => { let width = 1; while (value >= 128) { value = Math.floor(value / 128); width++; } return width; };
 	const emptyParameters = encodeCanonical({kind: KIND, version: 1, ...anchor, aclBytes: exactCanonicalAclBytes,
 		parametersBytes: new Uint8Array()}).byteLength;
+	// The last-member frontier a removing close may persist once: exactly the record this epoch's member
+	// install authenticated (registered below), so its exact width; none when this epoch has none.
+	const maxMemberFrontierByteLength = creatorMemberFrontierWidth(trust);
 	return Object.freeze({maxContextByteLength: emptyParameters + MAX_PARAMETERS + varuintWidth(MAX_PARAMETERS) - 1,
-		maxCompletionByteLength, maxCompletionMemberByteLength, maxExpiryByteLength, maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+		maxCompletionByteLength, maxCompletionMemberByteLength, maxExpiryByteLength, ...(maxMemberFrontierByteLength === undefined ? {} : {maxMemberFrontierByteLength}),
+		maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
 }
 
 /** Historical authority only: no inclusion, noninclusion, current Writer grant or native currency. */
