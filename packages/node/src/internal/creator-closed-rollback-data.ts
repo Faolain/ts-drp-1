@@ -10390,6 +10390,9 @@ async function prepareClosedJournalDetails(
 					(value.dependencyKind === "signed-settled-issuance" || value.dependencyKind === "source-committed-inclusion" ||
 						value.dependencyKind === "authenticated-covered-native-issuance") ||
 					value.classification === "displaced" && value.dependencyKind === "source-authenticated-expiry" ||
+					// A replaced source released by its authenticated replaced-source resolution (design (b)).
+					(value.classification === "displaced" || value.classification === "covered-historical") &&
+						value.dependencyKind === "source-replaced-release" ||
 					// The original pinned bootstrap verifier authenticates this exact
 					// epoch-zero control. Its journal consumer follows the same covered
 					// class as native retirement; publication still must be acknowledged.
@@ -10407,7 +10410,7 @@ async function prepareClosedJournalDetails(
 			paired === undefined ||
 			coverage === undefined ||
 			(paired.publishState !== "published" && coverage.dependencyKind !== "source-committed-inclusion" &&
-				coverage.dependencyKind !== "source-authenticated-expiry") ||
+				coverage.dependencyKind !== "source-authenticated-expiry" && coverage.dependencyKind !== "source-replaced-release") ||
 			!closedRetirementEqual(original.digest, paired.digest) ||
 			!closedRetirementEqual(original.digest, coverage.digest) ||
 			!closedRetirementEqual(original.digest, closedRetirementHex(row.vertexDigest))
@@ -20099,10 +20102,15 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 				(proof.dependencyKind === "signed-settled-issuance" || proof.dependencyKind === "source-committed-inclusion" || proof.dependencyKind === "authenticated-covered-native-issuance") ||
 			 // Signed local-author abandonment: authenticated terminal, never published.
 			 proof.classification === "displaced" && proof.dependencyKind === "source-authenticated-expiry" ||
+			 // A replaced source released by its authenticated replaced-source resolution (design (b)): its
+			 // replacement carries the move and its epoch is closed; pending or published alike.
+			 (proof.classification === "displaced" || proof.classification === "covered-historical") &&
+				proof.dependencyKind === "source-replaced-release" ||
 			 proof.classification === "pinned-genesis" && epoch === 0 &&
 				(proof.dependencyKind === "pinned-genesis" || proof.dependencyKind === "authenticated-covered-native-issuance")) &&
 			proof.digest instanceof Uint8Array && compareBytes(proof.digest, row.digest) === 0);
-		const expired = covered.length === 1 && covered[0].dependencyKind === "source-authenticated-expiry";
+		const expired = covered.length === 1 && (covered[0].dependencyKind === "source-authenticated-expiry" ||
+			covered[0].dependencyKind === "source-replaced-release");
 		const paired = input.rows.outbox.filter(out => out.objectId === input.objectId && out.author === row.author &&
 			out.authorSequence === row.authorSequence && (out.publishState === "published" || expired && out.publishState === "pending") &&
 			compareBytes(out.digest, row.digest) === 0);

@@ -109,8 +109,9 @@ import {
 import {
 	CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN,
 	creatorSourceExpiryDigest,
+	creatorReplacedSourceFields,
 	creatorSourceExpiryFields,
-	openCreatorSourceExpiryReceipt,
+	openCreatorSourceAuthorReceiptAuthor,
 	verifyCreatorSourceExpiryReceipt,
 } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
 import {
@@ -200,6 +201,7 @@ import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyRecei
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
 	captureCreatorSourceCompletion, openCreatorSourceCompletion, captureCreatorSourceExpiry, openCreatorSourceExpiry,
+	captureCreatorReplacedSourceResolution, openCreatorReplacedSourceResolution,
 	type VerifiedCreatorSourceCustody, type CreatorSourceCustodyIdentity } from "./internal/creator-source-custody.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -7284,8 +7286,8 @@ async function withOwnedCreatorSourceExpiryRequest<T>(registration: V3PlaneRegis
 	read: CreatorSnapshotRecoveryCloseDependencyRead, bytes: Uint8Array, valid: () => Promise<boolean>,
 	action: (request: OwnedSigningRequest) => Promise<T>): Promise<T> {
 	const author = registration.issuanceScope.author;
-	const receipt = openCreatorSourceExpiryReceipt(bytes);
-	if (receipt === undefined || receipt.sourceAuthor !== author || !(await valid()))
+	// An expiry or a replaced-source resolution: the author's own settlement statements.
+	if (openCreatorSourceAuthorReceiptAuthor(bytes) !== author || !(await valid()))
 		throw new TypeError("creator source expiry exact owner is unavailable");
 	await custody.check();
 	if (!currentRegistration(registration) || !(await valid())) throw new TypeError("creator source expiry exact owner is revoked");
@@ -10625,6 +10627,31 @@ async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null
 		contexts.set(lowerHexDigest(context.digest)!, ObjectFreeze({capability, identity, admission, parameters, runtime,
 			trust: ObjectFreeze({trust: identity.trust})}));
 	}
+	// A replaced-source frontier resolution: the store admits it structurally; only the plan author's exact
+	// signature over a receipt bound to this room, this entry and a past epoch, whose frontier statement
+	// holds, authenticates it. Checked on every preparation (each install and reopen): fails closed.
+	for (const entry of plan?.entries ?? []) {
+		if (entry.sourceResolutionScope === undefined) continue;
+		const resolution = plan?.sourceContexts?.find(value => entry.sourceResolutionDigest !== undefined &&
+			sameBytes(value.digest, entry.sourceResolutionDigest));
+		// A committed-replacement resolution names its replacement's own completion proof, which the loop
+		// below opens and checks (creator-signed Cut membership of the replacement); the link itself is
+		// proven from signed content by the census on every install (replacementCommittedResolution).
+		if (entry.sourceResolutionKind === "replacement") {
+			const replacement = plan?.entries.find(value => value.sourceSequence === entry.replacementSequence);
+			if (resolution === undefined || entry.replacementSequence === null || replacement?.disposition !== "committed" ||
+				replacement.sourceContextDigest === undefined || replacement.sourceResolutionDigest === undefined ||
+				!sameBytes(replacement.sourceResolutionDigest, resolution.digest))
+				throw new TypeError("creator replaced source proof is invalid");
+			continue;
+		}
+		if (plan == null || resolution === undefined || entry.replacementSequence === null ||
+			openCreatorReplacedSourceResolution(resolution, {objectId: currentTrust.objectId,
+				pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest, sourceAuthor: plan.scope.author,
+				sourceSequence: entry.sourceSequence, sourceDigest: entry.sourceDigest, replacementSequence: entry.replacementSequence,
+				currentEpoch: currentTrust.currentEpoch}, V3_SETTLEMENT_OWN_WINDOW_EPOCHS) === undefined)
+			throw new TypeError("creator replaced source proof is invalid");
+	}
 	const sources = new Map<number, CreatorRetainedSourceRow>();
 	const completions = new Map<string, Readonly<{members: ReadonlySet<string>; context: SettlementSourceContext}>>();
 	for (const entry of plan?.entries ?? []) {
@@ -10891,6 +10918,7 @@ const CREATOR_ISSUANCE_CENSUS_DEPENDENCY_KINDS = ObjectFreeze([
 	"current-issuance", "unsettled-issuance", "pinned-genesis", "signed-settled-issuance", "source-committed-inclusion",
 	"source-bound-completed-issuance", "adjacent-author-fence", "separate-source-author-fence",
 	"authenticated-closed-issuance", "authenticated-covered-native-issuance", "source-authenticated-expiry",
+	"source-replaced-release",
 ] as const);
 const CREATOR_ISSUANCE_CENSUS_CLASSIFICATIONS = ObjectFreeze([
 	"covered-historical", "current", "displaced", "pinned-genesis", "filtered-settlement-source",
@@ -12235,7 +12263,26 @@ async function readCreatorRecoveryDependencyCensus(
 			// source rows as displaced forever. This does not prune anything: the
 			// complete native preimages remain held and charged; the retirement
 			// owner still checks replay consumers and its native protected holes.
-			rows.push(creatorIssuanceCensusFields(terminallyCovered ? "authenticated-covered-native-issuance" : dependencyKind,
+			// A replaced-source resolution (design (b)) releases this exact source: its frontier receipt was
+			// authenticated at preparation; a committed-replacement resolution is proven here, on every install,
+			// by the same link step the lost-twice chain walk uses. Anything else refuses.
+			const release = scope.author === registration.issuanceScope.author
+				? inheritancePlan?.entries.find(value => value.sourceSequence === row.authorSequence && value.sourceResolutionScope !== undefined)
+				: undefined;
+			if (release !== undefined) {
+				const plan = inheritancePlan === null ? undefined : copySettlementPlan(inheritancePlan, scope);
+				const live = observation.liveRegistration;
+				if (!sameBytes(release.sourceDigest, row.digest) || (classified.kind !== "displaced" && classified.kind !== "covered-historical") ||
+					release.sourceResolutionKind === "replacement" && (plan === undefined || live === undefined ||
+						!replacementCommittedResolution(registration, plan, plan.entries.find(value => value.sourceSequence === row.authorSequence)!,
+							proveReplacementLink(live.payload, registration, ObjectFreeze({ ...classified, row }),
+								plan.entries.find(value => value.sourceSequence === row.authorSequence)!, plan, replacementChunkClaims(plan),
+								nativeRows.issued, vertexFacts)))) {
+					observation.stage = `replaced-source-release:${row.authorSequence}`; return undefined;
+				}
+			}
+			rows.push(creatorIssuanceCensusFields(terminallyCovered ? "authenticated-covered-native-issuance"
+				: release !== undefined ? "source-replaced-release" : dependencyKind,
 				scope, row.authorSequence, row.digest, terminallyCovered ? "covered-historical" : classified.kind));
 		}
 		if (page.length < 64) break;
@@ -17145,6 +17192,25 @@ type ReplacementIssuedRow = Readonly<{ objectId: string; author: string; authorS
  */
 type ReplacementChunkEnd = "committed" | "expired" | "current" | "covered" | "open" | "completed";
 
+/**
+ * One node of a replacement link (a replaced source or a replacement chunk), authenticated under its own
+ * retained source contract (custody) or, without one, through this plane's classification. A retained
+ * contract that does not authenticate the row refuses (never falls back to classification).
+ */
+function classifyReplacementNode(registration: CreatorRecoveryCensusContext, row: SnapshottedOutboxRow,
+	vertexFacts?: CreatorCensusVertexFacts): Readonly<{ node: ClassifiedRebaseRow; classified: boolean }> | undefined {
+	const retained = registration.historicalIssuance?.retainedSources?.get(row.authorSequence);
+	const retainedVertex = retained === undefined || !sameBytes(retained.sourceDigest, row.digest) ? undefined
+		: authenticateRetainedSourceVertex(retained.contract, row.canonicalPreimageBytes, row.signature, row.digest,
+			row.scope.author, row.authorSequence, vertexFacts);
+	if (retainedVertex !== undefined)
+		return ObjectFreeze({ node: ObjectFreeze({ row, authenticated: retainedVertex, kind: "displaced" as const,
+			sourceContract: retained!.contract }), classified: false });
+	if (retained !== undefined) return undefined;
+	const node = classifyRebaseRow(registration, row, undefined, vertexFacts);
+	return node === undefined ? undefined : ObjectFreeze({ node, classified: true });
+}
+
 /** Every chunk named by every entry of the plan, counted (a chunk replaces exactly one source). */
 function replacementChunkClaims(plan: SettlementPlan): ReadonlyMap<number, number> {
 	const claims = new IntrinsicMap<number, number>();
@@ -17203,12 +17269,8 @@ function proveReplacementLink(payload: PreparedV3LivePayload, registration: Crea
 		const replacementRow = ObjectFreeze({ scope, authorSequence: chunk, canonicalPreimageBytes: rows[0]!.canonicalPreimageBytes,
 			signature: rows[0]!.signature, digest: rows[0]!.digest, publishState: "pending" as const }) as SnapshottedOutboxRow;
 		const retained = retainedSources?.get(chunk);
-		const retainedVertex = retained === undefined || !sameBytes(retained.sourceDigest, rows[0]!.digest) ? undefined
-			: authenticateRetainedSourceVertex(retained.contract, rows[0]!.canonicalPreimageBytes, rows[0]!.signature,
-				rows[0]!.digest, scope.author, chunk, vertexFacts);
-		const replacement: ClassifiedRebaseRow | undefined = retainedVertex !== undefined
-			? ObjectFreeze({ row: replacementRow, authenticated: retainedVertex, kind: "displaced" as const, sourceContract: retained!.contract })
-			: retained !== undefined ? undefined : classifyRebaseRow(registration, replacementRow, undefined, vertexFacts);
+		const node = classifyReplacementNode(registration, replacementRow, vertexFacts);
+		const replacement = node?.node, retainedVertex = node?.classified === false ? node.node.authenticated : undefined;
 		if (replacement === undefined || replacement.authenticated.digest !== lowerHexDigest(rows[0]!.digest) ||
 			replacement.authenticated.author !== scope.author || replacement.authenticated.authorSequence !== chunk ||
 			replacement.authenticated.admitted.epoch <= source.authenticated.admitted.epoch) return undefined;
@@ -17249,6 +17311,24 @@ function proveReplacementLink(payload: PreparedV3LivePayload, registration: Crea
 		portable !== 0 && entry.replacementProgress !== undefined && throughIntent !== entry.replacementProgress.intentCount ||
 		!sameBytes(encodeCanonical(replaced), encodeCanonical(expected))) return undefined;
 	return ObjectFreeze(steps);
+}
+
+/**
+ * The committed-replacement basis of a replaced-source resolution (design (b)): the entry's single
+ * replacement link is proven (proveReplacementLink, the one owner) and ends committed, and the resolution
+ * names exactly that replacement's retained completion proof (creator-signed Cut membership).
+ * @returns Whether the basis holds.
+ */
+function replacementCommittedResolution(registration: CreatorRecoveryCensusContext, plan: SettlementPlan,
+	entry: SettlementPlan["entries"][number] | undefined,
+	steps: ReturnType<typeof proveReplacementLink>): boolean {
+	const step = steps?.length === 1 ? steps[0] : undefined;
+	const completion = step === undefined ? undefined : registration.historicalIssuance?.retainedSources?.get(step.chunk)?.completion;
+	const replacement = step === undefined ? undefined : plan.entries.find(value => value.sourceSequence === step.chunk);
+	return entry !== undefined && step !== undefined && step.end === "committed" && entry.replacementSequence === step.chunk &&
+		entry.replacementProgress === undefined && completion !== undefined && replacement?.disposition === "committed" &&
+		replacement.sourceResolutionDigest !== undefined && sameBytes(replacement.sourceResolutionDigest, completion.digest) &&
+		(entry.sourceResolutionDigest === undefined || sameBytes(entry.sourceResolutionDigest, completion.digest));
 }
 
 /**
@@ -25854,4 +25934,288 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 		results.push(creatorSourceAbandonmentResult(scope.author, recorded));
 	}
 	return ObjectFreeze(results);
+}
+
+/** At most this many replaced sources are resolved per drain (bounded input charge); the rest next drain. */
+const REPLACED_SOURCE_RESOLUTION_BATCH = 16;
+
+/**
+ * What the creator's signed frontier proves about the source of one completed replacement entry
+ * (fix/creator-replaced-source-resolution; held-anchor-retention.qnt `resolved`): settled when its epoch
+ * is closed in the frontier and the frontier passed it (terminalThrough reached it: admitted, or below an
+ * admitted own fence), or when it is displaced, fence-guarded (settlementOwnRowFenceGuarded) and past the
+ * settlement window. A replaced source was never admitted by construction (it was replaced because its
+ * closed epoch did not contain it); the statement is what the author signs so the store may stop
+ * protecting it without the plan's current fence.
+ * @param frontier - The valid installed frontier for this author.
+ * @param sourceSequence - The source's author sequence.
+ * @param sourceEpoch - The source's own signed epoch.
+ * @param scan - The author's own-fence scan.
+ * @returns The guarding own fence (null: the frontier passed it, or it is the first unsettled sequence), or undefined.
+ */
+async function replacedSourceFrontierStatement(frontier: SettlementFrontierContext, sourceSequence: number, sourceEpoch: number,
+	scan: () => ReturnType<typeof scanOwnFences>): Promise<Readonly<{guard: number | null}> | undefined> {
+	if (!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
+	const tt = frontier.terminalThrough;
+	if (tt !== null && sourceSequence <= tt) return ObjectFreeze({guard: null});
+	if (sourceEpoch < frontier.admissionEpoch || sourceEpoch > frontier.currentEpoch - V3_SETTLEMENT_OWN_WINDOW_EPOCHS) return undefined;
+	if (sourceSequence === (tt ?? -1) + 1) return ObjectFreeze({guard: null});
+	const fence = (await scan()).lowest.get(sourceEpoch);
+	return fence !== undefined && fence <= sourceSequence ? ObjectFreeze({guard: fence}) : undefined;
+}
+
+/** A completed single replacement that may still gain a replaced-source resolution (store contract law). */
+function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boolean {
+	return entry.sourceResolutionDigest === undefined && (entry.disposition === "rebase" || entry.disposition === "transform") &&
+		entry.replacementSequence !== null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
+		entry.sourceObjectId === undefined && entry.inheritance === undefined;
+}
+
+/**
+ * Replaced-source resolution (fix/creator-replaced-source-resolution, design (b)): a plan whose author
+ * fence is withheld (a non-member) or awaited keeps every completed replacement entry's source protected,
+ * because the store lets a replaced source go only under the plan's current fence. Two bases, recorded
+ * on the entry write-once in one plan write:
+ * - committed replacement (kind "replacement", first; no signature, no installed frontier, so it also
+ *   serves a removed author): the entry's single replacement link, proven from signed content by the
+ *   lost-twice link step (proveReplacementLink), ends committed, and the resolution names that
+ *   replacement's retained completion proof (replacementCommittedResolution);
+ * - frontier (kind "frontier"): the installed frontier proves the source settled
+ *   (replacedSourceFrontierStatement); the author signs a replaced-source receipt with its owned key (the
+ *   expiry signing path, a distinct receipt kind).
+ * Before anything, every stored resolution is verified again (a committed one by the same link step; a
+ * frontier one by signature, binding, statement and monotone agreement with the frontier): any that fails
+ * refuses (fails closed). Nothing about the move changes: the replacement carries it.
+ * @param plane - Original live handle.
+ * @param raw - The owned signer.
+ * @returns The source sequences resolved by this call.
+ */
+export function resolveV3ReplacedSources(plane: V3PlaneHandle, raw: Readonly<{
+	signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}>): Promise<readonly number[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("creator replaced source resolution owner is unavailable"));
+	return enqueueRegistrationTask(registration, (inputCustody) => {
+		const input = snapshotClosedRecord(raw, ["signRegisteredVertexDigest"]);
+		if (input === undefined || typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
+			throw new TypeError("creator replaced source resolution input is invalid");
+		const scope = registration.issuanceScope;
+		const receiptBound = encodeCanonical(creatorReplacedSourceFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8ArrayConstructor(32), sourceEpoch: Number.MAX_SAFE_INTEGER,
+			replacementSequence: Number.MAX_SAFE_INTEGER, frontierCurrentEpoch: Number.MAX_SAFE_INTEGER,
+			frontierAdmissionEpoch: Number.MAX_SAFE_INTEGER, frontierTerminalThrough: Number.MAX_SAFE_INTEGER,
+			guardSequence: Number.MAX_SAFE_INTEGER, signingEpoch: Number.MAX_SAFE_INTEGER, signingAnchorDigest: "0".repeat(64),
+			signingNativeHeadDigest: new Uint8ArrayConstructor(32), signingFloorDigest: new Uint8ArrayConstructor(32)})).byteLength;
+		inputCustody.chargeBytes((receiptBound + 64 + 72) * REPLACED_SOURCE_RESOLUTION_BATCH);
+		const sign = input.signRegisteredVertexDigest as SignRegisteredVertexDigest;
+		return async () => {
+			const controller = new AbortController();
+			registration.settlementSelectionControllers ??= new Set();
+			registration.settlementSelectionControllers.add(controller);
+			let custody: LocalReplacementCustody | undefined;
+			try {
+				return await resolveCreatorReplacedSources(registration, sign, controller.signal, (owned) => { custody = owned; });
+			} finally {
+				registration.settlementSelectionControllers.delete(controller);
+				await custody?.release();
+			}
+		};
+	}, {
+		pool: "input",
+		refuse: (): never => { throw new TypeError("creator replaced source resolution task capacity exhausted"); },
+		refuseCapture: (): never => { throw new TypeError("creator replaced source resolution input capacity exhausted"); },
+	});
+}
+
+async function resolveCreatorReplacedSources(registration: V3PlaneRegistration, sign: SignRegisteredVertexDigest,
+	aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<readonly number[]> {
+	const payload = registration.payload, scope = registration.issuanceScope, history = registration.historicalIssuance,
+		frontierCapability = history?.capability;
+	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
+		registration.issuanceScope === scope && registration.historicalIssuance === history &&
+		registration.historicalIssuance?.capability === frontierCapability;
+	if (!current()) throw new TypeError("creator replaced source resolution owner is unavailable");
+	const store = creatorOriginalIssuanceStore(registration);
+	const census = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+	if (census === undefined) throw new TypeError("creator replaced source resolution census is unavailable");
+	const censusInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+		maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+	const inspect = async () => {
+		const read = await census(censusInput);
+		return {read, plan: read.rows.plans.find(value => sameScope(value.scope, scope)) ?? null};
+	};
+	const first = await inspect();
+	if (!current()) throw new TypeError("creator replaced source resolution owner changed during native read");
+	if (first.plan === null) return ObjectFreeze([]);
+	const installed = settlementFrontierFromHistory(history);
+	const frontier = installed !== undefined && validSettlementFrontierContext(payload, installed) ? installed : undefined;
+	// A removed author has no installed frontier; its persisted last-member frontier (re-verified at this
+	// open) still bounds every stored resolution: none may claim a later frontier than it.
+	const memberIdentity = history?.memberFrontier === undefined ? undefined : resolveCreatorMemberFrontier(history.memberFrontier);
+	const bound: SettlementFrontierContext | undefined = frontier ?? (memberIdentity?.admissionEpoch === undefined ? undefined
+		: ObjectFreeze({admissionEpoch: memberIdentity.admissionEpoch, currentEpoch: memberIdentity.successorEpoch,
+			terminalThrough: memberIdentity.admittedAuthorSequence}));
+	const expected = (entry: SettlementPlan["entries"][number]) => ({objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+		sourceSequence: entry.sourceSequence, sourceDigest: entry.sourceDigest, replacementSequence: entry.replacementSequence ?? -1,
+		currentEpoch: payload.trust.trust.currentEpoch});
+	// The committed-replacement basis: this entry's single replacement link, proven from signed content by
+	// the one link owner (proveReplacementLink), ends committed (its retained completion proof).
+	const plannedRows = first.read.rows.issued.filter(row => sameScope(row, scope));
+	const committedBasis = (plan: SettlementPlan, entry: SettlementPlan["entries"][number]): Uint8Array | undefined => {
+		const issued = plannedRows.filter(row => row.authorSequence === entry.sourceSequence);
+		if (issued.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest)) return undefined;
+		const source = classifyReplacementNode(registration, ObjectFreeze({scope, authorSequence: entry.sourceSequence,
+			canonicalPreimageBytes: issued[0]!.canonicalPreimageBytes, signature: issued[0]!.signature, digest: issued[0]!.digest,
+			publishState: "pending" as const}) as SnapshottedOutboxRow, registration.vertexFacts)?.node;
+		// The census releases exactly these classes (displaced, or covered by a creator-signed frontier).
+		const steps = source === undefined || (source.kind !== "displaced" && source.kind !== "covered-historical") ? undefined : proveReplacementLink(payload, registration, source, entry, plan,
+			replacementChunkClaims(plan), plannedRows, registration.vertexFacts);
+		return replacementCommittedResolution(registration, plan, entry, steps)
+			? registration.historicalIssuance?.retainedSources?.get(steps![0]!.chunk)?.completion?.digest : undefined;
+	};
+	// Every stored resolution authenticates again, and the installed frontier never contradicts it (the
+	// frontier's epoch and terminalThrough only grow): otherwise refuse, retaining everything.
+	for (const entry of first.plan.entries) {
+		if (entry.sourceResolutionScope === undefined) continue;
+		if (entry.sourceResolutionKind === "replacement") {
+			const digest = committedBasis(first.plan, entry);
+			if (digest === undefined || entry.sourceResolutionDigest === undefined || !sameBytes(digest, entry.sourceResolutionDigest))
+				throw new TypeError("creator replaced source proof is invalid");
+			continue;
+		}
+		const resolution = first.plan.sourceContexts?.find(value => entry.sourceResolutionDigest !== undefined &&
+			sameBytes(value.digest, entry.sourceResolutionDigest));
+		const receipt = resolution === undefined || entry.replacementSequence === null ? undefined
+			: openCreatorReplacedSourceResolution(resolution, expected(entry), V3_SETTLEMENT_OWN_WINDOW_EPOCHS);
+		if (receipt === undefined || (bound !== undefined && (receipt.frontierCurrentEpoch > bound.currentEpoch ||
+			(receipt.frontierTerminalThrough !== null && (bound.terminalThrough === null ||
+				bound.terminalThrough < receipt.frontierTerminalThrough)))))
+			throw new TypeError("creator replaced source proof is invalid");
+	}
+	// The committed basis first (no signature: the creator-signed completion is the evidence; it needs no
+	// installed frontier, so it also serves a removed author), then the frontier statement (signed receipt).
+	const committed = new Map<number, Uint8Array>();
+	for (const entry of first.plan.entries) {
+		if (committed.size >= REPLACED_SOURCE_RESOLUTION_BATCH) break;
+		if (!replacedSourceResolvable(entry)) continue;
+		const digest = committedBasis(first.plan, entry);
+		if (digest !== undefined) committed.set(entry.sourceSequence, digest);
+	}
+	const frontierCurrent = frontier !== undefined && payload.trust.trust.currentEpoch === frontier.currentEpoch ? frontier : undefined;
+	let fences: ReturnType<typeof scanOwnFences> | undefined;
+	const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
+	const candidates: Readonly<{entry: SettlementPlan["entries"][number]; sourceEpoch: number; guard: number | null}>[] = [];
+	for (const entry of frontierCurrent === undefined ? [] : first.plan.entries) {
+		if (committed.size + candidates.length >= REPLACED_SOURCE_RESOLUTION_BATCH) break;
+		if (!replacedSourceResolvable(entry) || committed.has(entry.sourceSequence)) continue;
+		const issued = first.read.rows.issued.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+		const outbox = first.read.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+		if (issued.length !== 1 || outbox.length > 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
+			(outbox.length === 1 && !sameBytes(outbox[0]!.digest, entry.sourceDigest)) ||
+			!first.read.rows.issued.some(row => sameScope(row, scope) && row.authorSequence === entry.replacementSequence)) continue;
+		let decoded: unknown;
+		try { decoded = decodeCanonical(issued[0]!.canonicalPreimageBytes); } catch { continue; }
+		const sourceEpoch = isObject(decoded) && Reflect.get(decoded, "author") === scope.author &&
+			Reflect.get(decoded, "authorSequence") === entry.sourceSequence ? Reflect.get(decoded, "epoch") : undefined;
+		if (typeof sourceEpoch !== "number" || !NumberIsSafeInteger(sourceEpoch)) continue;
+		const statement = await replacedSourceFrontierStatement(frontierCurrent!, entry.sourceSequence, sourceEpoch, scan);
+		if (statement !== undefined) candidates.push(ObjectFreeze({entry, sourceEpoch, guard: statement.guard}));
+	}
+	if ((candidates.length === 0 && committed.size === 0) || !current()) return ObjectFreeze([]);
+	const signed = new Map<number, SettlementSourceContext>();
+	let custody: LocalReplacementCustody | undefined;
+	if (candidates.length !== 0) {
+		const signingFrontier = frontierCurrent!;
+		const floor = payload.input.settlementFloor;
+		if (floor === undefined) throw new TypeError("creator replaced source resolution whole-floor owner is unavailable");
+		const image = await floor.readRetirementImage({scope: {objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest}});
+		if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, payload.trust.trust) || !isDigestHex(image.imageDigest))
+			throw new TypeError("creator replaced source resolution whole-floor is stale");
+		const owned = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+		custody = owned;
+		own(owned);
+		await owned.check();
+		const receipts = candidates.map(candidate => {
+			const bytes = encodeCanonical(creatorReplacedSourceFields({objectId: scope.objectId,
+				pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+				sourceSequence: candidate.entry.sourceSequence, sourceDigest: new Uint8ArrayConstructor(candidate.entry.sourceDigest),
+				sourceEpoch: candidate.sourceEpoch, replacementSequence: candidate.entry.replacementSequence,
+				frontierCurrentEpoch: signingFrontier.currentEpoch, frontierAdmissionEpoch: signingFrontier.admissionEpoch,
+				frontierTerminalThrough: signingFrontier.terminalThrough, guardSequence: candidate.guard, signingEpoch: signingFrontier.currentEpoch,
+				signingAnchorDigest: payload.trust.trust.currentAnchorDigest,
+				signingNativeHeadDigest: hashDomain(CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN, encodeHeadRecordV1(payload.trust.head)),
+				signingFloorDigest: digestBytesFromHex(image.imageDigest)}));
+			return ObjectFreeze({candidate, bytes, digest: creatorSourceExpiryDigest(bytes)});
+		});
+		const valid = async (): Promise<boolean> => {
+			if (!current()) return false;
+			try {
+				const now = await census(censusInput);
+				return current() && now.image.imageDigest === first.read.image.imageDigest;
+			} catch { return false; }
+		};
+		const signatures: (Uint8Array | undefined)[] = [];
+		await withActiveRebaseDependencies(registration, undefined, (read) => read.checkWhile(async () => {
+			if (!(await valid())) throw new TypeError("creator replaced source resolution source currency changed");
+			for (const receipt of receipts) {
+				const signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, owned, read, receipt.bytes, valid,
+					request => sign(new Uint8ArrayConstructor(receipt.digest), request)));
+				if (signature !== undefined) v3SettlementWorkCounts.sourceExpirySignatures += 1;
+				signatures.push(signature);
+			}
+		}), owned, receipts.flatMap(receipt => [receipt.bytes, new Uint8ArrayConstructor(64)]));
+		receipts.forEach((receipt, index) => {
+			const signature = signatures[index];
+			const context = signature === undefined || signature.byteLength !== 64 ? undefined
+				: captureCreatorReplacedSourceResolution(receipt.bytes, signature);
+			if (context === undefined || openCreatorReplacedSourceResolution(context, expected(receipt.candidate.entry),
+				V3_SETTLEMENT_OWN_WINDOW_EPOCHS) === undefined)
+				throw new TypeError("creator replaced source resolution signed receipt is invalid");
+			signed.set(receipt.candidate.entry.sourceSequence, context);
+		});
+		await owned.check();
+	}
+	const second = await inspect();
+	if (!current() || second.plan === null || second.read.image.imageDigest !== first.read.image.imageDigest ||
+		second.plan.revision !== first.plan.revision)
+		throw new TypeError("creator replaced source resolution source currency changed");
+	const prior = second.plan;
+	const entries = prior.entries.map(entry => {
+		if (!replacedSourceResolvable(entry)) return entry;
+		const completion = committed.get(entry.sourceSequence), resolution = signed.get(entry.sourceSequence);
+		if (completion !== undefined) return {...entry, sourceResolutionDigest: new Uint8ArrayConstructor(completion),
+			sourceResolutionKind: "replacement" as const, sourceResolutionScope: "replaced-source" as const};
+		return resolution === undefined ? entry : {...entry,
+			sourceResolutionDigest: new Uint8ArrayConstructor(resolution.digest), sourceResolutionKind: "frontier" as const,
+			sourceResolutionScope: "replaced-source" as const};
+	});
+	// A committed-replacement resolution names a completion context the plan already holds.
+	const contexts = [...(prior.sourceContexts ?? [])];
+	for (const resolution of signed.values())
+		if (!contexts.some(value => sameBytes(value.digest, resolution.digest))) contexts.push(resolution);
+	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
+	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
+		sourceContexts: contexts, ...(prior.handBacks === undefined ? {} : {handBacks: prior.handBacks}),
+		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier}),
+		...(prior.completedSourceCustody === true ? {completedSourceCustody: true} : {})}, scope);
+	if (plan == null) throw new TypeError("creator replaced source resolution plan is invalid");
+	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
+	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
+	const nativeBytes = future.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + row.signature.byteLength + row.digest.byteLength, 0) +
+		future.plans.reduce((sum, value) => sum + issuanceSettlementPlanStorageByteLength(value), 0) +
+		future.lineages.reduce((sum, value) => sum + (value.pendingUnsigned === undefined ? 0 : encodeCanonical(value.pendingUnsigned).byteLength), 0);
+	if (nativeBytes > censusInput.limits.maxBytes) throw new TypeError("creator replaced source resolution exceeds reserved native material");
+	const written = await store.transactWriteSettlementPlan({expectedRevision: prior.revision, plan, scope});
+	const limits = {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxDepth: 32, maxItems: 65536};
+	const after = await census(censusInput);
+	const stored = after.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+	if (written === null || stored === null || !sameBytes(encodeCanonical(written, limits), encodeCanonical(plan, limits)) ||
+		!sameBytes(encodeCanonical(stored, limits), encodeCanonical(plan, limits)))
+		throw new TypeError("creator replaced source resolution plan readback differs");
+	await custody?.check();
+	return ObjectFreeze([...committed.keys(), ...signed.keys()]);
 }

@@ -2,7 +2,7 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 import { digestReceivedVertexPreimage, vertexCanonicalBytes } from "../index.js";
 import { prepareCreatorAnchorSigningRequest } from "../creator-close.js";
 import { decodeCreatorReattachmentCheckpoint } from "./creator-reattachment-checkpoint.js";
-import { creatorSourceExpiryDigest, openCreatorSourceExpiryReceipt } from "./creator-source-expiry.js";
+import { creatorSourceExpiryDigest, openCreatorSourceAuthorReceiptAuthor } from "./creator-source-expiry.js";
 
 declare const ownedSigningRequestBrand: unique symbol;
 export interface OwnedSigningRequest { readonly [ownedSigningRequestBrand]: true; }
@@ -101,9 +101,10 @@ export function withAuthoredSourceExpirySigningRequest<T>(input: Readonly<{
 		!(input.exactCanonicalReceiptBytes instanceof Uint8Array) ||
 		!(input.signerPublicKey instanceof Uint8Array) || input.signerPublicKey.byteLength !== 32) throw new TypeError("OWNED_SOURCE_EXPIRY_RECEIPT_INVALID");
 	const bytes = Uint8Array.from(input.exactCanonicalReceiptBytes);
-	const receipt = openCreatorSourceExpiryReceipt(bytes);
+	// An expiry or a replaced-source resolution receipt (both the source author's own settlement statements).
+	const receiptAuthor = openCreatorSourceAuthorReceiptAuthor(bytes);
 	const author = Array.from(input.signerPublicKey, byte => byte.toString(16).padStart(2, "0")).join("");
-	if (receipt === undefined || receipt.sourceAuthor !== author) throw new TypeError("OWNED_SOURCE_EXPIRY_RECEIPT_INVALID");
+	if (receiptAuthor === undefined || receiptAuthor !== author) throw new TypeError("OWNED_SOURCE_EXPIRY_RECEIPT_INVALID");
 	return withRequest({ kind: "source-expiry", digest: creatorSourceExpiryDigest(bytes), publicKey: Uint8Array.from(input.signerPublicKey) }, action);
 }
 

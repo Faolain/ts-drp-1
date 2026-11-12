@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -68,7 +68,8 @@ async function nativeImage(f: Fixture) {
 			plan: plan === null ? null : { fenceSequence: plan.fenceSequence, entries: plan.entries.map(entry => ({
 				sequence: entry.sourceSequence, disposition: entry.disposition, replacement: entry.replacementSequence,
 				resolved: entry.sourceResolutionDigest !== undefined,
-				...(Reflect.get(entry, "sourceResolutionScope") === undefined ? {} : { scope: Reflect.get(entry, "sourceResolutionScope") }) })),
+				...(Reflect.get(entry, "sourceResolutionScope") === undefined ? {} : { scope: Reflect.get(entry, "sourceResolutionScope"),
+					kind: Reflect.get(entry, "sourceResolutionKind") }) })),
 				contexts: plan.sourceContexts?.length ?? 0 },
 			lineage: await store.readLineage(scope),
 			outbox: (await store.readOutboxPage({ scope, limit: 128 })).map(row => {
@@ -136,7 +137,8 @@ function expectReleased(image: Awaited<ReturnType<typeof nativeImage>>, m1: numb
 	// What released it: the write-once replaced-source frontier resolution on its completed entry (or
 	// the entry is gone with its pruned row).
 	const entry = image.plan?.entries.find(value => value.sequence === m1);
-	if (entry !== undefined) expect(entry).toMatchObject({ disposition: "rebase", resolved: true, scope: "replaced-source" });
+	// The replacement was admitted (committed), so the committed-replacement basis resolves it (no signature).
+	if (entry !== undefined) expect(entry).toMatchObject({ disposition: "rebase", resolved: true, scope: "replaced-source", kind: "replacement" });
 }
 
 describe.skipIf(INNER)("replaced-source frontier resolution: a withheld (non-member) plan", () => {
@@ -160,6 +162,148 @@ describe.skipIf(INNER)("replaced-source frontier resolution: a withheld (non-mem
 		expect(count(creator, MOVE)).toBe(1);
 	}, 600_000);
 });
+
+function issuanceFile(directory: string): string {
+	const found: string[] = [];
+	const walk = (path: string): void => { for (const entry of readdirSync(path, { withFileTypes: true })) {
+		const child = join(path, entry.name);
+		if (entry.isDirectory()) walk(child); else if (entry.name.endsWith(".drp-issuance-v1.sqlite")) found.push(child);
+	} };
+	walk(join(directory, "local-sessions"));
+	return required(found.length === 1 ? found[0] : undefined);
+}
+const PLAN_LIMITS = { maxBytes: 4_194_304, maxDepth: 32, maxItems: 65_536 };
+type StoredEntry = { sourceSequence: number; sourceDigest: Uint8Array; replacementSequence: number | null; disposition: string;
+	sourceContextDigest?: Uint8Array; sourceResolutionDigest?: Uint8Array; sourceResolutionKind?: string };
+type StoredContext = { digest: Uint8Array; exactCanonicalContextBytes: Uint8Array };
+/** Store-level edit of the Writer's plan (canonical carrier), bypassing every plan-write law. */
+function editPlanEntries(directory: string, edit: (entries: StoredEntry[], contexts: StoredContext[]) => void): void {
+	const database = new DatabaseSync(issuanceFile(directory));
+	try {
+		database.function("issuance_retirement_connection", (_objectId: unknown) => 1); // the store's retirement fence trigger
+		const row = required(database.prepare("SELECT object_id, author, entries_json FROM settlement_plans").get());
+		const stored = JSON.parse(String(row.entries_json)) as { kind: string; bytes: string };
+		const plan = decodeCanonical(Buffer.from(stored.bytes, "base64"), PLAN_LIMITS) as
+			{ entries: StoredEntry[]; sourceContexts?: StoredContext[] };
+		plan.sourceContexts ??= [];
+		edit(plan.entries, plan.sourceContexts);
+		plan.sourceContexts.sort((a, b) => Buffer.compare(a.digest, b.digest));
+		const text = JSON.stringify({ ...stored, bytes: Buffer.from(encodeCanonical(plan, PLAN_LIMITS)).toString("base64") });
+		database.prepare("UPDATE settlement_plans SET entries_json=? WHERE object_id=? AND author=?").run(text, row.object_id, row.author);
+	} finally { database.close(); }
+}
+const sameDigest = (a: Uint8Array | undefined, b: Uint8Array | undefined) => a !== undefined && b !== undefined && Buffer.from(a).equals(Buffer.from(b));
+
+// The committed-replacement basis rests on signed evidence proven on every install by the lost-twice link
+// step (proveReplacementLink + replacementCommittedResolution), never on the plan alone. With m1 resolved
+// but not yet retired, a store edit of the Writer's plan makes the next open or install refuse, and the edit
+// is never silently repaired:
+// - "forged-completion": the resolution names a well-formed context (digest of its bytes) that is not the
+//   replacement's retained completion proof;
+// - "link-mismatch": m1's entry names another own row (the epoch-1 fence) as its replacement;
+// - "double-claim": a second entry claims m1's replacement as well;
+// - "other-plane-completion": the resolution names a genuine context of a different plane (m1's own
+//   displaced-plane custody context, or the fence's).
+describe.skipIf(INNER)("replaced-source resolution, committed-replacement basis: tamper refuses", () => {
+	it.each(["forged-completion", "link-mismatch", "double-claim", "other-plane-completion"] as const)("tamper (%s)", async (shape) => {
+		const f = await fixture();
+		const creator = await f.open(0);
+		let member = await f.open(1);
+		const { m1, replaced } = await replacedThenRevoked(f, creator, member);
+		const replacement = required(replaced.plan?.entries.find(value => value.sequence === m1)?.replacement);
+		let image = replaced;
+		for (let seal = 0; seal < 6; seal++) {
+			image = await roll(f, creator, member, `tamper-${shape}-${seal}`);
+			if (image.plan?.entries.some(value => value.sequence === m1 && value.kind === "replacement")) break;
+		}
+		expect(image.plan?.entries.find(value => value.sequence === m1)).toMatchObject({ kind: "replacement", scope: "replaced-source" });
+		expect(image.outbox.some(row => row.sequence === m1), "m1 not yet retired").toBe(true);
+		const fence = required(image.outbox.find(row => row.epoch === 1 && row.action === "$drp.author-fence.v1")).sequence;
+		await f.stop(member);
+		let before: StoredEntry | undefined;
+		editPlanEntries(f.directory, (entries, contexts) => {
+			const entry = required(entries.find(value => value.sourceSequence === m1));
+			if (shape === "forged-completion") {
+				const exactCanonicalContextBytes = encodeCanonical({ forged: "replacement-completion", sequence: replacement });
+				const forged = { digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes };
+				contexts.push(forged);
+				entry.sourceResolutionDigest = forged.digest;
+			} else if (shape === "link-mismatch") entry.replacementSequence = fence;
+			else if (shape === "double-claim") {
+				const other = required(entries.find(value => value.sourceSequence !== m1 && value.sourceSequence !== replacement &&
+					value.sourceResolutionDigest === undefined));
+				other.disposition = "rebase";
+				other.replacementSequence = replacement;
+			} else {
+				const genuine = required(contexts.find(value => !sameDigest(value.digest, entry.sourceResolutionDigest)));
+				entry.sourceResolutionDigest = genuine.digest;
+			}
+			before = structuredClone(entry);
+			// Unreferenced contexts are malformed (a store-law refusal, not the proof's): keep only referenced ones.
+			const referenced = (value: StoredContext) => entries.some(e => sameDigest(e.sourceContextDigest, value.digest) ||
+				sameDigest(e.sourceResolutionDigest, value.digest));
+			contexts.splice(0, contexts.length, ...contexts.filter(referenced));
+		});
+		let refusal: string[] | undefined;
+		try {
+			member = await f.open(1, { reopen: true, promote: true });
+			await roll(f, creator, member, `tamper-${shape}-next`);
+		} catch (cause) { refusal = chain(cause); }
+		console.info(`REPLACED_SOURCE tamper ${shape} refusal ${JSON.stringify(refusal)}`);
+		expect(refusal).toBeDefined();
+		// Never repaired: the edited entry is stored as written.
+		const database = new DatabaseSync(issuanceFile(f.directory), { readOnly: true });
+		try {
+			const author = required(f.identities[1]).author;
+			const stored = planEntries(database, author).find(value => value.sourceSequence === m1);
+			expect(stored?.replacementSequence).toBe(required(before).replacementSequence);
+			expect(sameDigest(stored?.sourceResolutionDigest as Uint8Array | undefined, required(before).sourceResolutionDigest)).toBe(true);
+		} finally { database.close(); }
+	}, 600_000);
+});
+
+// The committed basis needs the replacement link to END committed. m1 is replaced by r1 and r1 never
+// reaches the creator (its chain end is open, not committed); a store edit writes a kind "replacement"
+// resolution on m1's entry anyway (naming a genuine context of the plan). The next open or install refuses
+// and m1 stays protected; the edit is not repaired.
+it.skipIf(INNER)("committed basis: a replacement whose chain end is not committed is never a release basis", async () => {
+	const f = await fixture();
+	const creator = await f.open(0);
+	let member = await f.open(1);
+	const publish = Reflect.get(member.networkNode, "publishMessage") as (...args: unknown[]) => unknown;
+	Reflect.set(member.networkNode, "publishMessage", () => Promise.resolve(false));
+	await member.room.issue(message(MOVE)).catch(() => undefined);
+	const m1 = required((await nativeImage(f)).outbox.find(row => row.id === MOVE)).sequence;
+	expect((await creator.room.sealEpoch()).ok).toBe(true);
+	await creator.room.adoptCreatorSuccessor();
+	// Rows reach the creator only when delivered (creator.receive): r1 is published, never received.
+	Reflect.set(member.networkNode, "publishMessage", (...args: unknown[]) => publish.apply(member.networkNode, args));
+	await f.install(member); // r1 issued in epoch 1
+	const image = await nativeImage(f);
+	console.info(`REPLACED_SOURCE uncommitted ${JSON.stringify(image)}`);
+	const r1 = required(image.plan?.entries.find(value => value.sequence === m1)?.replacement);
+	expect(count(creator, MOVE)).toBe(0);
+	await f.stop(member);
+	editPlanEntries(f.directory, (entries, contexts) => {
+		const entry = required(entries.find(value => value.sourceSequence === m1));
+		expect(entry.replacementSequence).toBe(r1);
+		Object.assign(entry, { sourceResolutionDigest: required(contexts[0]).digest, sourceResolutionKind: "replacement",
+			sourceResolutionScope: "replaced-source" });
+	});
+	let refusal: string[] | undefined;
+	try {
+		member = await f.open(1, { reopen: true, promote: true });
+		await roll(f, creator, member, "uncommitted-next");
+	} catch (cause) { refusal = chain(cause); }
+	console.info(`REPLACED_SOURCE tamper uncommitted-end refusal ${JSON.stringify(refusal)}`);
+	expect(refusal).toBeDefined();
+	const database = new DatabaseSync(issuanceFile(f.directory), { readOnly: true });
+	try {
+		const stored = planEntries(database, required(f.identities[1]).author).find(value => value.sourceSequence === m1);
+		expect(stored?.sourceResolutionKind).toBe("replacement");
+	} finally { database.close(); }
+	expect(count(creator, MOVE)).toBe(0);
+}, 600_000);
 
 type Setup = { selectors: Record<number, { slot: number; incarnation: number }>; author: string; m1: number; next: number };
 const planEntries = (database: DatabaseSync, author: string) => {

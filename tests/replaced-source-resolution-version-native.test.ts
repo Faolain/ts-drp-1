@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 
+import { copySettlementPlan } from "../packages/issuance-store/src/contract.js";
 import { durableIssuancePruningMaintenanceForStore } from "../packages/issuance-store/src/maintenance.js";
 import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixtures/chat-membership-shares/room.js";
@@ -52,7 +53,7 @@ async function image(f: Fixture) {
 		const plan = await store.readSettlementPlan(scope);
 		return { fenceSequence: plan?.fenceSequence ?? null, next: (await store.readLineage(scope)).next,
 			entries: plan?.entries.map(entry => ({ sequence: entry.sourceSequence, disposition: entry.disposition,
-				scope: Reflect.get(entry, "sourceResolutionScope") ?? null })) ?? [],
+				scope: Reflect.get(entry, "sourceResolutionScope") ?? null, kind: Reflect.get(entry, "sourceResolutionKind") ?? null })) ?? [],
 			holes: completed?.protectedRecords.filter(hole => hole.author === author).map(hole => hole.authorSequence) ?? null,
 			throughEpoch: completed?.throughEpoch ?? null };
 	});
@@ -92,6 +93,45 @@ function durableCensus(directory: string): Record<string, string> {
 	return out;
 }
 
+/**
+ * The Writer's stored plans (canonical carrier), decoded, read-only. Used by the "refuse" phase: this
+ * version's own plan reader (the checkout it runs from) must refuse the stored plan exactly because of
+ * the replaced-source resolution keys, and accept the same plan without them.
+ */
+function storedPlans(directory: string) {
+	const plans: { scope: { objectId: string; author: string }; plan: Record<string, unknown> }[] = [];
+	const walk = (path: string) => {
+		for (const entry of readdirSync(path, { withFileTypes: true })) {
+			const full = join(path, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (entry.name.endsWith(".drp-issuance-v1.sqlite")) {
+				const database = new DatabaseSync(full, { readOnly: true });
+				try {
+					for (const row of database.prepare("SELECT object_id, author, entries_json FROM settlement_plans").all()) {
+						const stored = JSON.parse(String(row.entries_json)) as { bytes?: string };
+						if (stored.bytes === undefined) continue;
+						plans.push({ scope: { objectId: String(row.object_id), author: String(row.author) },
+							plan: decodeCanonical(Buffer.from(stored.bytes, "base64"), { maxBytes: 4_194_304, maxDepth: 32, maxItems: 65_536 }) as Record<string, unknown> });
+					}
+				} finally { database.close(); }
+			}
+		}
+	};
+	walk(directory);
+	return plans;
+}
+const RESOLUTION_KEYS = ["sourceResolutionScope", "sourceResolutionKind", "sourceResolutionDigest"];
+/** The plan without the replaced-source resolution and without later fields older readers never knew. */
+function withoutReplacedSourceResolution(plan: Record<string, unknown>): Record<string, unknown> {
+	const entries = (plan.entries as Record<string, unknown>[]).map(entry => entry.sourceResolutionScope === undefined ? entry
+		: Object.fromEntries(Object.entries(entry).filter(([key]) => !RESOLUTION_KEYS.includes(key))));
+	const referenced = (digest: unknown) => entries.some(entry => [entry.sourceContextDigest, entry.sourceResolutionDigest]
+		.some(value => value instanceof Uint8Array && Buffer.from(value).equals(Buffer.from(digest as Uint8Array))));
+	const contexts = ((plan.sourceContexts ?? []) as { digest: Uint8Array }[]).filter(value => referenced(value.digest));
+	const { memberFrontier: _frontier, completedSourceCustody: _custody, sourceContexts: _contexts, ...rest } = plan;
+	return { ...rest, entries, ...(contexts.length === 0 ? {} : { sourceContexts: contexts }) };
+}
+
 it.runIf(PHASE === "setup")("setup: replace m1, revoke the Writer, roll until m1 is released", async () => {
 	const directory = required(DIRECTORY), log: unknown[] = [];
 	const f = await fixture(directory);
@@ -116,7 +156,9 @@ it.runIf(PHASE === "setup")("setup: replace m1, revoke the Writer, roll until m1
 	for (let seal = 0; seal < 6; seal++) last = await roll(f, creator, member, log, `setup-${seal}`);
 	// Released through the replaced-source resolution; its entry stays while its row is present.
 	expect(last.holes).not.toContain(m1);
-	expect(last.entries.find(entry => entry.sequence === m1)).toMatchObject({ disposition: "rebase", scope: "replaced-source" });
+	// The replacement was admitted, so the committed-replacement basis resolved it (kind "replacement").
+	expect(last.entries.find(entry => entry.sequence === m1)).toMatchObject({ disposition: "rebase", scope: "replaced-source",
+		kind: "replacement" });
 	writeFileSync(join(directory, "setup.json"), JSON.stringify({ selectors: f.localSelectors, m1, log }));
 	console.info(`REPLACED_SOURCE_VERSION setup ${JSON.stringify(last)}`);
 }, 600_000);
@@ -146,6 +188,18 @@ it.runIf(PHASE === "continue")("continue: reopen the same stores", async () => {
 		// Fails closed on first open, and nothing durable changed.
 		expect(error, "the older version must refuse to open a store holding a replaced-source resolution").toBeDefined();
 		expect(after).toEqual(before);
+		// This version's own plan reader refuses the stored plan because of the resolution keys alone: it
+		// accepts the same plan without them (and without the unreleased F2/lost-twice fields).
+		const resolved = storedPlans(directory).filter(value => (value.plan.entries as Record<string, unknown>[])
+			.some(entry => entry.sourceResolutionScope !== undefined));
+		expect(resolved.length).toBeGreaterThan(0);
+		for (const { scope, plan } of resolved) {
+			const readsStored = copySettlementPlan(plan, scope) !== undefined;
+			const readsWithout = copySettlementPlan(withoutReplacedSourceResolution(plan), scope) !== undefined;
+			console.info(`REPLACED_SOURCE_VERSION reader ${JSON.stringify({ author: scope.author.slice(0, 12), readsStored, readsWithout })}`);
+			expect(readsStored).toBe(false);
+			expect(readsWithout).toBe(true);
+		}
 		return;
 	}
 	expect(error).toBeUndefined();

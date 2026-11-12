@@ -13,13 +13,16 @@ import { creatorCloseMembershipSubsetFields, creatorCloseMembershipSubsetMemberF
 import { openReceivedCloseMembership, RECEIVED_CLOSE_AUTHORITY_MAX_RECORD_BYTES } from "./creator-received-close-membership.js";
 import {creatorQ1SealQcFields, creatorQ1SealVoteFields} from "@ts-drp/seal/creator";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with {type: "json"};
-import { creatorSourceExpiryFields, verifyCreatorSourceExpiryReceipt, type CreatorSourceExpiryReceipt } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
+import { creatorReplacedSourceFields, creatorSourceExpiryFields, verifyCreatorReplacedSourceReceipt, verifyCreatorSourceExpiryReceipt,
+	type CreatorReplacedSourceReceipt, type CreatorSourceExpiryReceipt } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
 
 const KIND = "creator-settlement-source-context-1";
 const DOMAIN = "ts-drp/settlement-source-context/v1";
 const COMPLETION_KIND = "creator-settlement-source-completion-1";
 const EXPIRY_KIND = "creator-settlement-source-expiry-1";
-export { creatorSourceExpiryFields };
+// A replaced-source frontier resolution carrier: never an expiry (distinct carrier and receipt kinds).
+const REPLACED_KIND = "creator-settlement-replaced-source-1";
+export { creatorReplacedSourceFields, creatorSourceExpiryFields };
 const MAX_PARAMETERS = encodeCanonical(Object.fromEntries(registry.kinds.parameters.fields.map(field =>
 	[field.name, field.constraints.maximum]))).byteLength;
 // Exact existing anchor, ACL and registered parameter-schema bounds, with canonical field overhead.
@@ -130,8 +133,14 @@ export function creatorSourceCustodyGeometryForSizing(trust: CurrentAnchorTrust,
 	const expiry = record(creatorSourceExpiryFields({objectId: trust.objectId, pinnedGenesisAnchorDigest: digest,
 		sourceAuthor: digest, sourceSequence: integer, sourceDigest: bytes(32), sourceContextDigest: bytes(32),
 		signingEpoch: integer, signingAnchorDigest: digest, signingNativeHeadDigest: bytes(32), signingFloorDigest: bytes(32)}));
-	const maxExpiryByteLength = record({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: bytes(expiry.byteLength),
-		detachedSignature: bytes(64)}).byteLength;
+	// One receipt context per resolvable source: an expiry or a replaced-source resolution, the wider.
+	const replaced = record(creatorReplacedSourceFields({objectId: trust.objectId, pinnedGenesisAnchorDigest: digest,
+		sourceAuthor: digest, sourceSequence: integer, sourceDigest: bytes(32), sourceEpoch: integer, replacementSequence: integer,
+		frontierCurrentEpoch: integer, frontierAdmissionEpoch: integer, frontierTerminalThrough: integer, guardSequence: integer,
+		signingEpoch: integer, signingAnchorDigest: digest, signingNativeHeadDigest: bytes(32), signingFloorDigest: bytes(32)}));
+	const maxExpiryByteLength = Math.max(record({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: bytes(expiry.byteLength),
+		detachedSignature: bytes(64)}).byteLength, record({kind: REPLACED_KIND, version: 1,
+		exactCanonicalReceiptBytes: bytes(replaced.byteLength), detachedSignature: bytes(64)}).byteLength);
 	const varuintWidth = (value: number): number => { let width = 1; while (value >= 128) { value = Math.floor(value / 128); width++; } return width; };
 	const emptyParameters = encodeCanonical({kind: KIND, version: 1, ...anchor, aclBytes: exactCanonicalAclBytes,
 		parametersBytes: new Uint8Array()}).byteLength;
@@ -274,6 +283,45 @@ export function captureCreatorSourceExpiry(exactCanonicalReceiptBytes: Uint8Arra
 	const bytes = encodeCanonical({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: new Uint8Array(exactCanonicalReceiptBytes),
 		detachedSignature: new Uint8Array(detachedSignature)}, expiryLimits);
 	return {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
+}
+
+/** Wraps the exact signed replaced-source receipt as one plan context (no authority). */
+export function captureCreatorReplacedSourceResolution(exactCanonicalReceiptBytes: Uint8Array, detachedSignature: Uint8Array): SettlementSourceContext {
+	if (!(exactCanonicalReceiptBytes instanceof Uint8Array) || !(detachedSignature instanceof Uint8Array) || detachedSignature.byteLength !== 64)
+		throw new TypeError("creator replaced source carrier is invalid");
+	const bytes = encodeCanonical({kind: REPLACED_KIND, version: 1, exactCanonicalReceiptBytes: new Uint8Array(exactCanonicalReceiptBytes),
+		detachedSignature: new Uint8Array(detachedSignature)}, expiryLimits);
+	return {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
+}
+
+/**
+ * Exact signed replaced-source frontier resolution of one completed plan entry: the carrier, the source
+ * author's signature, the receipt's internal frontier statement, and its binding to this room, this
+ * author's entry (source sequence and digest, replacement) and an epoch no later than the current one.
+ * DATA only: the installed frontier's monotone consistency is the native resolver's check.
+ * @param context - The retained receipt context.
+ * @param expected - The room, the plan entry and the current epoch.
+ * @param windowEpochs - The settlement window.
+ * @returns The receipt, or undefined.
+ */
+export function openCreatorReplacedSourceResolution(context: SettlementSourceContext, expected: Readonly<{objectId: string;
+	pinnedGenesisAnchorDigest: string; sourceAuthor: string; sourceSequence: number; sourceDigest: Uint8Array;
+	replacementSequence: number; currentEpoch: number}>, windowEpochs: number): CreatorReplacedSourceReceipt | undefined {
+	try {
+		const bytes = new Uint8Array(context.exactCanonicalContextBytes);
+		if (!(context.digest instanceof Uint8Array) || compareBytes(hashDomain(DOMAIN, bytes), context.digest) !== 0) return undefined;
+		const value = decodeCanonical(bytes, expiryLimits);
+		if (!isClosedDurableIssuanceRecord(value, ["kind", "version", "exactCanonicalReceiptBytes", "detachedSignature"]) ||
+			value.kind !== REPLACED_KIND || value.version !== 1 || !(value.exactCanonicalReceiptBytes instanceof Uint8Array) ||
+			!(value.detachedSignature instanceof Uint8Array) || value.detachedSignature.byteLength !== 64 ||
+			compareBytes(bytes, encodeCanonical(value, expiryLimits)) !== 0) return undefined;
+		const receipt = verifyCreatorReplacedSourceReceipt(value.exactCanonicalReceiptBytes, value.detachedSignature, windowEpochs);
+		if (receipt === undefined || receipt.objectId !== expected.objectId || receipt.pinnedGenesisAnchorDigest !== expected.pinnedGenesisAnchorDigest ||
+			receipt.sourceAuthor !== expected.sourceAuthor || receipt.sourceSequence !== expected.sourceSequence ||
+			!(expected.sourceDigest instanceof Uint8Array) || compareBytes(receipt.sourceDigest, expected.sourceDigest) !== 0 ||
+			receipt.replacementSequence !== expected.replacementSequence || receipt.signingEpoch > expected.currentEpoch) return undefined;
+		return receipt;
+	} catch { return undefined; }
 }
 
 /** Exact signed local-author abandonment of one retained source. Historical

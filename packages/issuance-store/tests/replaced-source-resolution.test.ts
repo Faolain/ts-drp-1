@@ -89,6 +89,54 @@ describe("store law: a replaced-source frontier resolution", () => {
 	});
 });
 
+// The committed-replacement basis (approved "replacement committed"): kind "replacement" names the
+// replacement's committed completion context (creator-signed Cut membership) the plan already holds; no
+// new signature. The store law is the same structural form; the native census proves the link and the
+// completion on every install (the lost-twice link step), and fails closed.
+describe("store law: a replaced-source resolution on the committed-replacement basis", () => {
+	const completion = context("replacement-completion");
+	// The replacement's own entry: committed under its received-close completion proof.
+	const committed = { sourceSequence: 3, sourceDigest: bytes(4, 32), disposition: "committed", replacementSequence: null,
+		sourceContextDigest: fenceContext.digest, sourceResolutionDigest: completion.digest } as Entry;
+	const byReplacement = { sourceResolutionDigest: completion.digest, sourceResolutionKind: "replacement",
+		sourceResolutionScope: "replaced-source" } as const;
+	const withCompletion = (entries: readonly Entry[], revision = 4): SettlementPlan =>
+		({ scope, revision, fenceSequence: null, entries: [...entries],
+			sourceContexts: [completion, fenceContext].sort((a, b) => Buffer.compare(a.digest, b.digest)) });
+
+	it("is accepted on a completed rebase or transform entry; it shares the replacement's completion context", () => {
+		expect(copySettlementPlan(withCompletion([rebase(byReplacement), committed]), scope)?.entries[0]).toMatchObject(byReplacement);
+		expect(copySettlementPlan(withCompletion([rebase({ ...byReplacement, disposition: "transform" }), committed]), scope)?.entries[0])
+			.toMatchObject(byReplacement);
+	});
+
+	it("is refused without its scope, on a non-replacement entry, and when its context is absent", () => {
+		const { sourceResolutionScope: _scope, ...noScope } = byReplacement;
+		expect(copySettlementPlan(withCompletion([rebase(noScope), committed]), scope)).toBeUndefined();
+		expect(copySettlementPlan(withCompletion([rebase({ ...byReplacement, replacementSequence: null }), committed]), scope)).toBeUndefined();
+		expect(copySettlementPlan(withCompletion([{ sourceSequence: 2, sourceDigest: bytes(3, 32), disposition: "expire",
+			replacementSequence: null, sourceContextDigest: completion.digest, ...byReplacement } as Entry, committed]), scope)).toBeUndefined();
+		expect(copySettlementPlan({ scope, revision: 4, fenceSequence: null, entries: [rebase(byReplacement)] }, scope)).toBeUndefined();
+		expect(copySettlementPlan(withCompletion([rebase({ ...byReplacement, sourceResolutionKind: "committed" }), committed]), scope))
+			.toBeUndefined();
+	});
+
+	it("arrives once and never changes kind, digest or leaves after", () => {
+		const before = withCompletion([rebase(), committed], 4), after = withCompletion([rebase(byReplacement), committed], 5);
+		expect(() => assertSettlementPlanProgressTransition(before, after)).not.toThrow();
+		expect(() => assertSettlementPlanProgressTransition(after, withCompletion([rebase(), committed], 6))).toThrow();
+		const asFrontier: SettlementPlan = { ...withCompletion([rebase({ ...byReplacement, sourceResolutionKind: "frontier" }), committed], 6) };
+		expect(() => assertSettlementPlanProgressTransition(after, asFrontier)).toThrow();
+		const fromFrontier = withCompletion([rebase({ ...byReplacement, sourceResolutionKind: "frontier" }), committed], 5);
+		expect(() => assertSettlementPlanProgressTransition(fromFrontier, { ...after, revision: 6 })).toThrow();
+	});
+
+	it("the per-entry release clause counts it; the whole-plan pruning predicate is unchanged", () => {
+		expect(settlementEntryPermitsSourceRelease(null, rebase(byReplacement))).toBe(true);
+		expect(settlementPlanPermitsAuthenticatedPruning({ fenceSequence: null, entries: [rebase(byReplacement)] })).toBe(false);
+	});
+});
+
 describe("retirement law: a fenceless plan lets a frontier-resolved replaced source go", () => {
 	const control: DurableIssuanceRetirementControl = { kind: "v3-issuance-retirement-control-1", objectId: scope.objectId,
 		incarnation: "c".repeat(64), revision: 0, sequence: 0, active: null, completed: null };
