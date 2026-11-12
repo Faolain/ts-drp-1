@@ -1070,7 +1070,7 @@ async function deliveredReissuesLeaveTheBacklog() {
 					writer: await writer.authorityEpoch(),
 					undelivered: (await status())?.undelivered.length,
 					kept: ((await writer.rolloverStatus?.()) as { kept?: unknown[] } | null)?.kept?.length,
-					consumed: ((await writer.settlementPlanDump?.()) as { consumed?: unknown[] } | null)?.consumed,
+					plan: await writer.settlementPlanDump?.(),
 				})}\n`
 			);
 		try {
