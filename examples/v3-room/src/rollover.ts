@@ -153,6 +153,28 @@ export class V3RoomBusy extends Error {
 }
 
 /**
+ * Reported through `onError` (never thrown to the caller): a kept move's re-offer was refused with an
+ * error outside the kinds the policy keeps a move for. The move is not dropped: it stays kept
+ * (`status().kept`) and is offered again in a later epoch, once per epoch, as a given-back move the room
+ * still lists is.
+ */
+export class V3RoomKeptMoveRefused extends Error {
+	/**
+	 * @param operation - The kept move.
+	 * @param epoch - The epoch the re-offer was refused in.
+	 * @param options - The refusal, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		options?: ErrorOptions
+	) {
+		super("a kept move's re-offer was refused; the move is kept and offered again in a later epoch", options);
+		this.name = "V3RoomKeptMoveRefused";
+	}
+}
+
+/**
  * A member's new move refused because its undelivered moves fill the room's backlog
  * (V3RoomLocalBacklogFull): they are not reaching the host. The move was never accepted, so it is not
  * lost: the policy keeps it and offers it again once the member's moves reach the creator
@@ -636,14 +658,17 @@ export function createV3RoomRolloverPolicy(
 				hooks.onError?.(error);
 				return "next";
 			}
-			// Refused for good: a given-back move stays listed by the room until a row offering it again
-			// consumes its record, so the next settlement poll keeps it again (one offer per epoch).
+			// Refused for good, never dropped: a given-back move stays listed by the room until a row
+			// offering it again consumes its record, so the next settlement poll keeps it again; a new move
+			// is kept here. Either is offered again in a later epoch (one offer per epoch), and the refusal
+			// reaches onError with the move.
+			const refusedIn = currentEpoch();
 			const handBack = handBackOf.get(operation);
 			if (handBack !== undefined) {
 				handBackOf.delete(operation);
 				takenBack.delete(handBackKey(handBack));
-			}
-			hooks.onError?.(error);
+			} else keep(operation, refusedIn);
+			hooks.onError?.(new V3RoomKeptMoveRefused(operation, refusedIn, { cause: error }));
 		}
 		return "next";
 	};

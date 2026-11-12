@@ -79,6 +79,7 @@ export {
 	type V3RoomRolloverPolicy,
 	type V3RoomRolloverStatus,
 	V3RoomBusy,
+	V3RoomKeptMoveRefused,
 	V3RoomSuccessorUnavailable,
 	type V3RoomSuccessorOffer,
 } from "./rollover.js";
