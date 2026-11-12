@@ -92,6 +92,8 @@ export interface IssuedVertexFact {
 export interface FrontierScenarioResult {
 	readonly admittedDigests: readonly string[];
 	readonly initialTips: readonly string[];
+	/** The initial tips are the author's own sibling rows; here in author-sequence order. */
+	readonly initialTipsBySequence: readonly string[];
 	readonly issued: readonly IssuedVertexFact[];
 	readonly stagedOutputs?: readonly unknown[];
 	readonly journalAppends: number;
@@ -879,6 +881,8 @@ export async function runFrontierScenario(
 		});
 		return Object.freeze({
 			admittedDigests: Object.freeze(admittedDigests),
+			// The author's sibling rows in sequence order (read before the sort below).
+			initialTipsBySequence: Object.freeze([...initialTips]),
 			initialTips: Object.freeze(initialTips.sort()),
 			issued: Object.freeze(issued),
 			journalAppends,

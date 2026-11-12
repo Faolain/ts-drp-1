@@ -309,3 +309,165 @@ module skipScopeInstallerCoverage {
     .then(corrupt(1)).then(stale(1))
     .then(all { assert(chainInvalid and dishonest and neverWronglyRetired and scope.get(1) == "closed"), creatorRoll })
 }
+
+// The frontier-classification path for a member too far behind for the departed scope's carrier
+// (departed-carrier pin). A skip install retains the departed epoch's own rows whose fate it cannot
+// see (unknown accepted work, which withholds the author fence) and classifies each one from the
+// creator's signed settlement frontier in the installed checkpoint (v3-live frontierRetainedResolution):
+//   - the creator's frontier law (deriveCreatorAuthorSettlementFrontier): per closed epoch, start from
+//     the previous tuple (carried forward unchanged for a silent author), jump to fence - 1 on an own
+//     fence above it, then extend through contiguous admitted slots;
+//   - "committed": seq <= terminalThrough and no own fence follows the row (a fence is the only other
+//     way to the boundary), or the highest own fence is within terminalThrough in the row's own epoch;
+//   - "never-admitted": seq > terminalThrough and fence-guarded (seq = terminalThrough + 1, or its own
+//     epoch's lowest fence precedes it); its move is handed back;
+//   - otherwise "unproven": the row stays retained (pinned).
+// Join rules (fix/join-own-predecessor):
+//   "covered"   a causalJoin covers the author's latest own row (every own row depends on its
+//               predecessor in the epoch);
+//   "hashOrder" (the code before) a join may skip its predecessor (first 16 tips in hash order).
+// Every epoch the member enters starts with its own fence, once nothing it retains is unclassified.
+// Assumption: the own-fence scan sees every own fence issued after a retained row.
+module skipScopeFrontier {
+  pure val MAX_E = 3
+  pure val MAX_S = 5
+  pure val SEQS = 0.to(MAX_S)
+
+  var joinRule: str
+  var creator: int
+  var member: int
+  var nextSeq: int
+  var rowEpoch: int -> int          // -1: not issued
+  var rowKind: int -> str           // fence | op | join | none
+  var deps: int -> Set[int]         // own dependencies (own rows only)
+  var admitted: Set[int]
+  var frontier: int -> int          // closed epoch -> terminalThrough (-1: null)
+  var retained: Set[int]            // own rows a skip install kept as unknown accepted work
+  var verdict: int -> str           // none | committed | never | unproven | replaced
+  var handedBack: Set[int]
+  var fenced: bool                  // the member's current epoch has its fence
+
+  def epochRows(e: int): Set[int] = SEQS.filter(s => rowEpoch.get(s) == e)
+  def fences: Set[int] = SEQS.filter(s => rowKind.get(s) == "fence")
+  def minOf(xs: Set[int]): int = xs.fold(MAX_S + 1, (a, x) => if (x < a) x else a)
+  def maxOf(xs: Set[int]): int = xs.fold(-1, (a, x) => if (x > a) x else a)
+  def closeFrontier(c: int): int =
+    val prev = if (c == 0) -1 else frontier.get(c - 1)
+    val slots = SEQS.filter(s => admitted.contains(s) and rowEpoch.get(s) == c)
+    val jumps = slots.filter(s => rowKind.get(s) == "fence" and s > prev)
+    val start = if (jumps.size() > 0) minOf(jumps) - 1 else prev
+    range(0, MAX_S + 1).foldl(start, (b, s) => if (s == b + 1 and slots.contains(s)) s else b)
+  def classifyRow(s: int, t: int): str =
+    val e = rowEpoch.get(s)
+    val highest = maxOf(fences)
+    val lowestOwn = minOf(fences.filter(f => rowEpoch.get(f) == e))
+    if (s <= t and (highest < s or (highest <= t and rowEpoch.get(highest) == e))) "committed"
+    else if (s > t and (s == t + 1 or lowestOwn <= s)) "never"
+    else "unproven"
+
+  action initWith(rule: str): bool = all {
+    joinRule' = rule, creator' = 0, member' = 0, nextSeq' = 1,
+    rowEpoch' = SEQS.mapBy(s => if (s == 0) 0 else -1),
+    rowKind' = SEQS.mapBy(s => if (s == 0) "fence" else "none"),
+    deps' = SEQS.mapBy(s => Set()), admitted' = Set(), frontier' = 0.to(MAX_E).mapBy(e => -1),
+    retained' = Set(), verdict' = SEQS.mapBy(s => "none"), handedBack' = Set(), fenced' = true,
+  }
+  action init = initWith("covered")
+  action initHashOrder = initWith("hashOrder")
+
+  action unchangedRows = all { rowEpoch' = rowEpoch, rowKind' = rowKind, deps' = deps, nextSeq' = nextSeq }
+
+  // The member issues an application row or a causalJoin in its epoch, once that epoch is fenced.
+  action issue(kind: str, skip: bool): bool = all {
+    fenced, nextSeq <= MAX_S,
+    val earlier = epochRows(member)
+    val own = if (kind == "join" and skip and joinRule == "hashOrder") earlier.exclude(Set(maxOf(earlier))) else earlier
+    all {
+      rowEpoch' = rowEpoch.set(nextSeq, member), rowKind' = rowKind.set(nextSeq, kind), deps' = deps.set(nextSeq, own),
+      nextSeq' = nextSeq + 1,
+    },
+    joinRule' = joinRule, creator' = creator, member' = member, admitted' = admitted, frontier' = frontier,
+    retained' = retained, verdict' = verdict, handedBack' = handedBack, fenced' = fenced,
+  }
+  // The creator admits a delivered row in its current epoch once its dependencies are admitted.
+  action deliver(s: int): bool = all {
+    rowEpoch.get(s) == creator, not(admitted.contains(s)), deps.get(s).subseteq(admitted),
+    admitted' = admitted.union(Set(s)), unchangedRows,
+    joinRule' = joinRule, creator' = creator, member' = member, frontier' = frontier,
+    retained' = retained, verdict' = verdict, handedBack' = handedBack, fenced' = fenced,
+  }
+  action creatorRoll = all {
+    creator < MAX_E, creator' = creator + 1, frontier' = frontier.set(creator, closeFrontier(creator)), unchangedRows,
+    joinRule' = joinRule, member' = member, admitted' = admitted,
+    retained' = retained, verdict' = verdict, handedBack' = handedBack, fenced' = fenced,
+  }
+  // Adjacent install: the offer's Cut shows the departed epoch's admitted rows; the rest are replaced
+  // (their moves reissued in the target epoch, outside this model's sequences). Skip install: the
+  // departed epoch's unseen rows are retained and the fence is withheld until each is classified.
+  action install(t: int): bool = all {
+    t > member, t <= creator, retained.forall(s => verdict.get(s) != "none"),
+    val departed = epochRows(member).filter(s => rowKind.get(s) != "fence" and verdict.get(s) == "none")
+    if (t == member + 1) all {
+      verdict' = SEQS.mapBy(s => if (departed.contains(s)) (if (admitted.contains(s)) "committed" else "replaced") else verdict.get(s)),
+      retained' = retained,
+    } else all { verdict' = verdict, retained' = retained.union(departed) },
+    member' = t, fenced' = false, unchangedRows,
+    joinRule' = joinRule, creator' = creator, admitted' = admitted, frontier' = frontier, handedBack' = handedBack,
+  }
+  // The author fence of the member's epoch, once nothing retained is unclassified.
+  action fence = all {
+    not(fenced), nextSeq <= MAX_S, retained.forall(s => verdict.get(s) != "none"),
+    rowEpoch' = rowEpoch.set(nextSeq, member), rowKind' = rowKind.set(nextSeq, "fence"), deps' = deps.set(nextSeq, epochRows(member)),
+    nextSeq' = nextSeq + 1, fenced' = true,
+    joinRule' = joinRule, creator' = creator, member' = member, admitted' = admitted, frontier' = frontier,
+    retained' = retained, verdict' = verdict, handedBack' = handedBack,
+  }
+  // A retained row classified from the installed checkpoint's frontier (the close of member - 1).
+  action classify(s: int): bool = all {
+    retained.contains(s), verdict.get(s) == "none", member >= 1,
+    val v = classifyRow(s, frontier.get(member - 1))
+    all {
+      verdict' = verdict.set(s, v),
+      handedBack' = if (v == "never" and rowKind.get(s) == "op") handedBack.union(Set(s)) else handedBack,
+    },
+    unchangedRows, joinRule' = joinRule, creator' = creator, member' = member, admitted' = admitted,
+    frontier' = frontier, retained' = retained, fenced' = fenced,
+  }
+
+  action step = any {
+    nondet k = Set("op", "join").oneOf()
+    nondet skip = Set(true, false).oneOf()
+    issue(k, skip),
+    nondet s = SEQS.oneOf()
+    deliver(s),
+    creatorRoll,
+    nondet t = 0.to(MAX_E).oneOf()
+    install(t),
+    fence,
+    nondet r = SEQS.oneOf()
+    classify(r),
+  }
+
+  // 1. No committed row is handed back (nor declared never admitted).
+  val noCommittedHandedBack = SEQS.forall(s => verdict.get(s) == "never" implies not(admitted.contains(s)))
+  // 2. No displaced row is lost: a row declared committed was admitted (its move is not given back).
+  val noDisplacedLost = SEQS.forall(s => verdict.get(s) == "committed" implies admitted.contains(s))
+  // 3. The departed scope becomes collectible: no retained row stays unproven.
+  val scopeCollectible = SEQS.forall(s => verdict.get(s) != "unproven")
+  val safety = noCommittedHandedBack and noDisplacedLost
+  val frontierSafety = safety and scopeCollectible
+
+  // Witness (hashOrder): fence 0 and op 1 issued; a join skips op 1 and is admitted alone; after a skip
+  // install the frontier stops at 0 and the admitted join is declared never admitted.
+  run hashOrderJoinGapTest = initHashOrder.then(issue("op", false)).then(issue("join", true))
+    .then(deliver(0)).then(deliver(2)).then(creatorRoll).then(creatorRoll).then(install(2))
+    .then(all { assert(frontier.get(1) == 0 and retained == Set(1, 2)), classify(2) })
+    .then(all { assert(verdict.get(2) == "never" and admitted.contains(2) and not(noCommittedHandedBack)), classify(1) })
+  // The same schedule under "covered": the join cannot be admitted without its predecessor.
+  run coveredJoinTest = init.then(issue("op", false)).then(issue("join", true))
+    .then(deliver(0)).then(all { assert(not(deps.get(2).subseteq(admitted))), deliver(1) }).then(deliver(2))
+    .then(creatorRoll).then(creatorRoll).then(install(2))
+    .then(all { assert(frontier.get(1) == 2 and retained == Set(1, 2)), classify(2) })
+    .then(all { assert(verdict.get(2) == "committed" and frontierSafety), classify(1) })
+    .then(all { assert(verdict.get(1) == "committed" and frontierSafety), creatorRoll })
+}
