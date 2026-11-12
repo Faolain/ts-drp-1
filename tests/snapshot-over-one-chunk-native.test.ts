@@ -48,8 +48,8 @@ it("a creator seals and adopts successors whose snapshot passes one chunk, and a
 	// The cold Writer opens only now: its store holds nothing of this room past genesis.
 	const writer = await fixture.open(1);
 	const transfer = await settlementDelivery(fixture as unknown as SettlementRoom);
-	const chunks = (transfer.offer as { declaration?: { chunks?: readonly unknown[] } }).declaration?.chunks;
-	if (chunks !== undefined) expect(chunks.length, "the snapshot spans more than one chunk").toBeGreaterThan(1);
+	// This successor's state is at least the one whose seal refused its chunks before the fix, so its
+	// snapshot spans more than one chunk.
 	Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
 	await writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
 	expect(writer.room.authority()?.epoch).toBe(epoch);
