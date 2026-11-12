@@ -98,6 +98,7 @@ import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./nat
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
+import { RevisionReadMemo } from "./sqlite-revision.js";
 import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
@@ -979,7 +980,7 @@ import type { LocalSessionLifetime } from "./local-session-lifetime.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows } from "./local-session-lifetime.js";
 
 // Recovery census work counts (diagnostics): every census read, and those that read and classified
-// the rows.
+// the rows (the others were proven unchanged by the connection's exact revision).
 const recoveryCensusCounts = { reads: 0, fullReads: 0 };
 /**
  * Reads the recovery census work counts since the process started.
@@ -988,9 +989,21 @@ const recoveryCensusCounts = { reads: 0, fullReads: 0 };
 export function nodeRecoveryCensusCounts(): Readonly<{ reads: number; fullReads: number }> {
 	return Object.freeze({ ...recoveryCensusCounts });
 }
+// A census observation (rows, image and control: up to the census byte entitlement) and its exact
+// encoding, for one census input, retained as private copies.
+const RECOVERY_CENSUS_MEMO_ENTRIES = 4;
+const RECOVERY_CENSUS_MEMO_BYTES = 16 * 1024 * 1024;
 
 class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
+	// The recovery census is a pure read of this connection's database. Inside the census's own read
+	// transaction, an equal connection revision (sqlite-revision.ts: total_changes, data_version,
+	// schema_version) proves no row and no schema changed since the remembered read, so the remembered
+	// rows, image and control are exactly what the full read would return. Any write, by this
+	// connection (rolled back too) or another, misses. Every hit is a private deep copy. The memo lives
+	// only while one native read reservation is held: acquiring or releasing a reservation clears it,
+	// so an ended reservation retains no observation and no encoded image.
+	readonly #censusMemo = new RevisionReadMemo(RECOVERY_CENSUS_MEMO_ENTRIES, RECOVERY_CENSUS_MEMO_BYTES);
 	readonly #filename: string;
 	readonly #readReservations: SqliteNativeReadReservationOwner;
 	// Persistent (session-less) stores keep the last issue job's private writer connection for the
@@ -1034,11 +1047,13 @@ class NodeIssuanceImplementation {
 		const native = await this.#readReservations.acquire();
 		const pending = new Set<Promise<boolean>>(), token = Object.freeze({});
 		let terminal: Promise<void> | undefined;
+		this.#censusMemo.clear();
 		const lease = {native, pending, token, releasing: false, release: (): Promise<void> => {
 			// Revoke before the first await. Escaping probes retain tokens only,
 			// never an observation, its encoded image, or this native lease.
 			lease.releasing = true;
 			if (this.#censusEnrollment?.leaseToken === token) this.#censusEnrollment = undefined;
+			if (this.#censusLease === lease) this.#censusMemo.clear();
 			return terminal ??= Promise.allSettled([...pending]).then(async () => {
 				try { await native.release(); }
 				finally { if (this.#censusLease === lease) this.#censusLease = undefined; }
@@ -1066,16 +1081,39 @@ class NodeIssuanceImplementation {
 			this.#database.exec("BEGIN");
 			began = true;
 			recoveryCensusCounts.reads += 1;
-			recoveryCensusCounts.fullReads += 1;
-			const rows = retirementRows(this.#database, captured.objectId, captured.limits);
-			const image = issuanceRetirementImage(rows, captured.objectId);
-			const control = readRetirementControl(this.#database, captured.objectId);
-			if (image.logicalBytes > captured.limits.maxBytes)
-				throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+			const key = `${captured.objectId}\u0000${String(captured.limits.maxRows)}\u0000${String(captured.limits.maxBytes)}`;
+			const memo = this.#censusMemo;
+			const holder = this.#censusLease;
+			const reserved = holder !== undefined && !holder.releasing && this.#readReservations.current() === holder.native;
+			// Outside a held reservation every read is full (the memo is not begun: load reads through).
+			if (reserved) memo.begin(this.#database);
+			let observation: DurableIssuanceRecoveryCensus;
+			let exactValueBytes: Uint8Array | undefined;
+			try {
+				observation = memo.load(`census\u0000${key}`, () => {
+					recoveryCensusCounts.fullReads += 1;
+					const rows = retirementRows(this.#database, captured.objectId, captured.limits);
+					const image = issuanceRetirementImage(rows, captured.objectId);
+					const control = readRetirementControl(this.#database, captured.objectId);
+					return { rows, image, control };
+				});
+				if (observation.image.logicalBytes > captured.limits.maxBytes)
+					throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+				// The enrollment's exact encoding is a pure function of the observation: remembered with it.
+				const value = observation;
+				if (reserved)
+					try {
+						exactValueBytes = memo.load(`bytes\u0000${key}`, () => encodeCanonical(value));
+					} catch {
+						/* Optional capture: retried below exactly as before. */
+					}
+			} finally {
+				memo.end();
+			}
 			this.#database.exec("COMMIT");
 			began = false;
 			this.#assertAvailable();
-			const observation = { rows, image, control }, lease = this.#censusLease;
+			const lease = this.#censusLease;
 			if (lease !== undefined && !lease.releasing && this.#readReservations.current() === lease.native) {
 				// The original complete native read above has validated every row,
 				// preimage, plan and issued/outbox pair. Enrollment is optional DATA
@@ -1084,7 +1122,7 @@ class NodeIssuanceImplementation {
 					const observations = new WeakMap<DurableIssuanceRecoveryCensus, Readonly<{
 						input: DurableIssuanceRecoveryCensusInput; exactValueBytes: Uint8Array;
 					}>>();
-					observations.set(observation, {input: captured, exactValueBytes: encodeCanonical(observation)});
+					observations.set(observation, {input: captured, exactValueBytes: exactValueBytes ?? encodeCanonical(observation)});
 					this.#censusEnrollment = {leaseToken: lease.token, token: Object.freeze({}), observations};
 				} catch { /* Optional capture cannot narrow the original full read. */ }
 			}
