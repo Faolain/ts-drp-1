@@ -53,6 +53,9 @@ async function probe(loss: Loss) {
 	});
 	const log = (label: string, value: unknown) =>
 		process.stdout.write(`OWN_FENCE_FRESHNESS ${loss} ${label} ${JSON.stringify(value)}\n`);
+	const key = createHash("sha256").update(JSON.stringify(["issuance", "peer-1"])).digest("hex");
+	const issuancePath = join(f.directory, `${key}.sqlite.drp-issuance-v1.sqlite`);
+	const plan = () => readPlan(issuancePath);
 	const creator = await f.open(0);
 	const before = new Set(readdirSync(f.directory));
 	let member = await f.open(1);
@@ -76,6 +79,7 @@ async function probe(loss: Loss) {
 	const rows1 = await f.issuedAfter(1, null);
 	log("rows-after-install", rows1.map(describeRow));
 	log("status-after-install", member.room.settlementStatus?.());
+	log("plan-after-install", plan());
 	const fence = rows1.find((row) => {
 		const value = preimageOf(row);
 		return value.operation?.action === FENCE && value.epoch === 1;
@@ -91,8 +95,6 @@ async function probe(loss: Loss) {
 	log("creator-epoch", creator.room.authority()?.epoch ?? 0);
 	log("creator-accepted-m1", acceptedOperation(creator, author, "m1"));
 
-	const key = createHash("sha256").update(JSON.stringify(["issuance", "peer-1"])).digest("hex");
-	const issuancePath = join(f.directory, `${key}.sqlite.drp-issuance-v1.sqlite`);
 	if (loss === "delete-row" || loss === "suffix") {
 		const target = required(fence);
 		const sequence = target.commit.authorSequence;
@@ -107,7 +109,6 @@ async function probe(loss: Loss) {
 					.run(f.objectId, author, sequence);
 			if (loss === "suffix")
 				database.prepare("UPDATE lineages SET next=? WHERE object_id=? AND author=?").run(sequence, f.objectId, author);
-			log("plan-row", database.prepare("SELECT revision, fence_sequence, entries_json FROM settlement_plans").all());
 		} finally {
 			database.close();
 		}
@@ -124,10 +125,13 @@ async function probe(loss: Loss) {
 	log("rows-after-reopen", (await f.issuedAfter(1, null)).map(describeRow));
 	log("currency-after-reopen", member.room.localIssueCurrency?.());
 	log("status-after-reopen", member.room.settlementStatus?.());
+	log("plan-after-reopen", plan());
 	const installed = await outcome(() => f.install(member));
 	log("install-current", installed);
 	log("rows-after-current-install", (await f.issuedAfter(1, null)).map(describeRow));
 	log("status-after-current-install", member.room.settlementStatus?.());
+	log("authority-after-current-install", member.room.authority()?.epoch ?? 0);
+	log("plan-after-current-install", plan());
 	const issued = await outcome(() => member.room.issue(message("m2")));
 	log("issue-after", issued);
 	const after = await f.issuedAfter(1, null);
@@ -143,6 +147,26 @@ async function probe(loss: Loss) {
 	log("m1-given-back", givenBack);
 	await f.stop(member);
 	return { f, loss, reopen: "opened", installed, issued, givenBack };
+}
+
+/** The Writer's stored settlement plan: [sourceSequence, disposition, replacementSequence] per entry. */
+function readPlan(path: string) {
+	const database = new DatabaseSync(path, { readOnly: true });
+	try {
+		return database.prepare("SELECT revision, fence_sequence, entries_json FROM settlement_plans").all().map((row) => {
+			const carrier = JSON.parse(String(row.entries_json)) as { bytes: string };
+			const value = decodeCanonical(Buffer.from(carrier.bytes, "base64")) as { entries?: Record<string, unknown>[] };
+			return {
+				revision: row.revision,
+				fence: row.fence_sequence,
+				entries: (value.entries ?? []).map((entry) => [entry.sourceSequence, entry.disposition, entry.replacementSequence]),
+			};
+		});
+	} catch (error) {
+		return String((error as Error).message);
+	} finally {
+		database.close();
+	}
 }
 
 function acceptedOperation(peer: { room: { projection(): unknown } }, _author: string, id: string): boolean {
