@@ -164,6 +164,9 @@ export function openRoomWorker<Commands extends CommandMap = CommandMap>(
 		port: options.meter === undefined ? (worker as unknown as RoomWorkerPort) : meteredPort(worker, options.meter),
 		...(options.localStorageKeys === undefined ? {} : { storage: pageStorage(options.localStorageKeys) }),
 		rtc: { receive: (message) => rtcHost.receive(message) },
+		...(options.meter?.stream !== undefined && options.meter.command !== undefined
+			? { measure: options.meter as RoomWorkerMeasure }
+			: {}),
 		onStopped: terminateWorker,
 	});
 	worker.addEventListener("error", (event) => {
