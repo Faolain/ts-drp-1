@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
-import { installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
+import { callSite, installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
 import { openRole, type RoleEnvironment } from "./fixtures/track-m-apps/long-room-core.js";
 import {
@@ -1160,7 +1160,15 @@ async function profileHandBackSkipInstall(moves: number) {
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-profile-"));
 	directories.push(directory);
 	const counts = new Map<string, number>();
-	const bump = (key: string, amount = 1) => counts.set(key, (counts.get(key) ?? 0) + amount);
+	// SKIP_PROFILE_ATTRIBUTE=1: each canonical encode (and its bytes) and each SELECT by its call site.
+	const attribute = process.env.SKIP_PROFILE_ATTRIBUTE === "1";
+	const sites = new Map<string, number>();
+	const bump = (key: string, amount = 1) => {
+		counts.set(key, (counts.get(key) ?? 0) + amount);
+		if (!attribute || (key !== "canonical.encode" && key !== "canonical.encodeBytes" && key !== "sql.SELECT")) return;
+		const site = `${key} | ${callSite(Number(process.env.SKIP_PROFILE_DEPTH ?? 5))}`;
+		sites.set(site, (sites.get(site) ?? 0) + amount);
+	};
 	const restores: (() => void)[] = [await installSqliteCountSeams((key) => bump(key))];
 	observeCanonicalCalls((kind, byteLength) => {
 		bump(`canonical.${kind}`);
@@ -1195,6 +1203,7 @@ async function profileHandBackSkipInstall(moves: number) {
 			const workBefore = readV3SettlementWorkCounts();
 			const adoptsBefore = stagesBefore["member.install.adopt"]?.count ?? 0;
 			counts.clear();
+			sites.clear();
 			const cpuBefore = process.cpuUsage();
 			const started = performance.now();
 			wire.resume();
@@ -1244,6 +1253,11 @@ async function profileHandBackSkipInstall(moves: number) {
 				plan: await plan(),
 			};
 			process.stdout.write(`SKIP_PROFILE ${JSON.stringify(result)}\n`);
+			if (attribute)
+				for (const kind of ["canonical.encode |", "canonical.encodeBytes |", "sql.SELECT |"])
+					process.stdout.write(
+						`SKIP_PROFILE_SITES ${JSON.stringify({ label, kind, top: [...sites].filter(([site]) => site.startsWith(kind)).sort((a, b) => b[1] - a[1]).slice(0, 12) })}\n`
+					);
 			return result;
 		};
 		try {
