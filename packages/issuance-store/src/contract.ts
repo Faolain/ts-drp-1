@@ -622,7 +622,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
  * @returns The detached plan, or undefined when invalid.
  */
 function isSettlementHandBackReason(value: unknown): value is SettlementHandBackReason {
-	return value === "application-state-limit" || value === "admission-rejected";
+	return value === "application-state-limit" || value === "admission-rejected" || value === "transient-exhausted";
 }
 
 function copySettlementHandBack(value: unknown): SettlementHandBack | undefined {

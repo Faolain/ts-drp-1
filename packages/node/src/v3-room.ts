@@ -1,5 +1,5 @@
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { settlementHandBacksWith } from "@ts-drp/issuance-store";
+import { settlementHandBacksWith, type SettlementHandBackReason } from "@ts-drp/issuance-store";
 import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
@@ -391,11 +391,13 @@ export type V3RoomSettlementStatus = Readonly<{
 		handBack: V3RoomHandBack;
 		/**
 		 * Why the room gave it back when its replay was refused by this Writer's own admission at an
-		 * install: "application-state-limit" (the room's application state limit) or "admission-rejected"
-		 * (the room's admission policy). Absent: the settlement window or the creator's frontier gave it
-		 * back. Never offered again automatically.
+		 * install: "application-state-limit" (the room's application state limit), "admission-rejected"
+		 * (the room's admission policy), or "transient-exhausted" (a transient refusal, such as input
+		 * capacity or snapshot readiness, that its install's retries did not clear; offering it again
+		 * later may succeed). Absent: the settlement window or the creator's frontier gave it back.
+		 * Never offered again automatically.
 		 */
-		reason?: "application-state-limit" | "admission-rejected";
+		reason?: SettlementHandBackReason;
 	}>[];
 	/**
 	 * Safety net (observation only), expected 0: moves the window or the creator's frontier would give
@@ -2021,6 +2023,23 @@ function lastingLocalRefusal(kind: string, detail: string): "application-state-l
 	if (kind === "admission-rejected" && detail === V3_LOCAL_POLICY_REFUSAL_DETAIL) return "admission-rejected";
 	return undefined;
 }
+
+/**
+ * Whether a local issue failure is a transient admission refusal (input capacity, snapshot readiness,
+ * admission halted or awaiting recovery or classification): "admission-rejected" without the policy's
+ * own rejection.
+ * @param kind - The local issue failure kind.
+ * @param detail - Its detail.
+ * @returns Whether a retry may clear it.
+ */
+function transientLocalRefusal(kind: string, detail: string): boolean {
+	return kind === "admission-rejected" && detail !== V3_LOCAL_POLICY_REFUSAL_DETAIL;
+}
+
+/** The first backoff of a settlement replay refused transiently, in ms (doubling per retry). */
+export const SETTLEMENT_TRANSIENT_RETRY_MS = 10;
+/** The retries of a settlement replay refused transiently, in its install (10 + 20 + ... + 640 ms). */
+export const SETTLEMENT_TRANSIENT_RETRIES = 7;
 
 /**
  * A new local move refused up front because this epoch's author fence is awaited
@@ -7636,7 +7655,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const handBackRefusedReplay = async (
 		source: DisplacedSource,
 		fromIntent: number,
-		reason: "application-state-limit" | "admission-rejected"
+		reason: SettlementHandBackReason
 	): Promise<void> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
 		const entry = current?.entries.find((candidate) => candidate.sourceSequence === source.authorSequence);
@@ -7733,27 +7752,52 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		} as Parameters<RoomPlaneHandle["issueLocal"]>[0] & { planEffect: RoomReplacementEffect };
 		if (effect.kind === "replacement" && source === undefined)
 			throw new TypeError("v3 room replacement owning source is unavailable");
-		const issued =
+		const handle = activeHandle;
+		const attemptIssue = (): ReturnType<RoomPlaneHandle["issueLocal"]> =>
 			effect.kind === "replacement"
-				? await (source as DisplacedSource).issueReplacement(localInput)
+				? (source as DisplacedSource).issueReplacement(localInput)
 				: // The settlement lane: received rows and caller moves can never refuse this mandatory fence.
-					await (activeHandle.issueSettlementLocal ?? activeHandle.issueLocal)(localInput);
+					(handle.issueSettlementLocal ?? handle.issueLocal)(localInput);
+		let issued = await attemptIssue();
+		// A replay refused before signing for a transient reason (input capacity, snapshot readiness,
+		// admission halted or awaiting recovery) is retried in this install, with backoff
+		// (SETTLEMENT_TRANSIENT_RETRY_MS, doubling, SETTLEMENT_TRANSIENT_RETRIES times, about 1.3 s in
+		// all): this install is the last that can replay the source (a displaced row not replayed at its
+		// own epoch's install leaves the next scan), and a failed install is the room's terminal failure.
+		// Nothing was signed or written, so the retry is the same replay.
+		for (
+			let retry = 0;
+			retry < SETTLEMENT_TRANSIENT_RETRIES &&
+			!issued.ok &&
+			effect.kind === "replacement" &&
+			!signed &&
+			transientLocalRefusal(issued.kind, "detail" in issued ? issued.detail : "");
+			retry++
+		) {
+			await new Promise((resolve) => setTimeout(resolve, SETTLEMENT_TRANSIENT_RETRY_MS * 2 ** retry));
+			assertSessionOpen();
+			const unchangedPlan = await issuanceStore.readSettlementPlan(settlementScope);
+			const unchangedLineage = await issuanceStore.readLineage(settlementScope);
+			if (
+				unchangedPlan === null ||
+				!sameBytes(encodeCanonical(unchangedPlan), encodeCanonical(prior)) ||
+				unchangedLineage.next !== lineage.next
+			)
+				break;
+			issued = await attemptIssue();
+		}
 		if (!issued.ok) {
 			if (issued.kind === "split-required") return issued;
 			// Refused replay: the Writer's own admission (the room's state limit, or its admission policy)
 			// refused the replay BEFORE signing, so no row exists for these intents. The decision to hand
 			// back is the Writer's alone; the creator stays the only owner of graph admission.
-			if (
-				effect.kind === "replacement" &&
-				source !== undefined &&
-				!signed &&
-				lastingLocalRefusal(issued.kind, issued.detail) !== undefined
-			) {
-				await handBackRefusedReplay(
-					source,
-					"fromIntent" in effect ? effect.fromIntent : 0,
-					lastingLocalRefusal(issued.kind, issued.detail)!
-				);
+			// Still refused transiently after the retries: handed back as "transient-exhausted" (this is
+			// the last install that can replay it), so the move goes to the application, never stuck or lost.
+			const handBackReason =
+				lastingLocalRefusal(issued.kind, issued.detail) ??
+				(transientLocalRefusal(issued.kind, issued.detail) ? ("transient-exhausted" as const) : undefined);
+			if (effect.kind === "replacement" && source !== undefined && !signed && handBackReason !== undefined) {
+				await handBackRefusedReplay(source, "fromIntent" in effect ? effect.fromIntent : 0, handBackReason);
 				return SETTLEMENT_REPLAY_SETTLED;
 			}
 			const observed = await issuanceStore.readSettlementPlan(settlementScope);

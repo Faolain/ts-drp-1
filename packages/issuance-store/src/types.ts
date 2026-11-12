@@ -151,7 +151,7 @@ export interface SettlementHandBackKey {
  * frontier gave it back). The author's own local annotation for the application; it carries no
  * safety weight (the entry's handedBack is the durable fact).
  */
-export type SettlementHandBackReason = "application-state-limit" | "admission-rejected";
+export type SettlementHandBackReason = "application-state-limit" | "admission-rejected" | "transient-exhausted";
 
 export interface SettlementHandBack {
 	readonly reason?: SettlementHandBackReason;

@@ -747,11 +747,23 @@ export function createV3RoomRolloverPolicy(
 					continue;
 				}
 				closingSince = undefined;
-				if (offer >= MAX_OFFERS) throw error;
-				if (TRANSIENT_REFUSAL.test(message(error))) {
+				if (offer < MAX_OFFERS && TRANSIENT_REFUSAL.test(message(error))) {
 					await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_MS * offer));
 					continue;
 				}
+				if (refused !== undefined) {
+					// A given-back move refused for a passing reason: kept with its record and offered again
+					// once the room is past this epoch, while the room still lists the record (it may have
+					// been consumed or declined meanwhile).
+					const key = `${refused.handBack.sourceSequence}:${refused.handBack.intent}`;
+					const listed = selected
+						.settlementStatus?.()
+						.undelivered.some((given) => `${given.handBack.sourceSequence}:${given.handBack.intent}` === key);
+					if (listed === true) keep(operation, attempted);
+					else handBackOf.delete(operation);
+					throw error;
+				}
+				if (offer >= MAX_OFFERS) throw error;
 				if (!clearedByRollover(error)) throw error;
 				// The refused move was not admitted (its issue transaction or admission refused it);
 				// the same move is offered again in a later epoch.
