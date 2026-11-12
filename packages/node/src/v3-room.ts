@@ -7554,6 +7554,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// No free record (or no one-for-one hand-back): the move stays live (deferred), like the
 			// window's rule; the next install retries it.
 			windowDeferredMoves += source.intents.length - fromIntent;
+			await refreshHandBackListing();
 			return;
 		}
 		await issuanceStore.transactWriteSettlementPlan({
