@@ -17138,7 +17138,11 @@ const verifiedNestedNativeSources = new WeakSet<ClassifiedRebaseRow>();
 type ReplacementIssuedRow = Readonly<{ objectId: string; author: string; authorSequence: number; canonicalPreimageBytes: Uint8Array;
 	signature: Uint8Array; digest: Uint8Array }>;
 
-/** How one proven replacement chunk ends: terminal, live, or a completed displaced link to walk on. */
+/**
+ * How one proven replacement chunk ends (proveReplacementLink is the single owner of this classification):
+ * terminal (committed, expired, covered), live (current, open: unresolved displaced work), or a completed
+ * displaced link to walk on.
+ */
 type ReplacementChunkEnd = "committed" | "expired" | "current" | "covered" | "open" | "completed";
 
 /** Every chunk named by every entry of the plan, counted (a chunk replaces exactly one source). */
@@ -17163,9 +17167,10 @@ function replacementChunkClaims(plan: SettlementPlan): ReadonlyMap<number, numbe
  *   and intent range; the chunks' signed operations together are exactly the source's permitted
  *   replacement operations, derived again from the source's signed operations by the immutable policy,
  *   with the entry's disposition and refusal;
- * - its end: durably committed (retained completion proof matching the plan), durably expired (signed
- *   abandonment receipt matching the plan), covered by a creator-signed frontier, current in this plane,
- *   open displaced work (an unresolved entry or one awaiting its receipt), or a completed displaced link.
+ * - its end: durably committed (retained completion proof matching the plan), expired (a signed abandonment
+ *   receipt matching the plan, or an `expire` entry still awaiting it: window-expired and handed back),
+ *   covered by a creator-signed frontier, current in this plane, open (an unresolved displaced entry), or a
+ *   completed displaced link.
  * @returns One proven step per chunk in plan order, or undefined when any of it is not proven.
  */
 function proveReplacementLink(payload: PreparedV3LivePayload, registration: CreatorRecoveryCensusContext,
@@ -17235,7 +17240,9 @@ function proveReplacementLink(payload: PreparedV3LivePayload, registration: Crea
 		if (replacement.kind !== "displaced" || next === undefined || !sameBytes(next.sourceDigest, rows[0]!.digest) ||
 			next.disposition === "committed" || next.disposition === "inherited" ||
 			next.disposition === "expire" && next.replacementSequence !== null) return undefined;
-		step(next.replacementSequence === null ? "open" : "completed");
+		// An `expire` entry without a replacement is terminal (window-expired and handed back, or abandoned),
+		// with or without its signed receipt yet: never walked on, never re-offered by the chain.
+		step(next.disposition === "expire" ? "expired" : next.replacementSequence === null ? "open" : "completed");
 	}
 	// Every chunk is either portable or not; the signed operations are exactly the permitted ones.
 	if (portable !== 0 && portable !== chunks.length ||
