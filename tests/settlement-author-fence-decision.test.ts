@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import * as rollover from "../examples/v3-room/src/rollover.js";
 import { retainedRowUnprovenKind } from "../packages/node/src/v3-live.js";
-import { settlementAuthorFenceDecision, V3RoomAwaitingAuthorFence } from "../packages/node/src/v3-room.js";
+import {
+	awaitingFencePinnedSourceDiagnostic,
+	settlementAuthorFenceDecision,
+	V3RoomAwaitingAuthorFence,
+} from "../packages/node/src/v3-room.js";
+import { AHE_BOUNDED_READ_LIMITS } from "../packages/storage/src/index.js";
 
 // fix/creator-anchor-uncovered (g): the author fence is withheld only for retained work a later
 // frontier may still prove, and while it is (the frontier is not installed yet) new moves are refused
@@ -72,6 +77,51 @@ describe("settlementAuthorFenceDecision", () => {
 		expect(
 			settlementAuthorFenceDecision({ retained: [unresolved(undefined)], eligible: false, currentMember: true })
 		).toBe("withhold");
+	});
+});
+
+describe("awaitingFencePinnedSourceDiagnostic", () => {
+	// held-anchor-retention.qnt p6: a fence awaited while a completed replacement entry pins a source
+	// older than the retained AHE generations. A native room is not expected to reach it; the event
+	// makes it observable without changing behaviour.
+	const bound = AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
+	const retained = [
+		{ disposition: "manual-review", unproven: "awaiting-frontier" },
+		{ disposition: "manual-review", unproven: "never" },
+	] as const;
+	const decision = settlementAuthorFenceDecision({ retained, eligible: false, currentMember: true });
+	it("fires when the fence is awaited and a pinned source is more than the generation bound old", () => {
+		expect(decision).toBe("await-fence");
+		const event = awaitingFencePinnedSourceDiagnostic({
+			decision,
+			epoch: 20,
+			awaitingSequences: [9],
+			pinnedSources: [
+				{ sourceSequence: 7, sourceEpoch: 20 - bound },
+				{ sourceSequence: 4, sourceEpoch: 20 - bound - 2 },
+				{ sourceSequence: 2, sourceEpoch: 20 - bound - 1 },
+			],
+			generationBound: bound,
+		});
+		expect(event).toEqual({
+			kind: "awaiting-fence-pinned-source",
+			epoch: 20,
+			awaitingSequences: [9],
+			pinnedSources: [
+				{ sourceSequence: 4, sourceEpoch: 20 - bound - 2 },
+				{ sourceSequence: 2, sourceEpoch: 20 - bound - 1 },
+			],
+			generationBound: bound,
+		});
+	});
+	it("stays silent within the bound, when the fence is not awaited, or with nothing pinned", () => {
+		const base = { epoch: 20, awaitingSequences: [9], generationBound: bound } as const;
+		const young = [{ sourceSequence: 7, sourceEpoch: 20 - bound }];
+		const old = [{ sourceSequence: 4, sourceEpoch: 1 }];
+		expect(awaitingFencePinnedSourceDiagnostic({ ...base, decision, pinnedSources: young })).toBeUndefined();
+		expect(awaitingFencePinnedSourceDiagnostic({ ...base, decision, pinnedSources: [] })).toBeUndefined();
+		expect(awaitingFencePinnedSourceDiagnostic({ ...base, decision: "fence", pinnedSources: old })).toBeUndefined();
+		expect(awaitingFencePinnedSourceDiagnostic({ ...base, decision: "withhold", pinnedSources: old })).toBeUndefined();
 	});
 });
 
