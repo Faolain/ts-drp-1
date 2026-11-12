@@ -17617,6 +17617,9 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			successorJournalAppend,
 			currentContinuationAppends,
 			{ control: capture.journal.control, ...(!preclose ? { closedMembershipByteLength } : {}),
+				// An ordinary quote also reserves what the successor's mandatory fence will quote (its own
+				// horizon: the next successor's header and first fence), from this same function.
+				...(preclose ? {} : { fenceHorizon: true }),
 				...(received === undefined ? {} : {localIssuerBasis: received.localIssuerBasis}) }
 		);
 		const actualFinalJournal = preclose ? journal.afterLocal : (journal.afterSuccessorLocal ?? journal.afterSuccessor);
@@ -17676,8 +17679,20 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			...(journal.afterSuccessorLocal === undefined
 				? []
 				: [[journal.afterSuccessorLocal, finalJournalControl] as const]),
+			// The successor's mandatory fence horizon (live-journal fenceHorizon): the same phases that fence's
+			// own quote checks, so an admission this reserve allows never leaves the fence refused.
+			...(journal.fenceHorizon === undefined ? [] : [
+				[journal.fenceHorizon.afterSuccessor, finalJournalControl] as const,
+				[journal.fenceHorizon.afterSuccessorLocal, finalJournalControl] as const]),
 		] as const) {
-			const capacity = journalCapacityFor(phase);
+			const horizon = phase === journal.fenceHorizon?.afterSuccessor || phase === journal.fenceHorizon?.afterSuccessorLocal;
+			const local = journal.afterSuccessorLocal;
+			// A horizon phase widens by afterSuccessorLocal's own finishing rectangle (the rows it adds lie past it).
+			const capacity = !horizon ? journalCapacityFor(phase) : finalJournalCapacity === undefined || local === undefined
+				? undefined : {
+					canonicalRowsBytes: finalJournalCapacity.canonicalRowsBytes + phase.canonicalRowsBytes - local.canonicalRowsBytes,
+					nativeImageBytes: finalJournalCapacity.nativeImageBytes + phase.nativeImageBytes - local.nativeImageBytes,
+				};
 			const wrapperWidth = maintenanceCanonicalWidth({
 				control,
 				image: {

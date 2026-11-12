@@ -1128,38 +1128,33 @@ interface FutureWidthMeasurements {
 }
 function futureWidths(
 	frames: readonly Pick<NativeFrame, "table" | "key" | "row">[],
-	unknownSignatureIndex?: number,
-	unknownLocalDigestIndex?: number,
+	unknownSignatureIndex?: number | readonly number[],
+	unknownLocalDigestIndex?: number | readonly number[],
 	measurements?: FutureWidthMeasurements
 ): JournalFutureNativeWidths {
+	const indices = (value: number | readonly number[] | undefined): readonly number[] =>
+		value === undefined ? [] : typeof value === "number" ? [value] : value;
 	const scopes = frames.filter((f) => f.table === "scopes"),
 		rows = frames.filter((f) => f.table !== "scopes");
 	if (!journalRetirementImageCountsFit(scopes.length, rows.length)) throw new TypeError("retirement-fenced");
 	// The missing registered BYTES64 field is measured structurally. No placeholder
 	// signature, native row, digest or dedup identity is created for that field.
-	const missing =
-		unknownSignatureIndex === undefined
-			? 0
-			: ((): number => {
-					const f = frames[unknownSignatureIndex];
-					if (f === undefined || typeof f.row !== "object" || f.row === null) throw new TypeError("malformed-input");
-					const n = Object.keys(f.row).length;
-					const name = Object.hasOwn(f.row, "object_id") ? "detached_anchor_signature" : "detachedAnchorSignature";
-					return encodeCanonical(name).length + 1 + varUintWidth(64) + 64 + varUintWidth(n + 1) - varUintWidth(n);
-				})();
-	const missingDigest =
-		unknownLocalDigestIndex === undefined
-			? 0
-			: ((): number => {
-					const f = frames[unknownLocalDigestIndex];
-					if (f === undefined || typeof f.row !== "object" || f.row === null) throw new TypeError("malformed-input");
-					const n = Object.keys(f.row).length;
-					const name = Object.hasOwn(f.row, "object_id") ? "vertex_digest" : "vertexDigest";
-					// Complete STRING64 field width; no prospective digest value is created.
-					return encodeCanonical(name).length + 1 + varUintWidth(64) + 64 + varUintWidth(n + 1) - varUintWidth(n);
-				})();
+	const missingField = (index: number, sqlName: string, browserName: string): number => {
+		const f = frames[index];
+		if (f === undefined || typeof f.row !== "object" || f.row === null) throw new TypeError("malformed-input");
+		const n = Object.keys(f.row).length;
+		const name = Object.hasOwn(f.row, "object_id") ? sqlName : browserName;
+		// Complete BYTES64 / STRING64 field width; no prospective signature or digest value is created.
+		return encodeCanonical(name).length + 1 + varUintWidth(64) + 64 + varUintWidth(n + 1) - varUintWidth(n);
+	};
+	const signatureIndices = indices(unknownSignatureIndex), digestIndices = indices(unknownLocalDigestIndex);
+	const missingSignatures = signatureIndices.map(index => missingField(index, "detached_anchor_signature", "detachedAnchorSignature"));
+	const missingDigests = digestIndices.map(index => missingField(index, "vertex_digest", "vertexDigest"));
+	const missing = missingSignatures.reduce((n, width) => n + width, 0),
+		missingDigest = missingDigests.reduce((n, width) => n + width, 0);
 	const missingAt = (index: number): number =>
-		(index === unknownSignatureIndex ? missing : 0) + (index === unknownLocalDigestIndex ? missingDigest : 0);
+		signatureIndices.reduce((n, at, k) => n + (at === index ? missingSignatures[k]! : 0), 0) +
+		digestIndices.reduce((n, at, k) => n + (at === index ? missingDigests[k]! : 0), 0);
 	const measured = (frame: FutureWidthFrame) => {
 		let value = measurements?.frames.get(frame);
 		if (value === undefined) {
@@ -1263,11 +1258,17 @@ export function journalFutureAppendPostimageWidths(
 	successorLocalAppendForSizing?: Readonly<{ author: string; authorSequence: number }>,
 	currentContinuationAppends: readonly unknown[] = [],
 	sizingOptions?: Readonly<{ control?: LiveJournalRetirementControl | null; closedMembershipByteLength?: number;
-		localIssuerBasis?: Readonly<{objectId: string; author: string; nextAuthorSequence: number}> }>
+		localIssuerBasis?: Readonly<{objectId: string; author: string; nextAuthorSequence: number}>;
+		/** Also measure the successor's mandatory fence horizon (see fenceHorizon below). */
+		fenceHorizon?: boolean }>
 ): Readonly<{
 	afterLocal: JournalFutureNativeWidths;
 	afterSuccessor: JournalFutureNativeWidths;
 	afterSuccessorLocal?: JournalFutureNativeWidths;
+	/** What the successor epoch's mandatory fence quote checks beyond afterSuccessorLocal: that quote is this same
+	 * function from the post-adoption journal (its own fence is afterSuccessorLocal's successor row), adding the
+	 * next successor's scope header (no membership: a preclose quote) and that successor's first local fence. */
+	fenceHorizon?: Readonly<{ afterSuccessor: JournalFutureNativeWidths; afterSuccessorLocal: JournalFutureNativeWidths }>;
 }> {
 	const frames = decodeNativeFrames(
 		dense(actualCanonicalRows, LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows * 2) as readonly Uint8Array[]
@@ -1561,11 +1562,33 @@ export function journalFutureAppendPostimageWidths(
 	updated[updated.indexOf(added)] = finalHeader;
 	updated.push(successorEntry);
 	updated.sort(compareFrameKeys);
-	return Object.freeze({
-		afterLocal,
-		afterSuccessor,
-		afterSuccessorLocal: futureWidths(updated, updated.indexOf(finalHeader), updated.indexOf(successorEntry), measurements),
-	});
+	const afterSuccessorLocal = futureWidths(updated, updated.indexOf(finalHeader), updated.indexOf(successorEntry), measurements);
+	if (sizingOptions?.fenceHorizon !== true) return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal });
+	// The next successor has the same structural anchor and parameters carriers as this one (an epoch-chain
+	// anchor's fields have fixed widths), one epoch on; a wider epoch integer widens its preimage by as much.
+	if (s.scope.epoch >= Number.MAX_SAFE_INTEGER - 1 || integer(futureLocal.authorSequence) === Number.MAX_SAFE_INTEGER)
+		throw new TypeError("malformed-input");
+	const nextScope = { ...s.scope, epoch: s.scope.epoch + 1 };
+	const epochGrowth = varUintWidth(nextScope.epoch) - varUintWidth(s.scope.epoch);
+	const nextPreimage = new Uint8Array(s.exactCanonicalAnchorPreimageBytes.byteLength + epochGrowth);
+	const nextKey = [nextScope.objectId, nextScope.epoch, nextScope.anchorDigest];
+	const nextHeaderRow = journalUnsignedSuccessorHeaderFields({sql, scope: nextScope,
+		exactCanonicalAnchorPreimageBytes: nextPreimage, parametersDigest: s.parametersDigest,
+		exactCanonicalParametersCarrierBytes: s.exactCanonicalParametersCarrierBytes});
+	const nextHeader = { table: "scopes", key: nextKey, row: nextHeaderRow };
+	const horizon = [...updated, nextHeader].sort(compareFrameKeys);
+	const signed = [horizon.indexOf(finalHeader), horizon.indexOf(nextHeader)];
+	const horizonSuccessor = futureWidths(horizon, signed, horizon.indexOf(successorEntry), measurements);
+	const nextEntryRow: Record<string, unknown> = { ...successorRow,
+		epoch: nextScope.epoch,
+		[sql ? "local_author_sequence" : "localAuthorSequence"]: integer(futureLocal.authorSequence) + 1 };
+	const nextEntry = { table, key: [...nextKey, 0], row: nextEntryRow };
+	const nextFinalHeader = { ...nextHeader, row: { ...nextHeaderRow, [sql ? "next_journal_sequence" : "nextJournalSequence"]: 1 } };
+	const horizonLocal = [...updated, nextFinalHeader, nextEntry].sort(compareFrameKeys);
+	const horizonSuccessorLocal = futureWidths(horizonLocal, [horizonLocal.indexOf(finalHeader), horizonLocal.indexOf(nextFinalHeader)],
+		[horizonLocal.indexOf(successorEntry), horizonLocal.indexOf(nextEntry)], measurements);
+	return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal,
+		fenceHorizon: Object.freeze({ afterSuccessor: horizonSuccessor, afterSuccessorLocal: horizonSuccessorLocal }) });
 }
 
 /**
