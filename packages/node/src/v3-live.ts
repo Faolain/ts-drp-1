@@ -8979,7 +8979,11 @@ function reofferCarriedRow(
 		sameCarryPlane(plane, successor)
 			? enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
 					custody.chargeBytes(row.exactWireBytes.byteLength);
-					return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
+					return ObjectFreeze({
+						exactWireBytes: row.exactWireBytes,
+						sender: row.sender,
+						transport: "retained" as const,
+					});
 				}).catch(() => ingressFailureLog("admission-rejected"))
 			: Promise.resolve(refuseCarriedRow(predecessor, row.sender));
 	if (carry.chained === 0 && successor.admittedInputJobs < MAX_ADMITTED_INPUT_JOBS / 2) {
