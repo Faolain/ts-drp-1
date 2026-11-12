@@ -19360,7 +19360,8 @@ function terminalFailure(
 
 function terminalIssueFailure(result: Exclude<V3LocalIssueResult, { readonly ok: true }>): V3TerminalPublishResult {
 	return terminalFailure(
-		result.kind === "split-required" ? "malformed-input" : result.kind,
+		// A terminal is a control operation, which the application state bound never judges.
+		result.kind === "split-required" ? "malformed-input" : result.kind === "application-state-limit" ? "admission-rejected" : result.kind,
 		result.detail,
 		Reflect.get(result, "terminalIntent") === "outcome-unknown" ? "outcome-unknown" : "absent"
 	);
