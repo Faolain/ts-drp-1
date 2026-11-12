@@ -3410,13 +3410,19 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 	}
 	const outcome = (run: () => unknown) => {try {return {value: run()};} catch (error) {
 		return {error: (error as Error).message, cause: (error as Error & {cause?: Error}).cause?.message};}};
+	// An ordinary (non-preclose) quote also asks for the successor fence's horizon (j22, fix/maintenance-image-capacity).
+	const ordinary = (args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
+		const withHorizon = [...args] as Parameters<typeof journalFutureAppendPostimageWidths>;
+		withHorizon[5] = {...args[5], fenceHorizon: true};
+		return journalFutureAppendPostimageWidths(...withHorizon);
+	};
 	it("validates complete CURRENT separately and freshly computes every FUTURE recipe across cardinality/backend shapes", () => {
 		for (const sql of [false, true]) for (const count of [0, 127]) {
 			const f = fixture(sql, count), o = owner();
 			const currentArgs = [...f.args] as Parameters<typeof journalFutureAppendPostimageWidths>;
 			currentArgs[5] = {control: null};
 			expect(o.run({...f, args: currentArgs}, true)).toEqual(journalFutureAppendPostimageWidths(...currentArgs));
-			const expected = journalFutureAppendPostimageWidths(...f.args), first = o.run(f);
+			const expected = ordinary(f.args), first = o.run(f);
 			expect(first).toEqual(expected);
 			for (let schedule = 0; schedule < 8; schedule++) {const fresh = o.run(f); expect(fresh).toEqual(first); expect(fresh).not.toBe(first);}
 			expect(o.calls()).toBe(10); // Full PRE freshly validated by each original producer invocation.
@@ -3437,7 +3443,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 		];
 		for (const change of mutations) {
 			const f = fixture(), o = owner(); o.run(f); change(f);
-			expect(outcome(() => o.run(f))).toEqual(outcome(() => journalFutureAppendPostimageWidths(...f.args)));
+			expect(outcome(() => o.run(f))).toEqual(outcome(() => ordinary(f.args)));
 			expect(o.calls()).toBe(2);
 		}
 		const f = fixture(), a = owner(), b = owner();
@@ -3472,7 +3478,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 			node.expression.getText(parsed).includes("forward.wholeFloor === undefined") && !node.expression.getText(parsed).includes("currentFacts"));
 		const inspect = () => execute<any>(`(() => {${guard.getText(parsed)} return effect();})();`,
 			{frame, capture, forward, facts: {}, input: {proof: {accounting}}, ledgers, effect: () => o.run(f)});
-		expect(inspect()).toEqual(journalFutureAppendPostimageWidths(...f.args));
+		expect(inspect()).toEqual(ordinary(f.args));
 		frame.alive = false;
 		expect(inspect()).toEqual({ok: false, reason: "MAINTENANCE_SOURCE_UNAVAILABLE"});
 		frame.alive = true; capture.currentTrust = {};
