@@ -110,26 +110,27 @@ it("a member re-offers at most what the epoch's budget leaves of its kept moves,
 	expect(policy.status().kept).toEqual([]);
 }, 30_000);
 
-it("the epoch's budget counts the member's own moves accepted in it, and every author's observed moves", async () => {
+it("the epoch's budget counts the member's own accepted moves, and stops at any author's observed budget", async () => {
 	const budget = 4;
 	const { room, state, offers } = memberRoom(6);
 	const { policy } = memberPolicy(budget);
 	policy.bind(room);
 	await sleep(1_500);
 	state.epoch = 4;
-	// Before the kept moves' poll: the application's own new move (never paced) and another author's
-	// move, observed at three of the budget, leave one kept re-offer for epoch 4.
+	// Before the kept moves' poll: the application's own new move (never paced) counts toward this
+	// member's budget, and another author below the budget does not stop it: three kept re-offers.
 	await policy.issue({ action: "move", id: "new-0" });
-	for (let k = 0; k < 3; k++) policy.observe({ author: "other", epoch: 4 });
+	for (let k = 0; k < 2; k++) policy.observe({ author: "other", epoch: 4 });
 	await sleep(2_000);
-	const keptInFour = offers.filter((offer) => offer.epoch === 4 && offer.handBack).length;
-	expect(keptInFour, "kept re-offers in epoch 4").toBe(1);
+	expect(offers.filter((offer) => offer.epoch === 4 && offer.handBack).length, "kept re-offers in epoch 4").toBe(3);
+	// Another author at the budget: the creator is sealing this epoch, so no kept move is offered into it.
 	state.epoch = 5;
-	await until(() => offers.filter((offer) => offer.epoch === 5).length >= budget, 5_000);
-	await sleep(1_500);
-	expect(offers.filter((offer) => offer.epoch === 5).length, "kept re-offers in epoch 5").toBe(4);
+	for (let k = 0; k < budget; k++) policy.observe({ author: "other", epoch: 5 });
+	await sleep(2_000);
+	expect(offers.filter((offer) => offer.epoch === 5).length, "kept re-offers in epoch 5").toBe(0);
 	state.epoch = 6;
 	await until(() => policy.status().kept.length === 0, 5_000);
+	expect(offers.filter((offer) => offer.epoch === 6).length, "kept re-offers in epoch 6").toBe(3);
 	expect(offers.filter((offer) => offer.handBack).map((offer) => offer.id)).toEqual(
 		Array.from({ length: 6 }, (_, k) => `given-${k}`)
 	);
