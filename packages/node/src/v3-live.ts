@@ -17216,13 +17216,49 @@ async function issueLocal(
 		const joined = await issueOneVertex(
 			registration,
 			input,
-			tips.slice(0, maxDependencies),
+			causalJoinDependencies(registration, tips, maxDependencies),
 			first.logicalTime,
 			ObjectFreeze({ action: "causalJoin" }), false, undefined, finishingSuffix
 		);
 		if (!joined.ok) return joined;
 		finishingSuffix = undefined;
 	}
+}
+
+/**
+ * A causalJoin's dependencies: the first `maxDependencies` tips in hash order, except that the author's
+ * latest own row of this plane is always covered (that row when it is a tip, else the first tip that
+ * descends from it, in place of the last hash-ordered one). Every other own row already depends on all
+ * tips, so an author's own rows of one epoch stay a causal chain: admitting any of them admits every
+ * earlier one, and the creator's contiguous settlement frontier (deriveCreatorAuthorSettlementFrontier)
+ * separates admitted rows from rows that never entered history. Node-local: any `maxDependencies` tips
+ * are a valid join.
+ * @param registration - The live plane issuing the join.
+ * @param tips - Its current hash-sorted tips (more than `maxDependencies`).
+ * @param maxDependencies - The plane's dependency bound.
+ * @returns Sorted, distinct dependencies, at most `maxDependencies`.
+ */
+function causalJoinDependencies(
+	registration: V3PlaneRegistration,
+	tips: readonly string[],
+	maxDependencies: number
+): readonly string[] {
+	const selected = tips.slice(0, maxDependencies);
+	const author = registration.issuanceScope.author;
+	let own: string | undefined;
+	let ownSequence = -1;
+	for (const [digest, identity] of registration.closeAuthors)
+		if (identity.author === author && identity.authorSequence > ownSequence) {
+			own = digest;
+			ownSequence = identity.authorSequence;
+		}
+	if (own === undefined) return selected;
+	const index = registration.index;
+	const covers = (tip: string): boolean => tip === own || index.isAncestor(own, tip);
+	if (selected.some(covers)) return selected;
+	const covering = tips.find(covers);
+	if (covering === undefined) return selected;
+	return ObjectFreeze([...tips.slice(0, maxDependencies - 1), covering].sort());
 }
 
 function enqueueLocalIssue(
