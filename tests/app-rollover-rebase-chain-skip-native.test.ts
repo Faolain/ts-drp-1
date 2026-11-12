@@ -1070,6 +1070,7 @@ async function deliveredReissuesLeaveTheBacklog() {
 					writer: await writer.authorityEpoch(),
 					undelivered: (await status())?.undelivered.length,
 					kept: ((await writer.rolloverStatus?.()) as { kept?: unknown[] } | null)?.kept?.length,
+					consumed: ((await writer.settlementPlanDump?.()) as { consumed?: unknown[] } | null)?.consumed,
 				})}\n`
 			);
 		try {
@@ -1108,6 +1109,7 @@ async function deliveredReissuesLeaveTheBacklog() {
 				(value) => value.landed === ids.length,
 				120_000
 			);
+			await phase("reissues-admitted");
 			// Evidence: a creator row of this epoch whose causal past reaches every reissued row.
 			await creator.issueRoom!(epoch, ordinal.next++);
 			await rows.toWriter();
