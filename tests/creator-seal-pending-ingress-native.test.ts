@@ -94,6 +94,12 @@ it.each([
 			const moves = otherRows.filter((row) => !isControl(row));
 			const later = required(moves.at(-1));
 			if (held) {
+				// Everything Writer 2 published before this epoch's earlier move (its re-offers of moves
+				// outside the last cut) reaches the creator; the earlier move is withheld, the later held.
+				const earlier = otherRows.indexOf(required(moves.at(-2)));
+				const before = otherRows.slice(0, earlier);
+				const lastMove = before.findLastIndex((row) => !isControl(row));
+				if (lastMove >= 0) await creator.receive(before.slice(0, lastMove + 1), 2).catch(() => undefined);
 				creator.inject([later], 2);
 				await sleep(400);
 				expect(
@@ -138,9 +144,24 @@ it.each([
 				if (failure !== undefined) installFailures.push(`${epoch + 1}:${index}: ${failure}`);
 			}
 		}
+		// Every move lands: the released copies are re-offered by their author in the successor epoch.
+		const landed = async (): Promise<string[]> => {
+			const text = Buffer.from(
+				required(fixture.application.migration).canonicalStateBytes(creator.room.projection() as never)
+			).toString("latin1");
+			return Array.from({ length: seals.length }, (_, epoch) => [`other-a-${epoch}`, `other-b-${epoch}`])
+				.flat()
+				.filter((id) => !text.includes(id));
+		};
+		let missing = await landed();
+		for (let round = 0; round < 10 && missing.length !== 0; round++) {
+			await deliver(2, 0);
+			await sleep(500);
+			missing = await landed();
+		}
 		console.log(
 			"CREATOR_SEAL_WITH_PENDING",
-			JSON.stringify({ held, seals, installFailures, events: events.slice(-60) })
+			JSON.stringify({ held, seals, installFailures, missing, events: events.slice(-60) })
 		);
 		expect(
 			seals.filter((row) => !row.ok).map((row) => `${row.epoch}: ${row.error ?? ""}`),
@@ -153,6 +174,7 @@ it.each([
 				.map((row) => `${row.epoch}: ${row.attempts} attempts: ${row.error ?? ""}`),
 			"no seal needed a retry"
 		).toEqual([]);
+		expect(missing, "every Writer 2 move is in the creator's state").toEqual([]);
 	},
 	1_200_000
 );
