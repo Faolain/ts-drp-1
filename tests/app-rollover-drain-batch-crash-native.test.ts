@@ -12,7 +12,12 @@ import { afterEach, expect, it } from "vitest";
 
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
 import { openRole } from "./fixtures/track-m-apps/long-room-core.js";
-import { fromBase64, type RoleEndpoint, successorWire, type WireRow } from "./fixtures/track-m-apps/long-room-driver.js";
+import {
+	fromBase64,
+	type RoleEndpoint,
+	successorWire,
+	type WireRow,
+} from "./fixtures/track-m-apps/long-room-driver.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Per-drain batching across process death (SIGKILL right after a real SQLite COMMIT of the Writer's
@@ -53,7 +58,12 @@ const idOf = (operation: string): string | undefined => {
 	return typeof value?.id === "string" ? value.id : undefined;
 };
 const issuanceFile = (directory: string, name: string) =>
-	join(directory, `${createHash("sha256").update(JSON.stringify(["issuance", name])).digest("hex")}.sqlite.drp-issuance-v1.sqlite`);
+	join(
+		directory,
+		`${createHash("sha256")
+			.update(JSON.stringify(["issuance", name]))
+			.digest("hex")}.sqlite.drp-issuance-v1.sqlite`
+	);
 
 type PlanEntry = { disposition: string; sourceSequence: number; replacementSequence: number | null };
 /** The Writer's settlement plan, read straight from its SQLite file. */
@@ -67,8 +77,11 @@ function writerPlan(file: string, author: string) {
 		const decoded = JSON.parse(row.entries_json) as unknown;
 		const entries = Array.isArray(decoded)
 			? (decoded as PlanEntry[])
-			: (decodeCanonical(new Uint8Array(Buffer.from((decoded as { bytes: string }).bytes, "base64"))) as { entries: PlanEntry[] })
-					.entries;
+			: (
+					decodeCanonical(new Uint8Array(Buffer.from((decoded as { bytes: string }).bytes, "base64"))) as {
+						entries: PlanEntry[];
+					}
+				).entries;
 		return { entries, fence: row.fence_sequence };
 	} finally {
 		db.close();
@@ -199,7 +212,10 @@ it.runIf(INNER)(
 				ids.push(`block-1-${k}`);
 			}
 			watch.author = rowValue((await writer.published(null))[0]!).author;
-			writeFileSync(setupFile, JSON.stringify({ writerAuthor: watch.author, ids, ordinal: ordinal.next } satisfies Setup));
+			writeFileSync(
+				setupFile,
+				JSON.stringify({ writerAuthor: watch.author, ids, ordinal: ordinal.next } satisfies Setup)
+			);
 			watch.armed = true;
 			// One one-epoch install: the Writer's moves (never carried) are displaced and replaced.
 			for (let round = 0; round < 3; round++) {
@@ -223,7 +239,12 @@ it.skipIf(INNER).each(EDGES)(
 		directories.push(directory);
 		const file = fileURLToPath(import.meta.url);
 		const child = spawn("npx", ["vitest", "run", file, "--no-file-parallelism", "--coverage.enabled=false"], {
-			env: { ...process.env, RUN_DRAIN_BATCH_CRASH: "1", DRAIN_BATCH_CRASH_DIRECTORY: directory, DRAIN_BATCH_CRASH_EDGE: edge },
+			env: {
+				...process.env,
+				RUN_DRAIN_BATCH_CRASH: "1",
+				DRAIN_BATCH_CRASH_DIRECTORY: directory,
+				DRAIN_BATCH_CRASH_EDGE: edge,
+			},
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let output = "";
