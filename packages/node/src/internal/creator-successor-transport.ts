@@ -15,6 +15,7 @@ import {
 	SNAPSHOT_PULL_INACTIVITY_MS,
 	SNAPSHOT_PULL_MAX_ATTEMPTS,
 	SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS,
+	SNAPSHOT_PULL_TOTAL_MS,
 	type SnapshotPeerAuthorization,
 } from "../snapshot-transfer.js";
 import { CREATOR_CLOSE_HISTORY_MAX_BYTES } from "./creator-close-history.js";
@@ -276,6 +277,14 @@ function refusalOf(
 }
 
 /**
+ * How long a member's serving session may sit idle (no request from it, nothing served to it) before a
+ * new requester meeting a full session table may take its place. A member pulls its chunks back to
+ * back right after its material, and its own reads time out after SNAPSHOT_PULL_INACTIVITY_MS, so a
+ * session idle this long has ended or failed on the member's side. An active session is never evicted.
+ */
+export const CREATOR_MATERIAL_SESSION_IDLE_MS = SNAPSHOT_PULL_INACTIVITY_MS;
+
+/**
  * Peer possession binds routing, while signed protocol carriers remain the only successor authority.
  * @param input Native source material, its current application identity and authenticated transport peers.
  * @returns A bounded transient peer binding and native control-frame handler.
@@ -301,20 +310,47 @@ export function createCreatorSuccessorMaterialServer(
 		 */
 		departed?(scope: CreatorSuccessorDepartedScope):
 			CreatorSuccessorDepartedCarrier | undefined | Promise<CreatorSuccessorDepartedCarrier | undefined>;
+		/**
+		 * The served snapshot's chunk count: a member's serving session ends once every chunk has been
+		 * served to it (see served). Without it a session ends only by its deadline, idleness or a
+		 * disconnect.
+		 */
+		chunkCount?: number;
+		/** Milliseconds clock for session deadlines and idleness (tests); default performance.now. */
+		clock?(): number;
 	}>
 ): Readonly<{
 	authorization: SnapshotPeerAuthorization;
 	control(stream: SnapshotChunkProtocolStream, bytes: Uint8Array): Promise<boolean>;
+	/** The snapshot owner served these chunk indices of the manifest to this peer (its session's progress). */
+	served(peerId: string, indices: readonly number[]): void;
 }> {
-	const authors = new Map<string, string>();
+	// One serving session per member: opened by its material response, it authorizes that member's
+	// manifest and chunk pulls. SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS bounds the CONCURRENT sessions, not
+	// the members served in an epoch: a session ends (and frees its place) when every chunk has been
+	// served to the member, when its pull deadline (SNAPSHOT_PULL_TOTAL_MS from the material
+	// response) passes, or when the member disconnects. Only a new requester meeting a full table may
+	// evict a session, and only one idle (no request, nothing served) for CREATOR_MATERIAL_SESSION_IDLE_MS.
+	const clock = input.clock ?? ((): number => performance.now());
+	const chunkCount =
+		input.chunkCount !== undefined && Number.isSafeInteger(input.chunkCount) && input.chunkCount > 0
+			? input.chunkCount
+			: undefined;
+	const sessions = new Map<string, { author: string; openedAt: number; activeAt: number; served: Set<number> }>();
+	const prune = (now: number, connected: ReadonlySet<string>): void => {
+		for (const [peer, session] of sessions)
+			if (!connected.has(peer) || now - session.openedAt >= SNAPSHOT_PULL_TOTAL_MS) sessions.delete(peer);
+	};
 	return Object.freeze({
 		authorization: Object.freeze({
 			authorForPeer: (peer: string) => {
-				if (!input.connectedPeers().includes(peer)) {
-					authors.delete(peer);
-					return undefined;
-				}
-				return authors.get(peer);
+				const now = clock();
+				prune(now, new Set(input.connectedPeers()));
+				const session = sessions.get(peer);
+				if (session === undefined) return undefined;
+				// A request from the member: its session is active.
+				session.activeAt = now;
+				return session.author;
 			},
 			isAuthorizedAuthor: input.isAuthorizedReader ?? input.identity.isAuthorizedAuthor,
 		}),
@@ -358,14 +394,26 @@ export function createCreatorSuccessorMaterialServer(
 				await refuse(stream, request.nonce, refusal, input.localPeerId);
 				return true;
 			}
-			// Routing possession is transient and bounded by the existing transfer session ceiling.
+			// Routing possession is transient and bounded by the existing transfer session ceiling, counted
+			// in concurrent sessions. A full table admits a new requester only in place of an idle session
+			// (the least recently active); otherwise it is refused and retries by itself (row 61 pacing).
+			const now = clock();
 			const connected = new Set(input.connectedPeers());
-			for (const peer of authors.keys()) if (!connected.has(peer)) authors.delete(peer);
+			prune(now, connected);
 			if (!connected.has(stream.peerId)) throw new TypeError("creator material requester disconnected");
-			if (!authors.has(stream.peerId) && authors.size >= SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS)
-				throw new TypeError("creator material requester session limit reached");
-			// A string: any other author was refused above.
-			authors.set(stream.peerId, request.author as string);
+			if (!sessions.has(stream.peerId) && sessions.size >= SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS) {
+				let idlest: string | undefined;
+				let idlestAt = Infinity;
+				for (const [peer, session] of sessions)
+					if (now - session.activeAt >= CREATOR_MATERIAL_SESSION_IDLE_MS && session.activeAt < idlestAt) {
+						idlest = peer;
+						idlestAt = session.activeAt;
+					}
+				if (idlest === undefined) throw new TypeError("creator material requester session limit reached");
+				sessions.delete(idlest);
+			}
+			// A string: any other author was refused above. A repeated request opens a fresh session.
+			sessions.set(stream.peerId, { author: request.author as string, openedAt: now, activeAt: now, served: new Set() });
 			const { exactCanonicalCloseMembershipBytes: membership,
 				exactCanonicalReattachmentCheckpointBytes: checkpoint, ...common } = auxiliary(input.material as unknown as Record<string, unknown>);
 			const unavailable = checkpointRequested && checkpoint === undefined;
@@ -404,6 +452,16 @@ export function createCreatorSuccessorMaterialServer(
 				clearTimeout(timer);
 			}
 			return true;
+		},
+		served: (peerId: string, indices: readonly number[]): void => {
+			const session = sessions.get(peerId);
+			if (session === undefined) return;
+			session.activeAt = clock();
+			for (const index of indices)
+				if (Number.isSafeInteger(index) && index >= 0 && (chunkCount === undefined || index < chunkCount))
+					session.served.add(index);
+			// Every chunk served: the member's pull is complete and its session ends.
+			if (chunkCount !== undefined && session.served.size >= chunkCount) sessions.delete(peerId);
 		},
 	});
 }
