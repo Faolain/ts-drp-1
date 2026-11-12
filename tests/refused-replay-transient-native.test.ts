@@ -1,4 +1,6 @@
 import { decodeCanonical } from "@ts-drp/canonical";
+import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
 import { DatabaseSync, StatementSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
@@ -16,13 +18,15 @@ import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
 //   - a refusal that persists past them: the move is handed back once, reason "transient-exhausted",
 //     the install completes and the Writer plays on; offered again later, the move lands once.
 // The fault is in the native read itself (the Writer's snapshot owner status query throws while armed);
-// nothing in the room is mocked. It is armed by the install's own plan merge (the displaced source's
-// replay decision committed) and disarmed after `failures` reads, or by the hand-back's plan write.
+// nothing in the room is mocked. It is armed in the Writer's own issuance store once its install's
+// drain has issued the epoch's fence (the drain issues the fence before any replay) with the displaced
+// source's replay still pending, and disarmed after `failures` reads, or by the hand-back's plan write.
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
 });
 
+const WRITER_ISSUANCE = createHash("sha256").update(JSON.stringify(["issuance", "peer-1"])).digest("hex");
 const OWNER_STATUS_SQL = "SELECT COUNT(*) AS count FROM snapshot_owner_v2";
 const block = (id: string, x: number) => ({ action: "placeBlock", id, kind: "stone", x, y: 0 });
 
@@ -57,15 +61,18 @@ function snapshotReadinessFault(failures: number) {
 			fault.watching &&
 			!fault.inside &&
 			(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
-			this.location()?.endsWith(".drp-issuance-v1.sqlite") === true
+			this.location()?.endsWith(".drp-issuance-v1.sqlite") === true &&
+			basename(this.location() ?? "").startsWith(WRITER_ISSUANCE)
 		) {
 			fault.inside = true;
 			try {
-				const states = (this.prepare("SELECT entries_json FROM settlement_plans").all() as { entries_json: string }[]).map(
-					(row) => planState(row.entries_json)
-				);
+				const rows = this.prepare("SELECT fence_sequence, entries_json FROM settlement_plans").all() as {
+					fence_sequence: number | null;
+					entries_json: string;
+				}[];
+				const states = rows.map((row) => ({ fenced: row.fence_sequence !== null, ...planState(row.entries_json) }));
 				if (states.some((state) => state.handedBack)) fault.armed = false;
-				else if (states.some((state) => state.pendingReplay)) fault.armed = fault.thrown < fault.failures;
+				else if (states.some((state) => state.fenced && state.pendingReplay)) fault.armed = fault.thrown < fault.failures;
 			} finally {
 				fault.inside = false;
 			}
