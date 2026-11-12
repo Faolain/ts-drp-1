@@ -745,9 +745,13 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	// Diagnostic: the policy's offers to the room (with or without a hand-back record) and outcomes.
 	const policyOffers: { at: number; epoch: number | undefined; handBack: boolean; outcome: string }[] = [];
 	policy?.bind(
-		new Proxy(room, {
-			get(target, key, receiver) {
-				if (key !== "issue") return Reflect.get(target, key, receiver) as unknown;
+		new Proxy({} as typeof room, {
+			get(_, key) {
+				const target = room;
+				if (key !== "issue") {
+					const value = Reflect.get(target, key) as unknown;
+					return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+				}
 				return async (operation: Readonly<Record<string, unknown>>, issueOptions?: { handBack?: unknown }) => {
 					const entry = { at: Math.round(performance.now()), epoch: target.authority()?.epoch, handBack: issueOptions?.handBack !== undefined, outcome: "pending" };
 					if (policyOffers.length < 2000) policyOffers.push(entry);
