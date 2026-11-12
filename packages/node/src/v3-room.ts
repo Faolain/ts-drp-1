@@ -388,6 +388,13 @@ export type V3RoomSettlementStatus = Readonly<{
 		operations: readonly Readonly<Record<string, unknown>>[];
 		/** The record's key: pass it back with the operation to consume the record. */
 		handBack: V3RoomHandBack;
+		/**
+		 * Why the room gave it back when its replay was refused by this Writer's own admission at an
+		 * install: "application-state-limit" (the room's application state limit) or "admission-rejected"
+		 * (the room's admission policy). Absent: the settlement window or the creator's frontier gave it
+		 * back. Never offered again automatically.
+		 */
+		reason?: "application-state-limit" | "admission-rejected";
 	}>[];
 	/**
 	 * Safety net (observation only), expected 0: moves the window or the creator's frontier would give
@@ -6768,7 +6775,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		readonly sourceSequence: number;
 		readonly throughIntent: number;
 	}>;
-	type RoomSettlementIssueResult = Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>> | null;
+	/** A replay the Writer's admission refused was given back (or, with no free record, left live). */
+	const SETTLEMENT_REPLAY_SETTLED = Object.freeze({ ok: false as const, kind: "replay-settled" as const });
+	type RoomSettlementIssueResult =
+		| Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>>
+		| typeof SETTLEMENT_REPLAY_SETTLED
+		| null;
 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
 	type RoomHandBack = NonNullable<RoomSettlementPlan["handBacks"]>[number];
 	let settlementStatusSnapshot: V3RoomSettlementStatus | undefined;
@@ -6867,6 +6879,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				.filter((record) => record.reissueSequence === null)
 				.map((record) =>
 					Object.freeze({
+						...(record.reason === undefined ? {} : { reason: record.reason }),
 						vertexDigest: hex(record.sourceDigest),
 						epoch: record.sourceEpoch,
 						operations: Object.freeze([
@@ -6978,6 +6991,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
 		left.sourceResolutionKind === right.sourceResolutionKind &&
+		sameBytes(encodeCanonical(left.handedBack ?? null), encodeCanonical(right.handedBack ?? null)) &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -7009,7 +7023,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const inheritance = inheritances.get(source.authorSequence) ?? prior?.inheritance;
 			// The settlement window resolves an unreplaced displaced move as expired (settlementWindowExpired).
 			const expired = windowExpired.has(source.authorSequence);
-			const disposition = prior?.sourceContextDigest !== undefined ? prior.disposition :
+			// A refused replay's hand-back is terminal: the source keeps its `expire` (it is never replaced).
+			const disposition = prior?.sourceContextDigest !== undefined || prior?.handedBack !== undefined ? prior.disposition :
 				inheritance === undefined ? (expired ? "expire" : settlementDisposition(source)) : "inherited";
 			if (disposition === undefined) continue;
 			const sourceDigest = bytes(source.vertexDigest);
@@ -7033,6 +7048,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			entries.push(
 				Object.freeze({
 					disposition,
+					...(prior?.handedBack === undefined ? {} : { handedBack: prior.handedBack }),
 					...(sourceObjectId === undefined ? {} : { sourceObjectId }),
 					...(inheritance === undefined ? {} : { inheritance }),
 					...(prior?.replacementProgress === undefined ? {} : { replacementProgress: prior.replacementProgress }),
@@ -7481,6 +7497,87 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// fence and replacements locally and the startup barrier publishes them after readiness
 	// (rebasePromise). Every other drain (successor adoption) publishes each issue at once.
 	let settlementDrainPublication: "immediate" | "after-readiness" = "immediate";
+	/**
+	 * Settles a displaced source whose replay the Writer's own admission refused before signing: in ONE
+	 * plan write, its entry becomes `expire` with `handedBack {fromIntent, reason}` (written once, a
+	 * terminal chain end) and its intents from `fromIntent` on are given back to the application as
+	 * durable hand-back records carrying the reason. Never re-offered automatically: `expire` is never
+	 * replayed (eligible), and only the application's own issue(op, {handBack}) consumes a record. With no
+	 * free record the source is NOT expired: it stays live (not replayed now) and the next install
+	 * retries it, so no move is ever expired unrecorded.
+	 * @param source - The displaced source.
+	 * @param fromIntent - Its first intent not yet replaced.
+	 * @param reason - The refusal.
+	 */
+	const handBackRefusedReplay = async (
+		source: DisplacedSource,
+		fromIntent: number,
+		reason: "application-state-limit" | "admission-rejected"
+	): Promise<void> => {
+		const current = await issuanceStore.readSettlementPlan(settlementScope);
+		const entry = current?.entries.find((candidate) => candidate.sourceSequence === source.authorSequence);
+		if (
+			current === null ||
+			entry === undefined ||
+			!sameBytes(entry.sourceDigest, bytes(source.vertexDigest)) ||
+			(entry.disposition !== "rebase" && entry.disposition !== "transform") ||
+			entry.replacementSequence !== null ||
+			entry.sourceContextDigest !== undefined ||
+			(entry.replacementProgress?.chunks.at(-1)?.throughIntent ?? 0) !== fromIntent ||
+			fromIntent >= (entry.replacementProgress?.intentCount ?? source.intents.length)
+		)
+			throw new TypeError("v3 room refused replay source changed");
+		// The records carry the source's own intents from `fromIntent` on. With signed chunks already
+		// (fromIntent > 0) that is exact only when the replay replays the source's intents one for one (a
+		// rebase of the same intent count); a transform's replacement intents need not map back to the
+		// source's, so such a source is not handed back here: it stays live, like a full record set.
+		const oneForOne =
+			fromIntent === 0 ||
+			(entry.disposition === "rebase" && entry.replacementProgress?.intentCount === source.intents.length);
+		const handBacks = !oneForOne
+			? undefined
+			: settlementHandBacksWith(
+					current.handBacks?.filter((record) => record.reissueSequence === null),
+					source.intents.slice(fromIntent).map((intent, index) =>
+						Object.freeze({
+							reason,
+							sourceSequence: source.authorSequence,
+							sourceDigest: bytes(source.vertexDigest),
+							sourceEpoch: source.epoch,
+							intent: fromIntent + index,
+							exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+							reissueSequence: null,
+						})
+					)
+				);
+		if (handBacks === undefined) {
+			// No free record (or no one-for-one hand-back): the move stays live (deferred), like the
+			// window's rule; the next install retries it.
+			windowDeferredMoves += source.intents.length - fromIntent;
+			return;
+		}
+		await issuanceStore.transactWriteSettlementPlan({
+			expectedRevision: current.revision,
+			scope: settlementScope,
+			plan: Object.freeze({
+				...current,
+				revision: current.revision + 1,
+				entries: Object.freeze(
+					current.entries.map((candidate) =>
+						candidate.sourceSequence === source.authorSequence
+							? Object.freeze({
+									...candidate,
+									disposition: "expire" as const,
+									handedBack: Object.freeze({ fromIntent, reason }),
+								})
+							: candidate
+					)
+				),
+				handBacks: Object.freeze([...handBacks]),
+			}),
+		});
+		await refreshHandBackListing();
+	};
 	const issueSettlement = async (
 		operations: readonly Readonly<{
 			readonly logicalTime: number;
@@ -7518,6 +7615,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					await (activeHandle.issueSettlementLocal ?? activeHandle.issueLocal)(localInput);
 		if (!issued.ok) {
 			if (issued.kind === "split-required") return issued;
+			// Refused replay: the Writer's own admission (the room's state limit, or its admission policy)
+			// refused the replay BEFORE signing, so no row exists for these intents. The decision to hand
+			// back is the Writer's alone; the creator stays the only owner of graph admission.
+			if (
+				effect.kind === "replacement" &&
+				source !== undefined &&
+				!signed &&
+				(issued.kind === "application-state-limit" || issued.kind === "admission-rejected")
+			) {
+				await handBackRefusedReplay(source, "fromIntent" in effect ? effect.fromIntent : 0, issued.kind);
+				return SETTLEMENT_REPLAY_SETTLED;
+			}
 			const observed = await issuanceStore.readSettlementPlan(settlementScope);
 			const linked = readSettlementEffect(prior, observed, lineage.next, effect);
 			const unchanged = observed !== null && sameBytes(encodeCanonical(observed), encodeCanonical(prior));
@@ -7814,7 +7923,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence }),
 					source
 				);
-				if (legacy === null || legacy.ok) continue;
+				if (legacy === null || legacy.ok || legacy === SETTLEMENT_REPLAY_SETTLED) continue;
 				if (legacy.kind !== "split-required") throw new TypeError("v3 room settlement split result is invalid");
 				initialPrefixLength = legacy.prefixLength;
 				const current = await issuanceStore.readSettlementPlan(settlementScope);
@@ -7954,13 +8063,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						throw new TypeError("v3 room settlement split prefix is invalid");
 					}
 					const throughIntent = fromIntent + initialPrefixLength;
-					await issueSettlement(remaining.slice(0, initialPrefixLength), effect(throughIntent), source);
+					if (
+						(await issueSettlement(remaining.slice(0, initialPrefixLength), effect(throughIntent), source)) ===
+						SETTLEMENT_REPLAY_SETTLED
+					)
+						break;
 					await refreshProgressPrefix(throughIntent);
 					fromIntent = throughIntent;
 					initialPrefixLength = undefined;
 					continue;
 				}
 				const attempted = await issueSettlement(remaining, effect(ordered.length), source);
+				if (attempted === SETTLEMENT_REPLAY_SETTLED) break;
 				if (attempted === null || attempted.ok) {
 					await refreshProgressPrefix(ordered.length);
 					fromIntent = ordered.length;
@@ -7975,7 +8089,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					throw new TypeError("v3 room settlement split prefix is invalid");
 				}
 				const throughIntent = fromIntent + attempted.prefixLength;
-				await issueSettlement(remaining.slice(0, attempted.prefixLength), effect(throughIntent), source);
+				if (
+					(await issueSettlement(remaining.slice(0, attempted.prefixLength), effect(throughIntent), source)) ===
+					SETTLEMENT_REPLAY_SETTLED
+				)
+					break;
 				await refreshProgressPrefix(throughIntent);
 				fromIntent = throughIntent;
 			}

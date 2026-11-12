@@ -11,6 +11,7 @@ import type {
 	DurableIssueScope,
 	DurableSignedEnvelope,
 	SettlementHandBack,
+	SettlementHandBackReason,
 	SettlementInheritance,
 	SettlementPlan,
 	SettlementPlanEntry,
@@ -495,9 +496,11 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "replacementProgress");
 	const hasInheritance =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "inheritance");
+	const hasHandedBack = typeof value === "object" && value !== null && Object.hasOwn(value, "handedBack");
 	if (
 		!isClosedDurableIssuanceRecord(value, [
 			"disposition",
+			...(hasHandedBack ? ["handedBack"] : []),
 			...(hasSourceObjectId ? ["sourceObjectId"] : []),
 			...(hasSourceContext ? ["sourceContextDigest"] : []),
 			...(hasSourceResolution ? ["sourceResolutionDigest"] : []),
@@ -546,8 +549,27 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 					proposedIntentDigest: refusalDigest,
 				}
 			: undefined;
+	const rawHandedBack = hasHandedBack ? value.handedBack : undefined;
+	const handedBack =
+		rawHandedBack !== undefined &&
+		isClosedDurableIssuanceRecord(rawHandedBack, ["fromIntent", "reason"]) &&
+		isValidDurableAuthorSequence(rawHandedBack.fromIntent) &&
+		isSettlementHandBackReason(rawHandedBack.reason)
+			? { fromIntent: rawHandedBack.fromIntent, reason: rawHandedBack.reason }
+			: undefined;
 	if (
 		sourceDigest === undefined ||
+		(hasHandedBack &&
+			(handedBack === undefined ||
+				value.disposition !== "expire" ||
+				value.replacementSequence !== null ||
+				hasSourceContext ||
+				hasSourceResolution ||
+				hasInheritance ||
+				(replacementProgress === undefined
+					? handedBack.fromIntent !== 0
+					: handedBack.fromIntent !== (replacementProgress.chunks.at(-1)?.throughIntent ?? 0) ||
+						handedBack.fromIntent >= replacementProgress.intentCount))) ||
 		(hasSourceContext && sourceContextDigest?.byteLength !== 32) ||
 		// A resolution is exactly one of two signed terminal proofs: received-close
 		// completion (`committed`) or local-author expiry (`expire`). Each has its
@@ -560,13 +582,14 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			hasProgress || hasTransformRefusal)) ||
 		(value.disposition === "committed" && (!hasSourceResolution || value.replacementSequence !== null || hasProgress || hasInheritance)) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
-		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
+		(hasTransformRefusal && (transformRefusal === undefined || (value.disposition !== "transform" && !hasHandedBack))) ||
 		(hasProgress && replacementProgress === undefined) ||
 		(hasInheritance && inheritance === undefined) ||
 		(value.disposition === "inherited"
 			? inheritance === undefined || value.replacementSequence !== null || hasProgress || sourceDigest.byteLength !== 32
 			: hasInheritance) ||
-		(replacementProgress !== undefined && (value.disposition === "expire" || value.disposition === "manual-review"))
+		(replacementProgress !== undefined &&
+			((value.disposition === "expire" && !hasHandedBack) || value.disposition === "manual-review"))
 	) {
 		return undefined;
 	}
@@ -577,6 +600,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	}
 	return {
 		disposition: value.disposition,
+		...(handedBack === undefined ? {} : { handedBack }),
 		...(sourceContextDigest === undefined ? {} : { sourceContextDigest }),
 		...(sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest }),
 		...(hasResolutionKind ? { sourceResolutionKind: "frontier" as const } : {}),
@@ -596,9 +620,15 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
  * @param scope - Validated scope the plan must match.
  * @returns The detached plan, or undefined when invalid.
  */
+function isSettlementHandBackReason(value: unknown): value is SettlementHandBackReason {
+	return value === "application-state-limit" || value === "admission-rejected";
+}
+
 function copySettlementHandBack(value: unknown): SettlementHandBack | undefined {
+	const hasReason = typeof value === "object" && value !== null && Object.hasOwn(value, "reason");
 	if (
 		!isClosedDurableIssuanceRecord(value, [
+			...(hasReason ? ["reason"] : []),
 			"exactCanonicalOperationBytes",
 			"intent",
 			"reissueSequence",
@@ -606,6 +636,7 @@ function copySettlementHandBack(value: unknown): SettlementHandBack | undefined 
 			"sourceEpoch",
 			"sourceSequence",
 		]) ||
+		(hasReason && !isSettlementHandBackReason(value.reason)) ||
 		!isValidDurableAuthorSequence(value.sourceSequence) ||
 		!isValidDurableAuthorSequence(value.sourceEpoch) ||
 		!isValidDurableAuthorSequence(value.intent) ||
@@ -624,6 +655,7 @@ function copySettlementHandBack(value: unknown): SettlementHandBack | undefined 
 	)
 		return undefined;
 	return {
+		...(hasReason ? { reason: value.reason as SettlementHandBackReason } : {}),
 		exactCanonicalOperationBytes: operation,
 		intent: value.intent,
 		reissueSequence: value.reissueSequence,
@@ -679,6 +711,7 @@ export function settlementHandBacksWith(
 function settlementHandBacksEqual(left: SettlementHandBack, right: SettlementHandBack): boolean {
 	return (
 		left.sourceSequence === right.sourceSequence &&
+		left.reason === right.reason &&
 		left.sourceEpoch === right.sourceEpoch &&
 		left.intent === right.intent &&
 		left.reissueSequence === right.reissueSequence &&
@@ -770,6 +803,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 	return {
 		entries: plan.entries.map((entry) => ({
 			disposition: entry.disposition,
+			...(entry.handedBack === undefined ? {} : { handedBack: { ...entry.handedBack } }),
 			...(entry.sourceContextDigest === undefined ? {} : {sourceContextDigest: new Uint8Array(entry.sourceContextDigest)}),
 			...(entry.sourceResolutionDigest === undefined ? {} : {sourceResolutionDigest: new Uint8Array(entry.sourceResolutionDigest)}),
 			...(entry.sourceResolutionKind === undefined ? {} : {sourceResolutionKind: entry.sourceResolutionKind}),
@@ -812,6 +846,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 			? {}
 			: {
 					handBacks: plan.handBacks.map((record) => ({
+						...(record.reason === undefined ? {} : { reason: record.reason }),
 						exactCanonicalOperationBytes: new Uint8Array(record.exactCanonicalOperationBytes),
 						intent: record.intent,
 						reissueSequence: record.reissueSequence,
@@ -856,8 +891,26 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			}
 			continue;
 		}
+		// A refused replay's hand-back arrives once, with the one-way change of an unreplaced, unresolved
+		// rebase/transform decision to `expire`, and never changes or leaves after.
+		const handBackArrives =
+			prior.handedBack === undefined &&
+			candidate.handedBack !== undefined &&
+			candidate.disposition === "expire" &&
+			(prior.disposition === "rebase" || prior.disposition === "transform") &&
+			prior.replacementSequence === null &&
+			prior.sourceContextDigest === undefined &&
+			prior.sourceResolutionDigest === undefined;
 		if (
-			(candidate.disposition !== prior.disposition && !(prior.sourceContextDigest !== undefined &&
+			prior.handedBack !== undefined
+				? candidate.handedBack === undefined ||
+					candidate.handedBack.fromIntent !== prior.handedBack.fromIntent ||
+					candidate.handedBack.reason !== prior.handedBack.reason
+				: candidate.handedBack !== undefined && !handBackArrives
+		)
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back entry changed");
+		if (
+			(candidate.disposition !== prior.disposition && !handBackArrives && !(prior.sourceContextDigest !== undefined &&
 				prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
 				prior.disposition !== "expire" && prior.disposition !== "committed" && prior.disposition !== "inherited" &&
 				prior.replacementSequence === null && prior.replacementProgress === undefined &&

@@ -104,6 +104,15 @@ export interface SettlementPlanEntry {
 	readonly replacementProgress?: SettlementReplacementProgress;
 	readonly inheritance?: SettlementInheritance;
 	readonly transformRefusal?: SettlementTransformRefusal;
+	/**
+	 * Refused replay (fix/refused-replay-settlement): the drain's replay of this displaced source was
+	 * refused by the Writer's own admission before signing, so its intents from `fromIntent` on were
+	 * given back to the application (hand-back records with `reason`) in the same plan write, and the
+	 * source settled `expire`. Written once with that change, never altered or cleared while the entry
+	 * exists; a terminal chain end (never replaced, never re-offered). Older readers refuse the field
+	 * (closed record).
+	 */
+	readonly handedBack?: Readonly<{ readonly fromIntent: number; readonly reason: SettlementHandBackReason }>;
 }
 
 /** Shared exact bytes, retained for as long as any settlement source refers to them. */
@@ -131,7 +140,15 @@ export const SETTLEMENT_HAND_BACK_LIMITS = Object.freeze({
  * `reissueSequence`. Plan writes never drop or alter an unconsumed record. Older readers refuse the
  * field (closed record).
  */
+/**
+ * Why a move was given back by a refused replay (absent: the settlement window or the creator's
+ * frontier gave it back). The author's own local annotation for the application; it carries no
+ * safety weight (the entry's handedBack is the durable fact).
+ */
+export type SettlementHandBackReason = "application-state-limit" | "admission-rejected";
+
 export interface SettlementHandBack {
+	readonly reason?: SettlementHandBackReason;
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly sourceEpoch: number;
