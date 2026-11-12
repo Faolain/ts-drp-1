@@ -263,6 +263,36 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP))).toBeUndefined();
 		expect(() => carrier({value: 1n})).toThrow(); // Any other codec failure is unchanged.
 	});
+	it("compares a retained journal's rows row by row: as strict as the whole array, without one encode under the carrier cap", () => {
+		// A member's successor install (received recovery turnover → installClosedRetirementSource)
+		// compared its whole journal rows array with closedRetirementEqual, one encode under the close's
+		// carrier cap (786,432). A member's retained journal is bounded by the journal's own image bound,
+		// not that cap, so a five-Writer room's members failed every install with "canonical value
+		// exceeds byte limit". Every journal rows equality compares row by row.
+		// The member's install (11484/11492 drain read, journalNative, verifyCompleted) and its lull's drain
+		// ACK readback compare the whole retained journal or its residual.
+		expect(source).not.toMatch(/closedRetirementEqual\([^()]*(?:canonicalRows|readExactCanonicalRows\(\))/u);
+		expect(source.match(/closedJournalRowsEqual\([^()]*(?:\(\))?[^()]*(?:canonicalRows|rows)\)/gu)?.length).toBe(5);
+		const cap = {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128};
+		const bindings = {encodeCanonical, compareBytes, CLOSED_RETIREMENT_BYTES: cap};
+		const rowsEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual", "closedJournalRowsEqual"],
+			"closedJournalRowsEqual", bindings);
+		const wholeEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual"], "closedRetirementEqual", bindings);
+		const rows = (count: number, bytes: number, mark = 0) => Array.from({length: count}, (_, index) => {
+			const row = encodeCanonical({author: index, payload: new Uint8Array(bytes).fill(index === count - 1 ? mark : 7)});
+			return row;
+		});
+		const big = rows(5, 200_000); // 1,000,000+ bytes: past the carrier cap, under the journal's image bound.
+		expect(() => wholeEqual(big, rows(5, 200_000))).toThrow("canonical value exceeds byte limit");
+		expect(rowsEqual(big, rows(5, 200_000))).toBe(true);
+		expect(rowsEqual(big, rows(5, 200_000, 1))).toBe(false); // One byte of the last row differs.
+		expect(rowsEqual(big, rows(4, 200_000))).toBe(false);
+		expect(rowsEqual(big, [...rows(5, 200_000)].reverse())).toBe(false);
+		// Under the cap the row-by-row answer is the whole-array answer.
+		for (const [left, right] of [[rows(3, 100), rows(3, 100)], [rows(3, 100), rows(3, 100, 1)], [rows(3, 100), rows(2, 100)], [[], []]] as const)
+			expect(rowsEqual(left, right)).toBe(wholeEqual(left, right));
+		expect(() => rowsEqual([1n], [1n])).toThrow(); // A non-canonical row still fails as before.
+	});
 	it("reserves one prospective row-plan plus independent header-only drain, retaining distinct OLD plans and all progress", () => {
 		// Actual original reservation bodies, native encoder and accounting union.
 		// Context/classification are controlled premises, not authority minted here.
