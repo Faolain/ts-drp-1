@@ -4402,6 +4402,8 @@ interface CreatorOrdinaryIssuanceSourceFacts {
 	readonly journal: CreatorIssuanceMaintenanceProof["journal"];
 	/** Sole finite numerical expression; no retained original proof or credit. */
 	readonly capacity: { template?: object; material: CreatorOrdinaryFinishingMaterialIndex;
+		/** Roles whose cold quote has asked for a program on this source (no numbers). */
+		templateRequests?: Set<"local" | "received">;
 		readiness?: Readonly<{reader: CreatorOrdinaryApplicationResourceBoundReader; sourceIdentity: object;
 			geometry: CreatorOrdinaryReadinessGeometry;
 			window?: Readonly<{declaredLimits: CreatorOrdinaryFinishingWindowLimits; limits: CreatorOrdinaryFinishingWindowLimits;
@@ -15168,17 +15170,57 @@ export function createCreatorFinishingWidthCompiler() {
 	const results: Readonly<{ unknown: number; envelopes: readonly number[] }>[] = [];
 	const native: Readonly<{ width: number; maximum: number }>[] = [];
 	const counterMaximums = new Map<string, number>();
-	const interned = new Map<string, number>();
-	const append = (node: CreatorFinishingWidthNode, value: number): number => {
-		let key: string;
+	// A node is interned exactly when its kind and operands equal an earlier node's,
+	// keyed by its numbers rather than by a string spelling of them. Lists hash
+	// their kind and children into a bucket and compare every candidate fully.
+	const constantNodes = new Map<number, number>(), parameterNodes = new Map<string, number>();
+	const bytesNodes = new Map<number, number>(), arrayCountNodes = new Map<number, number>();
+	const productNodes = new Map<number, Map<number, number>>(), listNodes = new Map<number, number[]>();
+	const listHash = (kind: "sum" | "maximum", children: readonly number[]): number => {
+		let hash = kind === "sum" ? 0x2545f491 : 0x6b43a9b5;
+		for (let index = 0; index < children.length; index++)
+			hash = Math.imul(hash ^ children[index]!, 0x9e3779b1) ^ (hash >>> 15);
+		return hash;
+	};
+	const sameList = (index: number, kind: "sum" | "maximum", children: readonly number[]): boolean => {
+		const node = nodes[index]!;
+		if (node.kind !== kind || node.children.length !== children.length) return false;
+		for (let position = 0; position < children.length; position++)
+			if (node.children[position] !== children[position]) return false;
+		return true;
+	};
+	const internedIndex = (node: CreatorFinishingWidthNode): number | undefined => {
 		switch (node.kind) {
-			case "constant": key = `c:${node.value}`; break;
-			case "parameter": key = `p:${node.key}`; break;
-			case "sum": case "maximum": key = `${node.kind}:${node.children.join(",")}`; break;
-			case "product": key = `x:${node.left},${node.right}`; break;
-			case "bytes": case "array-count": key = `${node.kind}:${node.child}`; break;
+			case "constant": return constantNodes.get(node.value);
+			case "parameter": return parameterNodes.get(node.key);
+			case "sum": case "maximum": return listNodes.get(listHash(node.kind, node.children))?.find(index =>
+				sameList(index, node.kind as "sum" | "maximum", node.children));
+			case "product": return productNodes.get(node.left)?.get(node.right);
+			case "bytes": return bytesNodes.get(node.child);
+			case "array-count": return arrayCountNodes.get(node.child);
 		}
-		const existing = interned.get(key);
+	};
+	const intern = (node: CreatorFinishingWidthNode, index: number): void => {
+		switch (node.kind) {
+			case "constant": constantNodes.set(node.value, index); break;
+			case "parameter": parameterNodes.set(node.key, index); break;
+			case "sum": case "maximum": {
+				const hash = listHash(node.kind, node.children), bucket = listNodes.get(hash);
+				if (bucket === undefined) listNodes.set(hash, [index]); else bucket.push(index);
+				break;
+			}
+			case "product": {
+				let right = productNodes.get(node.left);
+				if (right === undefined) productNodes.set(node.left, right = new Map());
+				right.set(node.right, index);
+				break;
+			}
+			case "bytes": bytesNodes.set(node.child, index); break;
+			case "array-count": arrayCountNodes.set(node.child, index); break;
+		}
+	};
+	const append = (node: CreatorFinishingWidthNode, value: number): number => {
+		const existing = internedIndex(node);
 		if (existing !== undefined) {
 			if (values[existing] !== value) throw new TypeError("ORDINARY_FINISHING_TEMPLATE_NODE_DRIFT");
 			return existing;
@@ -15187,8 +15229,36 @@ export function createCreatorFinishingWidthCompiler() {
 			throw new TypeError("ORDINARY_FINISHING_TEMPLATE_COMPLEXITY");
 		const index = nodes.length;
 		nodes.push(Object.freeze(node)); values.push(value);
-		interned.set(key, index);
+		intern(node, index);
 		return index;
+	};
+	// Leaf widths. A scalar's canonical width is a pure function of the scalar, so
+	// each distinct scalar is encoded once per compile (refusals are never kept).
+	// A plain Uint8Array's is its tag, varuint length and payload, as the encoder
+	// writes it; one over the closed-retirement limit, or any other byte carrier,
+	// takes the original encode and its original refusal.
+	const integerWidth = closedRetirementBytes(Number.MAX_SAFE_INTEGER).byteLength;
+	const scalarWidths = new Map<string | number | boolean | null, number>();
+	let scalarBytes = 0;
+	const leafWidth = (node: unknown): number => {
+		if (typeof node === "number" && Number.isSafeInteger(node)) return integerWidth;
+		if (node instanceof Uint8Array) {
+			if (Object.getPrototypeOf(node) === Uint8Array.prototype && !Object.hasOwn(node, "byteLength")) {
+				const width = 1 + maintenanceVarUintWidth(node.byteLength) + node.byteLength;
+				if (width <= CLOSED_RETIREMENT_BYTES.maxBytes) return width;
+			}
+			return closedRetirementBytes(node).byteLength;
+		}
+		if (node !== null && typeof node !== "string" && typeof node !== "number" && typeof node !== "boolean")
+			return closedRetirementBytes(node).byteLength;
+		const prior = scalarWidths.get(node);
+		if (prior !== undefined) return prior;
+		const width = closedRetirementBytes(node).byteLength;
+		if (scalarWidths.size < 65_536 && width <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes - scalarBytes) {
+			scalarWidths.set(node, width);
+			scalarBytes += width;
+		}
+		return width;
 	};
 	const constant = (value: number): number => append({kind: "constant", value}, value);
 	const combine = (kind: "sum" | "maximum", children: readonly number[]): number => {
@@ -15247,7 +15317,7 @@ export function createCreatorFinishingWidthCompiler() {
 		}
 		if (value instanceof Uint8Array) {
 			const child = byteParameters.get(value);
-			return {width: child === undefined ? constant(closedRetirementBytes(value).byteLength) : bytes(child),
+			return {width: child === undefined ? constant(leafWidth(value)) : bytes(child),
 				items: constant(1), depth: constant(0)};
 		}
 		const array = Array.isArray(value);
@@ -15270,9 +15340,7 @@ export function createCreatorFinishingWidthCompiler() {
 				depth: children.length === 0 ? constant(0) : combine("sum", [constant(1),
 					combine("maximum", children.map(child => child.depth))])};
 		}
-		return {width: constant(typeof value === "number" && Number.isSafeInteger(value)
-			? closedRetirementBytes(Number.MAX_SAFE_INTEGER).byteLength : closedRetirementBytes(value).byteLength),
-			items: constant(1), depth: constant(0)};
+		return {width: constant(leafWidth(value)), items: constant(1), depth: constant(0)};
 	};
 	return Object.freeze({
 		bind: (key: string, value: number): number => { parameter(key, value); return value; },
@@ -15296,7 +15364,8 @@ export function createCreatorFinishingWidthCompiler() {
 			return register(width, expression);
 		},
 		measure: (value: unknown): number => {
-			const actual = maintenanceCanonicalCapacityWidth(value), compiled = tree(value);
+			// maintenanceCanonicalCapacityWidth with the same leaf widths, measured once.
+			const actual = maintenanceCanonicalWidth(value, leafWidth), compiled = tree(value);
 			if (values[compiled.width] < actual) throw new TypeError("ORDINARY_FINISHING_TEMPLATE_FIELD_DRIFT");
 			shapes.push(Object.freeze({items: compiled.items, depth: compiled.depth}));
 			// A repeated complete child may deliberately dominate the cold array.
@@ -15896,6 +15965,22 @@ function creatorFinishingTemplateShapeMatches(template: CreatorFinishingCapacity
 		input.signingFrames.every((row, index) => `${row.store}:${row.phase}:${JSON.stringify(row.key)}` === template.signingLayout[index]);
 }
 
+/** Diagnostics only: the first shape field on which a retained template differs. */
+function creatorFinishingTemplateShapeMismatch(template: CreatorFinishingCapacityTemplate,
+	input: CreatorFinishingCommonInput): string | undefined {
+	if (input.planEffect !== undefined) return "plan-effect";
+	if (input.archiveConstruction !== undefined) return "archive";
+	if (input.ordinaryFinishingCapacityDimensions === undefined) return "dimensions";
+	if (input.ordinaryFinishingCapacityDimensions.successorFenceCount !== template.successorFenceCount) return "successor-fence-count";
+	if (input.postAdoptionCensusSizing?.length !== template.postAdoptionVariantCount) return "post-adoption-variants";
+	if (input.exactCanonicalSnapshotChunks.length !== template.chunkCount) return `chunks:${template.chunkCount}->${input.exactCanonicalSnapshotChunks.length}`;
+	if (input.metadata.length !== template.metadataLayout.length) return `metadata:${template.metadataLayout.length}->${input.metadata.length}`;
+	if (!input.metadata.every((row, index) => row.priorRef?.digest === template.metadataLayout[index]?.prior)) return "metadata-prior";
+	if (input.signingFrames.length !== template.signingLayout.length) return `signing:${template.signingLayout.length}->${input.signingFrames.length}`;
+	const index = input.signingFrames.findIndex((row, index) => `${row.store}:${row.phase}:${JSON.stringify(row.key)}` !== template.signingLayout[index]);
+	return index === -1 ? undefined : `signing-layout:${index}`;
+}
+
 /** Existing ordinary I law: fresh byte-exact ownership plus every UNKNOWN
  * occurrence, without a charge, refund, or retained projection. */
 function creatorFinishingPrefixesFitOrdinaryBook(accounting: CreatorClosedRollbackProofAccounting,
@@ -16028,7 +16113,8 @@ function creatorFinishingAuthenticatedTrustContextEqual(
  * temporary compiler/source observations are gone before this numeric program
  * enters the existing immutable source's sole capacity cell. */
 export async function captureCreatorOrdinaryFinishingCapacityTemplate(
-	input: ProspectiveCreatorMaintenancePrefixInput, source: CreatorOrdinaryIssuanceProofSource
+	input: ProspectiveCreatorMaintenancePrefixInput, source: CreatorOrdinaryIssuanceProofSource,
+	options?: Readonly<{deferFirstCompile?: boolean}>
 ): Promise<CreatorFinishingTemplateCaptureResult> {
 	let stage = "eligibility";
 	let prefixes: CreatorFinishingValidatedPrefixes | undefined;
@@ -16106,6 +16192,27 @@ export async function captureCreatorOrdinaryFinishingCapacityTemplate(
 			} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 			return Object.freeze({captured: true});
 		}
+		// A retained source's first cold quote of a role takes the original exact
+		// cold forecast and compiles nothing: a program is only worth its compile when
+		// the SAME source sees that role's cold quote again (most sources see one and
+		// are replaced at the next boundary, so their program was never evaluated).
+		if (options?.deferFirstCompile === true) {
+			const requested = seed.capacity.templateRequests ??= new Set();
+			if (!requested.has(role)) {
+				requested.add(role);
+				try {
+					const observer = Reflect.get(globalThis, "__warmProofEvent");
+					if (typeof observer === "function") observer({kind: "ordinary-finishing-template-deferred", role});
+				} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
+				return Object.freeze({captured: false});
+			}
+		}
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "ordinary-finishing-template-compiling", role,
+				reason: existing?.kind !== "creator-finishing-field-program-1" ? "absent" : "shape-mismatch",
+				...(existing?.kind !== "creator-finishing-field-program-1" ? {} : {mismatch: creatorFinishingTemplateShapeMismatch(existing, input)})});
+		} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 		stage = "input-parameters";
 		const compiler = createCreatorFinishingWidthCompiler();
 		creatorFinishingInputParameters(input, compiler);

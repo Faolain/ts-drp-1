@@ -452,7 +452,10 @@ describe("mandatory fence immutable source handoff", () => {
 		const f = make(), result = await f.run();
 		expect(f.events.slice(0, 3)).toEqual(["cold-proof", "capture-hint", "charge-UNKNOWN"]);
 		expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.proof, f.unsignedBytes);
-		expect(f.charge.mock.calls[0]!.at(-1)).toBeUndefined();
+		// No ordinary source reaches the compiler on the fence path (the source argument), and the
+		// fence capture is not the retained source, so no first compile is deferred.
+		expect(f.charge.mock.calls[0]![3]).toBeUndefined();
+		expect(f.charge.mock.calls[0]![4]).toBe(false);
 		expect(result.ordinaryProofSource).toBe(f.hint); expect(result.ordinaryTemplateReady).toBe(false);
 		for (const unsupported of ["replacement", "received", "archive", "no-bound"] as const) {
 			const g = make();
