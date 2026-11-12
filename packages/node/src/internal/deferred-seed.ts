@@ -12,8 +12,16 @@ export type DeferredSeedStepper<Result> = Readonly<{
 	finish(): Result | undefined;
 }>;
 
-/** One seed's cost: host turns taken, busy time across them, its longest turn, and install-to-result wall time. */
-export type DeferredSeedStats = Readonly<{ turns: number; busyUs: number; maxTurnUs: number; wallUs: number }>;
+/** One seed's cost: host turns taken, busy time across them, its longest turn, install-to-result wall time,
+ * the time its creation took (inside the first turn) and each turn's duration in order. */
+export type DeferredSeedStats = Readonly<{
+	turns: number;
+	busyUs: number;
+	maxTurnUs: number;
+	wallUs: number;
+	startUs: number;
+	turnUs: readonly number[];
+}>;
 
 export type DeferredSeedRunnerOptions = Readonly<{
 	/** Runs `turn` in a later host turn. */
@@ -52,6 +60,8 @@ type Entry<Result> = {
 	turns: number;
 	busyMs: number;
 	maxTurnMs: number;
+	startMs: number;
+	turnMs: number[];
 };
 
 /**
@@ -70,6 +80,8 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 			busyUs: Math.round(entry.busyMs * 1000),
 			maxTurnUs: Math.round(entry.maxTurnMs * 1000),
 			wallUs: Math.round((now() - entry.begunAt) * 1000),
+			startUs: Math.round(entry.startMs * 1000),
+			turnUs: Object.freeze(entry.turnMs.map((ms) => Math.round(ms * 1000))),
 		});
 	const abandon = (entry: Entry<Result>): void => {
 		try {
@@ -95,9 +107,15 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 		let finished = false;
 		let result: Result | undefined;
 		try {
-			entry.seed ??= entry.request.start();
+			let fresh = false;
+			if (entry.seed === undefined) {
+				entry.seed = entry.request.start();
+				entry.startMs = now() - started;
+				fresh = true;
+			}
 			if (entry.seed === undefined) finished = true;
-			else {
+			// A creation that used half the turn steps from the next turn; any later turn steps at least once.
+			else if (!fresh || now() - started < turnMs / 2) {
 				do finished = entry.seed.step(stepBytes) === true;
 				while (!finished && now() - started < turnMs);
 				if (finished) result = entry.seed.finish();
@@ -108,6 +126,7 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 		}
 		const spent = now() - started;
 		entry.turns++;
+		entry.turnMs.push(spent);
 		entry.busyMs += spent;
 		if (spent > entry.maxTurnMs) entry.maxTurnMs = spent;
 		if (!finished) {
@@ -125,7 +144,7 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 		begin(owner: Owner, request: DeferredSeedRequest<Result>): void {
 			const prior = entries.get(owner);
 			if (prior !== undefined) abandon(prior);
-			const entry: Entry<Result> = { request, begunAt: now(), turns: 0, busyMs: 0, maxTurnMs: 0 };
+			const entry: Entry<Result> = { request, begunAt: now(), turns: 0, busyMs: 0, maxTurnMs: 0, startMs: 0, turnMs: [] };
 			entries.set(owner, entry);
 			schedule(() => turn(owner, entry));
 		},

@@ -68,7 +68,8 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	const creator = await fixture.open(0);
 	const writer = await fixture.open(1);
 	const samples: Sample[] = [];
-	type Seed = { covered: boolean; durationUs: number; receiver: string; mode: string; turns: number; maxTurnUs: number; wallUs: number };
+	type Seed = { covered: boolean; durationUs: number; receiver: string; mode: string; turns: number; maxTurnUs: number; wallUs: number;
+		startUs: number; turnUs: number[] };
 	const seeds: Seed[] = [];
 	let discardedSeeds = 0;
 	let site = "none";
@@ -84,7 +85,8 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 		if (event.kind === "application-state-bound-seed")
 			seeds.push({ covered: event.covered === true, durationUs: Number(event.durationUs), receiver: String(event.receiver),
 				mode: String(event.mode), turns: Number(event.turns ?? 1), maxTurnUs: Number(event.maxTurnUs ?? event.durationUs),
-				wallUs: Number(event.wallUs ?? event.durationUs) });
+				wallUs: Number(event.wallUs ?? event.durationUs), startUs: Number(event.startUs ?? 0),
+				turnUs: Array.isArray(event.turnUs) ? (event.turnUs as number[]) : [Number(event.durationUs)] });
 		if (event.kind === "application-state-bound-seed-discarded") discardedSeeds++;
 		if (typeof previous === "function") previous(event);
 	});
@@ -206,6 +208,15 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 							busyP50Us: percentile(rows.map((seed) => seed.durationUs), 0.5),
 							busyP95Us: percentile(rows.map((seed) => seed.durationUs), 0.95),
 							maxTurnUs: Math.max(0, ...rows.map((seed) => seed.maxTurnUs)),
+							turnP50Us: percentile(rows.flatMap((seed) => seed.turnUs), 0.5),
+							turnP95Us: percentile(rows.flatMap((seed) => seed.turnUs), 0.95),
+							turnP99Us: percentile(rows.flatMap((seed) => seed.turnUs), 0.99),
+							turnsOver1ms: rows.flatMap((seed) => seed.turnUs).filter((us) => us > 1000).length,
+							turnCount: rows.flatMap((seed) => seed.turnUs).length,
+							firstTurnMaxUs: Math.max(0, ...rows.map((seed) => seed.turnUs[0] ?? 0)),
+							lastTurnMaxUs: Math.max(0, ...rows.map((seed) => seed.turnUs.at(-1) ?? 0)),
+							startP50Us: percentile(rows.map((seed) => seed.startUs), 0.5),
+							startMaxUs: Math.max(0, ...rows.map((seed) => seed.startUs)),
 							turnsMax: Math.max(0, ...rows.map((seed) => seed.turns)),
 							wallP50Us: percentile(rows.map((seed) => seed.wallUs), 0.5),
 							wallMaxUs: Math.max(0, ...rows.map((seed) => seed.wallUs)),
