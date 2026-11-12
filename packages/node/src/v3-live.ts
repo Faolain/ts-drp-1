@@ -983,11 +983,26 @@ type NativeReplacementPreparation = ReturnType<typeof derivePolicyReplacement> &
 		transformRefusal?: NonNullable<SettlementPlan["entries"][number]["transformRefusal"]>;
 	}>;
 
+/**
+ * The application's own upper bound on its state's canonical byte length, over a base state and every
+ * operation advanced into it, in any order and any subset (the same bound the creator's ordinary proof
+ * book charges: readOrdinaryApplicationResourceBound). quote never retains its candidate. Undefined means
+ * the bound does not cover that material; the caller then judges the exact fold.
+ */
+export interface V3ApplicationStateBound {
+	advance(operations: readonly unknown[]): boolean;
+	quote(candidateOperation: unknown): number | undefined;
+	/** The bound over the base and advanced operations alone, with no candidate. */
+	quoteBase(): number | undefined;
+}
+
 export interface V3OperationAdmissionPolicy {
 	reserve(
 		operation: Readonly<Record<string, unknown>>,
 		context?: Readonly<{ author: string }>
 	): V3OperationAdmissionReservation;
+	/** The application's state bound seeded with this plane's exact base state, when it has one. */
+	createApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBound | undefined;
 }
 export type V3OperationAdmissionPolicyFactory = (
 	context: Readonly<{
@@ -19931,6 +19946,8 @@ function stageClosedBlueprintEpoch(
 			vertices: projection.vertices,
 		});
 	} catch (error) {
+		const unsound = applicationStateBoundUnsound(registration, error);
+		if (unsound !== undefined) return blueprintFoldFailure("fold-rejected", unsound);
 		return blueprintFoldFailure(
 			"fold-rejected",
 			`v3 blueprint epoch fold was rejected: ${error instanceof Error ? error.message : "unknown failure"}`
@@ -21839,6 +21856,117 @@ type ApplicationStateFold = Readonly<{
 	/** The running fold this one extends by one apply, when it was forked from it. */
 	from?: BlueprintStateMachine;
 }>;
+/** One plane's application state bound, advanced with its admitted non-control operations. */
+type ApplicationStateBoundCache = {
+	base: BlueprintStateMachine;
+	index: V3PlaneRegistration["index"];
+	payload: V3PlaneRegistration["payload"];
+	/** Undefined once the bound does not cover this plane's material: the exact fold judges instead. */
+	bound: V3ApplicationStateBound | undefined;
+	advanced: Set<string>;
+	pending?: Readonly<{ digest: string; operation: unknown }>;
+	/** The bound admitted a candidate on this plane (the seal names the bound if its fold refuses). */
+	admittedByBound: boolean;
+};
+const applicationStateBounds = new WeakMap<V3PlaneRegistration, ApplicationStateBoundCache>();
+
+/**
+ * The bound path of the application state check: whether the application's own state bound, over this
+ * plane's base and admitted operations plus the candidate, stays within the room's limit. O(operation).
+ * The exact state is at most the bound (the application's theorem, property-tested per shipped app), so
+ * a vertex admitted here never makes the seal's fold refuse; the seal names the bound if it ever does.
+ * Conservative near the limit: the usable state there is bounded by the application's bound.
+ * @returns The verdict and the quoted bound, or undefined when the plane has no bound covering this material.
+ */
+function applicationStateBoundAdmits(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>
+): Readonly<{ admitted: boolean; quoted: number }> | undefined {
+	const policy = registration.operationAdmissionPolicy;
+	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
+	if (typeof create !== "function") return undefined;
+	let cache = applicationStateBounds.get(registration);
+	if (cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload) {
+		let bound: V3ApplicationStateBound | undefined;
+		try {
+			const created: unknown = ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]);
+			bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
+				typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
+				? created as V3ApplicationStateBound : undefined;
+			// A bound that does not fit the limit even before any operation (a constant ceiling above the
+			// room's limit) cannot decide this room's moves: the exact fold judges them.
+			const quotedBase = bound?.quoteBase();
+			if (quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES)
+				bound = undefined;
+		} catch {
+			bound = undefined;
+		}
+		cache = { base, index: registration.index, payload: registration.payload, bound, advanced: new IntrinsicSet(),
+			admittedByBound: false };
+		cache.advanced.add(registration.payload.provenance.anchorDigest);
+		applicationStateBounds.set(registration, cache);
+	}
+	const disable = (): undefined => {
+		cache.bound = undefined;
+		return undefined;
+	};
+	const pending = cache.pending;
+	cache.pending = undefined;
+	if (cache.bound === undefined) return undefined;
+	try {
+		// Advance with what was admitted since: the last admitted candidate at once, any other vertex
+		// (received under another path, or control) by a catch-up over the epoch graph.
+		if (pending !== undefined && !cache.advanced.has(pending.digest) && registration.closeVertices.has(pending.digest)) {
+			if (!cache.bound.advance([pending.operation])) return disable();
+			cache.advanced.add(pending.digest);
+		}
+		if (cache.advanced.size !== registration.closeVertices.size) {
+			const operations: unknown[] = [];
+			for (const [hash, vertex] of registration.closeVertices) {
+				if (cache.advanced.has(hash)) continue;
+				cache.advanced.add(hash);
+				if (!registration.controlVertices.has(hash) && vertex.operation !== undefined) operations.push(vertex.operation);
+			}
+			if (operations.length !== 0 && !cache.bound.advance(operations)) return disable();
+		}
+		const quoted = cache.bound.quote(candidate.operation);
+		if (quoted === undefined || !NumberIsSafeInteger(quoted) || quoted < 1) return disable();
+		const admitted = quoted <= ROOM_APPLICATION_STATE_BYTES;
+		if (admitted) {
+			cache.pending = ObjectFreeze({ digest: candidate.digest, operation: candidate.operation });
+			cache.admittedByBound = true;
+		}
+		return ObjectFreeze({ admitted, quoted });
+	} catch {
+		return disable();
+	}
+}
+
+/**
+ * The typed internal error when the seal's exact fold passes the room's application state limit although
+ * the application's state bound admitted this plane's vertices: the bound is wrong (it claims to cover
+ * every reachable state), never a silent stall.
+ * @returns The error detail, or undefined when the failure is not that.
+ */
+function applicationStateBoundUnsound(registration: V3PlaneRegistration, error: unknown): string | undefined {
+	if (!isObject(error) || Reflect.get(error, "code") !== "INVALID_APPLICATION_STATE" || !applicationStateBoundUsed(registration))
+		return undefined;
+	const detail = `APPLICATION_STATE_BOUND_UNSOUND: the application's state bound (readOrdinaryApplicationResourceBound) admitted ` +
+		`operations whose exact fold passes the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes); ` +
+		`the application's bound is wrong: ${error instanceof Error ? error.message : "unknown failure"}`;
+	try {
+		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-application-state", detail]);
+	} catch { /* Diagnostics only. */ }
+	return detail;
+}
+
+/** Whether this plane admitted any vertex on the application's state bound (the seal names it). */
+function applicationStateBoundUsed(registration: V3PlaneRegistration): boolean {
+	const cache = applicationStateBounds.get(registration);
+	return cache !== undefined && cache.admittedByBound && cache.base === registration.blueprintMachine;
+}
+
 const applicationStateFolds = new WeakMap<
 	V3PlaneRegistration,
 	{ running?: ApplicationStateFold; pending?: ApplicationStateFold }
@@ -21882,6 +22010,20 @@ function applicationStateAdmits(
 	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
 	if (registration.closeVertices.has(candidate.digest)) return true;
 	const started = typeof performance === "undefined" ? 0 : performance.now();
+	const emit = (event: Readonly<Record<string, unknown>>): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "application-state-bound", path, author: candidate.author, receiver: registration.issuanceScope.author,
+					durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000), ...event });
+		} catch { /* Diagnostics cannot alter admission. */ }
+	};
+	// The application's own state bound, when it covers this material: O(operation), no fold.
+	const bounded = applicationStateBoundAdmits(registration, base, candidate);
+	if (bounded !== undefined) {
+		emit({ mode: "bound", refolded: false, admitted: bounded.admitted, sortsLast: true, stateBytes: bounded.quoted });
+		return bounded.admitted;
+	}
 	const limitRefusal = (error: unknown): boolean =>
 		isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE";
 	const context = ObjectFreeze({ author: candidate.author });
@@ -21973,16 +22115,8 @@ function applicationStateAdmits(
 		// Only the state bound is judged here; any other fold failure is another check's to refuse.
 		if (limitRefusal(error)) admitted = false;
 	}
-	try {
-		const observer = Reflect.get(globalThis, "__warmProofEvent");
-		if (typeof observer === "function") {
-			const durationUs = typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000);
-			const staged = cache.pending?.digest === candidate.digest ? cache.pending.machine : undefined;
-			observer({ kind: "application-state-bound", path, refolded, admitted, sortsLast,
-				author: candidate.author, receiver: registration.issuanceScope.author, durationUs,
-				...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
-		}
-	} catch { /* Diagnostics cannot alter admission. */ }
+	const staged = cache.pending?.digest === candidate.digest ? cache.pending.machine : undefined;
+	emit({ mode: "exact", refolded, admitted, sortsLast, ...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
 	return admitted;
 }
 
@@ -22113,7 +22247,7 @@ function previewCreatorIssuanceClose(
 	if (projection === undefined || aclPreview === undefined || metadata === undefined)
 		throw new TypeError("creator issuance close preview projection is invalid");
 	const machine = registration.blueprintMachine.fork();
-	foldBlueprintEpoch({
+	try { foldBlueprintEpoch({
 		anchorHash: registration.payload.provenance.anchorDigest,
 		machine,
 		vertices: projection.vertices,
@@ -22130,7 +22264,10 @@ function previewCreatorIssuanceClose(
 			if (identity === undefined) throw new TypeError("creator issuance close preview author is unavailable");
 			return ObjectFreeze({ author: identity.author });
 		},
-	}).adopt();
+	}).adopt(); } catch (error) {
+		const unsound = applicationStateBoundUnsound(registration, error);
+		throw unsound === undefined ? error : new TypeError(unsound, { cause: error });
+	}
 	const exactCanonicalSuccessorAclBytes = encodeCanonical(aclPreview.next, {
 		maxBytes: registration.payload.parameters.maxSnapshotBytes,
 	});

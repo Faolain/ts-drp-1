@@ -45,9 +45,14 @@ export interface BlueprintStateMachineInput {
 class OwnedBlueprintForkInput implements BlueprintStateMachineInput {
 	readonly #source: BlueprintStateMachine;
 	constructor(source: BlueprintStateMachine, readonly exactCanonicalInitialStateBytes: Uint8Array,
-		readonly expectedBlueprintDigest: string, readonly expectedInitialStateDigest: string,
+		readonly expectedBlueprintDigest: string,
 		readonly preparedBlueprintRuntime: PreparedBlueprintRuntime, readonly maxApplicationStateBytes: number) {
 		this.#source = source;
+	}
+	/** Never read on the owned path (the fork takes its source's digest state, hashed lazily); a
+	 * staging fork does not hash its state. */
+	get expectedInitialStateDigest(): string {
+		return this.#source.snapshot().stateDigest;
 	}
 	static source(input: BlueprintStateMachineInput): BlueprintStateMachine | undefined {
 		return typeof input === "object" && input !== null && #source in input ? input.#source : undefined;
@@ -223,8 +228,9 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 	}
 
 	fork(): BlueprintStateMachine {
+		// A staging fork does not hash: the digest stays lazy (snapshot or a later fork that has it).
 		const fork = new BlueprintStateMachine(new OwnedBlueprintForkInput(this, this.#exactCanonicalStateBytes,
-			this.#expectedBlueprintDigest, this.#digest(), this.#preparedBlueprintRuntime, this.#applicationLimits.maxBytes));
+			this.#expectedBlueprintDigest, this.#preparedBlueprintRuntime, this.#applicationLimits.maxBytes));
 		fork.#baseGeneration = this.#generation;
 		fork.#parent = this;
 		return fork;

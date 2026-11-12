@@ -89,6 +89,7 @@ import {
 	type V3LiveDescriptor,
 	type V3LocalSettlementFloor,
 	type V3LocalSettlementPolicy,
+	type V3ApplicationStateBound,
 	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
 	type V3RetainedHashPage,
@@ -2866,6 +2867,57 @@ function roomOrdinaryFinishingWindowForEpoch(application: V3RoomApplication,
 	return selected;
 }
 
+/**
+ * The application's own state bound (readOrdinaryApplicationResourceBound, the bound the creator's
+ * ordinary proof book charges) seeded with a plane's exact base state, as the live plane's admission
+ * reads it: the canonical byte length of every state reachable from the base and the operations advanced
+ * into it. Undefined when the application has no incremental bound for this blueprint; the live plane
+ * then judges the exact fold.
+ * @param application - The room's application.
+ * @param blueprintDigest - The room's blueprint.
+ * @param exactCanonicalBaseStateBytes - The plane's exact base state.
+ * @returns The bound, or undefined.
+ */
+function createRoomApplicationStateBound(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): V3ApplicationStateBound | undefined {
+	const reader = application.readOrdinaryApplicationResourceBound;
+	const create = reader?.createIncrementalProjection;
+	if (typeof create !== "function") return undefined;
+	let resolved: ReturnType<V3RoomApplication["catalog"]["resolve"]>;
+	try {
+		resolved = application.catalog.resolve(blueprintDigest);
+	} catch {
+		return undefined;
+	}
+	if (resolved.blueprintDigest !== blueprintDigest) return undefined;
+	const projection = create({
+		catalog: Object.freeze({
+			blueprintDigest: resolved.blueprintDigest,
+			artifactId: resolved.artifactId,
+			artifactDigest: resolved.artifactDigest,
+			catalogDigest: resolved.evidence.catalogDigest,
+			runtimeProfile: resolved.runtimeProfile,
+			exactArtifactBytes: resolved.exactArtifactBytes,
+			canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes,
+		}),
+		material: Object.freeze({
+			exactCanonicalBaseStateBytes: Object.freeze([new Uint8Array(exactCanonicalBaseStateBytes)]),
+			currentOperations: Object.freeze([]),
+			protectedOperations: Object.freeze([]),
+			recoveryOperations: Object.freeze([]),
+		}),
+	} as Parameters<typeof create>[0]);
+	if (projection === undefined) return undefined;
+	return Object.freeze({
+		advance: (operations: readonly unknown[]) => projection.advance(operations),
+		quote: (candidateOperation: unknown) => projection.quote(candidateOperation)?.byteLength,
+		quoteBase: () => projection.quoteWithoutApplicationCandidate?.()?.byteLength,
+	});
+}
+
 function createRoomOperationAdmissionPolicy(
 	input: CreateV3RoomSessionInput,
 	material: V3RoomCreatorInviteMaterial,
@@ -2886,6 +2938,8 @@ function createRoomOperationAdmissionPolicy(
 	const maxImportBytes = parameters.maxEpochBytes as number;
 	const maxImports = (parameters.maxEpochVertices as number) * 16;
 	return Object.freeze({
+		createApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
+			createRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
 		reserve(operation: Readonly<Record<string, unknown>>, authenticated?: Readonly<{ author: string }>) {
 			const expanded =
 				operation.action === "applicationBatch"
