@@ -27,6 +27,7 @@ const MEASURE_EPOCHS = Number(process.env.STATE_BOUND_MEASURE_EPOCHS ?? 6);
 const TARGETS = [8192, 16_384, 32_768 - 2 * (ID_BYTES + 64)];
 
 type BoundEvent = {
+	mode?: "bound" | "exact";
 	path: "local" | "received";
 	refolded: boolean;
 	admitted: boolean;
@@ -166,6 +167,7 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 			key,
 			count: group.length,
 			refolds: group.filter((sample) => sample.refolded).length,
+			bound: group.filter((sample) => sample.mode === "bound").length,
 			sortsLast: group.filter((sample) => sample.sortsLast).length,
 			p50Us: percentile(all, 0.5),
 			p95Us: percentile(all, 0.95),
