@@ -96,6 +96,7 @@ import {
 	type V3SettlementSourceSelectionApproval,
 	type V3SettlementSourceSelectionRequest,
 	type V3TerminalMigrationSource,
+	V3_SETTLEMENT_DRAIN_TURN_ROWS,
 	withV3TerminalMigrationTargetFloor,
 	bindV3IngressCapacityRefusalListener,
 } from "@ts-drp/node/v3-live";
@@ -1944,6 +1945,8 @@ export class V3RoomNotYetCurrent extends TypeError {
  * own moves are admitted when issued and never count. The refusal is the typed V3RoomLocalBacklogFull.
  */
 export const V3_ROOM_LOCAL_BACKLOG_LIMIT = SETTLEMENT_HAND_BACK_LIMITS.maxRecords;
+/** Attempts of a drain's one transform-refusal plan CAS before it fails (each retry prepares again). */
+const V3_SETTLEMENT_REFUSAL_CAS_ATTEMPTS = 3;
 
 /**
  * A new local move refused up front because the Writer's undelivered own moves have reached
@@ -4862,7 +4865,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (served !== undefined) {
 				holdDepartedCarrier(scope, served);
 				outcome = "served-durable";
-			}
+			} else outcome = "durable-miss"; // not in the ring, and not rebuildable from native generations
 		}
 		// Observation only (the "__warmProofEvent" proof hook); never alters the answer.
 		try {
@@ -6750,6 +6753,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
 			{ ok: true; kind: "displaced" }
 		>["source"]["prepareReplacement"];
+		prepareReplacements: Extract<
+			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
+			{ ok: true; kind: "displaced" }
+		>["source"]["prepareReplacements"];
 	}>;
 	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
 	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
@@ -7757,66 +7764,103 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			sourceOwner = activeHandle;
 		};
-		const orderedBySequence = new Map<number, readonly Readonly<Record<string, unknown>>[]>();
-		for (const entry of plan.entries) {
+		// Per-drain batching: every eligible row is prepared in one dependency turn per chunk of
+		// V3_SETTLEMENT_DRAIN_TURN_ROWS (prepareReplacements: one consistent native view, writers
+		// excluded), not one turn per row. Every new transform refusal is then written in ONE plan CAS
+		// against the revision the preparation read; a plan another writer changed meanwhile fails the
+		// CAS with nothing written, and the drain prepares again from the plan as it now is. A crash
+		// before or at the CAS leaves no refusal; after it, every refusal is durable before the fence
+		// and before any replacement, as each was one at a time before.
+		let orderedBySequence = new Map<number, readonly Readonly<Record<string, unknown>>[]>();
+		for (let attempt = 0; ; attempt++) {
 			await checkpoint();
 			assertSessionOpen();
-			if (!eligible(entry))
-				continue;
-			const source = sourceBySequence.get(entry.sourceSequence);
-			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
-			const prepared = await source.prepareReplacement();
-			if (source.requiresCreatorSelection && authorizeSettlementSource === undefined) {
-				settlementAuthorizationHeld = true;
-				return;
+			orderedBySequence = new Map();
+			const selected: Readonly<{ entry: RoomSettlementPlanEntry; source: DisplacedSource }>[] = [];
+			for (const entry of plan.entries) {
+				if (!eligible(entry)) continue;
+				const source = sourceBySequence.get(entry.sourceSequence);
+				if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
+				if (source.requiresCreatorSelection && authorizeSettlementSource === undefined) {
+					settlementAuthorizationHeld = true;
+					return;
+				}
+				selected.push(Object.freeze({ entry, source }));
 			}
-			if (prepared.disposition !== entry.disposition)
-				throw new TypeError("replacement preparation disposition changed");
-			if (entry.transformRefusal !== undefined) {
+			const preparedRows: (typeof selected[number] & Readonly<{ prepared: Awaited<ReturnType<DisplacedSource["prepareReplacement"]>> }>)[] = [];
+			for (let from = 0; from < selected.length; from += V3_SETTLEMENT_DRAIN_TURN_ROWS) {
+				await checkpoint();
+				assertSessionOpen();
+				const chunk = selected.slice(from, from + V3_SETTLEMENT_DRAIN_TURN_ROWS);
+				const decisions = await chunk[0]!.source.prepareReplacements(chunk.map((row) => row.source));
+				if (decisions.length !== chunk.length) throw new TypeError("replacement preparation batch changed");
+				chunk.forEach((row, index) => preparedRows.push(Object.freeze({ ...row, prepared: decisions[index]! })));
+			}
+			const refusals = new Map<number, NonNullable<(typeof preparedRows)[number]["prepared"]["transformRefusal"]>>();
+			for (const { entry, prepared } of preparedRows) {
+				if (prepared.disposition !== entry.disposition)
+					throw new TypeError("replacement preparation disposition changed");
+				if (entry.transformRefusal !== undefined) {
+					if (
+						prepared.transformRefusal === undefined ||
+						!sameBytes(entry.transformRefusal.proposedIntentDigest, prepared.transformRefusal.proposedIntentDigest)
+					)
+						throw new TypeError("replacement durable refusal changed");
+				} else if (prepared.transformRefusal !== undefined) {
+					if (plan.fenceSequence !== null || entry.replacementProgress !== undefined)
+						throw new TypeError("replacement refusal must precede fence and effects");
+					refusals.set(entry.sourceSequence, prepared.transformRefusal);
+				}
+			}
+			if (refusals.size !== 0) {
+				try {
+					plan = await issuanceStore.transactWriteSettlementPlan({
+						expectedRevision: plan.revision,
+						scope: settlementScope,
+						plan: Object.freeze({
+							...plan,
+							revision: plan.revision + 1,
+							entries: Object.freeze(
+								plan.entries.map((row) => {
+									const transformRefusal = refusals.get(row.sourceSequence);
+									return transformRefusal === undefined ? row : Object.freeze({ ...row, transformRefusal });
+								})
+							),
+						}),
+					});
+				} catch (error) {
+					const code = error instanceof Error ? (error as { code?: unknown }).code : undefined;
+					if (code !== "ISSUANCE_RETRY_REQUIRED" || attempt >= V3_SETTLEMENT_REFUSAL_CAS_ATTEMPTS - 1) throw error;
+					const current = await issuanceStore.readSettlementPlan(settlementScope);
+					if (current === null) throw new TypeError("v3 room settlement plan is unavailable");
+					plan = current;
+					continue;
+				}
+			}
+			for (const { entry, source, prepared } of preparedRows) {
+				const ordered = prepared.operations;
 				if (
-					prepared.transformRefusal === undefined ||
-					!sameBytes(entry.transformRefusal.proposedIntentDigest, prepared.transformRefusal.proposedIntentDigest)
+					authorizeSettlementSource !== undefined &&
+					(explicitSettlementSourceAuthorization || source.requiresCreatorSelection)
 				)
-					throw new TypeError("replacement durable refusal changed");
-			} else if (prepared.transformRefusal !== undefined) {
-				const transformRefusal = prepared.transformRefusal;
-				if (plan.fenceSequence !== null || entry.replacementProgress !== undefined)
-					throw new TypeError("replacement refusal must precede fence and effects");
-				plan = await issuanceStore.transactWriteSettlementPlan({
-					expectedRevision: plan.revision,
-					scope: settlementScope,
-					plan: Object.freeze({
-						...plan,
-						revision: plan.revision + 1,
-						entries: Object.freeze(
-							plan.entries.map((row) =>
-								row.sourceSequence === entry.sourceSequence ? Object.freeze({ ...row, transformRefusal }) : row
+					await source.authorizeReplacement(authorizeSettlementSource);
+				const progress = entry.replacementProgress;
+				if (
+					progress !== undefined &&
+					(progress.intentCount !== ordered.length ||
+						!sameBytes(
+							progress.intentDigest,
+							hashDomain(
+								"ts-drp/settlement-replacement-intents/v1",
+								encodeCanonical(ordered, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
 							)
-						),
-					}),
-				});
+						))
+				) {
+					throw new TypeError("v3 room settlement replacement intent digest changed");
+				}
+				orderedBySequence.set(entry.sourceSequence, ordered);
 			}
-			const ordered = prepared.operations;
-			if (
-				authorizeSettlementSource !== undefined &&
-				(explicitSettlementSourceAuthorization || source.requiresCreatorSelection)
-			)
-				await source.authorizeReplacement(authorizeSettlementSource);
-			const progress = entry.replacementProgress;
-			if (
-				progress !== undefined &&
-				(progress.intentCount !== ordered.length ||
-					!sameBytes(
-						progress.intentDigest,
-						hashDomain(
-							"ts-drp/settlement-replacement-intents/v1",
-							encodeCanonical(ordered, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
-						)
-					))
-			) {
-				throw new TypeError("v3 room settlement replacement intent digest changed");
-			}
-			orderedBySequence.set(entry.sourceSequence, ordered);
+			break;
 		}
 		if (plan.fenceSequence === null) {
 			const lineage = await issuanceStore.readLineage(settlementScope);
@@ -7845,6 +7889,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			assertSessionOpen();
 			if (!eligible(entry))
 				continue;
+			// Re-check the row as the plan now is: the preparation's snapshot is never trusted for a
+			// row another plan write settled since (an expiry, a replacement): it is skipped, never
+			// replaced twice (settlement-drain-batch.qnt: without this re-check, exactlyOnce fails).
+			const now = (await issuanceStore.readSettlementPlan(settlementScope))?.entries.find(
+				(row) => row.sourceSequence === entry.sourceSequence
+			);
+			if (now === undefined || !eligible(now) || !sameBytes(now.sourceDigest, entry.sourceDigest)) continue;
 			await refreshSourceOwner();
 			const ordered = orderedBySequence.get(entry.sourceSequence);
 			let source = sourceBySequence.get(entry.sourceSequence);
