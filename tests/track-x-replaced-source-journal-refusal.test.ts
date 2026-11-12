@@ -31,17 +31,22 @@ it("collects a terminally covered settled source even while its replacements mis
 	const MISSED = 1;
 	// A settlement recipient keeps three native heads (current, first rollback and the oldest
 	// rollback point, 1515daab), so the journal protects the three epochs before each install
-	// regardless of any source. The chain must outlast that window, or the check below would see
-	// the window, not the source's own retention.
+	// regardless of any source. The check below runs only once the source epoch has left that
+	// window, or it would see the window, not the source's own retention.
 	const HELD_WINDOW = 3;
+	// A Writer's own-settlement window (V3_SETTLEMENT_OWN_WINDOW_EPOCHS, 94d117ca): a move that has
+	// waited this many epochs is not replaced again but handed back (settlementStatus().undelivered).
+	// So the chain has OWN_WINDOW - 1 replacements, each missing the next Cut, and the install after
+	// the last chain seal ends the chain with the hand-back. A longer replacement chain cannot exist.
+	const OWN_WINDOW = 4;
 	// The replacements issued by the installs after these seals miss the next Cut.
-	const CHAIN = new Set(Array.from({ length: HELD_WINDOW + 1 }, (_, offset) => MISSED + offset));
-	// The last link, issued by the install after the last chain seal, is in cut(LAST); this Writer
-	// knows that Cut from its install after seal LAST.
-	const LAST = MISSED + CHAIN.size + 1;
-	// Through the install of epoch LAST (the evidence run for the window sets more: its install of
-	// epoch 8 refuses, "settlement plan references retired or absent issued work").
-	const EPOCHS = Number(process.env.TRACK_X_R5_REFUSAL_A_EPOCHS ?? LAST);
+	const CHAIN = new Set(Array.from({ length: OWN_WINDOW - 1 }, (_, offset) => MISSED + offset));
+	// The install after this seal hands the move back: it issues the fence and no replacement.
+	const HAND_BACK = MISSED + CHAIN.size;
+	// From the install after this seal on, the source epoch is outside the held window, so only the
+	// source's own retention could still protect it.
+	const RELEASED = MISSED + HELD_WINDOW + 1;
+	const EPOCHS = Number(process.env.TRACK_X_R5_REFUSAL_A_EPOCHS ?? RELEASED + 2);
 	let source: DurableIssuanceOutboxRecord | undefined;
 	let late: DurableIssuanceOutboxRecord[] = [];
 	for (let epoch = 0; epoch < EPOCHS; epoch++) {
@@ -60,25 +65,42 @@ it("collects a terminally covered settled source even while its replacements mis
 		const kept = await protectedEpochs(room, 1);
 		history.push(`epoch ${epoch + 1}: ${installed}; protected [${kept.join(",")}]`);
 		expect(installed, history.join("\n")).toBe("ok");
-		if (epoch >= MISSED + CHAIN.size && epoch < LAST) {
-			// Its signed terminal coverage and local completion are enough once replay ends.
-			// The replacement's own future acceptance is a separate row's lifecycle.
+		if (epoch >= RELEASED) {
+			// Its signed terminal coverage and local completion are enough once replay ends. The
+			// replacement chain's end (here the hand-back) is a separate row's lifecycle.
 			expect(kept, history.join("\n")).not.toContain(MISSED);
-			expect(await journalHolds(room, 1, required(source).commit.envelope.digest)).toBe(false);
+			expect(await journalHolds(room, 1, required(source).commit.envelope.digest), history.join("\n")).toBe(false);
 		}
 		if (CHAIN.has(epoch)) {
 			// The install's fence reaches the creator in time (no admission report exists for a
 			// control row; the seal's settle covers it), and its replacement only after the next seal.
 			const rows = await room.fixture.publishedAfter(1, room.delivered[1]);
-			expect(rows.map(isControl)).toEqual([true, false]);
+			expect(rows.map(isControl), history.join("\n")).toEqual([true, false]);
 			creator.inject([required(rows[0])], 1);
 			late = [required(rows[1])];
 			room.delivered[1] = required(rows[1]).commit.authorSequence;
+		} else if (epoch === HAND_BACK) {
+			// The window ends the chain: the install issues its fence only, and the move is given back.
+			const rows = await room.fixture.publishedAfter(1, room.delivered[1]);
+			expect(rows.map(isControl), history.join("\n")).toEqual([true]);
+			const settlement = required(required(room.peers[1]).room.settlementStatus?.());
+			expect(settlement.window).toBe(OWN_WINDOW);
+			expect(
+				settlement.undelivered.map((given) => ({
+					ids: given.operations.map((operation) => operation.id),
+					handBack: given.handBack,
+				})),
+				history.join("\n")
+			).toEqual([
+				{ ids: [`seal-${MISSED}-1`], handBack: expect.objectContaining({ sourceSequence: expect.any(Number) }) },
+			]);
+			creator.inject([required(rows[0])], 1);
+			room.delivered[1] = required(rows[0]).commit.authorSequence;
 		} else await deliver(room, 1);
 	}
 	console.log(`TRACK_X_R5_REFUSAL_A ${JSON.stringify(history)}`);
-	// The move converged through the fourth link.
-	expect(blockIds(creator)).toContain(`seal-${MISSED}-1`);
+	// The move was given back, not converged: no replacement of it ever reached the creator.
+	expect(blockIds(creator)).not.toContain(`seal-${MISSED}-1`);
 }, 900_000);
 
 it("(c) a scope holding another Writer's move outside the Cut is kept across a crash after the install, then collected", async () => {
