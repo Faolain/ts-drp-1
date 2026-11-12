@@ -3029,6 +3029,16 @@ export function issuanceCapacityRefusal(reason: string): string | undefined {
 	return CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(reason)
 		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: issuance forecast exceeds its bound: ${reason}` : undefined;
 }
+/**
+ * The typed capacity reason of a thrown maintenance refusal, local or received. An Error is read by its
+ * message; a closed-rollback Refusal is typed data, not an Error, and names itself through its string
+ * form ("creator closed rollback refusal: proof-budget-exceeded"), never by its bare kind.
+ * @param error - The thrown value.
+ * @returns The typed text, or undefined when it is not an issuance capacity bound.
+ */
+export function issuanceCapacityRefusalOf(error: unknown): string | undefined {
+	return issuanceCapacityRefusal(error instanceof Error ? error.message : String(error));
+}
 
 async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,

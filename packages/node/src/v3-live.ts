@@ -191,7 +191,7 @@ import {
 	type CreatorRoomSettlementPreview,
 	type V3CreatorCloseRegistration,
 	inspectHead,
-	issuanceCapacityRefusal,
+	issuanceCapacityRefusalOf,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
@@ -8459,7 +8459,8 @@ async function handleV3IngressWithSource(
 			retainPendingIngress(registration, evidence, V3Envelope.encode({
 				canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
 			const reason = creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable");
-			const capacity = issuanceCapacityRefusal(reason);
+			// Typed as on the local issue path: the bare Refusal kind ("proof-budget-exceeded") is not.
+			const capacity = issuanceCapacityRefusalOf(error);
 			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${capacity ?? reason}`);
 			if (capacity !== undefined) {
 				try { ingressCapacityRefusalListeners.get(registration.onAdmittedVertex)?.(capacity); }
@@ -16521,10 +16522,8 @@ async function issueOneVertex(
 					: localIssueFailure(
 							"issuance-rejected",
 							// A Writer's (or creator's) own store bound is the same typed capacity refusal.
-							`v3 local issue transaction failed: ${(() => {
-								const reason = error instanceof Error ? error.message : String(error);
-								return issuanceCapacityRefusal(reason) ?? reason;
-							})()}`
+							`v3 local issue transaction failed: ${issuanceCapacityRefusalOf(error) ??
+								(error instanceof Error ? error.message : String(error))}`
 						);
 		}
 		const committedFailure = (
