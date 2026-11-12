@@ -70,6 +70,7 @@ import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canva
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
 import { createV3CanvasApplication } from "../../../packages/node/src/applications/canvas.js";
 import { readCreatorSuccessorExport } from "../../../packages/node/src/creator-adoption.js";
+import type { V3RoomSettlementStatus } from "../../../packages/node/src/v3-room.js";
 import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
 
@@ -808,6 +809,19 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		// The room's own settlement observation (V3RoomSession.settlementStatus), when it has one.
 		settlementStatus: async () =>
 			(Reflect.get(room, "settlementStatus") as (() => unknown) | undefined)?.call(room) ?? null,
+		// Diagnostic: offers the room's first listed given-back move again with its record, straight to
+		// the room (past the policy); the refusal's message, or null when the room accepted it.
+		reissueFirstGivenBack: async () => {
+			const status = (Reflect.get(room, "settlementStatus") as (() => V3RoomSettlementStatus | undefined) | undefined)?.call(room);
+			const given = status?.undelivered[0];
+			if (given === undefined) return "nothing listed";
+			try {
+				await room.issue(required(given.operations[0]), { handBack: given.handBack });
+				return null;
+			} catch (error) {
+				return describeError(error);
+			}
+		},
 		// The application policy's status line (examples/v3-room rollover status()).
 		rolloverStatus: async () => policy?.status() ?? null,
 		// Takes the other peer off (or back onto) this role's successor channel.
