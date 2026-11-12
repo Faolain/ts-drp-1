@@ -1260,14 +1260,17 @@ export function journalFutureAppendPostimageWidths(
 	sizingOptions?: Readonly<{ control?: LiveJournalRetirementControl | null; closedMembershipByteLength?: number;
 		localIssuerBasis?: Readonly<{objectId: string; author: string; nextAuthorSequence: number}>;
 		/** Also measure the successor's mandatory fence horizon (see fenceHorizon below). */
-		fenceHorizon?: boolean }>
+		fenceHorizon?: boolean;
+		/** Width of the membership row the successor epoch's own close writes when it holds only its fence: the
+		 * horizon's next fence acquires the journal after that close (fenceHorizon only). */
+		successorClosedMembershipByteLength?: number }>
 ): Readonly<{
 	afterLocal: JournalFutureNativeWidths;
 	afterSuccessor: JournalFutureNativeWidths;
 	afterSuccessorLocal?: JournalFutureNativeWidths;
-	/** What the successor epoch's mandatory fence quote checks beyond afterSuccessorLocal: that quote is this same
-	 * function from the post-adoption journal (its own fence is afterSuccessorLocal's successor row), adding the
-	 * next successor's scope header (no membership: a preclose quote) and that successor's first local fence. */
+	/** What the next mandatory fence observes beyond afterSuccessorLocal when the successor epoch holds only its own
+	 * fence (a refusal-triggered rollover): the successor epoch's close membership row (successorClosedMembershipByteLength),
+	 * the next successor's scope header, and that successor's first local fence. */
 	fenceHorizon?: Readonly<{ afterSuccessor: JournalFutureNativeWidths; afterSuccessorLocal: JournalFutureNativeWidths }>;
 }> {
 	const frames = decodeNativeFrames(
@@ -1298,9 +1301,11 @@ export function journalFutureAppendPostimageWidths(
 		nextAuthorSequence: local.authorSequence + 1} : undefined;
 	let completedScopes: readonly LiveJournalScope[] = [],
 		membershipByteLength = 0,
+		horizonMembershipByteLength = 0,
 		fenceHorizon = false;
 	if (sizingOptions !== undefined) {
-		const present = ["control", "closedMembershipByteLength", "localIssuerBasis", "fenceHorizon"].filter(
+		const present = ["control", "closedMembershipByteLength", "localIssuerBasis", "fenceHorizon",
+			"successorClosedMembershipByteLength"].filter(
 			(key) => Object.getOwnPropertyDescriptor(sizingOptions, key) !== undefined
 		);
 		const options = record(sizingOptions, present);
@@ -1315,6 +1320,12 @@ export function journalFutureAppendPostimageWidths(
 		if (present.includes("fenceHorizon")) {
 			if (typeof options.fenceHorizon !== "boolean") throw new TypeError("malformed-input");
 			fenceHorizon = options.fenceHorizon;
+		}
+		if (present.includes("successorClosedMembershipByteLength")) {
+			// Sizing of the fence horizon only: it names no close of the epoch this call appends to.
+			if (!fenceHorizon) throw new TypeError("malformed-input");
+			horizonMembershipByteLength = integer(options.successorClosedMembershipByteLength);
+			if (horizonMembershipByteLength > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) throw new TypeError("retirement-fenced");
 		}
 		if (present.includes("closedMembershipByteLength")) {
 			membershipByteLength = integer(options.closedMembershipByteLength);
@@ -1581,16 +1592,20 @@ export function journalFutureAppendPostimageWidths(
 		exactCanonicalAnchorPreimageBytes: nextPreimage, parametersDigest: s.parametersDigest,
 		exactCanonicalParametersCarrierBytes: s.exactCanonicalParametersCarrierBytes});
 	const nextHeader = { table: "scopes", key: nextKey, row: nextHeaderRow };
-	const horizon = [...updated, nextHeader].sort(compareFrameKeys);
-	const signed = [horizon.indexOf(finalHeader), horizon.indexOf(nextHeader)];
+	// The successor epoch closes before the next fence acquires: its header then carries that close's membership row.
+	const closedHeader = horizonMembershipByteLength === 0 ? finalHeader : { ...finalHeader,
+		row: { ...finalHeader.row, [membershipField]: new Uint8Array(horizonMembershipByteLength) } };
+	const closedUpdated = updated.map(entry => entry === finalHeader ? closedHeader : entry);
+	const horizon = [...closedUpdated, nextHeader].sort(compareFrameKeys);
+	const signed = [horizon.indexOf(closedHeader), horizon.indexOf(nextHeader)];
 	const horizonSuccessor = futureWidths(horizon, signed, horizon.indexOf(successorEntry), measurements);
 	const nextEntryRow: Record<string, unknown> = { ...successorRow,
 		epoch: nextScope.epoch,
 		[sql ? "local_author_sequence" : "localAuthorSequence"]: integer(futureLocal.authorSequence) + 1 };
 	const nextEntry = { table, key: [...nextKey, 0], row: nextEntryRow };
 	const nextFinalHeader = { ...nextHeader, row: { ...nextHeaderRow, [sql ? "next_journal_sequence" : "nextJournalSequence"]: 1 } };
-	const horizonLocal = [...updated, nextFinalHeader, nextEntry].sort(compareFrameKeys);
-	const horizonSuccessorLocal = futureWidths(horizonLocal, [horizonLocal.indexOf(finalHeader), horizonLocal.indexOf(nextFinalHeader)],
+	const horizonLocal = [...closedUpdated, nextFinalHeader, nextEntry].sort(compareFrameKeys);
+	const horizonSuccessorLocal = futureWidths(horizonLocal, [horizonLocal.indexOf(closedHeader), horizonLocal.indexOf(nextFinalHeader)],
 		[horizonLocal.indexOf(successorEntry), horizonLocal.indexOf(nextEntry)], measurements);
 	return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal,
 		fenceHorizon: Object.freeze({ afterSuccessor: horizonSuccessor, afterSuccessorLocal: horizonSuccessorLocal }) });

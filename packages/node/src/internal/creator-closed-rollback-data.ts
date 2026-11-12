@@ -13205,6 +13205,47 @@ function creatorOrdinaryJournalDescriptorGroupsForSizing(frames: ReturnType<type
 	return groups;
 }
 /**
+ * Width of the membership row the successor epoch's close writes when that epoch holds only its adoption fence
+ * (creatorCloseMembershipFields' shape: one local witness, the fence). A refusal-triggered rollover closes such an
+ * epoch before the next adoption fence acquires the journal, so the fence horizon an admission reserves carries it
+ * (live-journal successorClosedMembershipByteLength). Conservative: the widest history start, the wider of the
+ * current and successor latched ACLs, and two packed close-set digests.
+ * @param input - The current journal scope, both latched ACL widths and the successor fence's preimage width.
+ * @returns The membership row's canonical width.
+ */
+function creatorFenceHorizonMembershipWidthForSizing(input: Readonly<{
+	currentScope: LiveJournalScope; latchedAclByteLength: number; fencePreimageByteLength: number;
+}>): number {
+	const packed = 2 * 32;
+	return maintenanceCanonicalWidth({ kind: "creator-close-membership-1", cutValueDigest: maintenanceEncodedWidth(66),
+		scope: { ...input.currentScope, epoch: input.currentScope.epoch + 1 }, historyStart: Number.MAX_SAFE_INTEGER,
+		exactCanonicalLatchedAclBytes: maintenanceEncodedBytes(input.latchedAclByteLength),
+		orderedVertexDigests: maintenanceEncodedWidth(1 + maintenanceVarUintWidth(packed) + packed),
+		localVertexWitnesses: [{ vertexDigest: maintenanceEncodedWidth(66),
+			exactCanonicalPreimageBytes: maintenanceEncodedBytes(input.fencePreimageByteLength),
+			detachedSignature: maintenanceEncodedBytes(64) }] });
+}
+
+/**
+ * A fence horizon phase's finishing capacity: afterSuccessorLocal's own finishing rectangle widened by what the
+ * horizon adds past it. One owner for the composer and the template evaluator's mirror.
+ * @param finalCapacity - afterSuccessorLocal's finishing capacity.
+ * @param horizonPhase - The horizon phase (live-journal fenceHorizon).
+ * @param local - afterSuccessorLocal's exact widths.
+ * @returns The horizon phase's canonical rows and native image capacity.
+ */
+function closedJournalFenceHorizonCapacityForSizing(
+	finalCapacity: Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }>,
+	horizonPhase: Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }>,
+	local: Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }>
+): Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }> {
+	return Object.freeze({
+		canonicalRowsBytes: finalCapacity.canonicalRowsBytes + horizonPhase.canonicalRowsBytes - local.canonicalRowsBytes,
+		nativeImageBytes: finalCapacity.nativeImageBytes + horizonPhase.nativeImageBytes - local.nativeImageBytes,
+	});
+}
+
+/**
  * Width of the drain plan that will retire this epoch's own rows (closedJournalDrainPlanCarriers(...).plan), the
  * single-epoch plan bound readiness checks against the close's one encode cap. The install source, the classifier
  * result and the native plan carrier each hold a plan whole, with every received row's exact native frame. An epoch's
@@ -16494,7 +16535,14 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 			{objectId: seed.objectId, exactCanonicalAnchorPreimageBytes: input.exactCanonicalSuccessorAnchorPreimageBytes,
 				exactCanonicalParametersCarrierBytes: closedRetirementBytes(cut.parameters)}, successor, [],
 			{control: facts.capture.journal.control, closedMembershipByteLength: membership,
+				// The composer's fence horizon, from the same owners (creatorFenceHorizonMembershipWidthForSizing).
+				fenceHorizon: true, successorClosedMembershipByteLength: creatorFenceHorizonMembershipWidthForSizing({currentScope,
+					latchedAclByteLength: Math.max(input.exactCanonicalCurrentLatchedAclBytes.byteLength,
+						input.exactCanonicalSuccessorLatchedAclBytes.byteLength),
+					fencePreimageByteLength: Math.max(dimensions.canonicalSuccessorFencePreimageByteLength,
+						input.exactCanonicalUnsignedVertexBytes.byteLength)}),
 				...(received === undefined ? {} : {localIssuerBasis: received.localIssuerBasis})});
+		let futureFinalCapacity: Readonly<{canonicalRowsBytes: number; nativeImageBytes: number}> | undefined;
 		for (const context of ["current", "future"] as const) for (const phase of ["afterLocal", "afterSuccessor", "afterSuccessorLocal"] as const) {
 			const widths = journal[phase];
 			if (widths === undefined) continue;
@@ -16506,7 +16554,15 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 				maxClosedMembershipByteLength: context === "current" ? 0 : membership});
 			for (const field of ["canonicalRowsBytes", "nativeImageBytes", "canonicalRowByteLengthsTotal"] as const)
 				set(`journal.${context}.${phase}.${field}`, capacity[field]);
+			if (context === "future" && phase === "afterSuccessorLocal") futureFinalCapacity = capacity;
 		}
+		const local = journal.afterSuccessorLocal;
+		if (journal.fenceHorizon !== undefined && futureFinalCapacity !== undefined && local !== undefined)
+			for (const phase of ["afterSuccessor", "afterSuccessorLocal"] as const) {
+				const horizon = closedJournalFenceHorizonCapacityForSizing(futureFinalCapacity, journal.fenceHorizon[phase], local);
+				set(`journal.future.fenceHorizon.${phase}.canonicalRowsBytes`, horizon.canonicalRowsBytes);
+				set(`journal.future.fenceHorizon.${phase}.nativeImageBytes`, horizon.nativeImageBytes);
+			}
 		// The composer's single-epoch plan bound, from the same owner (closedJournalCurrentEpochPlanWidthForSizing).
 		set("journal.currentEpochPlan", closedJournalCurrentEpochPlanWidthForSizing({canonicalRows: facts.capture.journal.canonicalRows,
 			currentScope, afterLocalCanonicalRowBytes: journal.afterLocal.canonicalRowBytes, appendCount: 1,
@@ -17767,8 +17823,15 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			currentContinuationAppends,
 			{ control: capture.journal.control, ...(!preclose ? { closedMembershipByteLength } : {}),
 				// An ordinary quote also reserves what the successor's mandatory fence will quote (its own
-				// horizon: the next successor's header and first fence), from this same function.
-				...(preclose ? {} : { fenceHorizon: true }),
+				// horizon: the next successor's header and first fence), from this same function, and the
+				// membership row that successor's own close writes before the next fence acquires.
+				...(preclose ? {} : { fenceHorizon: true, successorClosedMembershipByteLength: creatorFenceHorizonMembershipWidthForSizing({
+					currentScope: immediateJournalAppend.scope,
+					latchedAclByteLength: Math.max(input.exactCanonicalCurrentLatchedAclBytes.byteLength,
+						input.exactCanonicalSuccessorLatchedAclBytes.byteLength),
+					fencePreimageByteLength: Math.max(successorNativeJobPhases?.[0]?.canonicalUnsignedVertexByteLength ?? 0,
+						capacityDimensions?.canonicalSuccessorFencePreimageByteLength ?? 0, input.exactCanonicalUnsignedVertexBytes.byteLength),
+				}) }),
 				...(received === undefined ? {} : {localIssuerBasis: received.localIssuerBasis}) }
 		);
 		const actualFinalJournal = preclose ? journal.afterLocal : (journal.afterSuccessorLocal ?? journal.afterSuccessor);
@@ -17837,11 +17900,16 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			const horizon = phase === journal.fenceHorizon?.afterSuccessor || phase === journal.fenceHorizon?.afterSuccessorLocal;
 			const local = journal.afterSuccessorLocal;
 			// A horizon phase widens by afterSuccessorLocal's own finishing rectangle (the rows it adds lie past it).
-			const capacity = !horizon ? journalCapacityFor(phase) : finalJournalCapacity === undefined || local === undefined
-				? undefined : {
-					canonicalRowsBytes: finalJournalCapacity.canonicalRowsBytes + phase.canonicalRowsBytes - local.canonicalRowsBytes,
-					nativeImageBytes: finalJournalCapacity.nativeImageBytes + phase.nativeImageBytes - local.nativeImageBytes,
-				};
+			// The template evaluator supplies the same owner's widths under the same names.
+			const horizonCapacity = !horizon || finalJournalCapacity === undefined || local === undefined ? undefined :
+				closedJournalFenceHorizonCapacityForSizing(finalJournalCapacity, phase, local);
+			const horizonName = phase === journal.fenceHorizon?.afterSuccessor ? "afterSuccessor" : "afterSuccessorLocal";
+			const capacity = !horizon ? journalCapacityFor(phase) : horizonCapacity === undefined ? undefined : {
+				canonicalRowsBytes: compiler?.bind(`journal.future.fenceHorizon.${horizonName}.canonicalRowsBytes`,
+					horizonCapacity.canonicalRowsBytes) ?? horizonCapacity.canonicalRowsBytes,
+				nativeImageBytes: compiler?.bind(`journal.future.fenceHorizon.${horizonName}.nativeImageBytes`,
+					horizonCapacity.nativeImageBytes) ?? horizonCapacity.nativeImageBytes,
+			};
 			const wrapperWidth = maintenanceCanonicalWidth({
 				// The carrier's control: a drain plan rides by digest (closedJournalObservationControl).
 				control: closedJournalObservationControl(control, () => digest),

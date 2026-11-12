@@ -55,5 +55,5 @@ it("an ordinary admission whose own phases fit but whose successor fence's horiz
 });
 
 it("the composer asks the one live-journal function for the fence horizon on ordinary quotes", () => {
-	expect(source).toContain("...(preclose ? {} : { fenceHorizon: true }),");
+	expect(source).toContain("...(preclose ? {} : { fenceHorizon: true, successorClosedMembershipByteLength: creatorFenceHorizonMembershipWidthForSizing({");
 });

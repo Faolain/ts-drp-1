@@ -44,7 +44,8 @@ it("the fence horizon reserved in epoch E covers the E+2 adoption fence after ep
 		...Array.from({ length: rows }, (_, ordinal) => frame("acceptedEntries", e, localRow(e, ordinal, ordinal), ordinal))];
 	// Epoch E's ordinary admission: its move, E's close membership, E+1's header and fence, and the fence horizon.
 	const reserved = codec.journalFutureAppendPostimageWidths(journal, local(e, rows, rows), install(next),
-		{ author, authorSequence: rows + 1 }, [], { closedMembershipByteLength: membershipE, fenceHorizon: true });
+		{ author, authorSequence: rows + 1 }, [], { closedMembershipByteLength: membershipE, fenceHorizon: true,
+			successorClosedMembershipByteLength: membershipNext });
 	expect(reserved.fenceHorizon).toBeDefined();
 	// The actual journal after E closed and E+1 was adopted, without E+1's fence row: the same function, chained,
 	// appends that fence, closes E+1 with its membership and adopts E+2 with its own fence.
@@ -63,3 +64,19 @@ it("the fence horizon reserved in epoch E covers the E+2 adoption fence after ep
 	}
 });
 
+
+it("the horizon membership is sizing input of the fence horizon only", () => {
+	const current = anchorMaterial(1), next = anchorMaterial(2), e = current.scope;
+	const journal = [frame("scopes", e, header(current, 0, 0))];
+	expect(() => codec.journalFutureAppendPostimageWidths(journal, local(e, 0, 0), install(next), { author, authorSequence: 1 }, [],
+		{ successorClosedMembershipByteLength: 64 })).toThrow("malformed-input");
+	expect(() => codec.journalFutureAppendPostimageWidths(journal, local(e, 0, 0), install(next), { author, authorSequence: 1 }, [],
+		{ fenceHorizon: true, successorClosedMembershipByteLength: -1 })).toThrow("malformed-input");
+	const without = codec.journalFutureAppendPostimageWidths(journal, local(e, 0, 0), install(next), { author, authorSequence: 1 }, [],
+		{ fenceHorizon: true });
+	const withMembership = codec.journalFutureAppendPostimageWidths(journal, local(e, 0, 0), install(next), { author, authorSequence: 1 }, [],
+		{ fenceHorizon: true, successorClosedMembershipByteLength: 1_917 });
+	// Only the horizon phases grow; the admission's own phases are unchanged.
+	expect(withMembership.afterSuccessorLocal).toEqual(without.afterSuccessorLocal);
+	expect(withMembership.fenceHorizon!.afterSuccessor.canonicalRowsBytes).toBeGreaterThan(without.fenceHorizon!.afterSuccessor.canonicalRowsBytes + 1_917);
+});

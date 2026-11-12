@@ -3412,6 +3412,10 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 				immediateJournalAppend: f.args[1], unsignedJournalSuccessor: f.args[2], successorJournalAppend: f.args[3],
 				currentContinuationAppends: f.args[4], preclose, closedMembershipByteLength: f.args[5]?.closedMembershipByteLength,
 				received: f.args[5]?.localIssuerBasis === undefined ? undefined : {localIssuerBasis: f.args[5].localIssuerBasis},
+				// The fence horizon's successor membership width has its own owner (creator-fence-horizon-membership.test.ts).
+				creatorFenceHorizonMembershipWidthForSizing: () => HORIZON_MEMBERSHIP, successorNativeJobPhases: undefined,
+				capacityDimensions: undefined, input: {exactCanonicalCurrentLatchedAclBytes: new Uint8Array(1),
+					exactCanonicalSuccessorLatchedAclBytes: new Uint8Array(1), exactCanonicalUnsignedVertexBytes: new Uint8Array(1)},
 				journalFutureAppendPostimageWidths: (...args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
 					calls++; return journalFutureAppendPostimageWidths(...args);
 				},
@@ -3419,10 +3423,12 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 	}
 	const outcome = (run: () => unknown) => {try {return {value: run()};} catch (error) {
 		return {error: (error as Error).message, cause: (error as Error & {cause?: Error}).cause?.message};}};
-	// An ordinary (non-preclose) quote also asks for the successor fence's horizon (j22, fix/maintenance-image-capacity).
+	const HORIZON_MEMBERSHIP = 2_048;
+	// An ordinary (non-preclose) quote also asks for the successor fence's horizon (j22, fix/maintenance-image-capacity)
+	// and the membership row that successor's own close writes (sdiag d4/d5).
 	const ordinary = (args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
 		const withHorizon = [...args] as Parameters<typeof journalFutureAppendPostimageWidths>;
-		withHorizon[5] = {...args[5], fenceHorizon: true};
+		withHorizon[5] = {...args[5], fenceHorizon: true, successorClosedMembershipByteLength: HORIZON_MEMBERSHIP};
 		return journalFutureAppendPostimageWidths(...withHorizon);
 	};
 	it("validates complete CURRENT separately and freshly computes every FUTURE recipe across cardinality/backend shapes", () => {
