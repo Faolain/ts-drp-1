@@ -1002,7 +1002,9 @@ const issuanceReadCounts: Record<IssuanceReadKind, { reads: number; fullReads: n
  * Reads the issuance read work counts since the process started.
  * @returns A snapshot per read kind: reads, and the full reads among them.
  */
-export function nodeIssuanceReadCounts(): Readonly<Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>> {
+export function nodeIssuanceReadCounts(): Readonly<
+	Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>
+> {
 	return Object.freeze(
 		Object.fromEntries(Object.entries(issuanceReadCounts).map(([kind, row]) => [kind, Object.freeze({ ...row })]))
 	) as Readonly<Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>>;
@@ -1665,9 +1667,14 @@ class NodeIssuanceImplementation {
 		const detached = copyDurableIssueScope(scope);
 		let observation: TerminalReadback;
 		try {
-			observation = this.#memoTransaction("issued", JSON.stringify([detached.objectId, detached.author, authorSequence]),
+			observation = this.#memoTransaction(
+				"issued",
+				JSON.stringify([detached.objectId, detached.author, authorSequence]),
 				// Inside the transaction opened here, the same queries #readTerminal runs in its own.
-				(opened) => (opened ? this.#queryTerminal(detached, authorSequence, this.#database) : this.#readTerminal(detached, authorSequence))
+				(opened) =>
+					opened
+						? this.#queryTerminal(detached, authorSequence, this.#database)
+						: this.#readTerminal(detached, authorSequence)
 			);
 		} catch (error) {
 			throw this.#mapOperationError(error, "issued-record read failed");
@@ -1807,7 +1814,10 @@ class NodeIssuanceImplementation {
 			const pageKey = JSON.stringify([parsed.scope ?? null, parsed.afterKey, parsed.limit]);
 			const page = this.#memoLoad("page", pageKey, () => {
 				const lineageRows = iterateSqliteRows(
-					statement(this.#database, "SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages")
+					statement(
+						this.#database,
+						"SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages"
+					)
 				);
 				// Even unused foreign lineages remain part of global validation.
 				for (const raw of lineageRows) {

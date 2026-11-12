@@ -29,9 +29,16 @@ afterEach(async () => {
 
 const scope = { objectId: "reserved-read-memo-room", author: "writer" };
 const contextBytes = encodeCanonical({ historicalSource: new Uint8Array(4_000).map((_, index) => index % 251) });
-const context = { digest: hashDomain("ts-drp/settlement-source-context/v1", contextBytes), exactCanonicalContextBytes: contextBytes };
+const context = {
+	digest: hashDomain("ts-drp/settlement-source-context/v1", contextBytes),
+	exactCanonicalContextBytes: contextBytes,
+};
 
-async function populatedStore(): Promise<{ store: DurableIssuanceStore; primaryFilename: string; commits: DurableIssueCommit[] }> {
+async function populatedStore(): Promise<{
+	store: DurableIssuanceStore;
+	primaryFilename: string;
+	commits: DurableIssueCommit[];
+}> {
 	const directory = await mkdtemp(join(tmpdir(), "issuance-reserved-read-memo-"));
 	directories.push(directory);
 	const primaryFilename = join(directory, "primary.sqlite");
@@ -61,7 +68,9 @@ async function populatedStore(): Promise<{ store: DurableIssuanceStore; primaryF
 
 async function held<T>(store: DurableIssuanceStore, run: () => Promise<T>): Promise<T> {
 	const reservation = await (
-		store as unknown as { acquireNativeReadReservation(input: { objectId: string }): Promise<{ release(): Promise<void> }> }
+		store as unknown as {
+			acquireNativeReadReservation(input: { objectId: string }): Promise<{ release(): Promise<void> }>;
+		}
 	).acquireNativeReadReservation({ objectId: scope.objectId });
 	try {
 		return await run();
@@ -74,7 +83,10 @@ async function held<T>(store: DurableIssuanceStore, run: () => Promise<T>): Prom
 async function readAll(store: DurableIssuanceStore) {
 	const first = await store.readOutboxPage({ afterKey: null, limit: 2 });
 	const last = first.at(-1)!;
-	const second = await store.readOutboxPage({ afterKey: [scope.objectId, scope.author, last.commit.authorSequence], limit: 2 });
+	const second = await store.readOutboxPage({
+		afterKey: [scope.objectId, scope.author, last.commit.authorSequence],
+		limit: 2,
+	});
 	return {
 		pages: [first, second],
 		issued: await store.readIssued(scope, 1),
@@ -115,7 +127,10 @@ it("under one reservation, repeated issuance reads of an unchanged database read
 	const { store } = await populatedStore();
 	await held(store, async () => {
 		let first: Awaited<ReturnType<typeof readAll>> | undefined;
-		expect(await fullReads(async () => (first = await readAll(store))), "first pass: one full read per distinct read").toBe(5);
+		expect(
+			await fullReads(async () => (first = await readAll(store))),
+			"first pass: one full read per distinct read"
+		).toBe(5);
 		const passes = 10;
 		expect(
 			await fullReads(async () => {
@@ -162,13 +177,19 @@ it("no write lands while the memo lives; any write between reservations is read 
 	const { next } = raw.prepare("SELECT next FROM lineages WHERE object_id=?").get(scope.objectId) as { next: number };
 	await held(store, async () => {
 		const before = await readAll(store);
-		expect(() => raw.prepare("UPDATE lineages SET next=? WHERE object_id=?").run(next + 1, scope.objectId)).toThrow(/locked|busy/iu);
+		expect(() => raw.prepare("UPDATE lineages SET next=? WHERE object_id=?").run(next + 1, scope.objectId)).toThrow(
+			/locked|busy/iu
+		);
 		expect(() => raw.exec("CREATE TABLE reserved_read_probe(a INTEGER)")).toThrow(/locked|busy/iu);
 		expect(await readAll(store)).toEqual(before);
 	});
 	// The store's own connection (total_changes): a settlement plan write.
 	const plan = (await store.readSettlementPlan(scope))!;
-	await store.transactWriteSettlementPlan({ scope, expectedRevision: plan.revision, plan: { ...plan, revision: plan.revision + 1 } });
+	await store.transactWriteSettlementPlan({
+		scope,
+		expectedRevision: plan.revision,
+		plan: { ...plan, revision: plan.revision + 1 },
+	});
 	await held(store, async () => {
 		const after = await readAll(store);
 		expect(after.plan!.revision).toBe(plan.revision + 1);
