@@ -22,6 +22,7 @@ interface ZoneSnapshot {
 	readonly enrollment: string;
 	readonly invite: string;
 	readonly ready: boolean;
+	readonly rawTransport: Readonly<{ links: readonly unknown[] }>;
 	readonly zoneId: string;
 }
 
@@ -96,17 +97,25 @@ async function closeAll(pages: readonly Page[], contexts: readonly BrowserContex
 
 /**
  * The member's placement, as each side's durable projection holds it.
- * @param creator
- * @param member
- * @param block
- * @param durableVertexCount
+ * @param creator - The creator's page.
+ * @param member - The member's page.
+ * @param block - The placement.
+ * @param durableVertexCount - Both sides' durable vertex count once it landed.
+ * @param timeout - How long to wait (a move the room kept waits for the next epoch: Grid's idle
+ * rollover is 30 s).
  */
-async function expectLandedOnce(creator: Page, member: Page, block: Block, durableVertexCount: number): Promise<void> {
+async function expectLandedOnce(
+	creator: Page,
+	member: Page,
+	block: Block,
+	durableVertexCount: number,
+	timeout = 20_000
+): Promise<void> {
 	for (const page of [creator, member]) {
 		await expect
-			.poll(async () => (await zone(page)).blocks.filter((placed) => placed.id === block.id))
+			.poll(async () => (await zone(page)).blocks.filter((placed) => placed.id === block.id), { timeout })
 			.toEqual([block]);
-		await expect.poll(async () => (await zone(page)).durableVertexCount).toBe(durableVertexCount);
+		await expect.poll(async () => (await zone(page)).durableVertexCount, { timeout }).toBe(durableVertexCount);
 	}
 	expect((await zone(member)).acceptedOperationDigest).toBe((await zone(creator)).acceptedOperationDigest);
 }
@@ -166,7 +175,7 @@ test("A: a placement whose reply is lost to a worker crash after local durable a
 test("A control: a placement lost to a crash before the worker admitted it is offered again and lands once", async ({
 	browser,
 }) => {
-	test.setTimeout(240_000);
+	test.setTimeout(360_000);
 	const { creator, member, contexts, created } = await sharedZone(browser);
 	try {
 		const block: Block = { id: "crash-before-admission", kind: "glass", x: 6, y: 2 };
@@ -187,13 +196,17 @@ test("A control: a placement lost to a crash before the worker admitted it is of
 		await member.evaluate((invite) => window.__TS_DRP_V3_ZONE__?.join(invite), created.invite);
 		await expect.poll(async () => (await zone(member)).zoneId).toBe(created.zoneId);
 		expect((await zone(creator)).blocks.some((placed) => placed.id === block.id)).toBe(false);
+		// The reopened member's own link to the creator, before it offers anything.
+		await expect
+			.poll(async () => (await zone(member)).rawTransport.links.length, { timeout: 60_000 })
+			.toBeGreaterThan(0);
 		// Offered again: accepted at once, or kept by the room until the member reaches its creator.
 		const recovered = await member.evaluate(
 			(placed) => window.__TS_DRP_GRID_ROOM_WORKER__?.recoverBlockPlacement(placed),
 			block
 		);
 		expect(["offered", "kept"]).toContain(recovered);
-		await expectLandedOnce(creator, member, block, before + 1);
+		await expectLandedOnce(creator, member, block, before + 1, 120_000);
 		// No late second copy: a kept move is offered by the room itself, once.
 		await new Promise((resolve) => setTimeout(resolve, 5_000));
 		expect((await zone(creator)).durableVertexCount).toBe(before + 1);
