@@ -88,7 +88,7 @@ async function probe(loss: Loss) {
 	const epoch1 = rows1.filter((row) => preimageOf(row).epoch === 1);
 	const delivered = loss === "restore-fence-only" ? epoch1.filter((row) => row === fence) : epoch1;
 	if (loss !== "restore-undelivered" && delivered.length > 0)
-		log("creator-receives-epoch-1-rows", { rows: delivered.map(describeRow), accepted: await creator.receive(delivered, 1) });
+		log("creator-receives-epoch-1-rows", { rows: delivered.map(describeRow), accepted: await creator.receive(delivered, 1, 20_000) });
 	await f.stop(member);
 	expect((await creator.room.sealEpoch()).ok).toBe(true);
 	await creator.room.adoptCreatorSuccessor();
