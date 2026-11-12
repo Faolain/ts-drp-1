@@ -68,6 +68,10 @@ const ROLLOVER_TAIL_MS = 1_000;
 // on both pages; other engines have no equivalent and record "unsupported". BROWSER_FPS_TRACE_EPOCHS="<a>-<b>":
 // a Chromium performance trace (both renderers, JS sampling) from creator epoch a to b, written to OUT.
 const CPU_THROTTLE = Number(process.env.BROWSER_FPS_CPU_THROTTLE ?? 1);
+// BROWSER_FPS_ROOM_WORKER=1: Grid opens with its zone in the opt-in room worker (`?roomWorker`) and the
+// page's bridge meter (`roomWorkerMeter`): each frame's bridge cost (library) and Grid rendering (app),
+// and the worker's data-channel counts and attach latency, are reported under summary.roomWorker.
+const ROOM_WORKER = process.env.BROWSER_FPS_ROOM_WORKER === "1";
 const TRACE_EPOCHS = (process.env.BROWSER_FPS_TRACE_EPOCHS ?? "").split("-").filter((value) => value !== "").map(Number);
 const TRACE_CATEGORIES = [
 	"devtools.timeline",
@@ -219,7 +223,7 @@ function gridDriver(): AppDriver {
 	let keyMismatch = 0;
 
 	const open = async (page: Page): Promise<void> => {
-		await page.goto(`${origin}/`);
+		await page.goto(ROOM_WORKER ? `${origin}/?roomWorker&roomWorkerMeter` : `${origin}/`);
 		await page.waitForFunction(() => Reflect.get(window, "__TS_DRP_GRID_SESSION__") !== undefined, undefined, {
 			timeout: 60_000,
 		});
@@ -467,6 +471,88 @@ function gridDriver(): AppDriver {
 				},
 			};
 		},
+	};
+}
+
+// ---------------------------------------------------------------------------------------------
+// The opt-in room worker (BROWSER_FPS_ROOM_WORKER=1, Grid only)
+
+interface RoomWorkerMeterReading {
+	readonly library: readonly number[];
+	readonly render: readonly number[];
+	readonly dropped: number;
+}
+
+interface RoomWorkerRtcReading {
+	readonly peerConnections: number;
+	readonly channelsCreated: number;
+	readonly channelsReceived: number;
+	readonly channelsAttached: number;
+	readonly attachMs: readonly number[];
+	readonly signallingCalls: number;
+	readonly syntheticOpens: number;
+}
+
+function roomWorkerReading(
+	page: Page,
+	action: "reset" | "read"
+): Promise<Readonly<{ meter: RoomWorkerMeterReading; rtc: RoomWorkerRtcReading }> | null> {
+	return page.evaluate(async (selected) => {
+		const meter = Reflect.get(window, "__TS_DRP_GRID_ROOM_WORKER_METER__") as
+			| { read(): RoomWorkerMeterReading; reset(): void }
+			| undefined;
+		const control = Reflect.get(window, "__TS_DRP_GRID_ROOM_WORKER__") as
+			| { rtcStats(): Promise<RoomWorkerRtcReading> }
+			| undefined;
+		if (meter === undefined || control === undefined) throw new Error("BROWSER_FPS_ROOM_WORKER_ABSENT");
+		if (selected === "reset") {
+			meter.reset();
+			return null;
+		}
+		return { meter: meter.read(), rtc: await control.rtcStats() };
+	}, action);
+}
+
+function distribution(values: readonly number[]): Readonly<{ count: number; p50: number; p99: number; max: number; mean: number }> {
+	const sorted = [...values].sort((a, b) => a - b);
+	const at = (q: number): number => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
+	const round = (value: number): number => Math.round(value * 1_000) / 1_000;
+	return {
+		count: sorted.length,
+		p50: round(at(0.5)),
+		p99: round(at(0.99)),
+		max: round(sorted[sorted.length - 1] ?? 0),
+		mean: round(sorted.reduce((sum, value) => sum + value, 0) / Math.max(1, sorted.length)),
+	};
+}
+
+/** Library share (bridge, messages, posts) and app share (Grid's DOM rendering) per page frame. */
+async function roomWorkerSummary(pages: ReadonlyMap<Role, Page>, playMs: number): Promise<Record<string, unknown>> {
+	const roles: Record<string, unknown> = {};
+	for (const [role, page] of pages) {
+		const reading = await roomWorkerReading(page, "read");
+		if (reading === null) continue;
+		const { meter, rtc } = reading;
+		const channels = rtc.channelsCreated + rtc.channelsReceived;
+		roles[role] = {
+			libraryMsPerFrame: distribution(meter.library),
+			renderMsPerFrame: distribution(meter.render),
+			libraryPlusRenderMsPerFrame: distribution(meter.library.map((value, index) => value + (meter.render[index] ?? 0))),
+			framesDropped: meter.dropped,
+			libraryP99WithinHalfMs: distribution(meter.library).p99 <= 0.5,
+			dataChannels: {
+				...rtc,
+				attachMs: distribution(rtc.attachMs),
+				opensPerSecondOverPlay: Math.round((channels / Math.max(1, playMs / 1_000)) * 1_000) / 1_000,
+				qualification:
+					"counts since the worker opened (join included); attachMs is createDataChannel in the worker to the page's transferred channel attaching (one page round trip per worker-created channel); received channels are transferred on arrival with no round trip",
+			},
+		};
+	}
+	return {
+		qualification:
+			"per page frame from play start: library = the room worker bridge's main-thread work (worker message handling, less the Grid rendering it ran, plus posts); render = Grid's DOM rendering (projection, network panel, the transient frame). The page probe's RTC entry counts see no data channels in this mode (they are transferred to the worker).",
+		roles,
 	};
 }
 
@@ -952,7 +1038,7 @@ for (const app of APPS)
 	test(`${app}: the shipped page keeps rendering through its own rollovers`, async ({ browser, browserName }) => {
 		mkdirSync(OUT, { recursive: true });
 		const driver = (DRIVERS[app] as () => AppDriver)();
-		const base = `${browserName}-${app}${CONTROL ? "-control" : ""}`;
+		const base = `${browserName}-${app}${ROOM_WORKER ? "-worker" : ""}${CONTROL ? "-control" : ""}`;
 		const epochLog = join(OUT, `${base}-epochs.jsonl`);
 		writeFileSync(epochLog, "");
 		const sourceDiff = execFileSync("git", ["diff", "--no-ext-diff", "HEAD"], {
@@ -970,6 +1056,7 @@ for (const app of APPS)
 			dirtyTracked: sourceDiff.length !== 0,
 			sourceDiffSha256: createHash("sha256").update(sourceDiff).digest("hex"),
 			control: CONTROL,
+			roomWorker: ROOM_WORKER && app === "grid",
 			injectBlock: INJECT === "" ? null : { ms: INJECT_MS, everyFrames: INJECT_EVERY },
 			cadenceMs: { drain: DRAIN_MS, move: MOVE_MS, place: PLACE_MS, paint: PAINT_MS, chat: CHAT_MS },
 			memberRolloverIssueBoundMs: APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS,
@@ -1045,7 +1132,11 @@ for (const app of APPS)
 		let play: Play | undefined;
 		let failure: unknown;
 		try {
+			const openStarted = Date.now();
 			await driver.open(creator, member);
+			const openMs = Date.now() - openStarted;
+			const roomWorker = ROOM_WORKER && app === "grid";
+			if (roomWorker) await Promise.all([creator, member].map((page) => roomWorkerReading(page, "reset")));
 			await Promise.all(
 				[creator, member].map((page) =>
 					page.evaluate(() => (Reflect.get(globalThis, "__TS_DRP_REALTIME_PROBE__") as { start(): void }).start())
@@ -1130,6 +1221,9 @@ for (const app of APPS)
 					)
 				)
 			).flat();
+			const roomWorkerReport = roomWorker
+				? await roomWorkerSummary(new Map<Role, Page>([["creator", creator], ["member", member]]), playMs)
+				: null;
 			const pages = { creator: meter.report("creator"), member: meter.report("member") };
 			const { windows, memberOverBound, rolloverIssueLatency } = issueLatency(meter, driver);
 			const stageCounts = {
@@ -1159,6 +1253,8 @@ for (const app of APPS)
 			summary = {
 				...configuration,
 				playMs,
+				openMs,
+				roomWorker: roomWorkerReport,
 				adoptedEpochs: { creator: meter.epoch("creator"), member: meter.epoch("member") },
 				rolloversObserved: windows.length,
 				stageCounts,
