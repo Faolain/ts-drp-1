@@ -20,7 +20,8 @@ afterEach(() => {
 });
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const backlogFull = () => Object.assign(new Error("v3 room local backlog is full: 64 of 64"), { name: "V3RoomLocalBacklogFull" });
+const backlogFull = () =>
+	Object.assign(new Error("v3 room local backlog is full: 64 of 64"), { name: "V3RoomLocalBacklogFull" });
 
 type Offer = { id: unknown; handBack: boolean; epoch: number; outcome: "accepted" | "refused" | "failed" };
 
@@ -35,18 +36,32 @@ type Offer = { id: unknown; handBack: boolean; epoch: number; outcome: "accepted
  */
 function memberRoom(options: { records: number; unsettledEpochs?: number; handBackFails?: boolean }) {
 	const state = { epoch: 3, full: true, unsettledEpochs: options.unsettledEpochs ?? 0 };
-	const listed = new Map<string, { handBack: { sourceSequence: number; intent: number }; operations: Record<string, unknown>[] }>();
+	const listed = new Map<
+		string,
+		{ handBack: { sourceSequence: number; intent: number }; operations: Record<string, unknown>[] }
+	>();
 	for (let k = 0; k < options.records; k++)
-		listed.set(`${10 + k}:0`, { handBack: { sourceSequence: 10 + k, intent: 0 }, operations: [{ action: "move", id: `given-${k}` }] });
+		listed.set(`${10 + k}:0`, {
+			handBack: { sourceSequence: 10 + k, intent: 0 },
+			operations: [{ action: "move", id: `given-${k}` }],
+		});
 	const offers: Offer[] = [];
 	const room = {
 		authority: () =>
 			({ epoch: state.epoch }) as unknown as ReturnType<
 				NonNullable<Parameters<rollover.V3RoomRolloverPolicy["bind"]>[0]>["authority"]
 			>,
-		issue: (operation: Readonly<Record<string, unknown>>, issueOptions?: { handBack?: { sourceSequence: number; intent: number } }) => {
+		issue: (
+			operation: Readonly<Record<string, unknown>>,
+			issueOptions?: { handBack?: { sourceSequence: number; intent: number } }
+		) => {
 			const handBack = issueOptions?.handBack;
-			const offer: Offer = { id: operation.id, handBack: handBack !== undefined, epoch: state.epoch, outcome: "accepted" };
+			const offer: Offer = {
+				id: operation.id,
+				handBack: handBack !== undefined,
+				epoch: state.epoch,
+				outcome: "accepted",
+			};
 			offers.push(offer);
 			if (handBack === undefined) {
 				if (!state.full) return Promise.resolve();
@@ -78,7 +93,11 @@ function memberPolicy() {
 	const errors: unknown[] = [];
 	const policy = (
 		rollover.createV3RoomRolloverPolicy as (input: Record<string, unknown>) => rollover.V3RoomRolloverPolicy
-	)({ role: "member", budget: { movesPerAuthor: 7, idleMs: 10_000 }, hooks: { onError: (error: unknown) => errors.push(error) } });
+	)({
+		role: "member",
+		budget: { movesPerAuthor: 7, idleMs: 10_000 },
+		hooks: { onError: (error: unknown) => errors.push(error) },
+	});
 	policies.add(policy);
 	return { policy, errors };
 }
@@ -145,7 +164,10 @@ it("a batch offers given-back moves first and stops its new moves at the first b
 	for (const id of ["new-0", "new-1", "new-2"])
 		await expect(policy.issue({ action: "move", id })).rejects.toBeInstanceOf(rollover.V3RoomNotReachingHost);
 	for (let k = 0; k < 2; k++)
-		listed.set(`${10 + k}:0`, { handBack: { sourceSequence: 10 + k, intent: 0 }, operations: [{ action: "move", id: `given-${k}` }] });
+		listed.set(`${10 + k}:0`, {
+			handBack: { sourceSequence: 10 + k, intent: 0 },
+			operations: [{ action: "move", id: `given-${k}` }],
+		});
 	await sleep(1_500);
 	const before = offers.length;
 	state.epoch = 4;

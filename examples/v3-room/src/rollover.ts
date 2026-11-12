@@ -127,6 +127,29 @@ export class V3RoomReadOnly extends Error {
 }
 
 /**
+ * A move the room kept refusing as transient (its input queue full: "retry after admitted work
+ * joins") for the whole retry bound, as during a long install or adoption. The move is not lost: the
+ * policy keeps it and offers it again once the room takes work (`status().kept`).
+ */
+export class V3RoomBusy extends Error {
+	/**
+	 * @param operation - The move kept until the room takes work again.
+	 * @param epoch - The epoch the move was offered in.
+	 * @param waitedMs - How long the policy retried.
+	 * @param options - The transient refusal, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly waitedMs: number,
+		options?: ErrorOptions
+	) {
+		super(`the room stayed busy for ${Math.round(waitedMs)} ms; the move is kept and sent once it takes work`, options);
+		this.name = "V3RoomBusy";
+	}
+}
+
+/**
  * A member's new move refused because its undelivered moves fill the room's backlog
  * (V3RoomLocalBacklogFull): they are not reaching the host. The move was never accepted, so it is not
  * lost: the policy keeps it and offers it again once the member's moves reach the creator
@@ -226,7 +249,14 @@ const SESSION_CLOSED = /v3 room session is closed/u;
  * first move too), so a move may need a rollover per spanned epoch before one admits it.
  */
 const MAX_OFFERS = 6;
+/**
+ * A transient refusal ("retry after admitted work joins") is retried with doubling backoff from
+ * TRANSIENT_RETRY_MS up to TRANSIENT_RETRY_MAX_MS, for as long as a closing may last (closingLimitMs):
+ * the room's input queue can stay full through a whole install or adoption. Past that the move is
+ * kept (V3RoomBusy), never dropped. Transient offers do not count against MAX_OFFERS.
+ */
 const TRANSIENT_RETRY_MS = 50;
+const TRANSIENT_RETRY_MAX_MS = 1_000;
 const MEMBER_EPOCH_POLL_MS = 250;
 /**
  * A move refused while the epoch closes is offered again when the room reaches a later epoch or
@@ -307,6 +337,8 @@ export function createV3RoomRolloverPolicy(
 	let keptEpoch = 0;
 	let givenBackEpoch = 0;
 	let keptTimer: ReturnType<typeof setTimeout> | undefined;
+	// The kept moves' re-offer runs one batch at a time, each move after the previous one's answer.
+	let reoffering = false;
 	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
 	// has already kept this session (by their durable hand-back record). A kept given-back operation
 	// is offered again with its record, whose consumption is part of the new row's own issuance
@@ -508,6 +540,10 @@ export function createV3RoomRolloverPolicy(
 		keptTimer = setTimeout(() => {
 			keptTimer = undefined;
 			if (closed || kept.length === 0) return;
+			if (reoffering) {
+				watchKept();
+				return;
+			}
 			const now = currentEpoch();
 			const givenBack =
 				now > givenBackEpoch && !readOnly() ? kept.filter((operation) => handBackOf.has(operation)) : [];
@@ -525,28 +561,45 @@ export function createV3RoomRolloverPolicy(
 			kept.splice(0, kept.length, ...waiting);
 			reportStatus();
 			watchKept();
+			reoffering = true;
 			void (async (): Promise<void> => {
-				for (const operation of givenBack) await offerKept(operation);
-				for (const [index, operation] of fresh.entries()) {
-					if (await offerKept(operation)) continue;
-					// Refused at the bound (and kept by issue()): the rest stay kept, in order, unoffered.
-					for (const unoffered of fresh.slice(index + 1)) keep(unoffered, backlogFullEpoch ?? currentEpoch());
-					break;
+				const batch = [...givenBack, ...fresh];
+				try {
+					for (const [index, operation] of batch.entries()) {
+						const answer = await offerKept(operation);
+						if (answer === "next" || (answer === "stop-new" && index < givenBack.length)) continue;
+						// Refused at the bound (new moves) or busy (every move), and kept by issue(): the rest of
+						// the batch stays kept, unoffered.
+						const rest = batch
+							.slice(index + 1)
+							.filter((unoffered) => answer === "stop-all" || !handBackOf.has(unoffered));
+						for (const unoffered of rest)
+							keep(unoffered, answer === "stop-all" ? currentEpoch() - 1 : (backlogFullEpoch ?? currentEpoch()));
+						break;
+					}
+				} finally {
+					reoffering = false;
+					// A batch move kept again goes back ahead of the moves kept since, in its order.
+					const again = batch.filter((operation) => kept.includes(operation));
+					if (again.length > 0)
+						kept.splice(0, kept.length, ...again, ...kept.filter((operation) => !again.includes(operation)));
 				}
 			})();
 		}, KEPT_POLL_MS);
 	};
-	// One kept move offered again: false when the room refused it at the undelivered-move bound.
-	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<boolean> => {
+	// One kept move offered again. "stop-new": the room refused it at the undelivered-move bound (the
+	// batch's other new moves are not offered); "stop-all": the room stayed busy (no move is offered).
+	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<"next" | "stop-new" | "stop-all"> => {
 		try {
 			await issue(operation);
 		} catch (error) {
-			if (error instanceof V3RoomNotReachingHost) return false;
+			if (error instanceof V3RoomNotReachingHost) return "stop-new";
+			if (error instanceof V3RoomBusy) return "stop-all";
 			// A move refused again for want of a successor (or while read-only) is kept again by issue().
-			if (error instanceof V3RoomSuccessorUnavailable) return true;
+			if (error instanceof V3RoomSuccessorUnavailable) return "next";
 			if (error instanceof V3RoomReadOnly) {
 				hooks.onError?.(error);
-				return true;
+				return "next";
 			}
 			// Refused for good: a given-back move stays listed by the room until a row offering it again
 			// consumes its record, so the next settlement poll keeps it again (one offer per epoch).
@@ -557,12 +610,14 @@ export function createV3RoomRolloverPolicy(
 			}
 			hooks.onError?.(error);
 		}
-		return true;
+		return "next";
 	};
-	const keep = (operation: Readonly<Record<string, unknown>>, attempted: number): void => {
+	// A kept move waits for the room to be past `waitPast` (the epoch that refused it; one before it for
+	// a move that may be offered again in the same epoch).
+	const keep = (operation: Readonly<Record<string, unknown>>, waitPast: number): void => {
 		kept.push(operation);
-		if (handBackOf.has(operation)) givenBackEpoch = Math.max(givenBackEpoch, attempted);
-		else keptEpoch = Math.max(keptEpoch, attempted);
+		if (handBackOf.has(operation)) givenBackEpoch = Math.max(givenBackEpoch, waitPast);
+		else keptEpoch = Math.max(keptEpoch, waitPast);
 		reportStatus();
 		watchKept();
 	};
@@ -610,6 +665,8 @@ export function createV3RoomRolloverPolicy(
 			throw new V3RoomReadOnly(operation, currentEpoch());
 		}
 		let closingSince: number | undefined;
+		let busySince: number | undefined;
+		let busyRetries = 0;
 		for (let offer = 1; ; offer++) {
 			// A move never enters the creator's own rollover between its seal and its adoption. A failed
 			// cut also waits for the roll's own failure handling (backoff, close) before the offer.
@@ -668,11 +725,20 @@ export function createV3RoomRolloverPolicy(
 					continue;
 				}
 				closingSince = undefined;
-				if (offer >= MAX_OFFERS) throw error;
 				if (TRANSIENT_REFUSAL.test(message(error))) {
-					await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_MS * offer));
+					// Not an offer of the move: the room's input queue is full until admitted work joins.
+					busySince ??= performance.now();
+					const waited = performance.now() - busySince;
+					if (waited >= closingLimitMs) {
+						keep(operation, attempted - 1);
+						throw new V3RoomBusy(operation, attempted, waited, { cause: error });
+					}
+					offer--;
+					const pause = Math.min(TRANSIENT_RETRY_MAX_MS, TRANSIENT_RETRY_MS * 2 ** busyRetries++);
+					await new Promise((resolve) => setTimeout(resolve, Math.min(pause, closingLimitMs - waited)));
 					continue;
 				}
+				if (offer >= MAX_OFFERS) throw error;
 				if (!clearedByRollover(error)) throw error;
 				// The refused move was not admitted (its issue transaction or admission refused it);
 				// the same move is offered again in a later epoch.

@@ -57,7 +57,11 @@ it("a given-back move whose re-offer fails once is offered again while the room 
 	const errors: unknown[] = [];
 	const policy = (
 		rollover.createV3RoomRolloverPolicy as (input: Record<string, unknown>) => rollover.V3RoomRolloverPolicy
-	)({ role: "member", budget: { movesPerAuthor: 7, idleMs: 10_000 }, hooks: { onError: (error: unknown) => errors.push(error) } });
+	)({
+		role: "member",
+		budget: { movesPerAuthor: 7, idleMs: 10_000 },
+		hooks: { onError: (error: unknown) => errors.push(error) },
+	});
 	policies.add(policy);
 	policy.bind(room);
 	// Listed and kept at epoch 3; offered once the room is past it.

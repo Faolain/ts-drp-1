@@ -19,6 +19,7 @@ import {
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
 	type V3RoomSuccessorDelivery,
+	V3RoomBusy,
 	V3RoomSuccessorUnavailable,
 	type V3RoomSession,
 	prepareV3RoomPlayerDatabase,
@@ -772,6 +773,16 @@ async function issueMessage(): Promise<void> {
 				error instanceof V3RoomReadOnly
 					? `Can't send: the room's host is unreachable. Your message "${String(error.operation.text ?? "")}" is kept and is sent once the host is back.`
 					: `Can't send: your messages are not reaching the host. Your message "${String(error.operation.text ?? "")}" is kept and is sent once they do.`,
+				"error"
+			);
+			return;
+		}
+		if (error instanceof V3RoomBusy) {
+			// The room's policy keeps the message and sends it once the room takes work again.
+			if (pendingSend?.operation.text === messageInput.value) messageInput.value = "";
+			pendingSend = undefined;
+			status(
+				`The room is busy catching up. Your message "${String(error.operation.text ?? "")}" is kept and is sent once it is done.`,
 				"error"
 			);
 			return;

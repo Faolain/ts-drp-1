@@ -17,7 +17,10 @@ afterEach(() => {
 });
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const busy = () => new TypeError("v3 room issue failed: admission-rejected: v3 input task capacity exhausted; retry after admitted work joins");
+const busy = () =>
+	new TypeError(
+		"v3 room issue failed: admission-rejected: v3 input task capacity exhausted; retry after admitted work joins"
+	);
 
 /**
  * A room double whose issue is refused as transient while `busyUntil` is in the future.
@@ -108,8 +111,13 @@ it("kept moves are offered again one at a time, never filling the room's input q
 	state.busyUntil = performance.now();
 	const by = performance.now() + 15_000;
 	while (offers.filter((offer) => offer.outcome === "accepted").length < 6 && performance.now() < by) await sleep(50);
-	expect(offers.filter((offer) => offer.outcome === "accepted").map((offer) => offer.id)).toEqual(
-		["m-0", "m-1", "m-2", "m-3", "m-4", "m-5"]
-	);
+	expect(offers.filter((offer) => offer.outcome === "accepted").map((offer) => offer.id)).toEqual([
+		"m-0",
+		"m-1",
+		"m-2",
+		"m-3",
+		"m-4",
+		"m-5",
+	]);
 	expect(state.maxInFlight, "re-offers in flight at once").toBe(1);
 }, 30_000);
