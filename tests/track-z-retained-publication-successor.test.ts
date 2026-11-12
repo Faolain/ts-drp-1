@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Test helpers: inferred fixture shapes. */
-import { DirectMessageSendError } from "@ts-drp/network";
 import type * as V3Live from "@ts-drp/node/v3-live";
 import { MessageType } from "@ts-drp/types";
 import { afterEach, expect, it, vi } from "vitest";
@@ -612,7 +611,11 @@ it("guard: a send that fails while the serving plane is still current still reje
 
 	const { wire, publication } = await holdPublication("recipient");
 	// Track 46: the transport's typed failure (sendMessage never resolves for a frame it did not take).
-	wire.hold.release?.(new DirectMessageSendError("DIRECT_SESSION_RESET", "TRACK_Z_SEND_REFUSED"));
+	// Shaped, not imported: with @ts-drp/network imported in this file every room open fails its native
+	// recovery census (observed on the sandbox; the module-loading cause is not isolated).
+	wire.hold.release?.(
+		Object.assign(new Error("TRACK_Z_SEND_REFUSED"), { name: "DirectMessageSendError", code: "DIRECT_SESSION_RESET" })
+	);
 
 	expect(await publication).toEqual({ ok: false, error: "v3 room retained publication failed: publish-failed" });
 	await playEpochs(room, options, 1, PLAYED);
