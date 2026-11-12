@@ -22,11 +22,16 @@ export type LullPassScheduler = Readonly<{
 }>;
 
 /**
- * @param input - `admit(step)` runs one step as ONE lifecycle admission (holding what a lull holds).
+ * @param input - `admit(step)` runs one step as ONE lifecycle admission (holding what a lull holds);
+ * `stopped()` ends the lull before its next step once the session is closing.
  * @returns The session's pass scheduler.
  */
 export function createLullPassScheduler(
-	input: Readonly<{ admit(step: LullStep): Promise<"done" | "more" | "deferred"> }>
+	input: Readonly<{
+		admit(step: LullStep): Promise<"done" | "more" | "deferred">;
+		/** True once the session is closing: no further step is admitted. */
+		stopped?(): boolean;
+	}>
 ): LullPassScheduler {
 	const passes = new Map<string, LullStep>();
 	return Object.freeze({
@@ -42,10 +47,20 @@ export function createLullPassScheduler(
 			let deferred = false;
 			for (const [reason, step] of [...passes]) {
 				for (;;) {
+					if (input.stopped?.() === true) {
+						deferred = true;
+						break;
+					}
 					let answer: "done" | "more" | "deferred";
 					try {
 						answer = await input.admit(step);
 					} catch (error) {
+						// Refused because the session began closing while the step was queued: the lull ends.
+						if (input.stopped?.() === true && !ran) throw error;
+						if (input.stopped?.() === true) {
+							deferred = true;
+							break;
+						}
 						if (error instanceof CreatorRecoveryHoldUnavailable) answer = "deferred";
 						else {
 							passes.delete(reason);
@@ -63,6 +78,8 @@ export function createLullPassScheduler(
 					}
 				}
 			}
+			// A close that began between steps ends the lull with what its steps already did.
+			if (ran && input.stopped?.() === true) return "maintained";
 			return deferred ? "deferred" : ran ? "maintained" : "not-needed";
 		},
 	});

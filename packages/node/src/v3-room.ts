@@ -9462,8 +9462,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// holding the issue barrier only for that step), so an install or a local move waits for at most
 	// one step, never a whole lull. internal/lull-passes.ts.
 	const lullPasses = createLullPassScheduler({
+		stopped: () => closed,
 		admit: (step) =>
 			enqueueLifetimeTransition(async () => {
+				// A close that began while this step was queued: the step does not run.
+				if (closed) return "deferred" as const;
 				assertSessionOpen();
 				await rebasePromise;
 				await migrationCompletionBarrier;
