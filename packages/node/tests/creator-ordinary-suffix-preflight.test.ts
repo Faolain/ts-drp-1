@@ -66,7 +66,8 @@ function fixture() {
 			readiness: {reader, sourceIdentity: identity, geometry: {graphVersion: 3, baseGraphCount: 2, basePreimageCount: 1,
 				baseWitnessPayloadBytes: 4100, acceptedWitnessPayloadBytes: 0, acceptedCount: 0, localIssuedCount: 0,
 				runtimeWidths,
-				journalObservationFields: {control: resource(null), image: resource(journal.image), canonicalRows: resource(journal.canonicalRows)}}}}};
+				journalObservationFields: {control: resource(null), image: resource(journal.image), canonicalRows: resource(journal.canonicalRows)},
+				journalContextControlWidth: 0}}}};
 	const current = {runtime: {kind: "pending-local-issuance", objectId: "room", epoch: 2, anchorDigest: anchor,
 		profileId: "creator-trusted-settlement-v1", issuanceScope: scope, graphVersion: 3, epochBytes: 10000},
 		parameters: {maxEpochVertices: 8192, maxEpochBytes: 8388608}, currentEpochVertexCount: 2,

@@ -4,6 +4,7 @@ import {canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, ca
 	canonicalArrayResourceForSizing, canonicalArrayResourcesForSizing, canonicalValueResourceForSizing} from "@ts-drp/canonical/resource";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 // Actual scalar/program expressions against the UNCHANGED original composer
 // literal and codec. These controls prove numerical lifetime composition, not
@@ -38,7 +39,9 @@ if (!originalJob || !observationLimits || initializers.size !== 5) throw new Err
 const bindings = {CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720,
 	canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, canonicalRecordResourceForSizing,
 	canonicalArrayResourceForSizing, canonicalArrayResourcesForSizing, compareBytes,
-	closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0};
+	closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+	// The owner's journal observation projection (C1).
+	closedJournalObservationControl: compileClosedJournalObservationOwner().closedJournalObservationControl};
 const original = execute<{compiler(): any; evaluate(program: any, parameters: Map<string, number>): Map<string, number> | undefined;
 	book(): any; parts(input: any): number[]; observations(input: any): any[]; exact(input: any): number}>(`
 	${["maintenanceWidthSum", "maintenanceVarUintWidth", "creatorCanonicalCapacityForSizing", "createCreatorNoneResourceProgramCompiler",

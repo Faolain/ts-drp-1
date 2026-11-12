@@ -46,6 +46,7 @@ import {capturePromotionRecord, capturePromotionArray, capturePromotionBytes} fr
 import {LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES} from "@ts-drp/live-journal";
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership } from "../src/internal/creator-close-membership.js";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 describe("private issuance hole selection", () => {
 	it("classifies exact terminal coverage only after publication and outside open settlement work", () => {
@@ -913,13 +914,16 @@ describe("single immutable journal plan native proof charges", () => {
 			native[0]!.controlBytes.byteLength, native[0]!.planBytes!.byteLength]);
 	});
 
-	it("preserves the complete original semantic PRE wrapper without embedding the newly exposed carrier array", () => {
+	it("preserves the semantic PRE wrapper (its drain plan by digest, C1) without embedding the newly exposed carrier array", () => {
 		const original = {control: controls[0], image: plan.sourceImage, canonicalRows: [Uint8Array.of(1, 2)]};
 		const value = {...original, exactCanonicalControlCarriers: [native[0]!.controlBytes, native[0]!.planBytes!]};
 		const wrappers = execute<readonly unknown[]>(`${declaration("creatorIssuanceMaintenanceObservationCarriers")}
 			creatorIssuanceMaintenanceObservationCarriers({journal: value, snapshot: null, ahe: null,
 				floor: null, floorImage: null, snapshotInventory: null});`, {value});
-		expect(encodeCanonical(wrappers[0])).toEqual(encodeCanonical(original));
+		// The wrapper holds the plan by digest; the exact plan is the separately charged native carrier above.
+		expect(encodeCanonical(wrappers[0])).toEqual(encodeCanonical({...original, control: closedJournalObservationControl(controls[0])}));
+		expect(Object.keys(wrappers[0] as object)).toEqual(["control", "image", "canonicalRows"]);
+		expect(encodeCanonical(wrappers[0]).byteLength).toBeLessThan(encodeCanonical(original).byteLength);
 	});
 });
 
@@ -2790,10 +2794,12 @@ const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpo
 // The owner's own capture-journal detach (its in-memory drainSource never reaches the encoder).
 const detachClosedCaptureJournal = Function("decodeCanonical", "closedRetirementBytes", `"use strict"; ${ts.transpile(
 	declaration("detachClosedCaptureJournal"), { target: ts.ScriptTarget.ES2022 })}; return detachClosedCaptureJournal;`)(decodeCanonical, encodeCanonical);
+// The owner's journal observation projection (C1): a drain control's plan rides in the carrier by digest.
+const { closedJournalObservationControl } = compileClosedJournalObservationOwner();
 function execute<T>(code: string, context: Record<string, unknown>): T {
 	const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
-		closedObservationCarrierBytes: encodeCanonical, detachClosedCaptureJournal,
+		closedObservationCarrierBytes: encodeCanonical, detachClosedCaptureJournal, closedJournalObservationControl,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
 	// Execute in the codec's realm. A separate VM realm would produce foreign

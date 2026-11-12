@@ -70,9 +70,11 @@ it("the capture journal detach encodes only the observed fields and carries the 
 });
 
 it("the journal observation carrier drops drainSource: its bytes equal the no-drain carrier's", () => {
-	const carriers = new Function(`${ts.transpile(declaration("creatorIssuanceMaintenanceObservationCarriers"),
-		{ target: ts.ScriptTarget.ES2022 })}; return creatorIssuanceMaintenanceObservationCarriers;`)() as
-		(input: Record<string, unknown>) => readonly unknown[];
+	// The carrier owner and its drain-plan projection (C1), compiled from the owner's declarations.
+	const owners = ["creatorIssuanceMaintenanceObservationCarriers", "closedJournalObservationControl", "closedJournalDrainPlanCarriers",
+		"closedJournalObservationRowsDigest"].map(name => ts.transpile(declaration(name), { target: ts.ScriptTarget.ES2022 })).join("\n");
+	const carriers = new Function("maintenanceWidthAtom", `${owners}; return creatorIssuanceMaintenanceObservationCarriers;`)(
+		Symbol("maintenance-width")) as (input: Record<string, unknown>) => readonly unknown[];
 	const journal = { control: null, image: { imageDigest: "a".repeat(64) }, canonicalRows: [Uint8Array.of(1)] };
 	const rest = { snapshot: 1, ahe: 2, floor: 3, floorImage: 4, snapshotInventory: 5 };
 	const withDrain = carriers({ journal: { ...journal, drainSource: { control: null, image: {}, canonicalRows: [Uint8Array.of(2)] } }, ...rest });

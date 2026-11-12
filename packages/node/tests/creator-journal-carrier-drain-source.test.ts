@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { encodeCanonical } from "@ts-drp/canonical";
 import ts from "typescript";
 import { expect, it } from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 // A journal mid-drain is read with drainSource: the adapter's reconstruction of the pre-drain journal
 // (control, image and every original row) from this same read's control (the plan carries the retired
@@ -21,8 +22,10 @@ function carriersFunction(): (input: unknown) => readonly unknown[] {
 	const declaration = ast.statements.find((node): node is ts.FunctionDeclaration =>
 		ts.isFunctionDeclaration(node) && node.name?.text === "creatorIssuanceMaintenanceObservationCarriers");
 	if (declaration === undefined) throw new TypeError("journal observation carrier builder missing");
-	return new Function(`${ts.transpile(declaration.getText(ast), { target: ts.ScriptTarget.ES2022 })};
-		return creatorIssuanceMaintenanceObservationCarriers;`)() as (input: unknown) => readonly unknown[];
+	// With the owner's journal observation projection (C1): a drain control's plan rides by digest.
+	return new Function("closedJournalObservationControl", `${ts.transpile(declaration.getText(ast), { target: ts.ScriptTarget.ES2022 })};
+		return creatorIssuanceMaintenanceObservationCarriers;`)(compileClosedJournalObservationOwner().closedJournalObservationControl) as
+		(input: unknown) => readonly unknown[];
 }
 
 it("a mid-drain journal's observation carrier holds its rows once: no reconstructed drainSource beside them", () => {

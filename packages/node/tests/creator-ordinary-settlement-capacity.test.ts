@@ -11,6 +11,7 @@ import {creatorAuthenticatedEpochVertexFields} from "../src/internal/runtime-rec
 import {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE} from "../src/internal/creator-source-custody.js";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 // The close's own per-carrier encode cap (CLOSED_RETIREMENT_BYTES.maxBytes = AHE maxUnionBytes).
 const CLOSED_OBSERVATION_CARRIER_CAP = AHE_BOUNDED_READ_LIMITS.maxUnionBytes;
@@ -731,9 +732,12 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(parameters.get("ordinary.nativeUnknown")).toBe(35251);
 		expect(parameters.get("ordinary.runtimeUnknown")).toBe(99209);
 		expect(encodeCanonical(fixture.program)).toEqual(before);
-		expect(builderExpression("semanticJournalProgress")).toContain("plan: journalPlan");
+		// The semantic progress (the journal observation carrier's control) holds the owner's projection of this same plan
+		// (C1: prefixes by digest); journalPlan itself stays the separately charged native plan carrier.
+		expect(builderExpression("semanticJournalProgress")).toContain("plan: observedJournalPlan");
+		expect(builderExpression("observedJournalPlan")).toContain("closedJournalDrainPlanCarriers(");
 	});
-	it("retains the complete old resumable journal plan when the NEW plan projection is smaller", () => {
+	it("retains the old resumable journal drain (its plan by digest in the carrier, C1) when the NEW plan projection is smaller", () => {
 		const objectId="room",digest="a".repeat(64),author="b".repeat(64),scope={objectId,epoch:0,anchorDigest:digest};
 		const baseControl={kind:"v3-live-journal-retirement-control-2",objectId,incarnation:digest,revision:1,sequence:1,
 			active:null,completed:{throughEpoch:1,decisionDigest:digest,sourceProofDigest:digest,protectedScopes:[]},drain:null};
@@ -745,11 +749,14 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		const compiler=createCreatorNoneResourceProgramCompiler(),backend=compiler.backend(limits),
 			actual=(value:unknown)=>canonicalValueResourceForSizing(value,128,limits,"exact"),
 			fields=Object.fromEntries(Object.entries(old).map(([key,value])=>[key,actual(value)]));
+		const {closedJournalObservationControl}=compileClosedJournalObservationOwner();
 		const bindings={maximum:backend.maximum,record:backend.record,semanticJournalProgress:backend.bytes(512),
-			baseFields:[undefined,fields],integer:backend.primitive(Number.MAX_SAFE_INTEGER)};
+			baseFields:[undefined,fields],integer:backend.primitive(Number.MAX_SAFE_INTEGER),controls:[undefined,old],
+			fields:(value:object)=>Object.fromEntries(Object.entries(value).map(([key,field])=>[key,actual(field)])),closedJournalObservationControl};
 		const js=ts.transpileModule(`return ${builderExpression("journalControl")};`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
 		const width=new Function("bindings",`const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
-		const completeOld=actual({...old,revision:Number.MAX_SAFE_INTEGER,sequence:Number.MAX_SAFE_INTEGER});
+		// Every old field survives, the old drain's plan by digest; its exact bytes stay the native carriers charged apart.
+		const completeOld=actual({...closedJournalObservationControl(old) as object,revision:Number.MAX_SAFE_INTEGER,sequence:Number.MAX_SAFE_INTEGER});
 		expect(width).toEqual(completeOld);
 		expect(width.byteLength).toBeGreaterThan(bindings.semanticJournalProgress.byteLength);
 		expect(encodeCanonical(old)).toEqual(before);
@@ -900,6 +907,7 @@ describe("candidate-free complete ordinary window certificate", () => {
 			acceptedCount: 0, localIssuedCount: 0, acceptedWitnessPayloadBytes: 0,
 			journalObservationFields: {control: {byteLength: 1, items: 1, maxDepth: 0}, image: {byteLength: 100, items: 20, maxDepth: 1},
 				canonicalRows: {byteLength: 100, items: 3, maxDepth: 1}},
+			journalContextControlWidth: 1,
 			journal: {projection: journalProjection, imageDigest: "journal", parametersBytes: encodeCanonical({}), canonicalRows: observation.journal.canonicalRows}};
 		const profile: any = {sourceIdentity: identity, preparedMaterial: true, preparedParameters: compiler.captureParameters(), program,
 			firstStageThroughNode: checkpoint, context: {objectId: scope.objectId, epoch: 3, anchorDigest: anchor,
@@ -1132,6 +1140,7 @@ describe("candidate-free complete ordinary window certificate", () => {
 		changed.input.observation.journal.control = oldControl;
 		changed.input.observation.journal.exactCanonicalControlCarriers = [encodeCanonical(oldControl)];
 		changed.input.geometry.journalObservationFields.control = resource;
+		changed.input.geometry.journalContextControlWidth = resource.byteLength;
 		const retained = changed.run(changed.input);
 		expect(retained.ordinaryProofEnvelopeByteLength).toBeGreaterThan(after.ordinaryProofEnvelopeByteLength + 8192);
 		for (const parameters of changed.calls.evaluated.slice(-2)) {
