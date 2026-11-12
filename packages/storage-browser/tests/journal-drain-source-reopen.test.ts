@@ -46,17 +46,18 @@ test("browser drainSource equals the pre-drain rows between batches and across r
 		const source = await read();
 		if (source.control === null) throw new Error("original floor missing");
 		expect(source.drainSource).toBeUndefined();
-		const decoded = source.canonicalRows.map(bytes => [bytes, decodeCanonical(bytes)] as const);
+		const decoded = source.canonicalRows.map(bytes =>
+			[bytes, decodeCanonical(bytes) as [string, unknown[], Record<string, unknown>]] as const);
 		// Browser frames: camelCase acceptedEntries rows (storage-node's are snake_case accepted_entries).
 		const rows = decoded.flatMap(([bytes, [table, , row]]) => table === "acceptedEntries" ? [{
-			journalSequence: (row as Record<string, unknown>).journalSequence as number,
-			vertexDigest: (row as Record<string, unknown>).vertexDigest as string,
-			author: (row as Record<string, unknown>).localAuthor as string,
-			authorSequence: (row as Record<string, unknown>).localAuthorSequence as number,
+			journalSequence: row.journalSequence as number,
+			vertexDigest: row.vertexDigest as string,
+			author: row.localAuthor as string,
+			authorSequence: row.localAuthorSequence as number,
 			nativeFrameDigest: journalRetirementFrameDigest(bytes) }] : []);
 		expect(rows).toHaveLength(1);
 		const headers = decoded.flatMap(([bytes, [table, key]]) => {
-			const epoch = (key as unknown[])[1];
+			const epoch = key[1];
 			return table === "scopes" && typeof epoch === "number" && epoch >= 2 && epoch <= 17
 				? [{ scope: materials[epoch]!.scope, exactCanonicalNativeFrameBytes: bytes }] : [];
 		});
