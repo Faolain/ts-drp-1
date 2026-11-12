@@ -6212,8 +6212,7 @@ async function prepareCreatorOrdinarySourceReadinessForSizing(source: CreatorOrd
 		{...originalJournal.control, revision: Number.MAX_SAFE_INTEGER};
 	const image = {...originalJournal.image, scopeCount: Number.MAX_SAFE_INTEGER, rowCount: Number.MAX_SAFE_INTEGER, byteCharge: Number.MAX_SAFE_INTEGER};
 	const journalObservationFields = Object.freeze(creatorIssuanceMaintenanceObservationCarriers({journal: {
-		control: resource(control), image: resource(image), canonicalRows: resource(originalJournal.canonicalRows),
-		...(originalJournal.drainSource === undefined ? {} : {drainSource: resource(originalJournal.drainSource)})},
+		control: resource(control), image: resource(image), canonicalRows: resource(originalJournal.canonicalRows)},
 		snapshot: null, ahe: null, floor: null, floorImage: null, snapshotInventory: null})[0]) as Readonly<Record<string, CanonicalResourceFootprint>>;
 	const geometry: CreatorOrdinaryReadinessGeometry = Object.freeze({
 		graphVersion: preparation.current.runtime.graphVersion, baseGraphCount: preparation.current.currentEpochVertexCount,
@@ -6669,10 +6668,12 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		// Exact cold frames keep the authenticated closed-role source identity;
 		// current rows are checked through the original replay verifier below.
 		const currentScope = {objectId: input.objectId, epoch: currentTrust.currentEpoch, anchorDigest: currentTrust.currentAnchorDigest};
+		// A drain's reconstructed original is the adapter's deterministic function of (control, image,
+		// rows): while one is active, those inputs compare instead (an ordinary append cannot run mid-drain).
+		const draining = journal.value.control?.drain != null || seed.journal.control?.drain != null;
 		if (!sameOrdinaryControl(journal.value.control, seed.journal.control) ||
-			(journal.value.drainSource === undefined || seed.journal.drainSource === undefined
-				? journal.value.drainSource !== seed.journal.drainSource
-				: !closedRetirementEqual(journal.value.drainSource, seed.journal.drainSource)))
+			draining && !(closedRetirementEqual(journal.value.image, seed.journal.image) &&
+				closedJournalRowsEqual(journal.value.canonicalRows, seed.journal.canonicalRows)))
 			throw unavailable;
 		journalProbe = captureCreatorOrdinaryJournalCurrentProbe(readJournal, journal.value);
 		const readinessAtCapture = seed.capacity.readiness;
@@ -7011,11 +7012,14 @@ function creatorIssuanceMaintenanceObservationCarriers(input: Readonly<{
 	// Preserve the complete original materialized PRE wrapper. Native carrier
 	// exposure is charged separately, not copied into this semantic wrapper as
 	// a second embedded plan. The width projection uses this same field owner.
+	// A mid-drain read's drainSource is the adapter's reconstruction of the pre-drain journal from this
+	// same control (its plan carries the retired frames), image and residual rows: a deterministic
+	// function of the three fields below. Encoding it beside them held the journal about twice under
+	// this carrier's one encode cap; sites that need the original use the adapter's own read.drainSource.
 	const journal = {
 		control: input.journal.control,
 		image: input.journal.image,
 		canonicalRows: input.journal.canonicalRows,
-		...(input.journal.drainSource === undefined ? {} : { drainSource: input.journal.drainSource }),
 	};
 	return [journal, input.snapshot, input.ahe, input.floor, input.floorImage, input.snapshotInventory];
 }
@@ -10775,8 +10779,7 @@ function closedJournalNativeObservationEqual(left: LiveJournalRetirementImageObs
 		return bytesEqual(closedJournalReconstructedControlCarriers(a), closedJournalReconstructedControlCarriers(b),
 			LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES);
 	};
-	const baseEqual = (a: LiveJournalRetirementImageObservation | NonNullable<LiveJournalRetirementImageObservation["drainSource"]>,
-		b: typeof a): boolean => controlEqual(a.control, b.control) && closedRetirementEqual(a.image, b.image) &&
+	const baseEqual = (a: LiveJournalRetirementImageObservation, b: LiveJournalRetirementImageObservation): boolean => controlEqual(a.control, b.control) && closedRetirementEqual(a.image, b.image) &&
 		bytesEqual(a.canonicalRows, b.canonicalRows, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes);
 	try {
 		const fields = ["control", "exactCanonicalControlCarriers", "image", "canonicalRows"];
@@ -10784,12 +10787,9 @@ function closedJournalNativeObservationEqual(left: LiveJournalRetirementImageObs
 			b = capturePromotionRecord(right, [...fields, ...(Object.hasOwn(right, "drainSource") ? ["drainSource"] : [])]);
 		if (a === undefined || b === undefined || !baseEqual(left, right) ||
 			!bytesEqual(left.exactCanonicalControlCarriers, right.exactCanonicalControlCarriers, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES)) return false;
-		const sourceA = Object.hasOwn(a, "drainSource"), sourceB = Object.hasOwn(b, "drainSource");
-		if (sourceA !== sourceB) return false;
-		if (!sourceA) return true;
-		return capturePromotionRecord(a.drainSource, ["control", "image", "canonicalRows"]) !== undefined &&
-			capturePromotionRecord(b.drainSource, ["control", "image", "canonicalRows"]) !== undefined &&
-			baseEqual(left.drainSource!, right.drainSource!);
+		// A present drainSource is the adapter's reconstruction from this same (control, image, rows), all
+		// compared above: equal inputs, equal reconstruction. Its presence follows control.drain.
+		return true;
 	} catch { return false; }
 }
 /** Row-only native drain plans omit BOTH header fields. Absence is not an
@@ -14679,10 +14679,9 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const snapshotImage = record({imageDigest: digest, scopeCount: integer, chunkCount: integer, metadataBytes: integer, scopes: snapshotPairs});
 		const snapshotWrapper = record({control: participantBounds[0], image: snapshotImage});
 		const journalImage = record({imageDigest: digest, scopeCount: integer, rowCount: integer, byteCharge: integer});
-		const journalDrainSource = maximum(capture.journal.drainSource === undefined ? nil : actual(capture.journal.drainSource),
-			record({control: completed[1], image: journalImage, canonicalRows: inputResource("journal.rows", journal.canonicalRows)}));
+		// The journal carrier holds no reconstructed drainSource (creatorIssuanceMaintenanceObservationCarriers).
 		const journalWrapper = record({control: journalControl, image: journalImage,
-			canonicalRows: inputResource("journal.rows", journal.canonicalRows), drainSource: journalDrainSource});
+			canonicalRows: inputResource("journal.rows", journal.canonicalRows)});
 		const newFact = record(snapshotQuarantineContract.recoveryRetirementFactFields({certificateDigest: digest, currentHead: roomHead}, pair, array(3, pair)));
 		const futureInventory = record({scopes: tuple([...inventoryScopes.map(actual), record({scope, incarnation: primitive("0".repeat(36)),
 			contentBytes: integer, retirement: newFact})]), owner: record({...fields(owner), recoveryScopes: integer, recoveryContentBytes: integer})});
@@ -14862,7 +14861,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		// both inventories. No current I charge or prior UNKNOWN is removed.
 		const successorObservations = current.successorFenceCount === 0 ? [] : creatorIssuanceMaintenanceObservationCarriers({
 			journal: {control: journalControl, image: journalImage,
-				canonicalRows: inputResource("journal.rows", journal.canonicalRows), drainSource: journalDrainSource},
+				canonicalRows: inputResource("journal.rows", journal.canonicalRows)},
 			snapshot: snapshotWrapper, ahe: aheObservation, floor, floorImage: floorPoint, snapshotInventory: futureInventory,
 		}).map((value, index) => {
 			if (index !== 0) return creatorCanonicalCapacityForSizing(value as CanonicalResourceFootprint);
@@ -16767,12 +16766,11 @@ function creatorNextEpochAdmissionForecastDelta(input: Readonly<{
 	const rows = census.rows as readonly Readonly<Record<string, unknown>>[];
 	if (rows.some(row => row.classification !== "current")) return undefined;
 	const journal = input.capture.journal;
-	const drain = journal.drainSource === undefined ? {} : {drainSource: journal.drainSource};
 	const journalNow = closedRetirementBytes({control: journal.control, image: journal.image,
-		canonicalRows: journal.canonicalRows, ...drain}).byteLength;
+		canonicalRows: journal.canonicalRows}).byteLength;
 	const journalNext = exactWidth({control: input.finalJournalControl, image: input.journalImage,
 		canonicalRows: maintenanceEncodedWidth(input.finalJournal.canonicalRowsBytes, undefined,
-			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes), ...drain});
+			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes)});
 	// Closing reclassifies every current row: the genesis row is pinned, the
 	// rest are closed issuance.
 	const closed = (row: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
@@ -19892,7 +19890,6 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 											byteCharge: journal.afterSuccessor.nativeImageBytes,
 										},
 										canonicalRows: maintenanceEncodedWidth(journal.afterSuccessor.canonicalRowsBytes),
-										...(capture.journal.drainSource === undefined ? {} : { drainSource: capture.journal.drainSource }),
 									},
 									snapshot: { control: successorJobControls.snapshot, image: snapshotImage },
 									ahe: {

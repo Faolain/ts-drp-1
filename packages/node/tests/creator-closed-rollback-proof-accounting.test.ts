@@ -2351,11 +2351,13 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		expect(same(value, decodeCanonical(encodeCanonical(value, {maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes})))).toBe(true);
 		const altered = rows.map(r => r.slice()); altered[17]![5] ^= 1;
 		expect(same(value, {...value, canonicalRows: altered})).toBe(false);
-		expect(same(value, {...value, drainSource: {...value.drainSource, canonicalRows: altered}})).toBe(false);
+		// drainSource is the adapter's reconstruction from this same (control, image, rows): those compare.
+		expect(same(value, {...value, drainSource: {...value.drainSource, canonicalRows: altered}})).toBe(true);
 		expect(same(value, {...value, control: {...control, revision: 1}})).toBe(false);
 		expect(same(value, {...value, exactCanonicalControlCarriers: [Uint8Array.of(0)]})).toBe(false);
 		expect(same(value, {...value, extra: true})).toBe(false);
-		expect(same(value, {...value, drainSource: undefined})).toBe(false);
+		// The reconstruction's presence follows control.drain, compared above; it is not compared itself.
+		expect(same(value, {...value, drainSource: undefined})).toBe(true);
 		const reordered = [...rows]; [reordered[0], reordered[1]] = [reordered[1]!, reordered[0]!];
 		expect(same(value, {...value, canonicalRows: reordered})).toBe(false);
 		let invoked = false;

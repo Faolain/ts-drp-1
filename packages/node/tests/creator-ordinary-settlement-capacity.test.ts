@@ -237,7 +237,8 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		const builder = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
 		expect(builder).toContain("journalWrapper.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes");
 		expect(builder).toContain("creatorIssuanceMaintenanceObservationCarriers({"); // Full successor jobs unchanged.
-		expect(declaration("creatorIssuanceMaintenanceObservationCarriers")).toContain("drainSource: input.journal.drainSource");
+		// A mid-drain journal's reconstructed drainSource is not encoded beside its own control, image and rows.
+		expect(declaration("creatorIssuanceMaintenanceObservationCarriers")).not.toContain("drainSource: input.journal.drainSource");
 		expect(declaration("acquireCreatorIssuanceMaintenanceProof")).toContain("creatorIssuanceMaintenanceObservationCarriers({"); // Immediate ordinary I is unchanged.
 		expect(() => builderExpression("physical")).toThrow("missing actual builder expression:physical");
 		expect(() => builderExpression("physicalTerm")).toThrow("missing actual builder expression:physicalTerm");
@@ -270,9 +271,10 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		// not that cap, so a five-Writer room's members failed every install with "canonical value
 		// exceeds byte limit". Every journal rows equality compares row by row.
 		// The member's install (11484/11492 drain read, journalNative, verifyCompleted) and its lull's drain
-		// ACK readback compare the whole retained journal or its residual.
+		// ACK readback compare the whole retained journal or its residual; the ordinary source recheck compares
+		// rows while a drain is active (no reconstructed drainSource comparison).
 		expect(source).not.toMatch(/closedRetirementEqual\([^()]*(?:canonicalRows|readExactCanonicalRows\(\))/u);
-		expect(source.match(/closedJournalRowsEqual\([^()]*(?:\(\))?[^()]*(?:canonicalRows|rows)\)/gu)?.length).toBe(5);
+		expect(source.match(/closedJournalRowsEqual\([^()]*(?:\(\))?[^()]*(?:canonicalRows|rows)\)/gu)?.length).toBe(6);
 		const cap = {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128};
 		const bindings = {encodeCanonical, compareBytes, CLOSED_RETIREMENT_BYTES: cap};
 		const rowsEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual", "closedJournalRowsEqual"],
@@ -763,9 +765,11 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 			parameters = (rows: any) => new Map([["journal.rows.bytes", rows.byteLength], ["journal.rows.items", rows.items], ["journal.rows.depth", rows.maxDepth]]),
 			bindings = {capture: {journal: {}}, nil: backend.primitive(null), completed: [undefined, backend.bytes(128)],
 				actual: (value: unknown) => canonicalValueResourceForSizing(value, 128, limits, "exact"), maximum: backend.maximum, record: backend.record,
-				journalImage: backend.bytes(64), journalControl: backend.bytes(790_000), journal: {canonicalRows: seed},
+				// The wrapper holds the rows once (no reconstructed drainSource term), so the control carries the
+				// width the second rows term did: the same seed/candidate/rectangle boundaries under 2 MiB.
+				journalImage: backend.bytes(64), journalControl: backend.bytes(1_443_000), journal: {canonicalRows: seed},
 				inputResource: (name: string, value: any) => compiler.inputResource(name, value)};
-		const js = ts.transpileModule(["journalDrainSource", "journalWrapper"].map(name => `const ${name}=${builderExpression(name)};`).join("\n"),
+		const js = ts.transpileModule(["journalWrapper"].map(name => `const ${name}=${builderExpression(name)};`).join("\n"),
 			{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText,
 			wrapper = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js};return journalWrapper;`)(bindings);
 		compiler.limit(compiler.references(wrapper).byteLength, 2_097_152, 1);
