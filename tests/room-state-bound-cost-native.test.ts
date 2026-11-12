@@ -25,6 +25,8 @@ const ID_BYTES = Number(process.env.STATE_BOUND_ID_BYTES ?? 200);
 const ROUNDS = Number(process.env.STATE_BOUND_ROUNDS ?? 8);
 const MEASURE_EPOCHS = Number(process.env.STATE_BOUND_MEASURE_EPOCHS ?? 6);
 const TARGETS = [8192, 16_384, 32_768 - 2 * (ID_BYTES + 64)];
+/** A pause after each install before the next move (a game's frame pacing); 0 issues at once. */
+const FIRST_MOVE_DELAY_MS = Number(process.env.STATE_BOUND_FIRST_MOVE_DELAY_MS ?? 0);
 
 type BoundEvent = {
 	mode?: "bound" | "exact";
@@ -66,7 +68,9 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	const creator = await fixture.open(0);
 	const writer = await fixture.open(1);
 	const samples: Sample[] = [];
-	const seeds: { covered: boolean; durationUs: number; receiver: string }[] = [];
+	type Seed = { covered: boolean; durationUs: number; receiver: string; mode: string; turns: number; maxTurnUs: number; wallUs: number };
+	const seeds: Seed[] = [];
+	let discardedSeeds = 0;
 	let site = "none";
 	let phase = "grow";
 	let stateBytes = 0;
@@ -78,7 +82,10 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 			if (bound.admitted && bound.stateBytes !== undefined && site === "creator-issue") stateBytes = bound.stateBytes;
 		}
 		if (event.kind === "application-state-bound-seed")
-			seeds.push({ covered: event.covered === true, durationUs: Number(event.durationUs), receiver: String(event.receiver) });
+			seeds.push({ covered: event.covered === true, durationUs: Number(event.durationUs), receiver: String(event.receiver),
+				mode: String(event.mode), turns: Number(event.turns ?? 1), maxTurnUs: Number(event.maxTurnUs ?? event.durationUs),
+				wallUs: Number(event.wallUs ?? event.durationUs) });
+		if (event.kind === "application-state-bound-seed-discarded") discardedSeeds++;
 		if (typeof previous === "function") previous(event);
 	});
 	const delivered: (number | null)[] = [null, null];
@@ -129,6 +136,7 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 		site = "none";
 		epoch++;
 		expect(writer.room.authority()?.epoch).toBe(epoch);
+		if (FIRST_MOVE_DELAY_MS > 0) await new Promise((resolve) => setTimeout(resolve, FIRST_MOVE_DELAY_MS));
 	};
 	const runEpoch = async (grow: boolean, concurrent: boolean): Promise<void> => {
 		for (let round = 0; round < ROUNDS; round++) {
@@ -184,12 +192,26 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	console.log(
 		`STATE_BOUND_COST ${JSON.stringify({
 			idBytes: ID_BYTES,
+			firstMoveDelayMs: FIRST_MOVE_DELAY_MS,
 			seeds: {
 				count: seeds.length,
 				covered: seeds.filter((seed) => seed.covered).length,
-				p50Us: percentile(seeds.map((seed) => seed.durationUs), 0.5),
-				p95Us: percentile(seeds.map((seed) => seed.durationUs), 0.95),
-				maxUs: Math.max(0, ...seeds.map((seed) => seed.durationUs)),
+				discarded: discardedSeeds,
+				// durationUs: busy time (all turns); maxTurnUs: the longest single turn; wallUs: install to seeded.
+				byMode: Object.fromEntries(
+					[...new Set(seeds.map((seed) => seed.mode))].map((mode) => {
+						const rows = seeds.filter((seed) => seed.mode === mode);
+						return [mode, {
+							count: rows.length,
+							busyP50Us: percentile(rows.map((seed) => seed.durationUs), 0.5),
+							busyP95Us: percentile(rows.map((seed) => seed.durationUs), 0.95),
+							maxTurnUs: Math.max(0, ...rows.map((seed) => seed.maxTurnUs)),
+							turnsMax: Math.max(0, ...rows.map((seed) => seed.turns)),
+							wallP50Us: percentile(rows.map((seed) => seed.wallUs), 0.5),
+							wallMaxUs: Math.max(0, ...rows.map((seed) => seed.wallUs)),
+						}];
+					})
+				),
 			},
 			rounds: ROUNDS,
 			epochs: epoch,

@@ -193,6 +193,7 @@ import {
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
 import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
+import { createDeferredSeedRunner } from "./internal/deferred-seed.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 	rewriteCreatorCloseMembershipWitnesses } from "./internal/creator-close-membership.js";
 import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
@@ -1000,6 +1001,13 @@ export interface V3ApplicationStateBound {
 	quoteBase(): number | undefined;
 }
 
+/** The resumable seed of a {@link V3ApplicationStateBound}: step consumes at most about `byteBudget`
+ * more base bytes (true once done), and finish returns the bound the synchronous seed returns. */
+export interface V3ApplicationStateBoundSeed {
+	step(byteBudget: number): boolean;
+	finish(): V3ApplicationStateBound | undefined;
+}
+
 export interface V3OperationAdmissionPolicy {
 	reserve(
 		operation: Readonly<Record<string, unknown>>,
@@ -1007,6 +1015,8 @@ export interface V3OperationAdmissionPolicy {
 	): V3OperationAdmissionReservation;
 	/** The application's state bound seeded with this plane's exact base state, when it has one. */
 	createApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBound | undefined;
+	/** The same bound, seeded in bounded steps (the plane drives it in short turns after an install). */
+	beginApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBoundSeed | undefined;
 }
 export type V3OperationAdmissionPolicyFactory = (
 	context: Readonly<{
@@ -22148,15 +22158,67 @@ type ApplicationStateBoundCache = {
 };
 const applicationStateBounds = new WeakMap<V3PlaneRegistration, ApplicationStateBoundCache>();
 
+/** A deferred seed turn stops stepping after this long, so each turn stays well under 1 ms. */
+const APPLICATION_STATE_SEED_TURN_MS = 0.5;
+/** Base bytes per seed step (a few dozen Grid blocks): one step is a small fraction of a turn. */
+const APPLICATION_STATE_SEED_STEP_BYTES = 512;
+/** Seeds each plane's bound after its machine install, in short host turns (one live seed per plane). */
+const applicationStateBoundSeeds = createDeferredSeedRunner<V3PlaneRegistration, V3ApplicationStateBound>({
+	schedule: (turn) => {
+		setTimeout(turn, 0);
+	},
+	now: () => (typeof performance === "undefined" ? Date.now() : performance.now()),
+	turnMs: APPLICATION_STATE_SEED_TURN_MS,
+	stepBytes: APPLICATION_STATE_SEED_STEP_BYTES,
+});
+
 /**
- * Seeds a plane's application state bound over its base: the application decodes the base state once.
- * Called when the plane's machine is installed (genesis bind, successor or recovery install), so no
- * move's admission check pays the base decode; a check that finds no current seed seeds itself.
+ * The application's bound when it fits this room: the closed shape, and a base bound within the room's
+ * limit. A bound that does not fit the limit even before any operation (a constant ceiling above the
+ * room's limit) cannot decide this room's moves: the exact fold judges them.
+ */
+function fittingApplicationStateBound(created: unknown): V3ApplicationStateBound | undefined {
+	const bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
+		typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
+		? created as V3ApplicationStateBound : undefined;
+	const quotedBase = bound?.quoteBase();
+	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES
+		? undefined : bound;
+}
+
+/** Records a plane's seeded bound over its base (fresh: nothing advanced yet but the anchor). */
+function installApplicationStateBound(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	bound: V3ApplicationStateBound | undefined,
+	event: Readonly<Record<string, unknown>>
+): ApplicationStateBoundCache {
+	const cache: ApplicationStateBoundCache = { base, index: registration.index, payload: registration.payload, bound,
+		advanced: new IntrinsicSet(), admittedByBound: false };
+	cache.advanced.add(registration.payload.provenance.anchorDigest);
+	applicationStateBounds.set(registration, cache);
+	emitApplicationStateBoundSeed(registration, { covered: bound !== undefined, ...event });
+	return cache;
+}
+
+function emitApplicationStateBoundSeed(registration: V3PlaneRegistration, event: Readonly<Record<string, unknown>>, kind =
+	"application-state-bound-seed"): void {
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({ kind, receiver: registration.issuanceScope.author, ...event });
+	} catch { /* Diagnostics cannot alter admission. */ }
+}
+
+/**
+ * Seeds a plane's application state bound over its base in one call: the application decodes the base
+ * state once. The fallback seed: an application without a resumable seed at install, and any admission
+ * check that finds no finished seed for the current base (a self-seed, counted by its mode).
  * @returns The seeded cache, or undefined when the plane's policy offers no bound.
  */
 function seedApplicationStateBound(
 	registration: V3PlaneRegistration,
-	base: BlueprintStateMachine
+	base: BlueprintStateMachine,
+	mode: "install" | "self"
 ): ApplicationStateBoundCache | undefined {
 	const policy = registration.operationAdmissionPolicy;
 	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
@@ -22164,37 +22226,65 @@ function seedApplicationStateBound(
 	const started = typeof performance === "undefined" ? 0 : performance.now();
 	let bound: V3ApplicationStateBound | undefined;
 	try {
-		const created: unknown = ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]);
-		bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
-			typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
-			? created as V3ApplicationStateBound : undefined;
-		// A bound that does not fit the limit even before any operation (a constant ceiling above the
-		// room's limit) cannot decide this room's moves: the exact fold judges them.
-		const quotedBase = bound?.quoteBase();
-		if (quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES)
-			bound = undefined;
+		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]));
 	} catch {
 		bound = undefined;
 	}
-	const cache: ApplicationStateBoundCache = { base, index: registration.index, payload: registration.payload, bound,
-		advanced: new IntrinsicSet(), admittedByBound: false };
-	cache.advanced.add(registration.payload.provenance.anchorDigest);
-	applicationStateBounds.set(registration, cache);
-	try {
-		const observer = Reflect.get(globalThis, "__warmProofEvent");
-		if (typeof observer === "function")
-			observer({ kind: "application-state-bound-seed", receiver: registration.issuanceScope.author, covered: bound !== undefined,
-				durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000) });
-	} catch { /* Diagnostics cannot alter admission. */ }
-	return cache;
+	const durationUs = typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000);
+	return installApplicationStateBound(registration, base, bound, { mode, durationUs, maxTurnUs: durationUs, turns: 1 });
 }
 
-/** Seeds the plane's application state bound when its machine is installed (never fails the install). */
+/** Whether the plane still has the machine, index and payload a seed was begun for. */
+function applicationStateBoundBaseCurrent(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	index: V3PlaneRegistration["index"],
+	payload: V3PlaneRegistration["payload"]
+): boolean {
+	return registration.active && registration.blueprintMachine === base && registration.index === index &&
+		registration.payload === payload && !registration.blueprintClosing && !registration.blueprintFolded;
+}
+
+/**
+ * Seeds the plane's application state bound when its machine is installed (genesis bind, successor or
+ * recovery install), never failing the install. With the application's resumable seed, the seed runs in
+ * short host turns after the install (each well under 1 ms), so no move's admission check and no install
+ * turn pays the base decode; the next install abandons an unfinished seed and begins one over its own
+ * base. Without one, the install seeds in one call, as before.
+ */
 function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): void {
 	try {
 		const base = registration.blueprintMachine;
 		if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return;
-		seedApplicationStateBound(registration, base);
+		const policy = registration.operationAdmissionPolicy;
+		const begin = policy === undefined ? undefined : Reflect.get(policy, "beginApplicationStateBound");
+		if (typeof begin !== "function") {
+			applicationStateBoundSeeds.cancel(registration);
+			seedApplicationStateBound(registration, base, "install");
+			return;
+		}
+		const index = registration.index;
+		const payload = registration.payload;
+		applicationStateBoundSeeds.begin(registration, {
+			start: () => {
+				const seed: unknown = ReflectApply(begin, policy, [base.snapshot().exactCanonicalStateBytes]);
+				if (!isObject(seed) || typeof Reflect.get(seed, "step") !== "function" || typeof Reflect.get(seed, "finish") !== "function")
+					return undefined;
+				return ObjectFreeze({
+					step: (byteBudget: number) => ReflectApply(Reflect.get(seed, "step") as (budget: number) => unknown, seed, [byteBudget]) === true,
+					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, [])),
+				});
+			},
+			current: () => applicationStateBoundBaseCurrent(registration, base, index, payload),
+			done: (bound, stats) => {
+				if (!applicationStateBoundBaseCurrent(registration, base, index, payload)) return;
+				// A check that self-seeded this same base meanwhile keeps its cache (and what it advanced).
+				const existing = applicationStateBounds.get(registration);
+				if (existing !== undefined && existing.base === base && existing.index === index && existing.payload === payload) return;
+				installApplicationStateBound(registration, base, bound, { mode: "deferred", durationUs: stats.busyUs, ...stats });
+			},
+			discarded: (stats) => emitApplicationStateBoundSeed(registration, stats, "application-state-bound-seed-discarded"),
+		});
 	} catch { /* A seed is an optimization: the first admission check seeds instead. */ }
 }
 
@@ -22214,8 +22304,10 @@ function applicationStateBoundAdmits(
 	let cache = applicationStateBounds.get(registration);
 	let rebuilt = false;
 	if (cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload) {
-		// Not seeded when the plane's machine was installed (or the plane was reset since): seed now.
-		cache = seedApplicationStateBound(registration, base);
+		// No finished seed over this base (the deferred seed has not finished, or the plane was reset
+		// since): self-seed now, in this turn, and abandon the unfinished one.
+		applicationStateBoundSeeds.cancel(registration);
+		cache = seedApplicationStateBound(registration, base, "self");
 		if (cache === undefined) return undefined;
 		rebuilt = true;
 	}

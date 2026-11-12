@@ -90,6 +90,7 @@ import {
 	type V3LocalSettlementFloor,
 	type V3LocalSettlementPolicy,
 	type V3ApplicationStateBound,
+	type V3ApplicationStateBoundSeed,
 	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
 	type V3RetainedHashPage,
@@ -132,7 +133,12 @@ import { type DRPNetworkNode, type Message, MessageType, V3Envelope } from "@ts-
 import { beginForegroundWork, createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
 import { pauseCreatorSuccessorRetainedReads } from "./internal/creator-successor-live.js";
-import type { CreatorOrdinaryApplicationResourceBoundReader, CreatorOrdinaryFinishingWindowLimits } from "./internal/runtime-reclamation.js";
+import type {
+	CreatorOrdinaryApplicationResourceBoundReader,
+	CreatorOrdinaryApplicationResourceProjection,
+	CreatorOrdinaryApplicationResourceProjectionInput,
+	CreatorOrdinaryFinishingWindowLimits,
+} from "./internal/runtime-reclamation.js";
 import {
 	resolveRecoveryPoolAutoMaintenanceOptions,
 	startRecoveryPoolAutoScheduler,
@@ -2993,9 +2999,39 @@ function createRoomApplicationStateBound(
 	blueprintDigest: string,
 	exactCanonicalBaseStateBytes: Uint8Array
 ): V3ApplicationStateBound | undefined {
-	const reader = application.readOrdinaryApplicationResourceBound;
-	const create = reader?.createIncrementalProjection;
+	const create = application.readOrdinaryApplicationResourceBound?.createIncrementalProjection;
 	if (typeof create !== "function") return undefined;
+	const input = roomApplicationStateBoundInput(application, blueprintDigest, exactCanonicalBaseStateBytes);
+	return input === undefined ? undefined : roomApplicationStateBoundFacade(create(input));
+}
+
+/**
+ * The resumable form of {@link createRoomApplicationStateBound}: the application's own resumable seed of
+ * the same projection over the same input (beginIncrementalProjection), so the live plane seeds the
+ * bound in bounded turns. Undefined when the application has no resumable form.
+ */
+function beginRoomApplicationStateBound(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): V3ApplicationStateBoundSeed | undefined {
+	const begin = application.readOrdinaryApplicationResourceBound?.beginIncrementalProjection;
+	if (typeof begin !== "function") return undefined;
+	const input = roomApplicationStateBoundInput(application, blueprintDigest, exactCanonicalBaseStateBytes);
+	const seed = input === undefined ? undefined : begin(input);
+	if (seed === undefined) return undefined;
+	return Object.freeze({
+		step: (byteBudget: number) => seed.step(byteBudget) === true,
+		finish: () => roomApplicationStateBoundFacade(seed.finish()),
+	});
+}
+
+/** The catalog-bound projection input over one exact base state, or undefined when the blueprint does not resolve. */
+function roomApplicationStateBoundInput(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): CreatorOrdinaryApplicationResourceProjectionInput | undefined {
 	let resolved: ReturnType<V3RoomApplication["catalog"]["resolve"]>;
 	try {
 		resolved = application.catalog.resolve(blueprintDigest);
@@ -3003,7 +3039,7 @@ function createRoomApplicationStateBound(
 		return undefined;
 	}
 	if (resolved.blueprintDigest !== blueprintDigest) return undefined;
-	const projection = create({
+	return {
 		catalog: Object.freeze({
 			blueprintDigest: resolved.blueprintDigest,
 			artifactId: resolved.artifactId,
@@ -3019,7 +3055,12 @@ function createRoomApplicationStateBound(
 			protectedOperations: Object.freeze([]),
 			recoveryOperations: Object.freeze([]),
 		}),
-	} as Parameters<typeof create>[0]);
+	} as CreatorOrdinaryApplicationResourceProjectionInput;
+}
+
+function roomApplicationStateBoundFacade(
+	projection: CreatorOrdinaryApplicationResourceProjection | undefined
+): V3ApplicationStateBound | undefined {
 	if (projection === undefined) return undefined;
 	return Object.freeze({
 		advance: (operations: readonly unknown[]) => projection.advance(operations),
@@ -3050,6 +3091,8 @@ function createRoomOperationAdmissionPolicy(
 	return Object.freeze({
 		createApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
 			createRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
+		beginApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
+			beginRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
 		reserve(operation: Readonly<Record<string, unknown>>, authenticated?: Readonly<{ author: string }>) {
 			const expanded =
 				operation.action === "applicationBatch"
