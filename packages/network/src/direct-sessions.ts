@@ -43,7 +43,7 @@ import {
 	SESSION_LEGACY_COOLDOWN_MS,
 	SESSION_OPEN_DEADLINE_MS,
 } from "./direct-message.js";
-import { uint8ArrayToStream } from "./stream.js";
+import { boundedLengthDecoder, uint8ArrayToStream } from "./stream.js";
 
 /** Admit one received frame: decode, validate, record evidence, enqueue. Throwing refuses (resets) the stream. */
 export type DirectFrameAdmission = (frame: Uint8Array, sender: string, protocol: string) => Promise<void>;
@@ -70,6 +70,13 @@ interface Pending {
 }
 
 const CREDIT_MAX_BYTES = 16;
+
+/** Bytes in the varint encoding of `value`: the longest length prefix a frame of `value` bytes needs. */
+function varintLength(value: number): number {
+	let length = 1;
+	for (let rest = value; rest >= 0x80; rest = Math.floor(rest / 0x80)) length++;
+	return length;
+}
 
 function encodeVarint(value: number, into: number[]): void {
 	let rest = value;
@@ -138,6 +145,7 @@ class ConnectionDirect {
 	#unsupported = false;
 	#legacyUntil = 0;
 	readonly #failures: number[] = [];
+	#openFailures = 0;
 	#closed?: DirectMessageSendError;
 
 	constructor(
@@ -173,14 +181,26 @@ class ConnectionDirect {
 		this.#unsupported = true;
 	}
 
-	recordFailure(): void {
+	/**
+	 * A session stream failed. Too many failures inside the rolling window, or too many failed opens in
+	 * a row with no successful open between them (opens that each run to the full negotiation deadline
+	 * are spaced wider than the window), put the connection on the legacy protocol for a cooldown.
+	 * @param open - Whether the failure was an open (negotiation) rather than the loss of an open stream.
+	 */
+	recordFailure(open: boolean): void {
 		const now = Date.now();
 		this.#failures.push(now);
 		while (this.#failures.length > 0 && now - (this.#failures[0] ?? now) > SESSION_FAILURE_WINDOW_MS) this.#failures.shift();
-		if (this.#failures.length >= SESSION_FAILURES_BEFORE_LEGACY) {
+		if (open) this.#openFailures++;
+		if (this.#failures.length >= SESSION_FAILURES_BEFORE_LEGACY || this.#openFailures >= SESSION_FAILURES_BEFORE_LEGACY) {
 			this.#failures.length = 0;
+			this.#openFailures = 0;
 			this.#legacyUntil = now + SESSION_LEGACY_COOLDOWN_MS;
 		}
+	}
+
+	recordOpened(): void {
+		this.#openFailures = 0;
 	}
 
 	close(error: DirectMessageSendError): void {
@@ -204,6 +224,7 @@ class OutboundSession {
 	#stream?: Stream;
 	#lp?: ReturnType<typeof lpStream>;
 	#writing = false;
+	#opening?: AbortController;
 	#closed?: DirectMessageSendError;
 
 	constructor(
@@ -236,6 +257,8 @@ class OutboundSession {
 		if (index < 0) return;
 		this.#queue.splice(index, 1);
 		this.#queuedBytes -= pending.bytes.byteLength;
+		// The new head may fit the credit the removed one was waiting for.
+		if (index === 0) this.#pump();
 	}
 
 	#pump(): void {
@@ -253,16 +276,18 @@ class OutboundSession {
 
 	async #open(): Promise<void> {
 		this.#state = "opening";
+		const opening = (this.#opening = new AbortController());
 		let stream: Stream;
 		try {
 			stream = await this.owner.connection.newStream(this.#protocol, {
-				signal: AbortSignal.timeout(SESSION_OPEN_DEADLINE_MS),
+				signal: AbortSignal.any([opening.signal, AbortSignal.timeout(SESSION_OPEN_DEADLINE_MS)]),
 			});
 		} catch (error) {
 			if (this.#closed !== undefined) return;
+			this.#opening = undefined;
 			this.#state = "idle";
 			if (error instanceof Error && error.name === "UnsupportedProtocolError") this.owner.markUnsupported();
-			else this.owner.recordFailure();
+			else this.owner.recordFailure(true);
 			if (this.owner.useLegacy()) this.#handOffToLegacy();
 			else if (this.owner.connection.status !== "open")
 				this.close(new DirectMessageSendError("DIRECT_CONNECTION_CLOSED", "Direct-message connection closed"));
@@ -270,12 +295,17 @@ class OutboundSession {
 			else this.#pump();
 			return;
 		}
+		this.#opening = undefined;
 		if (this.#closed !== undefined) {
 			stream.abort(this.#closed);
 			return;
 		}
+		this.owner.recordOpened();
 		this.#stream = stream;
-		this.#lp = lpStream(stream, { maxDataLength: CREDIT_MAX_BYTES });
+		this.#lp = lpStream(stream, {
+			maxDataLength: CREDIT_MAX_BYTES,
+			lengthDecoder: boundedLengthDecoder(varintLength(CREDIT_MAX_BYTES)),
+		});
 		this.#creditFrames = this.#limits.windowFrames;
 		this.#creditBytes = this.#limits.windowBytes;
 		this.#state = "open";
@@ -341,7 +371,7 @@ class OutboundSession {
 		if (isOpen(stream)) stream.abort(cause instanceof Error ? cause : new Error(String(cause)));
 		if (this.#closed !== undefined) return;
 		this.#state = "idle";
-		this.owner.recordFailure();
+		this.owner.recordFailure(false);
 		if (this.owner.useLegacy()) this.#handOffToLegacy();
 		else this.#pump();
 	}
@@ -350,6 +380,8 @@ class OutboundSession {
 		if (this.#closed !== undefined) return;
 		this.#closed = error;
 		this.#state = "closed";
+		this.#opening?.abort(error);
+		this.#opening = undefined;
 		for (const pending of this.#queue.splice(0)) settle(pending, error);
 		this.#queuedBytes = 0;
 		const stream = this.#stream;
@@ -365,6 +397,7 @@ class LegacySender {
 	#queuedBytes = 0;
 	#active = 0;
 	readonly #streams = new Set<Stream>();
+	readonly #opening = new Set<AbortController>();
 	#closed?: DirectMessageSendError;
 
 	constructor(private readonly connection: Connection) {}
@@ -403,11 +436,22 @@ class LegacySender {
 			if (stream !== undefined && isOpen(stream))
 				stream.abort(pending.signal?.reason instanceof Error ? pending.signal.reason : new Error("direct message send aborted"));
 		};
+		const opening = new AbortController();
+		this.#opening.add(opening);
 		try {
-			stream = await this.connection.newStream(DRP_MESSAGE_PROTOCOL, {
-				signal: pending.signal ?? AbortSignal.timeout(SESSION_OPEN_DEADLINE_MS),
-			});
+			try {
+				stream = await this.connection.newStream(DRP_MESSAGE_PROTOCOL, {
+					signal: AbortSignal.any([opening.signal, pending.signal ?? AbortSignal.timeout(SESSION_OPEN_DEADLINE_MS)]),
+				});
+			} finally {
+				this.#opening.delete(opening);
+			}
 			this.#streams.add(stream);
+			// Closed while negotiating: the frame was already out of the queue, so refuse it here.
+			if (this.#closed !== undefined) {
+				stream.abort(this.#closed);
+				throw this.#closed;
+			}
 			pending.signal?.addEventListener("abort", abort, { once: true });
 			pending.signal?.throwIfAborted();
 			pending.onWriteStart?.();
@@ -439,6 +483,7 @@ class LegacySender {
 		this.#closed = error;
 		for (const pending of this.#queue.splice(0)) settle(pending, error);
 		this.#queuedBytes = 0;
+		for (const opening of this.#opening) opening.abort(error);
 		for (const stream of this.#streams) if (isOpen(stream)) stream.abort(error);
 	}
 }
@@ -515,6 +560,7 @@ export class DirectMessageSessions {
 		const sender = connection.remotePeer.toString();
 		const lp = lpStream(stream, {
 			maxDataLength: limits.maxFrameBytes,
+			lengthDecoder: boundedLengthDecoder(varintLength(limits.maxFrameBytes)),
 			maxBufferSize: limits.windowBytes + limits.windowFrames * DIRECT_MESSAGE_MAX_PREFIX_BYTES,
 		});
 		this.#inbound.add(stream);
