@@ -120,6 +120,9 @@ function plane(maxPendingBytes = 1_048_576): {
 			"enqueueRegistrationTask",
 			"authenticateV3Ingress",
 			"enqueueV3Ingress",
+			"enqueueCapturedV3Ingress",
+			"settleIngressJob",
+			"collectLateIngress",
 			"holdV3IngressForReadiness",
 			"beginRetainedReplayTransition",
 			"retireRetainedReplay",
@@ -134,6 +137,10 @@ function plane(maxPendingBytes = 1_048_576): {
 			MAX_ADMITTED_PENDING_PUBLICATION_JOBS: constant("MAX_ADMITTED_PENDING_PUBLICATION_JOBS"),
 			MAX_ADMITTED_EGRESS_CONTROL_JOBS: constant("MAX_ADMITTED_EGRESS_CONTROL_JOBS"),
 			currentRegistration: (value: Registration) => value === registration && state.current,
+			// Same-epoch carry bookkeeping (no carry is open in these fixtures).
+			ingressJobsInFlight: new WeakMap(),
+			pendingIngressCarries: new WeakMap(),
+			deletePendingIngressCarry: () => undefined,
 			ingressFailureLog: (category: string, stage?: string) => {
 				logs.push(stage === undefined ? category : `${category}:${stage}`);
 			},
@@ -480,13 +487,17 @@ describe("readiness ingress hold: no FIFO task can await it", () => {
 		return [...names].sort();
 	}
 
-	it("only enqueueV3Ingress reads the hold, as its input-admission barrier, captured before the barrier", () => {
+	it("only the shared ingress entry reads the hold, as its input-admission barrier, captured before the barrier", () => {
 		expect(holders(liveTree, "readinessIngressHold")).toEqual([
 			"V3PlaneRegistration",
-			"enqueueV3Ingress",
+			"enqueueCapturedV3Ingress",
 			"holdV3IngressForReadiness",
 		]);
-		const enqueue = declaration(liveTree, "enqueueV3Ingress");
+		// Network input reaches the shared entry only through enqueueV3Ingress.
+		expect(declaration(liveTree, "enqueueV3Ingress")).toContain(
+			"return enqueueCapturedV3Ingress(registration, transport, sender, (custody) => {"
+		);
+		const enqueue = declaration(liveTree, "enqueueCapturedV3Ingress");
 		expect(enqueue).toContain("const hold = registration.readinessIngressHold;");
 		expect(enqueue).toContain("terminal === undefined ? hold : Promise.all([terminal, hold])");
 		expect(enqueue).toContain("captureBeforeBarrier: true");
@@ -520,6 +531,15 @@ describe("readiness ingress hold: no FIFO task can await it", () => {
 		expect(declaration(liveTree, "routeV3RetainedIngress")).toContain(
 			'void enqueueV3Ingress(registration, message, "retained");'
 		);
+		// The only other entry is the same-epoch carry's re-offer, awaited outside the FIFO too.
+		expect(holders(liveTree, "enqueueCapturedV3Ingress")).toEqual([
+			"enqueueCapturedV3Ingress",
+			"enqueueV3Ingress",
+			"reofferCarriedRow",
+		]);
+		const reoffer = declaration(liveTree, "reofferCarriedRow");
+		expect(reoffer).toContain("void reoffer();");
+		expect(reoffer).toContain("carry.reoffers = carry.reoffers.then(reoffer)");
 		const activation = declaration(liveTree, "activateV3LivePlane");
 		expect(activation.match(/enqueueV3Ingress\(/g)).toHaveLength(1);
 		expect(activation).toContain("subscribeActivationQueue(boundQueueManager, queueId, (message) => {");
