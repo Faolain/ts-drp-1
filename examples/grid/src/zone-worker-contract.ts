@@ -33,7 +33,7 @@ export function validateZoneMove(dx: unknown, dy: unknown): void {
 
 export const ZONE_WORKER_CONTRACT = defineRoomWorkerContract({
 	name: "ts-drp/grid-zone",
-	version: 1,
+	version: 2,
 	commands: {
 		"move": send(validateZoneMove),
 		"snapshot": call(),
@@ -59,7 +59,9 @@ export const ZONE_WORKER_CONTRACT = defineRoomWorkerContract({
 		"rtcStats": call(),
 		"session": call(),
 	},
-	streams: { projection: latest(), transient: latest(), network: latest() },
+	// Movement (transient) is message-paced: a remote move reaches the page one round trip after the
+	// worker emits it, not a frame later. The projection and the network panel stay frame-paced.
+	streams: { projection: latest(), transient: latest({ pace: "message" }), network: latest() },
 	hooks: ["roomHeadAuthorityForOpen", "approveSettlementSourceSelection", "publishSuccessor"],
 });
 

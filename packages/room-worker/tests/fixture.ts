@@ -35,7 +35,7 @@ export const contract = defineRoomWorkerContract({
 		}),
 		"refuse": send(),
 	},
-	streams: { projection: latest(), transient: latest() },
+	streams: { projection: latest(), transient: latest(), movement: latest({ pace: "message" }) },
 	hooks: ["authority", "approve"],
 });
 

@@ -23,8 +23,11 @@ One module both sides import declares a closed allowlist (`defineRoomWorkerContr
 - `send(validate)`: fire-and-forget, for per-frame input. The validator runs on the page,
   synchronously; `send` returns a correlation id, and a refusal in the worker reaches `onRefused`
   with that id.
-- `latest()`: a stream where only the newest value matters. At most one value per stream per page
-  frame crosses; the rest coalesce in the worker.
+- `latest()`: a stream where only the newest value matters. One value is in flight at a time, and the
+  rest coalesce in the worker. By default the page asks for the next value at its next frame, so at
+  most one value per frame crosses (bulk state). `latest({ pace: "message" })` asks as soon as the page
+  has handled a value, so a movement update waits one page round trip instead of up to a frame plus a
+  round trip. Use it for small, frequent updates the page renders at its next frame anyway.
 - `hooks`: page functions the worker may call (authority factories, approvals). Objects they return
   stay on the page; the worker gets a handle whose methods are the object's own, and nothing else.
 

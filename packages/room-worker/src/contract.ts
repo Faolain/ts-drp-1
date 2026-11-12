@@ -46,9 +46,18 @@ export interface SendCommand {
 
 export type CommandSpec = CallCommand | SendCommand;
 
-/** A latest-value stream: the page sees at most one value per frame and always the newest. */
+/**
+ * A latest-value stream: one value in flight at a time, always the newest, older ones dropped.
+ * `pace` says when the page asks for the next value:
+ * - "frame" (default): at its next frame, so it sees at most one value per frame (bulk state such
+ *   as a projection);
+ * - "message": as soon as it has handled the value, so a value waits for one page round trip, not a
+ *   frame (movement-class updates the page renders at its next frame anyway).
+ * Either way at most one value is in flight, so a busy page never queues a backlog.
+ */
 export interface LatestStream {
 	readonly kind: "latest";
+	readonly pace?: "frame" | "message";
 }
 
 export type StreamSpec = LatestStream;
@@ -67,8 +76,16 @@ export const send = <Args extends unknown[]>(validate?: (...args: Args) => void)
 			: { kind: "send" as const, validate: validate as unknown as (...args: never[]) => void }
 	);
 
-/** @returns A latest-value stream. */
-export const latest = (): LatestStream => Object.freeze({ kind: "latest" });
+/**
+ * @param options - The stream's pace (default "frame").
+ * @param options.pace - When the page asks for the next value: at its next frame, or once it has
+ * handled the value.
+ * @returns A latest-value stream.
+ */
+export const latest = (options: { readonly pace?: "frame" | "message" } = {}): LatestStream =>
+	Object.freeze(
+		options.pace === undefined ? { kind: "latest" as const } : { kind: "latest" as const, pace: options.pace }
+	);
 
 export interface RoomWorkerContract {
 	/** The app's contract name; page and worker must agree. */
@@ -98,6 +115,8 @@ export function defineRoomWorkerContract<Contract extends RoomWorkerContract>(co
 	for (const [name, spec] of Object.entries(contract.streams)) {
 		if (!isCommandName(name)) throw new TypeError(`room worker stream name ${name} is invalid`);
 		if (spec?.kind !== "latest") throw new TypeError(`room worker stream ${name} has no kind`);
+		if (spec.pace !== undefined && spec.pace !== "frame" && spec.pace !== "message")
+			throw new TypeError(`room worker stream ${name} has an unknown pace`);
 	}
 	for (const name of contract.hooks)
 		if (!isCommandName(name)) throw new TypeError(`room worker hook name ${name} is invalid`);

@@ -376,6 +376,11 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 		latestValues.set(name, value);
 		for (const listener of listeners.get(name) ?? []) listener(value);
 		if (creditScheduled.has(name)) return;
+		if (contractEntry(contract.streams, name)?.pace === "message") {
+			// Movement-class: ask for the next value now; the page renders the newest at its frame.
+			if (!stopped) post({ ...header, k: "credit", name });
+			return;
+		}
 		creditScheduled.add(name);
 		frame(() => {
 			creditScheduled.delete(name);

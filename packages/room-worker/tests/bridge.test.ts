@@ -1,4 +1,5 @@
 import {
+	defineRoomWorkerContract,
 	ROOM_WORKER_PROTOCOL,
 	RoomWorkerClosed,
 	RoomWorkerCrashed,
@@ -148,6 +149,43 @@ describe("room worker bridge: streams", () => {
 		await settle();
 		expect(client.latest("projection")).toEqual({ p: 1 });
 		expect(client.latest("transient")).toEqual({ t: 2 });
+	});
+});
+
+describe("room worker bridge: message-paced streams (movement)", () => {
+	it("a message-paced stream sends its next value as soon as the page has handled one, not at a frame", async () => {
+		const { client, context, frames } = make();
+		await client.ready;
+		const seen: unknown[] = [];
+		client.on("movement", (value) => seen.push(value));
+		for (let index = 1; index <= 3; index++) {
+			context().emit("movement", { m: index });
+			await settle();
+		}
+		expect(frames).toHaveLength(0);
+		expect(seen).toEqual([{ m: 1 }, { m: 2 }, { m: 3 }]);
+	});
+
+	it("keeps one value in flight: a burst reaches the page as its first and newest values", async () => {
+		const { client, context } = make();
+		await client.ready;
+		const seen: unknown[] = [];
+		client.on("movement", (value) => seen.push(value));
+		for (let index = 1; index <= 5; index++) context().emit("movement", { m: index });
+		await settle();
+		expect(seen).toEqual([{ m: 1 }, { m: 5 }]);
+	});
+
+	it("rejects an unknown pace", () => {
+		expect(() =>
+			defineRoomWorkerContract({
+				name: "bad",
+				version: 1,
+				commands: {},
+				streams: { s: { kind: "latest", pace: "never" } as never },
+				hooks: [],
+			})
+		).toThrow(TypeError);
 	});
 });
 
