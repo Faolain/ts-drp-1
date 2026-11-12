@@ -385,6 +385,8 @@ async function retainedResolutionCost(count: number) {
 			const next = {
 				recoveryCensusReads: nextAfter.recoveryCensusReads - nextBefore.recoveryCensusReads,
 				ownFenceScans: nextAfter.ownFenceScans - nextBefore.ownFenceScans,
+				// Reported, not asserted: own fence rows authenticated (one memoised Ed25519 check each).
+				ownFenceAuthentications: nextAfter.ownFenceAuthentications - nextBefore.ownFenceAuthentications,
 			};
 			const result = { count, installMs: Math.round(ms), cpuMs, perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work, next };
 			process.stdout.write(`RETAINED_COST ${JSON.stringify(result)}\n`);
@@ -702,6 +704,7 @@ async function windowExpiredCensusCost(count: number) {
 				plan: (await writer.settlementAudit()).dispositions,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
 				ownFenceScans: after.ownFenceScans - before.ownFenceScans,
+				ownFenceAuthentications: after.ownFenceAuthentications - before.ownFenceAuthentications,
 			};
 			process.stdout.write(`WINDOW_EXPIRED_COST ${JSON.stringify(result)}\n`);
 			return result;

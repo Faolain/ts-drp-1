@@ -5333,12 +5333,13 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * Observation only (tests): how much native settlement work this process has done. Counts of
  * charged dependency turns (withActiveRebaseDependencies), complete recovery census reads
  * (readCreatorRecoveryDependencyCensus), retained source contract preparations
- * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed and own-fence outbox
- * scans (scanOwnFences). Monotonic
+ * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed, own-fence outbox
+ * scans (scanOwnFences) and the own fence rows those scans authenticate (ownFenceAuthentications: one
+ * registered-digest Ed25519 check each, through the exact-bytes verify memo). Monotonic
  * process-wide scalars; never authority, never reset by the runtime.
  */
 const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
-	ownFenceScans: 0};
+	ownFenceScans: 0, ownFenceAuthentications: 0};
 export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
 	return ObjectFreeze({...v3SettlementWorkCounts});
 }
@@ -13622,7 +13623,55 @@ function createOwnEpochFenceReader(): OwnEpochFenceReader {
 }
 
 /**
- * The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch.
+ * A stored own fence row that does not authenticate as this author's own signed vertex (G5: durable
+ * store bytes are carriers, not authenticity). Closed reasons: "signature" (the exact preimage does not
+ * verify under the author's key, or is not a well-formed fence vertex), "digest" (the stored digest is
+ * not the preimage's registered digest) and "identity" (the preimage names another object, author or
+ * sequence than the row it is stored as). Terminal for the scan: no settlement decision is made on it.
+ */
+export class V3OwnFenceUnauthenticated extends TypeError {
+	readonly code = "V3_OWN_FENCE_UNAUTHENTICATED";
+	constructor(
+		readonly author: string,
+		readonly authorSequence: number,
+		readonly reason: "signature" | "digest" | "identity"
+	) {
+		super(`V3_OWN_FENCE_UNAUTHENTICATED: own fence row ${authorSequence} does not authenticate (${reason})`);
+		this.name = "V3OwnFenceUnauthenticated";
+	}
+}
+
+/**
+ * Authenticates one stored own fence row before the scan reports it: its exact preimage verifies under
+ * the author's own key (verifyReceivedVertex: registered digest, Ed25519 through the exact-bytes verify
+ * memo, well-formed fence operation), the stored digest is that registered digest, and the preimage
+ * names the row's own object, author and sequence. Authenticity only: whether the fence was admitted is
+ * the creator's frontier's to say.
+ * @param row - The shape-checked outbox row.
+ * @param preimage - Its decoded preimage.
+ * @param scope - The author's own scope.
+ */
+function authenticateOwnFenceRow(row: SnapshottedOutboxRow, preimage: Readonly<Record<string, unknown>>,
+	scope: DurableIssueScope): void {
+	v3SettlementWorkCounts.ownFenceAuthentications += 1;
+	if (preimage.objectId !== scope.objectId || preimage.author !== scope.author || preimage.authorSequence !== row.authorSequence)
+		throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "identity");
+	const anchor = preimage.anchor;
+	const key = publicKeyBytes(scope.author);
+	const verified = typeof anchor !== "string" || key === undefined || typeof V3_VERTEX_SUITE_ID !== "string" ? undefined :
+		verifyReceivedVertex({domain: V3_VERTEX_DOMAIN, expectedAnchor: anchor, receivedCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			signature: row.signature, suiteId: V3_VERTEX_SUITE_ID,
+			resolveAuthorPublicKey: candidate => candidate === scope.author ? ObjectFreeze({bytes: key, format: "raw" as const}) : undefined});
+	if (verified?.accepted !== true || verified.digest === undefined)
+		throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "signature");
+	if (!sameBytes(verified.digest, row.digest)) throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "digest");
+}
+
+/**
+ * The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. Every
+ * fence row it reports is authenticated first (authenticateOwnFenceRow); one that does not authenticate
+ * ends the scan with V3OwnFenceUnauthenticated, so no guard, expiry, hand-back, frontier resolution or
+ * pruning decision rests on unauthenticated store bytes, whatever the caller or call order.
  * Internal: exported for the native authentication tests.
  */
 export async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
@@ -13646,9 +13695,10 @@ export async function scanOwnFences(store: DurableIssuanceStore, scope: DurableI
 			const preimage = decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>;
 			const operation = preimage.operation;
 			const epoch = preimage.epoch;
+			const fenceRow = isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION;
+			if (fenceRow) authenticateOwnFenceRow(row, preimage, scope);
 			// Any own fence row (whatever its fenceSequence) bounds what contiguity can prove.
-			if (isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION &&
-				(highest === undefined || row.authorSequence > highest)) {
+			if (fenceRow && (highest === undefined || row.authorSequence > highest)) {
 				highest = row.authorSequence;
 				highestEpoch = typeof epoch === "number" && NumberIsSafeInteger(epoch) ? epoch : undefined;
 			}
