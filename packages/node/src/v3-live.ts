@@ -8297,6 +8297,29 @@ async function handleV3IngressWithSource(
 				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
 			throw new TypeError("received journal contexts disagree");
 		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		// A same-epoch recovery revoked this plane after the job's currency check (the custody path
+		// awaits its journal reads in between): an append now could land after the successor rebuilt
+		// from the journal, leaving the row in no index. The carry takes it instead. Both journals open
+		// their write transaction synchronously inside appendAccepted, so an append already called is
+		// ordered before the successor's later journal read. The creator's received append is gated
+		// by its close actor's maintenance admission, which the recovery joins before it rebuilds.
+		if (
+			!alreadyAccepted &&
+			maintenanceAdmission === undefined &&
+			!currentRegistration(registration) &&
+			pendingIngressCarries.has(registration)
+		) {
+			releaseOperationReservation(reservation);
+			collectLateIngress(
+				registration,
+				V3Envelope.encode({
+					canonicalPreimage: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(evidence.signature),
+				}).finish(),
+				evidence.transportSender
+			);
+			return false;
+		}
 		appended = await registration.liveJournalStore.appendAccepted({
 			detachedSignature: new Uint8ArrayConstructor(evidence.signature),
 			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
