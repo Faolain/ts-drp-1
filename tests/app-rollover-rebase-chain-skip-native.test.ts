@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
 import { decodeCanonical } from "@ts-drp/canonical";
+import { observeCanonicalCalls } from "@ts-drp/canonical/instrumentation";
+import { observeEd25519Verifications } from "@ts-drp/protocol-v3/instrumentation";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { Session } from "node:inspector/promises";
@@ -7,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
+import { installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
 import { openRole, type RoleEnvironment } from "./fixtures/track-m-apps/long-room-core.js";
 import {
@@ -16,7 +19,7 @@ import {
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
-import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
+import { readV3RoomStageTimes, V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -1144,3 +1147,145 @@ async function deliveredReissuesLeaveTheBacklog() {
 
 it("a consumed hand-back record whose reissued row the creator admitted leaves the undelivered bound", () =>
 	deliveredReissuesLeaveTheBacklog(), 1_800_000);
+
+// Profile (SKIP_PROFILE=1; measurement only, no budget): the skip install of the 100x16 catch-up's
+// steady state, which carries about 60 hand-back records. An offline Writer's SKIP_PROFILE_MOVES moves
+// are given back by a skip install over two closed epochs (install A: retained rows resolved from the
+// frontier); in the next epoch its policy offers them again, but those rows never reach the creator;
+// the next skip install over two closed epochs (install B) finds every reissued row displaced and gives
+// each move back again. For each install: deterministic counts (SQLite statements by keyword and
+// transactions by mode, canonical encodes and decodes with bytes, Ed25519 verifications computed and
+// memoized, the settlement work counters), per record, and wall and process CPU time per stage
+// (readV3RoomStageTimes; nested stages overlap their parent). One process holds both roles: the
+// creator only serves the successor material during the window, and its stages are listed apart.
+async function profileHandBackSkipInstall(moves: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-profile-"));
+	directories.push(directory);
+	const counts = new Map<string, number>();
+	const bump = (key: string, amount = 1) => counts.set(key, (counts.get(key) ?? 0) + amount);
+	const restores: (() => void)[] = [await installSqliteCountSeams((key) => bump(key))];
+	observeCanonicalCalls((kind, byteLength) => {
+		bump(`canonical.${kind}`);
+		bump(`canonical.${kind}Bytes`, byteLength);
+	});
+	restores.push(() => observeCanonicalCalls(undefined));
+	// Both protocol-v3 instances: the source this test's importers load, and the dist build the dist
+	// packages (storage, compaction, issuance-store) resolve through node.
+	const distVerifications = (
+		(await import(join(import.meta.dirname, "../packages/protocol-v3/dist/src/instrumentation.js"))) as {
+			observeEd25519Verifications: typeof observeEd25519Verifications;
+		}
+	).observeEd25519Verifications;
+	for (const observe of [observeEd25519Verifications, distVerifications]) {
+		observe((outcome) => bump(outcome === "computed" ? "ed25519.verify" : "ed25519.verifyMemo"));
+		restores.push(() => observe(undefined));
+	}
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		let n = 0;
+		const status = async () =>
+			(await writer.settlementStatus?.()) as { undelivered: unknown[]; unsettledEpochs: number } | null;
+		const plan = async () => (await writer.settlementPlanDump?.()) as { handBacks: number; entries: { d: string }[] } | null;
+		// One measured skip install: from resuming the wire until the member's install (adoption and
+		// settlement drain) has completed and the room lists `listed` given-back moves.
+		const measured = async (label: string, listed: number) => {
+			const stagesBefore = readV3RoomStageTimes();
+			const workBefore = readV3SettlementWorkCounts();
+			const adoptsBefore = stagesBefore["member.install.adopt"]?.count ?? 0;
+			counts.clear();
+			const cpuBefore = process.cpuUsage();
+			const started = performance.now();
+			wire.resume();
+			await wire.caughtUp(epoch, 1_200_000);
+			await waitFor(
+				`${label}: install and drain complete`,
+				async () => ({ adopts: readV3RoomStageTimes()["member.install.adopt"]?.count ?? 0, listed: (await status())?.undelivered.length }),
+				(value) => value.adopts > adoptsBefore && value.listed === listed,
+				600_000
+			);
+			const wallMs = performance.now() - started;
+			const cpu = process.cpuUsage(cpuBefore);
+			const snapshot = Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b)));
+			const workAfter = readV3SettlementWorkCounts();
+			const work = Object.fromEntries(
+				Object.keys(workAfter).map((key) => [key, workAfter[key as keyof typeof workAfter] - workBefore[key as keyof typeof workBefore]])
+			);
+			const stagesAfter = readV3RoomStageTimes();
+			const stages = Object.fromEntries(
+				Object.entries(stagesAfter)
+					.map(([stage, row]) => [stage, { ms: Math.round(row.ms - (stagesBefore[stage]?.ms ?? 0)), count: row.count - (stagesBefore[stage]?.count ?? 0) }] as const)
+					.filter(([, row]) => row.count > 0)
+			);
+			const records = Math.max(1, listed);
+			const perRecord = Object.fromEntries(
+				[
+					["sqlStatements", Object.entries(snapshot).filter(([key]) => key.startsWith("sql.") && !/begin|commit|rollback|stmt/u.test(key)).reduce((sum, [, value]) => sum + value, 0)],
+					["sqlWriteTransactions", snapshot["sql.beginWrite"] ?? 0],
+					["sqlReadTransactions", snapshot["sql.beginRead"] ?? 0],
+					["canonicalEncodes", snapshot["canonical.encode"] ?? 0],
+					["canonicalEncodedBytes", snapshot["canonical.encodeBytes"] ?? 0],
+					["ed25519Verify", snapshot["ed25519.verify"] ?? 0],
+					["dependencyTurns", work.dependencyTurns ?? 0],
+					["recoveryCensusReads", work.recoveryCensusReads ?? 0],
+				].map(([key, value]) => [key, Math.round(((value as number) / records) * 10) / 10])
+			);
+			const result = {
+				label,
+				epoch,
+				records: listed,
+				wallMs: Math.round(wallMs),
+				cpuMs: Math.round((cpu.user + cpu.system) / 1000),
+				stages,
+				work,
+				counts: snapshot,
+				perRecord,
+				plan: await plan(),
+			};
+			process.stdout.write(`SKIP_PROFILE ${JSON.stringify(result)}\n`);
+			return result;
+		};
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+				await rows.toCreator();
+			}
+			// Offline: moves the creator never receives, straight to the room.
+			for (let k = 0; k < moves; k++) await writer.issueRoom!(epoch, n++);
+			await wire.pause();
+			for (let roll = 0; roll < 2; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			const installA = await measured("A: retained rows resolved", moves);
+			// The next epoch: the policy offers the given-back moves again; their rows never reach the creator.
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 600_000);
+			const reissued = await waitFor(
+				"given-back moves offered again (records consumed)",
+				async () => ({ listed: (await status())?.undelivered.length ?? -1, policy: (({ state, kept }) => ({ state, kept: kept?.length }))(((await writer.rolloverStatus?.()) ?? {}) as { state?: string; kept?: unknown[] }) }),
+				(value) => value.listed === 0,
+				300_000
+			).catch((error: unknown) => ({ timedOut: String(error).slice(0, 600) }));
+			process.stdout.write(`SKIP_PROFILE_REISSUED ${JSON.stringify(reissued)}\n`);
+			await wire.pause();
+			for (let roll = 0; roll < 2; roll++) epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			const installB = await measured("B: reissued rows displaced, given back again", moves);
+			return { installA, installB };
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		for (const undo of restores.splice(0).reverse()) undo();
+		restore();
+	}
+}
+
+it.runIf(process.env.SKIP_PROFILE === "1")(
+	"profile: a skip install carrying about 60 hand-back records (deterministic counts and stage times)",
+	() => profileHandBackSkipInstall(Number(process.env.SKIP_PROFILE_MOVES ?? 60)),
+	1_800_000
+);
