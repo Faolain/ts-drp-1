@@ -1,9 +1,9 @@
 import {readFileSync} from "node:fs";
-import {compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-drp/canonical";
+import {CanonicalEncodingError, compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import {canonicalArrayResourcesForSizing, canonicalBytesResourceForSizing, canonicalRecordResourceForSizing, canonicalValueResourceForSizing} from "@ts-drp/canonical/resource";
 import {issuanceOrdinaryFinishingCapacityWidths} from "../../issuance-store/src/retirement.js";
 import {captureJournalRetirementControl, encodeJournalRetirementNativeCarriers, journalRetirementNativeProgressFields, LIVE_JOURNAL_RETIREMENT_LIMITS} from "../../live-journal/src/retirement.js";
-import {boundPreparedFields, boundCompletedFields, boundCompletionPayload} from "@ts-drp/storage";
+import {AHE_BOUNDED_READ_LIMITS, boundPreparedFields, boundCompletedFields, boundCompletionPayload} from "@ts-drp/storage";
 import {createCreatorClosedRollbackProofAccounting, createCreatorNoneResourceProgramCompiler, evaluateCreatorNoneResourceProgramForSizing,
 	creatorOrdinaryPreimageResourceGeometryForSizing, readCreatorOrdinaryPreimageCapacityForSizing,
 	captureCreatorOrdinaryFinishingWindowLimitsForSizing} from "../src/internal/creator-closed-rollback-data.js";
@@ -11,6 +11,9 @@ import {creatorAuthenticatedEpochVertexFields} from "../src/internal/runtime-rec
 import {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE} from "../src/internal/creator-source-custody.js";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
+
+// The close's own per-carrier encode cap (CLOSED_RETIREMENT_BYTES.maxBytes = AHE maxUnionBytes).
+const CLOSED_OBSERVATION_CARRIER_CAP = AHE_BOUNDED_READ_LIMITS.maxUnionBytes;
 
 // Controlled numerical seams only. No fixture mints a proof, runtime hold,
 // native grant, signed source or paid accounting credit. The production runtime
@@ -232,12 +235,33 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 			expect(result?.get("test.close")).toBe(expected.closeEnvelope); expect(result?.get("test.current")).toBe(expected.currentEnvelope);
 		}
 		const builder = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
-		expect(builder).toContain("journalWrapper.byteLength > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes");
+		expect(builder).toContain("journalWrapper.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes");
 		expect(builder).toContain("creatorIssuanceMaintenanceObservationCarriers({"); // Full successor jobs unchanged.
 		expect(declaration("creatorIssuanceMaintenanceObservationCarriers")).toContain("drainSource: input.journal.drainSource");
 		expect(declaration("acquireCreatorIssuanceMaintenanceProof")).toContain("creatorIssuanceMaintenanceObservationCarriers({"); // Immediate ordinary I is unchanged.
 		expect(() => builderExpression("physical")).toThrow("missing actual builder expression:physical");
 		expect(() => builderExpression("physicalTerm")).toThrow("missing actual builder expression:physicalTerm");
+	});
+	it("bounds every maintenance observation carrier by the close's own per-carrier encode cap, in readiness sizing and at acquisition", () => {
+		// The close encodes each observation carrier with closedRetirementBytes (CLOSED_RETIREMENT_BYTES,
+		// AHE maxUnionBytes = 786,432). Readiness sizing bounded the journal wrapper by the journal's own
+		// image bound (2 MiB) instead, so admission let a five-Writer room's journal carrier grow past what
+		// the close (and the creator's settlement fence) could encode.
+		const builder = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
+		expect(builder).toContain("[journalWrapper, CLOSED_RETIREMENT_BYTES.maxBytes, 65_536, 128]");
+		expect(builder).not.toContain("[journalWrapper, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes");
+		expect(builder).toContain("compiler.limit(compiler.references(value).byteLength, CLOSED_RETIREMENT_BYTES.maxBytes, 1)");
+		expect(declaration("creatorOrdinarySuffixCapacityForSizing")).toContain("freshJournalObservation.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes");
+		// Acquisition: a wider carrier is the proof's typed budget refusal (a rollover), never an untyped codec failure.
+		expect(source).not.toMatch(/creatorIssuanceMaintenanceObservationCarriers\(\{[^;]*?\}\)\.map\(closedRetirementBytes\)/u);
+		const carrier = execute<(value: unknown) => Uint8Array | undefined>(["closedRetirementBytes", "closedObservationCarrierBytes"],
+			"closedObservationCarrierBytes", {encodeCanonical, CanonicalEncodingError,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128}});
+		const journal = (rowBytes: number) => ({control: null, image: {rowCount: 1}, canonicalRows: [new Uint8Array(rowBytes)]});
+		const overhead = encodeCanonical(journal(0)).byteLength + 4;
+		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP - overhead))?.byteLength).toBeLessThanOrEqual(CLOSED_OBSERVATION_CARRIER_CAP);
+		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP))).toBeUndefined();
+		expect(() => carrier({value: 1n})).toThrow(); // Any other codec failure is unchanged.
 	});
 	it("reserves one prospective row-plan plus independent header-only drain, retaining distinct OLD plans and all progress", () => {
 		// Actual original reservation bodies, native encoder and accounting union.
@@ -723,7 +747,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(evaluateCreatorNoneResourceProgramForSizing(program, parameters(obsoleteHistoricalRectangle))).toBeUndefined();
 		const largerCandidateOrFence = canonicalArrayResourcesForSizing([oldRows, canonicalBytesResourceForSizing(32_768, limits)], limits);
 		expect(evaluateCreatorNoneResourceProgramForSizing(program, parameters(largerCandidateOrFence))).toBeUndefined();
-		expect(source).toContain("[journalWrapper, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, 65_536, 128]");
+		expect(source).toContain("[journalWrapper, CLOSED_RETIREMENT_BYTES.maxBytes, 65_536, 128]"); // The close's per-carrier encode cap.
 	});
 	it("keeps one complete future leaf and independent byte/item/depth maxima, without merging separate native jobs; NONE adds zero", () => {
 		const future = execute<(facts: any, native: any, frame: number) => any>(
@@ -877,7 +901,8 @@ describe("candidate-free complete ordinary window certificate", () => {
 					return evaluateCreatorNoneResourceProgramForSizing(program, values, checkpoint);
 				}, snapshotRetirementContract: {maxChunks: 100},
 				snapshotQuarantineContract: {recoveryContentBytes: (payload: number, manifest: number) => payload + manifest},
-				CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes});
+				CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128}});
 		const input: any = {source: sourceFacts, preparation, observation, profile, geometry,
 			application: {byteLength: 400, items: 40, maxDepth: 3}, limits: window,
 			knownResourceTotals: {knownBytes: 1000, protectedBytes: 800, unknownEncodedBytes: 74}};
@@ -1101,6 +1126,28 @@ describe("candidate-free complete ordinary window certificate", () => {
 		const f = windowFixture(), first = f.run(f.input), saved = structuredClone(first);
 		f.input.limits.maxAdditionalPreimageBytes = 500; f.input.application.byteLength = 50;
 		expect(first).toEqual(saved); // No mutable declaration/profile/owner is retained.
+	});
+	it("window certificate declines a journal observation carrier wider than the close's per-carrier encode cap, though the ordinary book would fit it", () => {
+		// The close encodes each observation carrier (journal {control, image, canonicalRows}, ...) with
+		// closedRetirementBytes, capped at CLOSED_RETIREMENT_BYTES.maxBytes (AHE maxUnionBytes, 786,432).
+		// Five hot Writers grew the creator's journal carrier past it while the ordinary book (1,310,720)
+		// still fit: the creator's next proof acquisition (its settlement fence, or its close) failed with
+		// an untyped "canonical value exceeds byte limit" and the room stopped. Readiness sizing charges
+		// the same carrier under the same cap, so admission refuses (typed) before it grows past.
+		const widened = (extra: number) => {
+			const f = windowFixture(), projection = f.input.geometry.journal.projection;
+			const widen = (quote: (request: any) => any) => (request: any) => {
+				const value = quote(request);
+				return {...value, canonicalRows: {...value.canonicalRows, byteLength: value.canonicalRows.byteLength + extra}};
+			};
+			projection.quoteCurrent = widen(projection.quoteCurrent); projection.quote = widen(projection.quote);
+			return f;
+		};
+		const within = widened(700_000);
+		expect(within.run(within.input), JSON.stringify(within.calls.declines)).toBeDefined();
+		const wide = widened(CLOSED_OBSERVATION_CARRIER_CAP);
+		expect(wide.run(wide.input)).toBeUndefined();
+		expect(wide.calls.declines).toContainEqual(expect.objectContaining({reason: expect.stringContaining(":observation-carrier")}));
 	});
 	it("selects a fully certified effective window only at the boundary, retaining OLD/UNKNOWN and coherent enforced aggregate caps", () => {
 		const f = windowFixture(); f.input.limits.maxAdditionalOperationBytes = 1000;
