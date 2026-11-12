@@ -487,6 +487,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	const hasSourceContext = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContextDigest");
 	const hasSourceResolution = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionDigest");
 	const hasResolutionKind = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionKind");
+	const hasResolutionScope = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionScope");
 	const hasSourceObjectId =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "sourceObjectId");
 	const hasTransformRefusal =
@@ -502,6 +503,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			...(hasSourceContext ? ["sourceContextDigest"] : []),
 			...(hasSourceResolution ? ["sourceResolutionDigest"] : []),
 			...(hasResolutionKind ? ["sourceResolutionKind"] : []),
+			...(hasResolutionScope ? ["sourceResolutionScope"] : []),
 			...(hasTransformRefusal ? ["transformRefusal"] : []),
 			...(hasInheritance ? ["inheritance"] : []),
 			...(hasProgress ? ["replacementProgress"] : []),
@@ -552,12 +554,18 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		// A resolution is exactly one of two signed terminal proofs: received-close
 		// completion (`committed`) or local-author expiry (`expire`). Each has its
 		// own native reopen verifier; neither may carry replacement work.
-		(hasSourceResolution && (sourceResolutionDigest?.byteLength !== 32 || !hasSourceContext ||
-			(value.disposition !== "committed" && value.disposition !== "expire"))) ||
+		(hasSourceResolution && (sourceResolutionDigest?.byteLength !== 32 || (!hasResolutionScope && (!hasSourceContext ||
+			(value.disposition !== "committed" && value.disposition !== "expire"))))) ||
 		(value.disposition === "expire" && hasSourceResolution && (value.replacementSequence !== null || hasInheritance)) ||
-		// A frontier resolution is a signed expiry decided on the creator's signed frontier.
-		(hasResolutionKind && (value.sourceResolutionKind !== "frontier" || !hasSourceResolution || value.disposition !== "expire" ||
-			hasProgress || hasTransformRefusal)) ||
+		// A frontier resolution is a signed expiry decided on the creator's signed frontier; a replacement
+		// resolution releases a replaced source whose replacement is committed (replaced-source scope only).
+		(hasResolutionKind && ((value.sourceResolutionKind !== "frontier" && value.sourceResolutionKind !== "replacement") ||
+			!hasSourceResolution || (value.sourceResolutionKind === "replacement" && !hasResolutionScope) ||
+			(!hasResolutionScope && value.disposition !== "expire") || hasProgress || hasTransformRefusal)) ||
+		// A replaced-source resolution: the frontier resolution of a completed single replacement's source.
+		(hasResolutionScope && (value.sourceResolutionScope !== "replaced-source" || !hasResolutionKind || !hasSourceResolution ||
+			(value.disposition !== "rebase" && value.disposition !== "transform") || value.replacementSequence === null ||
+			hasProgress || hasTransformRefusal || hasSourceObjectId || hasInheritance)) ||
 		(value.disposition === "committed" && (!hasSourceResolution || value.replacementSequence !== null || hasProgress || hasInheritance)) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
 		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
@@ -579,7 +587,8 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		disposition: value.disposition,
 		...(sourceContextDigest === undefined ? {} : { sourceContextDigest }),
 		...(sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest }),
-		...(hasResolutionKind ? { sourceResolutionKind: "frontier" as const } : {}),
+		...(hasResolutionKind ? { sourceResolutionKind: value.sourceResolutionKind as "frontier" | "replacement" } : {}),
+		...(hasResolutionScope ? { sourceResolutionScope: "replaced-source" as const } : {}),
 		...(hasSourceObjectId ? { sourceObjectId: value.sourceObjectId as string } : {}),
 		...(transformRefusal === undefined ? {} : { transformRefusal }),
 		...(inheritance === undefined ? {} : { inheritance }),
@@ -800,6 +809,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 			...(entry.sourceContextDigest === undefined ? {} : {sourceContextDigest: new Uint8Array(entry.sourceContextDigest)}),
 			...(entry.sourceResolutionDigest === undefined ? {} : {sourceResolutionDigest: new Uint8Array(entry.sourceResolutionDigest)}),
 			...(entry.sourceResolutionKind === undefined ? {} : {sourceResolutionKind: entry.sourceResolutionKind}),
+			...(entry.sourceResolutionScope === undefined ? {} : {sourceResolutionScope: entry.sourceResolutionScope}),
 			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
 			...(entry.transformRefusal === undefined
 				? {}
@@ -912,8 +922,13 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 				!durableIssuanceBytesEqual(prior.sourceResolutionDigest, candidate.sourceResolutionDigest))) ||
 			// A resolution arrives only with the one-way unresolved->terminal change above;
 			// an already-terminal (e.g. retained-fence) expiry never gains one later.
+			// (A replaced-source resolution is the exception: it arrives on an entry already completed by
+			// its replacement, whose disposition and replacement never change.)
 			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
-				candidate.disposition === prior.disposition) ||
+				candidate.disposition === prior.disposition && !(candidate.sourceResolutionScope === "replaced-source" &&
+					prior.replacementSequence !== null && prior.replacementProgress === undefined)) ||
+			// The resolution scope arrives with its resolution and never changes after.
+			(prior.sourceResolutionDigest !== undefined && candidate.sourceResolutionScope !== prior.sourceResolutionScope) ||
 			// The resolution kind arrives with its resolution and never changes after.
 			(prior.sourceResolutionDigest !== undefined && candidate.sourceResolutionKind !== prior.sourceResolutionKind) ||
 			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionKind !== undefined &&

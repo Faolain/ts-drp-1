@@ -243,6 +243,35 @@ describe("native retirement plan law", () => {
 		expect(() => assertIssuanceRetirementPreparationRows(control, prepare(committedPending, []), committedPending))
 			.toThrow("pending publication is unprotected");
 	});
+	// The pending-release law (issuanceRowHasAuthenticatedRelease) accepts a replaced-source resolution
+	// (design (b)). It is structural: the chain end (committed for kind "replacement") is the native census's
+	// proof (proveReplacementLink + replacementCommittedResolution, refused otherwise on every install). Here:
+	// a pending replaced source of a fenceless plan is protected unless its entry carries the resolution, and
+	// a preparation that drops it without one is refused.
+	it("retires a pending replaced source only under its replaced-source resolution", () => {
+		const original = fixture();
+		const completion = (() => {const bytes = encodeCanonical({replacementCompletion: 1});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};})();
+		const outbox = original.outbox.map(row => row.authorSequence === 0 ? {...row, publishState: "pending" as const} : row);
+		const source = {sourceSequence: 0, sourceDigest: original.issued[0]!.digest, disposition: "rebase" as const, replacementSequence: 1};
+		const replacement = {sourceSequence: 1, sourceDigest: original.issued[1]!.digest, disposition: "committed" as const,
+			replacementSequence: null, sourceContextDigest: completion.digest, sourceResolutionDigest: completion.digest};
+		const rows = (entry: typeof source & Record<string, unknown>): IssuanceRetirementRows => ({...original, outbox,
+			plans: [{scope, revision: 1, fenceSequence: null, entries: [entry, replacement], sourceContexts: [completion]}]});
+		for (const kind of ["replacement", "frontier"] as const) {
+			const resolved = rows({...source, sourceResolutionDigest: completion.digest, sourceResolutionKind: kind,
+				sourceResolutionScope: "replaced-source"});
+			const p = prepare(resolved, []);
+			expect(p.protectedRecords.map(value => value.authorSequence), kind).not.toContain(0);
+			expect(() => assertIssuanceRetirementPreparationRows(control, p, resolved), kind).not.toThrow();
+		}
+		// Unresolved: protected; a preparation that leaves it out is refused.
+		const unresolved = rows(source);
+		expect(prepare(unresolved, []).protectedRecords.map(value => value.authorSequence)).toContain(0);
+		const dropped = issuanceRetirementPreparationWithPlanRewrite(control, {...labels, protectedRecords: []}, unresolved);
+		// (the protected-record closure refuses it first; the pending law stands behind it)
+		expect(() => assertIssuanceRetirementPreparationRows(control, dropped, unresolved)).toThrow("issuance retirement protected records");
+	});
 	it("permits fence-less pruning only when every entry is an authenticated terminal resolution", () => {
 		const digest = (marker: number) => hashDomain("ts-drp/settlement-source-context/v1", encodeCanonical({marker}));
 		const terminal = (disposition: "committed" | "expire", sequence: number) => ({sourceSequence: sequence,

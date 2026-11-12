@@ -197,6 +197,13 @@ export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): s
 	);
 }
 
+/** A completed single replacement that may still gain a replaced-source resolution (contract law). */
+function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boolean {
+	return entry.sourceResolutionDigest === undefined && (entry.disposition === "rebase" || entry.disposition === "transform") &&
+		entry.replacementSequence !== null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
+		entry.sourceObjectId === undefined && entry.inheritance === undefined;
+}
+
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
 	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
 		plan.completedSourceCustody === undefined
@@ -232,9 +239,13 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const originalEntries = captured?.entries ?? [];
 	if (originalEntries.length + maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows) throw invalid();
 	// An existing entry still without a resolution may later be resolved from the settlement
-	// frontier: charge it as expire with the frontier kind too, keeping the wider form.
+	// frontier: charge it as expire with the frontier kind too, keeping the wider form. A completed
+	// replacement entry may instead gain a replaced-source resolution (kind and scope; its receipt is
+	// charged with the contexts below).
 	const originalEntryForms = (entry: SettlementPlan["entries"][number]) => {
 		const {sourceContextDigest: _context, sourceResolutionDigest: _resolution, ...fields} = entry;
+		// The wider of the two replaced-source kinds ("replacement") is charged.
+		if (replacedSourceResolvable(entry)) return [fields, {...fields, sourceResolutionKind: "replacement", sourceResolutionScope: "replaced-source"}];
 		return entry.sourceResolutionDigest !== undefined || entry.sourceContextDigest === undefined ? [fields]
 			: [fields, {...fields, disposition: "expire", sourceResolutionKind: "frontier"}];
 	};
@@ -244,10 +255,12 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		const shapes = originalEntryForms(entry).map(fields => unsignedRecordShape(fields, {sourceContextDigest: leaf, sourceResolutionDigest: leaf}));
 		return Object.freeze({items: Math.max(...shapes.map(shape => shape.items)), maxDepth: Math.max(...shapes.map(shape => shape.maxDepth))});
 	});
-	// A potential row ends either in manual review or resolved from the settlement frontier
-	// (expire plus the frontier kind); the wider alternative is charged.
+	// A potential row ends in manual review, resolved from the settlement frontier (expire plus the
+	// frontier kind), or replaced with its source resolved as a replaced source; the widest is charged.
 	const entryAlternatives = [{disposition: "manual-review", replacementSequence: null},
-		{disposition: "expire", replacementSequence: null, sourceResolutionKind: "frontier"}];
+		{disposition: "expire", replacementSequence: null, sourceResolutionKind: "frontier"},
+		{disposition: "transform", replacementSequence: Number.MAX_SAFE_INTEGER, sourceResolutionKind: "replacement",
+			sourceResolutionScope: "replaced-source"}];
 	const entryWidth = Math.max(...entryAlternatives.map(entryFields => unsignedRecordWidth(entryFields,
 		{sourceSequence: integer, sourceDigest: digest, sourceContextDigest: digest, sourceResolutionDigest: digest})));
 	const entryAlternativeShapes = entryAlternatives.map(entryFields => unsignedRecordShape(entryFields,
@@ -261,8 +274,11 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const contextWidths = contexts.map(context => encodeCanonical(context, unsignedEncodingLimits).byteLength);
 	const contextShape = unsignedRecordShape({}, {digest: leaf, exactCanonicalContextBytes: leaf});
 	const contextShapes = [...contexts.map(unsignedCanonicalShape)];
+	// One signed receipt per potential row and per existing entry that may still gain one (an expiry or
+	// a replaced-source resolution).
 	const expiryCount = maxSourceCount + originalEntries.filter(entry => entry.sourceResolutionDigest === undefined &&
-		entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null).length;
+		entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null).length +
+		originalEntries.filter(replacedSourceResolvable).length;
 	// A completed replacement entry still without a context may gain its displaced source's context
 	// once, at the close that removes its author: one more context (one displaced plane per close).
 	const completedWithoutContext = originalEntries.some(entry => entry.sourceContextDigest === undefined &&
@@ -2112,7 +2128,7 @@ function retirementFenceIsReleasable(plan: SettlementPlan, entry: SettlementPlan
 		// signed local-author expiry terminates it.
 		rows.outbox.every(out => out.objectId !== plan.scope.objectId || out.author !== plan.scope.author ||
 			out.publishState === "published" || rows.issued.some(issued => issued.author === out.author &&
-				issued.authorSequence === out.authorSequence && issuanceRowHasAuthenticatedExpiry(rows, issued)));
+				issued.authorSequence === out.authorSequence && issuanceRowHasAuthenticatedRelease(rows, issued)));
 }
 
 /**
@@ -2171,7 +2187,7 @@ function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | n
 	p: DurableIssuanceRetirementPreparation, plan: SettlementPlan, entry: SettlementPlan["entries"][number],
 	rows: IssuanceRetirementRows): boolean {
 	if (entry.sourceObjectId !== undefined || entry.disposition === "inherited" ||
-		!settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] }) &&
+		!settlementEntryPermitsSourceRelease(plan.fenceSequence, entry) &&
 		!retirementFenceIsReleasable(plan, entry, rows) && !retirementCustodyAlreadyRetired(control, plan, entry, rows)) return true;
 	const source = retirementLocalSource(plan, entry, rows);
 	return source !== undefined && retirementKeepsRow(control, p, source);
@@ -2408,7 +2424,7 @@ function checkedIssuanceRetirementTargetRows(
 		) as IssuanceRetirementRows["outbox"][number];
 		// Signed local-author expiry terminates the exact pending source without
 		// publication. Store-level exclusivity keeps it from ever publishing.
-		if (!allowed && out.publishState === "pending" && !issuanceRowHasAuthenticatedExpiry(rows, r))
+		if (!allowed && out.publishState === "pending" && !issuanceRowHasAuthenticatedRelease(rows, r))
 			throw issuanceRetirementRefusal("issuance retirement pending publication is unprotected");
 	}
 	const target = issuanceRetirementCommitRows(control, p, rows);
@@ -2650,7 +2666,8 @@ type SettlementPruningEntry = Readonly<{
 	readonly replacementSequence: number | null;
 	readonly sourceContextDigest?: Uint8Array;
 	readonly sourceResolutionDigest?: Uint8Array;
-	readonly sourceResolutionKind?: "frontier";
+	readonly sourceResolutionKind?: "frontier" | "replacement";
+	readonly sourceResolutionScope?: "replaced-source";
 }>;
 
 /**
@@ -2674,10 +2691,16 @@ export function settlementEntryIsAuthenticatedExpiry(entry: SettlementPruningEnt
 	return entry.disposition === "expire" && settlementEntryHasAuthenticatedTerminalResolution(entry);
 }
 
-function issuanceRowHasAuthenticatedExpiry(rows: IssuanceRetirementRows, row: RetirementIssuedRow): boolean {
+/**
+ * Whether a pending (never acknowledged) source may leave protection: its plan entry carries the author's
+ * signed expiry, or a replaced-source resolution (its replacement carries the move; the source's epoch is
+ * closed, so no plane admits it). Structural; the native census and reopen verifiers authenticate both.
+ */
+function issuanceRowHasAuthenticatedRelease(rows: IssuanceRetirementRows, row: RetirementIssuedRow): boolean {
 	const plan = rows.plans.find(value => value.scope.objectId === row.objectId && value.scope.author === row.author);
 	return plan?.entries.some(entry => entry.sourceObjectId === undefined && entry.sourceSequence === row.authorSequence &&
-		issuanceRetirementBytesEqual(entry.sourceDigest, row.digest) && settlementEntryIsAuthenticatedExpiry(entry)) === true;
+		issuanceRetirementBytesEqual(entry.sourceDigest, row.digest) &&
+		(settlementEntryIsAuthenticatedExpiry(entry) || settlementEntryHasReplacedSourceResolution(entry))) === true;
 }
 
 /**
@@ -2697,6 +2720,33 @@ export function assertSettlementExpiryPublicationExclusive(plan: Pick<Settlement
 		if (rows.some(row => row.authorSequence === entry.sourceSequence && row.publishState === "published"))
 			throw issuanceRetirementRefusal("settlement source expiry and publication are exclusive");
 	}
+}
+
+/**
+ * Structural shape of a replaced-source frontier resolution: a completed single replacement
+ * (`rebase`/`transform` with its replacement) whose source the author's signed receipt resolves on
+ * the creator's signed frontier. Authentication belongs to the native census and reopen verifiers.
+ * @param entry - One plan entry.
+ * @returns Whether the entry carries a replaced-source resolution.
+ */
+export function settlementEntryHasReplacedSourceResolution(entry: SettlementPruningEntry): boolean {
+	return (entry.disposition === "rebase" || entry.disposition === "transform") && entry.replacementSequence !== null &&
+		entry.sourceResolutionDigest !== undefined &&
+		(entry.sourceResolutionKind === "frontier" || entry.sourceResolutionKind === "replacement") &&
+		entry.sourceResolutionScope === "replaced-source";
+}
+
+/**
+ * Per-entry retirement clause: whether one entry lets its own source go (retirementEntryIsRetained).
+ * The plan's current fence settles every entry; without one, a terminal resolution or a replaced-source
+ * resolution does. Prefix reclamation stays whole-plan (settlementPlanPermitsAuthenticatedPruning).
+ * @param fenceSequence - The plan's current fence, if any.
+ * @param entry - One plan entry.
+ * @returns Whether the entry permits its source's release.
+ */
+export function settlementEntryPermitsSourceRelease(fenceSequence: number | null, entry: SettlementPruningEntry): boolean {
+	return settlementPlanPermitsAuthenticatedPruning({ fenceSequence, entries: [entry] }) ||
+		settlementEntryHasReplacedSourceResolution(entry);
 }
 
 /**
