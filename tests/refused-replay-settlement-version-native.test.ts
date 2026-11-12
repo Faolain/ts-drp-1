@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 
-import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
+import { closeFixtures, directories, required } from "./fixtures/track-m/room-retention-fixture.js";
 import { settlementDelivery, type SettlementRoom } from "./fixtures/track-m/settlement-room.js";
 import { isControl } from "./fixtures/track-x/outside-rows-room.js";
 import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
@@ -31,6 +31,8 @@ const doomingPolicy = (context: Readonly<{ epoch: number }>) =>
 const block = (id: string, x: number) => ({ action: "placeBlock", id, kind: "stone", x, y: 0 });
 
 afterEach(async () => {
+	// The driver owns the directory: both processes reopen it, so the fixture must not remove it.
+	if (DIRECTORY !== undefined) directories.delete(DIRECTORY);
 	expect(await closeFixtures()).toEqual([]);
 });
 
