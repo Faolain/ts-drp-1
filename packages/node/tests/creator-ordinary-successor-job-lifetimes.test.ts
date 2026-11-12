@@ -165,3 +165,39 @@ describe("successor native jobs use distinct complete proof lifetimes", () => {
 		expect(signing).toContain("correlatedPhases[correlatedPhases.length - 1]!.frames.map");
 	});
 });
+
+// The exact composer bounds the issuance census point image by the AHE union limit only with FINAL
+// rows and each issuance control, and charges its post-adoption census (currentClose or successorFinal
+// runtime, FINAL rows) in close/adopt, turnover and serial lifetimes. Pending successor rows appear
+// only in its separate successor reserved/entered job envelopes.
+describe("the finishing program's census phases follow the exact composer's lifetimes", () => {
+	const body = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
+	const local = ts.createSourceFile("build.ts", body, ts.ScriptTarget.Latest, true);
+	const found = new Map<string, string>();
+	const walk = (node: ts.Node): void => {
+		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer &&
+			["phaseCensus", "unionCensus", "finalRuntimeTerms"].includes(node.name.text)) found.set(node.name.text, node.initializer.getText(local));
+		ts.forEachChild(node, walk);
+	};
+	walk(local);
+	it("charges successor reserved/entered jobs with pending rows and every other runtime phase with final rows", () => {
+		expect([...found.keys()].sort()).toEqual(["finalRuntimeTerms", "phaseCensus", "unionCensus"]);
+		const census = {rows: "all phases"}, unionCensus = {rows: "final"};
+		const phaseCensus = execute<(phase: string) => unknown>(`return ${found.get("phaseCensus")!};`, {census, unionCensus});
+		expect(["currentClose", "successorReserved", "successorEntered", "successorFinal"].map(phaseCensus))
+			.toEqual([unionCensus, census, census, unionCensus]);
+		// Close/serial lifetimes take only the post-adoption phases; successor jobs keep terms 1 and 2.
+		expect(execute<unknown[]>(`return ${found.get("finalRuntimeTerms")!};`, {runtimeEnvelopeTerms: ["close", "reserved", "entered", "final"]}))
+			.toEqual(["close", "final"]);
+		expect(initializers.get("successorJobs")).toContain("runtimeEnvelopeTerms[index]");
+	});
+	it("bounds the union-limited census with final rows, the native image and the issuance control bound", () => {
+		const control = {kind: "issuance control bound"}, image = {kind: "image"};
+		const union = execute<unknown>(`return ${found.get("unionCensus")!};`, {record: (fields: unknown) => fields,
+			inputResource: (key: string, value: unknown) => ({key, value}), futureNative: {unionRows: "final rows"},
+			nativeImage: image, participantBounds: [null, null, control]});
+		expect(union).toEqual({rows: {key: "native.unionRows", value: "final rows"}, image, control});
+		expect(body).toContain("if (unionCensus.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;");
+		expect(body).toContain("compiler?.limit(compiler.references(unionCensus).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);");
+	});
+});
