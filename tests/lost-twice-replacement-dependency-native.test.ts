@@ -11,7 +11,9 @@ import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixture
 // install replays it as r1 (epoch 1): m1's plan entry is a completed `rebase` (replacement r1), but r1
 // is published and never received either, so epoch 1 closes without it too. The Writer must still
 // install epoch 2: r1 (and through it m1) was never admitted, so the move is re-offered (a fresh
-// replacement or a hand-back), reaches the creator in epoch 2, and is in history exactly once.
+// replacement or a hand-back), reaches the creator in epoch 2, and is in history exactly once (counted
+// on the creator and on the member). The aged case loses it three times, so m1 outlives the displaced
+// adjacency before the move lands.
 const MOVE = "lost-twice-move";
 
 afterEach(async () => expect(await closeChatSharesRooms()).toEqual([]));
@@ -87,7 +89,30 @@ describe("a move lost twice across two epochs", () => {
 		for (let seal = 0; seal < 3; seal++) await roll(f, creator, member, `settled-${seal}`);
 		expect(member.room.authority().epoch).toBe(5);
 		expect(count(creator, MOVE)).toBe(1);
+		expect(count(member, MOVE)).toBe(1);
 		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
 		expect((await nativeImage(f)).lineage.next).toBeGreaterThanOrEqual(after.lineage.next);
+	}, 300_000);
+
+	// Custody age: the move misses three epochs (m1, r1, r2 never received), so m1 ages past the displaced
+	// adjacency before r3 lands. Every install still authenticates the whole chain, and the move lands once.
+	it("lost three times: m1 ages past the displaced adjacency; r3 lands exactly once", async () => {
+		const f = await fixture();
+		const creator = await f.open(0), member = await f.open(1);
+		const publish = Reflect.get(member.networkNode, "publishMessage") as (...args: unknown[]) => unknown;
+		Reflect.set(member.networkNode, "publishMessage", () => Promise.resolve(false));
+		await member.room.issue(message(MOVE)).catch(() => undefined);
+		Reflect.set(member.networkNode, "publishMessage", (...args: unknown[]) => publish.apply(member.networkNode, args));
+		for (let epoch = 1; epoch <= 3; epoch++) {
+			const image = await roll(f, creator, member, `aged-${epoch}`);
+			expect(image.outbox.filter(row => row.id === MOVE).at(-1)?.epoch).toBe(epoch);
+		}
+		expect(member.room.authority().epoch).toBe(3);
+		expect(await deliverEpoch(f, creator, 0, 3)).toBeGreaterThan(0);
+		for (let seal = 0; seal < 3; seal++) await roll(f, creator, member, `aged-settled-${seal}`);
+		expect(member.room.authority().epoch).toBe(6);
+		expect(count(creator, MOVE)).toBe(1);
+		expect(count(member, MOVE)).toBe(1);
+		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
 	}, 300_000);
 });
