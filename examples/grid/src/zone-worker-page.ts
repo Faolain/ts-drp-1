@@ -82,9 +82,26 @@ export interface GridRoomWorkerControl {
 	readonly refusals: readonly Readonly<{ id: number; command: string; name: string; message: string }>[];
 }
 
+/**
+ * One message kind's share of the library cost: its handlings and posts, and what it spent in frames
+ * whose library cost exceeded half a millisecond.
+ */
+export interface GridRoomWorkerMeterKind {
+	readonly count: number;
+	readonly totalMs: number;
+	readonly maxMs: number;
+	readonly heavyFrames: number;
+	readonly heavyMs: number;
+}
+
 /** Per-frame main-thread cost of the bridge (library) and of Grid's DOM rendering (app). */
 export interface GridRoomWorkerMeter {
-	read(): Readonly<{ library: readonly number[]; render: readonly number[]; dropped: number }>;
+	read(): Readonly<{
+		library: readonly number[];
+		render: readonly number[];
+		dropped: number;
+		kinds: Readonly<Record<string, GridRoomWorkerMeterKind>>;
+	}>;
 	reset(): void;
 }
 
@@ -153,11 +170,34 @@ function createBridgeMeter(): BridgeMeter {
 	let dropped = 0;
 	const libraryFrames: number[] = [];
 	const renderFrames: number[] = [];
+	type Kind = { count: number; totalMs: number; maxMs: number; heavyFrames: number; heavyMs: number };
+	const kinds = new Map<string, Kind>();
+	const frameKinds = new Map<string, number>();
+	const charge = (kind: string, ms: number): void => {
+		library += ms;
+		let entry = kinds.get(kind);
+		if (entry === undefined) {
+			entry = { count: 0, totalMs: 0, maxMs: 0, heavyFrames: 0, heavyMs: 0 };
+			kinds.set(kind, entry);
+		}
+		entry.count++;
+		entry.totalMs += ms;
+		entry.maxMs = Math.max(entry.maxMs, ms);
+		frameKinds.set(kind, (frameKinds.get(kind) ?? 0) + ms);
+	};
 	const tick = (): void => {
 		if (libraryFrames.length < METER_FRAME_LIMIT) {
 			libraryFrames.push(library);
 			renderFrames.push(render);
 		} else dropped++;
+		if (library > 0.5)
+			for (const [kind, ms] of frameKinds) {
+				const entry = kinds.get(kind);
+				if (entry === undefined) continue;
+				entry.heavyFrames++;
+				entry.heavyMs += ms;
+			}
+		frameKinds.clear();
 		library = 0;
 		render = 0;
 		requestAnimationFrame(tick);
@@ -175,22 +215,29 @@ function createBridgeMeter(): BridgeMeter {
 		return spent;
 	};
 	const meter: BridgeMeter = {
-		message(_kind, ms) {
-			library += Math.max(0, ms - renderInMessage);
+		message(kind, ms) {
+			charge(kind, Math.max(0, ms - renderInMessage));
 			renderInMessage = 0;
 		},
-		post(ms) {
-			library += ms;
+		post(kind, ms) {
+			charge(`post:${kind}`, ms);
 		},
 		render(draw) {
 			renderInMessage += timed(draw);
 		},
 		renderFrame: (callback) => (time) => void timed(() => callback(time)),
 		control: {
-			read: () => ({ library: [...libraryFrames], render: [...renderFrames], dropped }),
+			read: () => ({
+				library: [...libraryFrames],
+				render: [...renderFrames],
+				dropped,
+				kinds: Object.fromEntries([...kinds].map(([kind, entry]) => [kind, { ...entry }])),
+			}),
 			reset: () => {
 				libraryFrames.length = 0;
 				renderFrames.length = 0;
+				kinds.clear();
+				frameKinds.clear();
 				dropped = 0;
 			},
 		},

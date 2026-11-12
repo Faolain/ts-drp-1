@@ -484,6 +484,9 @@ interface RoomWorkerMeterReading {
 	readonly library: readonly number[];
 	readonly render: readonly number[];
 	readonly dropped: number;
+	readonly kinds?: Readonly<
+		Record<string, { count: number; totalMs: number; maxMs: number; heavyFrames: number; heavyMs: number }>
+	>;
 }
 
 interface RoomWorkerRtcReading {
@@ -542,6 +545,19 @@ async function roomWorkerSummary(pages: ReadonlyMap<Role, Page>, playMs: number)
 			renderMsPerFrame: distribution(meter.render),
 			libraryPlusRenderMsPerFrame: distribution(meter.library.map((value, index) => value + (meter.render[index] ?? 0))),
 			framesDropped: meter.dropped,
+			// Where the library cost goes, heaviest first: per message kind, and in frames over 0.5 ms.
+			kinds: Object.entries(meter.kinds ?? {})
+				.map(([kind, entry]) => ({
+					kind,
+					count: entry.count,
+					totalMs: Math.round(entry.totalMs * 10) / 10,
+					maxMs: Math.round(entry.maxMs * 100) / 100,
+					heavyFrames: entry.heavyFrames,
+					heavyMs: Math.round(entry.heavyMs * 10) / 10,
+				}))
+				.sort((a, b) => b.heavyMs - a.heavyMs)
+				.slice(0, 24),
+			heavyFrames: meter.library.filter((value) => value > 0.5).length,
 			libraryP99WithinHalfMs: distribution(meter.library).p99 <= 0.5,
 			dataChannels: {
 				...rtc,

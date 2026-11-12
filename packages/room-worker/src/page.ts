@@ -46,8 +46,38 @@ export interface OpenRoomWorkerOptions<Commands extends CommandMap = CommandMap>
 }
 
 export interface RoomWorkerMeter {
+	/** A worker message was handled; `kind` is its protocol kind, refined by stream, hook or RTC operation. */
 	message(kind: string, ms: number): void;
-	post(ms: number): void;
+	/** A message was posted to the worker; `kind` as for message. */
+	post(kind: string, ms: number): void;
+}
+
+/**
+ * A message's kind for the meter: the protocol kind, refined by stream name, host hook and method,
+ * command name or RTC operation.
+ * @param data - A protocol message.
+ * @returns The kind.
+ */
+function meterKind(data: unknown): string {
+	if (typeof data !== "object" || data === null) return "unknown";
+	const message = data as { k?: unknown; name?: unknown; hook?: unknown; method?: unknown; m?: unknown };
+	if (typeof message.k !== "string") return "unknown";
+	switch (message.k) {
+		case "stream":
+		case "call":
+		case "send":
+		case "credit":
+		case "refused":
+			return `${message.k}:${String(message.name)}`;
+		case "host-call":
+			return `host-call:${String(message.hook)}.${String(message.method)}`;
+		case "rtc": {
+			const rtc = message.m as { t?: unknown; method?: unknown } | null;
+			return `rtc:${String(rtc?.t)}${typeof rtc?.method === "string" ? `.${rtc.method}` : ""}`;
+		}
+		default:
+			return message.k;
+	}
 }
 
 function meteredPort(worker: Worker, meter: RoomWorkerMeter): RoomWorkerPort {
@@ -56,14 +86,14 @@ function meteredPort(worker: Worker, meter: RoomWorkerMeter): RoomWorkerPort {
 		postMessage(message, transfer = []): void {
 			const started = performance.now();
 			worker.postMessage(message, transfer);
-			meter.post(performance.now() - started);
+			meter.post(meterKind(message), performance.now() - started);
 		},
 		addEventListener(type, listener): void {
 			const measured = (event: MessageEvent): void => {
 				const started = performance.now();
-				const data = event.data as { k?: unknown } | null;
+				const data: unknown = event.data;
 				listener(event);
-				meter.message(typeof data?.k === "string" ? data.k : "unknown", performance.now() - started);
+				meter.message(meterKind(data), performance.now() - started);
 			};
 			wrapped.set(listener, measured);
 			worker.addEventListener(type, measured);
