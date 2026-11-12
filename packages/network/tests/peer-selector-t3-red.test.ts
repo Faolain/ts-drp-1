@@ -705,10 +705,13 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			await node.start();
 			if (host === undefined) throw new Error("expected explicit-path host");
 
-			await node.sendMessage(
-				peer(70).toString(),
-				Message.create({ data: new Uint8Array(), objectId: "t3-room", sender: node.peerId, type: 0 })
-			);
+			// Track 46: the denied dial is a typed failure, never a silent success.
+			await expect(
+				node.sendMessage(
+					peer(70).toString(),
+					Message.create({ data: new Uint8Array(), objectId: "t3-room", sender: node.peerId, type: 0 })
+				)
+			).rejects.toMatchObject({ code: "DIRECT_DIAL_FAILED" });
 			expect(snapshot(node)).toMatchObject({ charged: 1, selected: 0 });
 			await node
 				.sendSyncMessage(
