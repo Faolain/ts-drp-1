@@ -1612,7 +1612,7 @@ class NodeIssuanceImplementation {
 			if ((current?.revision ?? null) !== captured.expectedRevision) {
 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 			}
-			assertSettlementPlanProgressTransition(current, captured.plan);
+			assertSettlementPlanProgressTransition(current, captured.plan, captured.declineHandBack);
 			assertSettlementExpiryPublicationExclusive(
 				captured.plan,
 				captured.plan.entries

@@ -97,6 +97,7 @@ import {
 	type V3SettlementSourceSelectionApproval,
 	type V3SettlementSourceSelectionRequest,
 	type V3TerminalMigrationSource,
+	V3_LOCAL_POLICY_REFUSAL_DETAIL,
 	withV3TerminalMigrationTargetFloor,
 } from "@ts-drp/node/v3-live";
 import {
@@ -415,6 +416,15 @@ export type V3RoomSettlementStatus = Readonly<{
 
 /** The key of one durable hand-back record (V3RoomSettlementStatus.undelivered). */
 export type V3RoomHandBack = Readonly<{ sourceSequence: number; intent: number }>;
+
+/**
+ * The outcome of declining one given-back move (V3RoomSession.declineHandBack).
+ * - "declined": this call dropped the unconsumed record in one durable plan write; the move is no
+ *   longer listed and never offered again.
+ * - "consumed": a row offering the move again already consumed the record; nothing changed.
+ * - "absent": no such record (never given back, or already declined); nothing changed.
+ */
+export type V3RoomHandBackDecline = Readonly<{ kind: "declined" | "consumed" | "absent"; handBack: V3RoomHandBack }>;
 
 /** Options of one issued move. */
 export type V3RoomIssueOptions = Readonly<{
@@ -790,6 +800,15 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	 * settlement window gave back. Observation only (absent on room stubs). See V3RoomSettlementStatus.
 	 */
 	settlementStatus?(): V3RoomSettlementStatus;
+	/**
+	 * Declines one given-back move (a record of settlementStatus().undelivered) the application will not
+	 * offer again, typically after `issue(operation, { handBack })` was refused for a lasting reason
+	 * (V3RoomHandBackRefused.reason). One durable settlement plan write drops exactly that unconsumed
+	 * record: the move is never listed or offered again, and its backlog slot is free. Across a crash the
+	 * record is either still listed or gone. A record already consumed by a reissued row, or absent, is
+	 * left as it is and reported ("consumed" / "absent"). Absent on room stubs.
+	 */
+	declineHandBack?(handBack: V3RoomHandBack): Promise<V3RoomHandBackDecline>;
 	/**
 	 * Explicit, terminal local-author abandonment of one durable unresolved,
 	 * never-published accepted source. Owned local sessions only; it signs an
@@ -1944,14 +1963,63 @@ export class V3RoomLocalBacklogFull extends Error {
 	/**
 	 * @param backlog - The Writer's undelivered moves.
 	 * @param bound - V3_ROOM_LOCAL_BACKLOG_LIMIT.
+	 * @param handBackSlots - How many of them are given-back moves still listed (unconsumed hand-back
+	 * records): they free their slots only when offered again (`issue(operation, { handBack })`) or
+	 * declined (`declineHandBack`), never by delivery.
 	 */
 	constructor(
 		readonly backlog: number,
-		readonly bound: number
+		readonly bound: number,
+		readonly handBackSlots: number
 	) {
-		super(`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host`);
+		super(
+			`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host` +
+				(handBackSlots === 0 ? "" : ` (${handBackSlots} are given-back moves to offer again or decline)`)
+		);
 		this.name = "V3RoomLocalBacklogFull";
 	}
+}
+
+/**
+ * A given-back move offered again with its hand-back record (`issue(operation, { handBack })`) that the
+ * room refused: the record is NOT consumed and the move stays listed, holding one backlog slot. The
+ * message is the room's ordinary issue failure ("v3 room issue failed: <kind>: <detail>").
+ * `reason` is set when the refusal is this Writer's own lasting decision about the operation: the room's
+ * application state limit ("application-state-limit") or the room's admission policy refusing it
+ * ("admission-rejected"). Offering it again in the same state would be refused again; an app that will
+ * not change it declines the record (`declineHandBack(handBack)`) and tells its user. Without `reason`
+ * the refusal is transient (capacity, readiness, recovery) and the move may be offered again later.
+ */
+export class V3RoomHandBackRefused extends TypeError {
+	readonly reason: "application-state-limit" | "admission-rejected" | undefined;
+	/**
+	 * @param handBack - The record the refused issue carried.
+	 * @param kind - The local issue failure kind.
+	 * @param detail - The local issue failure detail.
+	 */
+	constructor(
+		readonly handBack: V3RoomHandBack,
+		readonly kind: string,
+		readonly detail: string
+	) {
+		super(`v3 room issue failed: ${kind}: ${detail}`);
+		this.name = "V3RoomHandBackRefused";
+		this.reason = lastingLocalRefusal(kind, detail);
+	}
+}
+
+/**
+ * Whether a local issue failure is this Writer's own lasting refusal of the operation: the room's
+ * application state limit, or the admission policy's rejection (V3_LOCAL_POLICY_REFUSAL_DETAIL). Other
+ * "admission-rejected" failures are capacity, readiness or recovery refusals a retry can clear.
+ * @param kind - The local issue failure kind.
+ * @param detail - Its detail.
+ * @returns The refusal reason, or undefined when it is not lasting.
+ */
+function lastingLocalRefusal(kind: string, detail: string): "application-state-limit" | "admission-rejected" | undefined {
+	if (kind === "application-state-limit") return "application-state-limit";
+	if (kind === "admission-rejected" && detail === V3_LOCAL_POLICY_REFUSAL_DETAIL) return "admission-rejected";
+	return undefined;
 }
 
 /**
@@ -6577,7 +6645,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return;
 		}
 		if (!issued.ok) {
-			rejectOwned(owned, new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`));
+			const handBack = owned.length === 1 ? owned[0]?.handBack : undefined;
+			rejectOwned(
+				owned,
+				handBack === undefined
+					? new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`)
+					: new V3RoomHandBackRefused(handBack, issued.kind, issued.detail)
+			);
 			return;
 		}
 		if (terminalFailure !== undefined) {
@@ -6787,6 +6861,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
+	// Of those, the given-back moves still listed (unconsumed hand-back records), for V3RoomLocalBacklogFull.
+	let settlementHandBackSlots = 0;
+	const unconsumedHandBacks = (plan: RoomSettlementPlan | null): number =>
+		(plan?.handBacks ?? []).filter((record) => record.reissueSequence === null).length;
 	// The epoch whose author fence the last drain awaits (settlementAuthorFenceDecision "await-fence"):
 	// new moves in it are refused (V3RoomAwaitingAuthorFence) until an install fences. Each drain
 	// decides again; a later epoch clears it.
@@ -6912,6 +6990,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
 		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		settlementHandBackSlots = unconsumedHandBacks(plan);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({
 				...settlementStatusSnapshot,
@@ -6919,6 +6998,49 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				deferred: deferredMovesOf(plan),
 				awaitingFence: authorFenceAwaited(),
 			});
+	};
+	/**
+	 * Declines one given-back move: ONE plan write (compare-and-swap on the plan revision) drops exactly
+	 * that unconsumed record and nothing else; the store refuses any other change in a decline write.
+	 * The source's entry stays as it is (an expired, handed-back source is never replayed). A reissued
+	 * row consuming the record races only through the store: whichever transaction commits first wins,
+	 * and the other sees the record consumed (this call reports "consumed") or absent (the reissue is
+	 * refused, its record unavailable). Runs as a lifetime transition, so never inside an install's drain.
+	 * @param handBack - The record's key.
+	 * @returns The outcome.
+	 */
+	const declineSettlementHandBack = async (handBack: V3RoomHandBack): Promise<V3RoomHandBackDecline> => {
+		for (let attempt = 1; ; attempt++) {
+			assertSessionOpen();
+			const current = await issuanceStore.readSettlementPlan(settlementScope);
+			const record = current?.handBacks?.find(
+				(value) => value.sourceSequence === handBack.sourceSequence && value.intent === handBack.intent
+			);
+			if (current === null || record === undefined || record.reissueSequence !== null) {
+				await refreshHandBackListing();
+				return Object.freeze({ kind: record === undefined ? ("absent" as const) : ("consumed" as const), handBack });
+			}
+			const remaining = (current.handBacks ?? []).filter((value) => value !== record);
+			const { handBacks: _declined, ...rest } = current;
+			try {
+				await issuanceStore.transactWriteSettlementPlan({
+					expectedRevision: current.revision,
+					scope: settlementScope,
+					declineHandBack: handBack,
+					plan: Object.freeze({
+						...rest,
+						revision: current.revision + 1,
+						...(remaining.length === 0 ? {} : { handBacks: Object.freeze(remaining) }),
+					}),
+				});
+			} catch (error) {
+				// A concurrent plan write (a reissue consuming another record) moved the revision: read again.
+				if (attempt < 8 && Reflect.get(Object(error), "code") === "ISSUANCE_RETRY_REQUIRED") continue;
+				throw error;
+			}
+			await refreshHandBackListing();
+			return Object.freeze({ kind: "declined" as const, handBack });
+		}
 	};
 	const authenticatedSettlementInheritance = (
 		sources: readonly DisplacedSource[]
@@ -7291,6 +7413,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		settlementSources = sources;
 		settlementDisplaced = new Map(sources.map((source) => [source.authorSequence, source.intents.length] as const));
 		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		settlementHandBackSlots = unconsumedHandBacks(plan);
 		// This plan write at `epoch` settled every own row of the epochs before it.
 		localMovesCountedFrom(epoch);
 		settlementStatusSnapshot = Object.freeze({
@@ -7367,6 +7490,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
 		settlementBacklog = settlementBacklogOf(current, settlementDisplaced);
+		settlementHandBackSlots = unconsumedHandBacks(current);
 		// The status reflects this drain's resolutions (given-back moves no longer wait).
 		recordSettlementStatus(settlementSources, current);
 		return current;
@@ -7623,9 +7747,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				effect.kind === "replacement" &&
 				source !== undefined &&
 				!signed &&
-				(issued.kind === "application-state-limit" || issued.kind === "admission-rejected")
+				lastingLocalRefusal(issued.kind, issued.detail) !== undefined
 			) {
-				await handBackRefusedReplay(source, "fromIntent" in effect ? effect.fromIntent : 0, issued.kind);
+				await handBackRefusedReplay(
+					source,
+					"fromIntent" in effect ? effect.fromIntent : 0,
+					lastingLocalRefusal(issued.kind, issued.detail)!
+				);
 				return SETTLEMENT_REPLAY_SETTLED;
 			}
 			const observed = await issuanceStore.readSettlementPlan(settlementScope);
@@ -10158,7 +10286,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const countsAgainstBacklog = handBack === undefined && redirectPromise === undefined && redirectedSession === undefined;
 			if (countsAgainstBacklog) {
 				const backlog = settlementBacklog + undeliveredLocalMoves();
-				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
+				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT)
+					throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT, settlementHandBackSlots);
 			}
 			// A move (a given-back one too) signed while this epoch's author fence is awaited would have no
 			// own fence before it: refused up front, not accepted.
@@ -10407,6 +10536,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					awaitingFence: false,
 				})
 			);
+		},
+		async declineHandBack(handBack: V3RoomHandBack): Promise<V3RoomHandBackDecline> {
+			if (redirectedSession !== undefined) {
+				if (redirectedSession.declineHandBack === undefined) throw new TypeError("v3 room hand-back decline is unavailable");
+				return redirectedSession.declineHandBack(handBack);
+			}
+			localOwner?.assertCurrent();
+			assertSessionOpen();
+			const key = issueHandBack({ handBack });
+			if (key === undefined) throw new TypeError("v3 room hand-back is invalid");
+			if (input.receiveOnly) throw new TypeError("v3 room is receive-only");
+			return enqueueLifetimeTransition(() => declineSettlementHandBack(key));
 		},
 		async unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]> {
 			if (redirectedSession !== undefined) return redirectedSession.unresolvedAcceptedWork();

@@ -11,6 +11,7 @@ import type {
 	DurableIssueScope,
 	DurableSignedEnvelope,
 	SettlementHandBack,
+	SettlementHandBackKey,
 	SettlementHandBackReason,
 	SettlementInheritance,
 	SettlementPlan,
@@ -794,6 +795,13 @@ export function settlementSourceContextsForEntries(plan: SettlementPlan, entries
 	return retained?.length === 0 ? undefined : retained;
 }
 
+/** A deterministic text image of a plan (its detached clone, bytes as hex) for exact comparison. */
+function settlementPlanImage(plan: SettlementPlan): string {
+	return JSON.stringify(cloneSettlementPlan(plan), (_key, value: unknown) =>
+		value instanceof Uint8Array ? Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("") : value
+	);
+}
+
 /**
  * Deeply detaches a previously validated settlement plan.
  * @param plan - Validated plan to detach.
@@ -864,10 +872,31 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
  * Freezes retained settlement identities and progress; issue effects own links and chunks.
  * @param current - Current durable plan, if present.
  * @param next - Proposed next plan revision.
+ * @param declined - The unconsumed hand-back record the application declines in this write, if any:
+ * the write is then exactly the current plan without that record (next revision), nothing else.
  */
-export function assertSettlementPlanProgressTransition(current: SettlementPlan | null, next: SettlementPlan): void {
+export function assertSettlementPlanProgressTransition(
+	current: SettlementPlan | null,
+	next: SettlementPlan,
+	declined?: SettlementHandBackKey
+): void {
+	if (declined !== undefined) {
+		const record = current?.handBacks?.find(
+			(value) => value.sourceSequence === declined.sourceSequence && value.intent === declined.intent
+		);
+		if (current === null || record === undefined || record.reissueSequence !== null)
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back decline is unavailable");
+		const remaining = current.handBacks!.filter((value) => value !== record);
+		const { handBacks: _dropped, ...rest } = current;
+		const expected: SettlementPlan = { ...rest, revision: current.revision + 1, ...(remaining.length === 0 ? {} : { handBacks: remaining }) };
+		const proposed: SettlementPlan = next.handBacks?.length === 0 ? (({ handBacks: _empty, ...value }) => value)(next) : next;
+		if (settlementPlanImage(expected) !== settlementPlanImage(proposed))
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back decline changed the plan");
+		return;
+	}
 	// Hand-back records: a plan write adds records only unconsumed, never alters one, and drops only
-	// consumed ones; consumption belongs to the reissued row's own issuance transaction.
+	// consumed or declined ones; consumption belongs to the reissued row's own issuance transaction, a
+	// decline to the application's own declineHandBack write (above).
 	for (const record of next.handBacks ?? []) {
 		const prior = current?.handBacks?.find(
 			(value) => value.sourceSequence === record.sourceSequence && value.intent === record.intent
@@ -990,10 +1019,23 @@ export function captureSettlementPlanWriteInput(value: unknown): Readonly<{
 	readonly expectedRevision: number | null;
 	readonly plan: SettlementPlan;
 	readonly scope: DurableIssueScope;
+	readonly declineHandBack?: SettlementHandBackKey;
 }> {
 	try {
-		if (!isClosedDurableIssuanceRecord(value, ["expectedRevision", "plan", "scope"])) {
+		const declining = typeof value === "object" && value !== null && Object.hasOwn(value, "declineHandBack");
+		if (!isClosedDurableIssuanceRecord(value, ["expectedRevision", "plan", "scope", ...(declining ? ["declineHandBack"] : [])])) {
 			throw new DurableIssuanceInvalidArgumentError("settlement plan write must be an exact record");
+		}
+		let declineHandBack: SettlementHandBackKey | undefined;
+		if (declining) {
+			const key = value.declineHandBack;
+			if (
+				!isClosedDurableIssuanceRecord(key, ["intent", "sourceSequence"]) ||
+				!isValidDurableAuthorSequence(key.sourceSequence) ||
+				!isValidDurableAuthorSequence(key.intent)
+			)
+				throw new DurableIssuanceInvalidArgumentError("settlement hand-back decline key is invalid");
+			declineHandBack = Object.freeze({ sourceSequence: key.sourceSequence as number, intent: key.intent as number });
 		}
 		assertDurableIssueScope(value.scope);
 		const scope = copyDurableIssueScope(value.scope);
@@ -1005,7 +1047,7 @@ export function captureSettlementPlanWriteInput(value: unknown): Readonly<{
 		if (plan === undefined || !Number.isSafeInteger(nextRevision) || plan.revision !== nextRevision) {
 			throw new DurableIssuanceInvalidArgumentError("settlement plan must be valid and carry the next revision");
 		}
-		return { expectedRevision: value.expectedRevision, plan, scope };
+		return { expectedRevision: value.expectedRevision, plan, scope, ...(declineHandBack === undefined ? {} : { declineHandBack }) };
 	} catch (error) {
 		if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
 		throw new DurableIssuanceInvalidArgumentError("settlement plan write could not be inspected");

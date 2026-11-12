@@ -9,6 +9,7 @@ import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixtu
 import { settlementDelivery, type SettlementRoom } from "./fixtures/track-m/settlement-room.js";
 import { isControl } from "./fixtures/track-x/outside-rows-room.js";
 import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
+import { V3RoomHandBackRefused, V3RoomLocalBacklogFull } from "../packages/node/src/v3-room.js";
 import { createNodeV3RoomStorageHost } from "../packages/storage-node/src/v3-room-host.js";
 
 // RED (refused replay, fix/refused-replay-settlement): a Writer's displaced move whose replay the
@@ -30,13 +31,18 @@ afterEach(async () => {
 });
 
 const DOOM_EPOCH = 2;
+// A test lifts the rule to let a given-back move's reissue be admitted (and consume its record).
+let doomLifted = false;
+afterEach(() => {
+	doomLifted = false;
+});
 const fresh = Object.freeze({ kind: "fresh" as const, commit: () => "committed" as const, release: () => undefined });
 
 /** Admits every move, except a "doomed" block from DOOM_EPOCH on (the rule its replay meets). */
 const doomingPolicy = (context: Readonly<{ epoch: number }>) =>
 	Object.freeze({
 		reserve: (operation: Readonly<Record<string, unknown>>) =>
-			context.epoch >= DOOM_EPOCH && String(operation.id ?? "").startsWith("doomed")
+			!doomLifted && context.epoch >= DOOM_EPOCH && String(operation.id ?? "").startsWith("doomed")
 				? Object.freeze({ kind: "rejected" as const })
 				: fresh,
 	});
@@ -160,7 +166,7 @@ async function doomingRoom(directory?: string) {
 // live move into at most one record. Here the Writer fills the bound with 64 lost moves (the 65th is
 // refused up front); every one of their replays is refused at the next install, and all 64 are given
 // back, none deferred.
-it("64 refused replays (the Writer's whole backlog) are all handed back; the backlog bound refused the 65th move", async () => {
+it("64 refused replays (the Writer's whole backlog) are all handed back; declined, they free the backlog and the Writer plays again", async () => {
 	const room = await doomingRoom();
 	await room.writer.room.issue(block("w-0", 0));
 	await room.deliver();
@@ -186,16 +192,115 @@ it("64 refused replays (the Writer's whole backlog) are all handed back; the bac
 	expect(room.listed().every((id) => String(id).startsWith("doomed-"))).toBe(true);
 	expect(status.undelivered.every((move) => Reflect.get(move, "reason") === "admission-rejected")).toBe(true);
 	expect(status.deferred, "none deferred").toBe(0);
-	// Each record stays until the application offers its exact operation again (issue(op, {handBack})),
-	// which this room's admission refuses again: with no way to decline a refused move, these records
-	// keep the Writer's backlog full (its next new move is refused). Reported for a decision.
-	let blocked: string | undefined;
+	// Each record holds a backlog slot until the application offers its exact operation again
+	// (issue(op, {handBack})) or declines it. Here the Writer's next new move is refused, and the
+	// refusal says the 64 slots are given-back moves.
+	let blocked: unknown;
 	try {
 		await room.writer.room.issue(block("w-2", 2));
 	} catch (error) {
-		blocked = error instanceof Error ? error.name : String(error);
+		blocked = error;
 	}
-	console.log(`REFUSED_REPLAY_BACKLOG_AFTER ${JSON.stringify({ blocked })}`);
+	expect(blocked).toBeInstanceOf(V3RoomLocalBacklogFull);
+	expect((blocked as V3RoomLocalBacklogFull).handBackSlots, "all 64 slots are given-back moves").toBe(limit);
+	// Offered again, each is refused again for the same lasting reason, typed with its record; the
+	// application declines it (one plan write drops exactly that record).
+	const outcomes: string[] = [];
+	for (const move of status.undelivered) {
+		let refusedAgain: unknown;
+		try {
+			await room.writer.room.issue(required(move.operations[0]), { handBack: move.handBack });
+		} catch (error) {
+			refusedAgain = error;
+		}
+		expect(refusedAgain).toBeInstanceOf(V3RoomHandBackRefused);
+		expect((refusedAgain as V3RoomHandBackRefused).handBack).toEqual(move.handBack);
+		expect((refusedAgain as V3RoomHandBackRefused).reason).toBe("admission-rejected");
+		outcomes.push((await required(room.writer.room.declineHandBack)(move.handBack)).kind);
+	}
+	expect(outcomes).toEqual(Array.from({ length: limit }, () => "declined"));
+	expect(room.listed(), "none listed").toEqual([]);
+	// The Writer plays again: its move is accepted, reaches the creator, and lands; no doomed move ever does.
+	await room.deliver();
+	await room.writer.room.issue(block("w-2", 2));
+	await room.deliver();
+	await room.adopt();
+	await room.install(3);
+	await room.deliver();
+	await room.adopt();
+	await room.install(4);
+	console.log(`REFUSED_REPLAY_DECLINED ${JSON.stringify({ outcomes: outcomes.length, creator: room.ids(room.creator) })}`);
+	expect(room.ids(room.creator)).toEqual(["w-0", "w-2"]);
+	expect(room.ids(room.writer)).toEqual(["w-0", "w-2"]);
+	expect(room.listed()).toEqual([]);
+}, 600_000);
+
+// Declining is exact: a record a reissued row already consumed is left as it is ("consumed"), and a
+// record no longer in the plan is reported "absent", never an error and never a second change.
+it("declining a consumed or absent hand-back record is a typed no-op", async () => {
+	const room = await doomingRoom();
+	await room.writer.room.issue(block("w-0", 0));
+	await room.deliver();
+	await room.adopt();
+	await room.install(1);
+	await room.deliver();
+	await room.writer.room.issue(block("doomed-1", 1));
+	expect(await room.lose()).toBe(1);
+	await room.adopt();
+	await room.install(2);
+	const [given] = room.status().undelivered;
+	expect(given?.operations[0]?.id).toBe("doomed-1");
+	const decline = required(room.writer.room.declineHandBack);
+	// The rule is lifted: the reissue is admitted and its row consumes the record.
+	doomLifted = true;
+	await room.deliver();
+	await room.writer.room.issue(required(required(given).operations[0]), { handBack: required(given).handBack });
+	expect(room.listed()).toEqual([]);
+	expect(await decline(required(given).handBack)).toEqual({ kind: "consumed", handBack: required(given).handBack });
+	// The next install's merge drops the consumed record; the reissued move lands.
+	await room.deliver();
+	await room.adopt();
+	await room.install(3);
+	expect(await decline(required(given).handBack)).toEqual({ kind: "absent", handBack: required(given).handBack });
+	expect(await decline({ sourceSequence: 9_999, intent: 0 })).toEqual({
+		kind: "absent",
+		handBack: { sourceSequence: 9_999, intent: 0 },
+	});
+	expect(room.ids(room.creator)).toEqual(["doomed-1", "w-0"]);
+}, 600_000);
+
+// A declined record is gone for good: declining again is "absent", and offering the move with the
+// record is refused (the record is unavailable), so it can never also be reissued.
+it("a declined hand-back can be neither declined again nor reissued with its record", async () => {
+	const room = await doomingRoom();
+	await room.writer.room.issue(block("w-0", 0));
+	await room.deliver();
+	await room.adopt();
+	await room.install(1);
+	await room.deliver();
+	await room.writer.room.issue(block("doomed-1", 1));
+	expect(await room.lose()).toBe(1);
+	await room.adopt();
+	await room.install(2);
+	const given = required(room.status().undelivered[0]);
+	const decline = required(room.writer.room.declineHandBack);
+	expect((await decline(given.handBack)).kind).toBe("declined");
+	expect((await decline(given.handBack)).kind).toBe("absent");
+	doomLifted = true;
+	let reissued: unknown;
+	try {
+		await room.writer.room.issue(required(given.operations[0]), { handBack: given.handBack });
+	} catch (error) {
+		reissued = error;
+	}
+	expect(reissued).toBeInstanceOf(V3RoomHandBackRefused);
+	expect((reissued as V3RoomHandBackRefused).reason, "not a lasting refusal: the record is unavailable").toBeUndefined();
+	expect(explain(reissued)).toContain("hand-back is unavailable");
+	await room.deliver();
+	await room.adopt();
+	await room.install(3);
+	expect(room.ids(room.creator)).toEqual(["w-0"]);
+	expect(room.listed()).toEqual([]);
 }, 600_000);
 
 // Fail-safe of the hand-back (unreachable through the public API, see above): with every record taken,

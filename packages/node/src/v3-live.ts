@@ -6155,6 +6155,13 @@ function localAdmittedFrontier(registration: V3PlaneRegistration, scope: Durable
 		identity.successorEpoch === registration.payload.provenance.epoch ? identity.admittedAuthorSequence : null;
 }
 
+/**
+ * The detail of a local move the room's operation admission policy refused: its reservation came back
+ * rejected, the policy's own decision about this operation in this epoch. Every other
+ * "admission-rejected" local failure is a capacity, readiness or recovery refusal a retry can clear.
+ */
+export const V3_LOCAL_POLICY_REFUSAL_DETAIL = "v3 local operation was rejected before issuance";
+
 function localIssueFailure(
 	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
 	detail: string
@@ -16455,7 +16462,7 @@ async function issueOneVertex(
 		? undefined
 		: reserveOperation(registration.operationAdmissionPolicy, operation, scope.author);
 	if (reservation === null) {
-		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+		return localIssueFailure("admission-rejected", V3_LOCAL_POLICY_REFUSAL_DETAIL);
 	}
 
 	const admittedFrontier = localAdmittedFrontier(registration, scope);

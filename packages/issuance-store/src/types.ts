@@ -132,6 +132,12 @@ export const SETTLEMENT_HAND_BACK_LIMITS = Object.freeze({
 	maxOperationBytes: 16_384,
 });
 
+/** One hand-back record's key: its source row and the intent within it. */
+export interface SettlementHandBackKey {
+	readonly sourceSequence: number;
+	readonly intent: number;
+}
+
 /**
  * One operation the settlement window (or the creator's signed frontier) gave back to the application:
  * the exact canonical operation of intent `intent` of the resolved own row `sourceSequence`. Written in
@@ -240,6 +246,11 @@ export interface DurableIssuanceStore {
 		readonly expectedRevision: number | null;
 		readonly plan: SettlementPlan;
 		readonly scope: DurableIssueScope;
+		/**
+		 * The application declines this unconsumed hand-back record: the write must be the current plan
+		 * with exactly that record dropped (and the next revision). Nothing else may change.
+		 */
+		readonly declineHandBack?: SettlementHandBackKey;
 	}): Promise<SettlementPlan>;
 	close(): Promise<void>;
 }
