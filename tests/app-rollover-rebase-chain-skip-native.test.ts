@@ -1069,18 +1069,31 @@ async function deliveredReissuesLeaveTheBacklog() {
 			await wire.caughtUp(epoch, 600_000);
 			const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[] } | null;
 			const givenBack = (await waitFor("moves given back", status, (value) => (value?.undelivered.length ?? 0) === ids.length, 120_000))?.undelivered.length;
-			// The next epoch: the policy offers the given-back moves again (each consumes its record).
-			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			// Connected again (the Writer's own rows of this epoch reach the creator). The next epoch: the
+			// policy offers the given-back moves again (each consumes its record).
+			const both = async () => {
+				await rows.toWriter();
+				await rows.toCreator();
+			};
+			await both();
+			epoch = await rollCreator(creator, both, ordinal);
 			await wire.caughtUp(epoch, 600_000);
 			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
 			await waitFor(
 				"every reissued move admitted",
 				async () => {
-					await rows.toWriter();
-					await rows.toCreator();
-					return acceptedCounts(creator, writerAuthor, ids);
+					await both();
+					return {
+						landed: (await acceptedCounts(creator, writerAuthor, ids)).filter((count) => count >= 1).length,
+						epochs: [await creator.authorityEpoch(), await writer.authorityEpoch()],
+						undelivered: (await status())?.undelivered.length,
+						policy: (({ state, kept }) => ({ state, kept: kept?.length }))(
+							((await writer.rolloverStatus?.()) ?? {}) as { state?: string; kept?: unknown[] }
+						),
+						errors: ((await writer.rollover?.())?.errors ?? []).slice(-3).map((error) => String(error).slice(0, 400)),
+					};
 				},
-				(counts) => counts.every((count) => count >= 1),
+				(value) => value.landed === ids.length,
 				300_000
 			);
 			// Evidence: a creator row of this epoch whose causal past reaches every reissued row.

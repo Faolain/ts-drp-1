@@ -303,7 +303,9 @@ export function createV3RoomRolloverPolicy(
 	let waiting = 0;
 	let successorWaits = 0;
 	const kept: Readonly<Record<string, unknown>>[] = [];
+	// The epoch each kind of kept move waits to be past: new moves, and moves the room gave back.
 	let keptEpoch = 0;
+	let givenBackEpoch = 0;
 	let keptTimer: ReturnType<typeof setTimeout> | undefined;
 	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
 	// has already kept this session (by their durable hand-back record). A kept given-back operation
@@ -312,6 +314,7 @@ export function createV3RoomRolloverPolicy(
 	let settlement: V3RoomSettlementStatus | undefined;
 	const takenBack = new Set<string>();
 	const handBackOf = new WeakMap<object, V3RoomHandBack>();
+	const handBackKey = (handBack: V3RoomHandBack): string => `${handBack.sourceSequence}:${handBack.intent}`;
 	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastStatus = "";
 	const epochWaiters = new Set<() => void>();
@@ -325,7 +328,7 @@ export function createV3RoomRolloverPolicy(
 	// Member only: the creator is unreachable now (read-only), or its moves are not reaching it.
 	const readOnly = (): boolean => role === "member" && hooks.creatorReachable?.() === false;
 	// The epoch in which the room last refused a new move at its backlog bound: until the room installs a
-	// later epoch (or a move is accepted) the member's moves are not reaching the host.
+	// later epoch (or a new move is accepted) the member's moves are not reaching the host.
 	let backlogFullEpoch: number | undefined;
 	const notReachingHost = (): boolean =>
 		role === "member" &&
@@ -494,36 +497,72 @@ export function createV3RoomRolloverPolicy(
 			poll();
 		});
 
-	// Kept moves are offered again, in order, once the room is past the epoch that refused them.
+	// Kept moves are offered again, in order, once the room is past the epoch that kept them. A move
+	// the room gave back carries its hand-back record: the room never refuses it at the undelivered-move
+	// bound and the record bound limits how many recirculate, so it is offered whatever
+	// notReachingHost() says (waiting on the member's lag only makes it older). It goes first in its
+	// batch. A new move also waits for this member's moves to reach the creator again, and the first
+	// new move refused at the bound keeps the batch's other new moves without offering them.
 	const watchKept = (): void => {
 		if (keptTimer !== undefined || closed || kept.length === 0) return;
 		keptTimer = setTimeout(() => {
 			keptTimer = undefined;
 			if (closed || kept.length === 0) return;
-			// Kept moves wait for a later epoch, a reachable creator, and (for moves the room gave back)
-			// for this member's moves to reach the creator again.
-			if (currentEpoch() <= keptEpoch || readOnly() || notReachingHost()) {
+			const now = currentEpoch();
+			const givenBack =
+				now > givenBackEpoch && !readOnly() ? kept.filter((operation) => handBackOf.has(operation)) : [];
+			const fresh =
+				now > keptEpoch && !readOnly() && !notReachingHost()
+					? kept.filter((operation) => !handBackOf.has(operation))
+					: [];
+			if (givenBack.length + fresh.length === 0) {
 				watchKept();
 				return;
 			}
-			advance(currentEpoch());
-			const pending = kept.splice(0, kept.length);
+			advance(now);
+			const offered = new Set<object>([...givenBack, ...fresh]);
+			const waiting = kept.filter((operation) => !offered.has(operation));
+			kept.splice(0, kept.length, ...waiting);
 			reportStatus();
+			watchKept();
 			void (async (): Promise<void> => {
-				for (const operation of pending) {
-					try {
-						await issue(operation);
-					} catch (error) {
-						// A move refused again for want of a successor is kept again by issue().
-						if (!(error instanceof V3RoomSuccessorUnavailable)) hooks.onError?.(error);
-					}
+				for (const operation of givenBack) await offerKept(operation);
+				for (const [index, operation] of fresh.entries()) {
+					if (await offerKept(operation)) continue;
+					// Refused at the bound (and kept by issue()): the rest stay kept, in order, unoffered.
+					for (const unoffered of fresh.slice(index + 1)) keep(unoffered, backlogFullEpoch ?? currentEpoch());
+					break;
 				}
 			})();
 		}, KEPT_POLL_MS);
 	};
+	// One kept move offered again: false when the room refused it at the undelivered-move bound.
+	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<boolean> => {
+		try {
+			await issue(operation);
+		} catch (error) {
+			if (error instanceof V3RoomNotReachingHost) return false;
+			// A move refused again for want of a successor (or while read-only) is kept again by issue().
+			if (error instanceof V3RoomSuccessorUnavailable) return true;
+			if (error instanceof V3RoomReadOnly) {
+				hooks.onError?.(error);
+				return true;
+			}
+			// Refused for good: a given-back move stays listed by the room until a row offering it again
+			// consumes its record, so the next settlement poll keeps it again (one offer per epoch).
+			const handBack = handBackOf.get(operation);
+			if (handBack !== undefined) {
+				handBackOf.delete(operation);
+				takenBack.delete(handBackKey(handBack));
+			}
+			hooks.onError?.(error);
+		}
+		return true;
+	};
 	const keep = (operation: Readonly<Record<string, unknown>>, attempted: number): void => {
 		kept.push(operation);
-		keptEpoch = Math.max(keptEpoch, attempted);
+		if (handBackOf.has(operation)) givenBackEpoch = Math.max(givenBackEpoch, attempted);
+		else keptEpoch = Math.max(keptEpoch, attempted);
 		reportStatus();
 		watchKept();
 	};
@@ -542,7 +581,7 @@ export function createV3RoomRolloverPolicy(
 					settlement = next;
 					const listed = new Set<string>();
 					for (const given of next.undelivered) {
-						const key = `${given.handBack.sourceSequence}:${given.handBack.intent}`;
+						const key = handBackKey(given.handBack);
 						listed.add(key);
 						if (takenBack.has(key)) continue;
 						takenBack.add(key);
@@ -581,7 +620,8 @@ export function createV3RoomRolloverPolicy(
 				const handBack = handBackOf.get(operation);
 				await selected.issue(operation, handBack === undefined ? undefined : { handBack });
 				handBackOf.delete(operation);
-				if (backlogFullEpoch !== undefined) {
+				// A given-back move's reissue never counted against the bound; only a new move reopens it.
+				if (handBack === undefined && backlogFullEpoch !== undefined) {
 					backlogFullEpoch = undefined;
 					reportStatus();
 				}

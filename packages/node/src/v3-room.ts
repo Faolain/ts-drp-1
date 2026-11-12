@@ -4114,6 +4114,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// causal past of a received creator row. The creator signed a row depending on them, so it admitted
 	// them and they are in this epoch's seal. Cleared with acceptedVertices; each row is walked once.
 	const creatorReachedRows = new Set<string>();
+	// The own rows among them, by author sequence: a consumed hand-back record whose reissued row is
+	// here is delivered and leaves the backlog (settlementBacklogNow).
+	const creatorReachedOwnSequences = new Set<number>();
 	let noteCreatorReachedOwnRow: ((identity: string) => void) | undefined;
 	const markCreatorReached = (creatorRow: V3RoomAcceptedVertex): void => {
 		const pending = [hex(creatorRow.digest)];
@@ -4122,7 +4125,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const reached = acceptedVertices.get(identity);
 			if (reached === undefined) continue;
 			creatorReachedRows.add(identity);
-			if (reached.author === input.author) noteCreatorReachedOwnRow?.(identity);
+			if (reached.author === input.author) {
+				creatorReachedOwnSequences.add(reached.authorSequence);
+				noteCreatorReachedOwnRow?.(identity);
+			}
 			pending.push(...reached.dependencies);
 		}
 	};
@@ -4391,6 +4397,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		authenticatedProjectionBase = base;
 		acceptedVertices.clear();
 		creatorReachedRows.clear();
+		creatorReachedOwnSequences.clear();
 		acceptedOperationRows.clear();
 		presentationHook((overlay) => overlay.epochChanged(authority.epoch));
 	};
@@ -6589,6 +6596,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
+	// The reissued rows (author sequences) of the plan's consumed hand-back records as of that write.
+	let settlementConsumedReissues: readonly number[] = [];
 	// New own moves the plan does not count yet: a move is in no plan until the first install after its
 	// epoch settles it, but it is undelivered until then, and an offline Writer's next skip install
 	// needs one hand-back record for each (a retained row past the record bound stays unresolved,
@@ -6630,8 +6639,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	 * The backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one per
 	 * intent): each live replaced move once (the entry of its newest displaced row, whose replacement is
 	 * not itself displaced, or which is not yet replaced), each retained source's moves (manual-review),
-	 * and every hand-back record (a consumed one keeps its reissued move's slot until the next merge
-	 * drops it and the reissued row is counted live, if displaced). A row counts all its moves: Grid
+	 * and every unconsumed hand-back record. A consumed record keeps its reissued move's slot until the
+	 * next merge drops it (and the reissued row is counted live, if displaced) unless a creator row
+	 * reaches the reissued row first: those slots are counted at check time (settlementBacklogNow), not
+	 * here. A row counts all its moves: Grid
 	 * batches moves made together into one row, and each of them needs its own record when the window
 	 * gives it back, so counting the row once let the Writer accept moves past the record bound.
 	 * @param plan - The durable plan.
@@ -6654,7 +6665,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
 			live += moves(entry.sourceSequence);
 		}
-		return live + (plan?.handBacks?.length ?? 0);
+		return live + (plan?.handBacks?.filter((record) => record.reissueSequence === null).length ?? 0);
+	};
+	const recordSettlementBacklog = (plan: RoomSettlementPlan | null): void => {
+		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		settlementConsumedReissues = Object.freeze(
+			(plan?.handBacks ?? []).flatMap((record) => (record.reissueSequence === null ? [] : [record.reissueSequence]))
+		);
+	};
+	// The plan's backlog now: a consumed record whose reissued row a creator row reached is delivered.
+	const settlementBacklogNow = (): number => {
+		let undelivered = settlementBacklog;
+		for (const sequence of settlementConsumedReissues) if (!creatorReachedOwnSequences.has(sequence)) undelivered++;
+		return undelivered;
 	};
 	/**
 	 * The given-back moves: the plan's unconsumed hand-back records (written with the window's expiry or
@@ -6699,7 +6722,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
-		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		recordSettlementBacklog(plan);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({
 				...settlementStatusSnapshot,
@@ -7074,7 +7097,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			.map((source) => source.epoch);
 		settlementSources = sources;
 		settlementDisplaced = new Map(sources.map((source) => [source.authorSequence, source.intents.length] as const));
-		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		recordSettlementBacklog(plan);
 		// This plan write at `epoch` settled every own row of the epochs before it.
 		localMovesCountedFrom(epoch);
 		settlementStatusSnapshot = Object.freeze({
@@ -7147,7 +7170,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
-		settlementBacklog = settlementBacklogOf(current, settlementDisplaced);
+		recordSettlementBacklog(current);
 		// The status reflects this drain's resolutions (given-back moves no longer wait).
 		recordSettlementStatus(settlementSources, current);
 		return current;
@@ -9794,7 +9817,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// The backlog includes the new moves the plan does not count yet (undeliveredLocalMoves).
 			const countsAgainstBacklog = handBack === undefined && redirectPromise === undefined && redirectedSession === undefined;
 			if (countsAgainstBacklog) {
-				const backlog = settlementBacklog + undeliveredLocalMoves();
+				const backlog = settlementBacklogNow() + undeliveredLocalMoves();
 				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
 			}
 			let countedAccepted = false;
