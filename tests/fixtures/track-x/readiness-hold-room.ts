@@ -87,6 +87,8 @@ export async function readinessHoldRoom(
 		parameters?: Partial<typeof defaultParameters>;
 		/** Non-creator Writers (default 1; row 60 R5 refusal case c uses 2). */
 		writers?: number;
+		/** The shipped zone's per-epoch admission policy factory (Grid wires outcome-commit's). */
+		createOperationAdmissionPolicy?: CreateV3RoomSessionInput["createOperationAdmissionPolicy"];
 	}> = {}
 ) {
 	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "track-x-readiness-hold-"));
@@ -254,6 +256,9 @@ export async function readinessHoldRoom(
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
 				: {}),
 			creatorInvite: openOptions.room?.invite ?? invite,
+			...(options.createOperationAdmissionPolicy === undefined
+				? {}
+				: { createOperationAdmissionPolicy: options.createOperationAdmissionPolicy }),
 			databaseName: name,
 			issuanceDatabaseName: name,
 			migrationDatabaseNamespace: name,
