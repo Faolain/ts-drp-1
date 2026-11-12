@@ -7799,6 +7799,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			transientLocalRefusal(issued.kind, "detail" in issued ? issued.detail : "");
 			retry++
 		) {
+			// Observation only (the "__warmProofEvent" proof hook): how often installs wait on a transient refusal.
+			try {
+				const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function")
+					observer({ kind: "settlement-replay-transient-refusal", retry, detail: "detail" in issued ? issued.detail : "" });
+			} catch { /* Diagnostics never alter the install. */ }
 			await new Promise((resolve) => setTimeout(resolve, SETTLEMENT_TRANSIENT_RETRY_MS * 2 ** retry));
 			assertSessionOpen();
 			const unchangedPlan = await issuanceStore.readSettlementPlan(settlementScope);
@@ -7821,6 +7827,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const handBackReason =
 				lastingLocalRefusal(issued.kind, issued.detail) ??
 				(transientLocalRefusal(issued.kind, issued.detail) ? ("transient-exhausted" as const) : undefined);
+			if (effect.kind === "replacement" && source !== undefined && !signed && handBackReason === "transient-exhausted") {
+				try {
+					const observer = Reflect.get(globalThis, "__warmProofEvent");
+					if (typeof observer === "function")
+						observer({ kind: "settlement-replay-transient-exhausted", detail: issued.detail });
+				} catch { /* Diagnostics never alter the install. */ }
+			}
 			if (effect.kind === "replacement" && source !== undefined && !signed && handBackReason !== undefined) {
 				await handBackRefusedReplay(source, "fromIntent" in effect ? effect.fromIntent : 0, handBackReason);
 				return SETTLEMENT_REPLAY_SETTLED;
