@@ -173,3 +173,47 @@ describe("settlement member frontier and completed-entry custody contract", () =
 		}
 	});
 });
+
+// fix/lost-twice-replacement-dependency: `completedSourceCustody` marks a plan once a close of a still-
+// authorized author took custody of a completed entry's source (the replacement may be lost too). It is
+// exactly `true`, written once and never cleared; older readers refuse the field at open (closed record).
+describe("settlement completed-source custody marker", () => {
+	const marked = (revision: number) => Object.freeze({ ...plan(revision, { entries: gained([1], DISPLACED.digest), contexts: [DISPLACED] }),
+		completedSourceCustody: true });
+	it("copies the marker exactly and refuses any other value", () => {
+		expect(snapshot(copySettlementPlan(marked(0), SCOPE))).toEqual(snapshot(marked(0)));
+		for (const bad of [false, 1, "true", null, {}])
+			expect(copySettlementPlan({ ...marked(0), completedSourceCustody: bad }, SCOPE)).toBeUndefined();
+	});
+	for (const kind of ["memory", "node", "browser"] as const) {
+		it(`${kind}: the marker is written once and never cleared`, async () => {
+			const store = await openStore(kind);
+			try {
+				await store.transactWriteSettlementPlan({ expectedRevision: null, plan: plan(0), scope: SCOPE });
+				await store.transactWriteSettlementPlan({ expectedRevision: 0, plan: marked(1), scope: SCOPE });
+				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(snapshot(marked(1)));
+				const cleared = plan(2, { entries: gained([1], DISPLACED.digest), contexts: [DISPLACED] });
+				expect(code(await failure(store.transactWriteSettlementPlan({ expectedRevision: 1, plan: cleared, scope: SCOPE }))))
+					.toBe("ISSUANCE_RETRY_REQUIRED");
+				await store.transactWriteSettlementPlan({ expectedRevision: 1, plan: marked(2), scope: SCOPE });
+				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(snapshot(marked(2)));
+			} finally {
+				await store.close();
+			}
+		});
+	}
+	it("node: the marker survives reopen", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "completed-source-custody-reopen-"));
+		directories.push(directory);
+		let store = await openStore("node", directory);
+		await store.transactWriteSettlementPlan({ expectedRevision: null, plan: plan(0), scope: SCOPE });
+		await store.transactWriteSettlementPlan({ expectedRevision: 0, plan: marked(1), scope: SCOPE });
+		await store.close();
+		store = await openStore("node", directory);
+		try {
+			expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(snapshot(marked(1)));
+		} finally {
+			await store.close();
+		}
+	});
+});

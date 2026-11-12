@@ -198,7 +198,8 @@ export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): s
 }
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
-	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined
+	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
+		plan.completedSourceCustody === undefined
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -290,14 +291,19 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		(hasMemberFrontierGeometry ? Number(geometry.maxMemberFrontierByteLength) : undefined);
 	const memberFrontier = memberFrontierLength === undefined ? undefined
 		: unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(memberFrontierLength)});
+	// The completed-source custody marker: stored, or the one this close's completed-entry custody may write.
+	const completedSourceCustody = captured?.completedSourceCustody === true || completedWithoutContext
+		? encodeCanonical(true).byteLength : undefined;
 	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
 		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths),
 		...(handBacks === undefined ? {} : {handBacks: handBacks.width}),
-		...(memberFrontier === undefined ? {} : {memberFrontier})});
+		...(memberFrontier === undefined ? {} : {memberFrontier}),
+		...(completedSourceCustody === undefined ? {} : {completedSourceCustody})});
 	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
 		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes),
 		...(handBacks === undefined ? {} : {handBacks: handBacks.shape}),
-		...(memberFrontier === undefined ? {} : {memberFrontier: contextShape})});
+		...(memberFrontier === undefined ? {} : {memberFrontier: contextShape}),
+		...(completedSourceCustody === undefined ? {} : {completedSourceCustody: leaf})});
 	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
 	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
 		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
@@ -1584,9 +1590,11 @@ function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan
 		const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 		const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 		const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
+		const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
 		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
-			...(hasMemberFrontier ? ["memberFrontier"] : [])])) throw invalid();
+			...(hasMemberFrontier ? ["memberFrontier"] : []),
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])])) throw invalid();
 		assertDurableIssueScope(value.scope);
 		const verified = copySettlementPlan(value, value.scope);
 		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();

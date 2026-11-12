@@ -691,10 +691,13 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
+	const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
-			...(hasMemberFrontier ? ["memberFrontier"] : [])]) ||
+			...(hasMemberFrontier ? ["memberFrontier"] : []),
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])]) ||
+		(hasCompletedSourceCustody && value.completedSourceCustody !== true) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
 		(value.fenceSequence !== null && !isValidDurableAuthorSequence(value.fenceSequence))
@@ -753,6 +756,7 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		fenceSequence: value.fenceSequence,
 		...(handBacks === undefined ? {} : { handBacks }),
 		...(memberFrontier === undefined ? {} : { memberFrontier }),
+		...(hasCompletedSourceCustody ? { completedSourceCustody: true as const } : {}),
 		revision: value.revision,
 		scope: copyDurableIssueScope(scope),
 	};
@@ -845,6 +849,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 				}),
 		...(plan.memberFrontier === undefined ? {} : {memberFrontier: {digest: new Uint8Array(plan.memberFrontier.digest),
 			exactCanonicalContextBytes: new Uint8Array(plan.memberFrontier.exactCanonicalContextBytes)}}),
+		...(plan.completedSourceCustody === true ? {completedSourceCustody: true as const} : {}),
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};
@@ -878,6 +883,9 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 		!durableIssuanceBytesEqual(current.memberFrontier.digest, next.memberFrontier.digest) ||
 		!durableIssuanceBytesEqual(current.memberFrontier.exactCanonicalContextBytes, next.memberFrontier.exactCanonicalContextBytes)))
 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement member frontier changed");
+	// The completed-source custody marker is written once and never cleared.
+	if (current.completedSourceCustody === true && next.completedSourceCustody !== true)
+		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement completed-source custody changed");
 	for (const prior of current.entries) {
 		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
 		if (candidate === undefined) {

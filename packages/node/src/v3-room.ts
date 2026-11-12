@@ -6969,6 +6969,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...(selectedHandBacks === undefined ? {} : { handBacks: Object.freeze([...selectedHandBacks]) }),
 				// The last-member frontier is written once and never changed or cleared.
 				...(current?.memberFrontier === undefined ? {} : { memberFrontier: current.memberFrontier }),
+				// So is the completed-source custody marker.
+				...(current?.completedSourceCustody === true ? { completedSourceCustody: true as const } : {}),
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,
 			});
@@ -7497,9 +7499,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// precedes) stays manual-review either way, and withholding the fence for it would leave this and
 		// every later epoch with no own fence, so no later move could be proven never admitted either
 		// (held for good, demanding an anchor the recovery certificate stops covering).
+		// A completed replacement entry in custody (its source's context kept after the replacement was
+		// issued: a removing close, or a replacement lost too) is not unresolved work: the replacement
+		// carries its intents and the entry is never replaced again, so it withholds no fence (a fence
+		// admitted past the source only covers it terminally).
 		const decision = settlementAuthorFenceDecision({
 			retained: plan.entries
-				.filter((entry) => entry.sourceContextDigest !== undefined)
+				.filter((entry) => entry.sourceContextDigest !== undefined && entry.replacementSequence === null)
 				.map((entry) => ({ disposition: entry.disposition, unproven: retainedUnproven.get(entry.sourceSequence) })),
 			eligible: plan.entries.some(eligible),
 			currentMember: activeHandle?.currentEphemeralAuthority()?.isCurrentMember(settlementScope.author) === true,

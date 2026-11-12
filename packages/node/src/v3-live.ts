@@ -10469,6 +10469,7 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		registration.historicalIssuance === undefined ? undefined
 		: captureCreatorMemberFrontier(registration.historicalIssuance.capability, payload.trust.trust);
 	if (memberFrontier !== undefined) added = true;
+	let completedSourceCustody = prior?.completedSourceCustody === true;
 	for (const issued of before.rows.issued) {
 		if (!sameScope(issued, scope)) continue;
 		const outbox = before.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === issued.authorSequence);
@@ -10495,12 +10496,21 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		// Protocol no-ops retain their signed source contract while still current.
 		// They have no application intent to retry or abandon. This also preserves
 		// old fences if a later ACL removes the author before native retirement.
-		if (!requiresApplicationCustody && !currentFence) continue;
-		// A completed replacement entry's source still present at the removing close and not covered by
-		// the last-member frontier (its replacement was admitted only in this epoch): custody of the
-		// source under its displaced plane's authenticated context, written once on the completed entry.
-		// The drain still treats the entry as done; nothing is re-offered.
-		if (removedAuthor && existing !== undefined && existing.sourceContextDigest === undefined &&
+		// A completed replacement entry's source still present and not covered by the author's signed
+		// frontier (seq > T), whose replacement is not proven committed in this close: either the close
+		// removes its author (no later creator statement names it), or the replacement missed this epoch
+		// too (lost twice), so no later frontier will cover the source. Custody of the source under its
+		// displaced plane's authenticated context, written once on the completed entry (store law). The
+		// drain still treats the entry as done; nothing is re-offered.
+		const replacementChunks = existing === undefined || existing.replacementSequence === null ? [] :
+			existing.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [existing.replacementSequence];
+		const replacementCommittedHere = committedMembers !== undefined && replacementChunks.length > 0 &&
+			replacementChunks.every(sequence => {
+				const replacement = before.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === sequence);
+				return replacement !== undefined && committedMembers!.has(lowerHexDigest(replacement.digest)!);
+			});
+		if ((removedAuthor || !replacementCommittedHere) && replacementChunks.every(sequence => sequence > issued.authorSequence) &&
+			existing !== undefined && existing.sourceContextDigest === undefined &&
 			existing.replacementSequence !== null && (existing.disposition === "rebase" || existing.disposition === "transform") &&
 			retainedVertex === undefined && classified.kind === "displaced" &&
 			(memberThrough === null || issued.authorSequence > memberThrough)) {
@@ -10513,9 +10523,12 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 				original.provenance.blueprintDigest, original.input.exactCanonicalParametersCarrierBytes);
 			if (!contexts.some(value => sameBytes(value.digest, replacedContext.digest))) contexts.push(replacedContext);
 			entries[entries.indexOf(existing)] = {...existing, sourceContextDigest: new Uint8ArrayConstructor(replacedContext.digest)};
+			// Beyond the removing close (F2), mark the plan so readers before this custody refuse it at open.
+			if (!removedAuthor) completedSourceCustody = true;
 			added = true;
 			continue;
 		}
+		if (!requiresApplicationCustody && !currentFence) continue;
 		// The complete signed membership is transferred into the original plan,
 		// once per source epoch. A terminal label alone never supplies this proof.
 		const knownCommitted = classified.authenticated.vertex.epoch === payload.provenance.epoch &&
@@ -10563,7 +10576,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		const plan = copySettlementPlan({scope, revision: prior === null ? 0 : prior.revision + 1,
 			fenceSequence: prior?.fenceSequence ?? null, entries, ...(contexts.length === 0 ? {} : {sourceContexts: contexts}),
 			...(prior?.handBacks === undefined ? {} : {handBacks: prior.handBacks}),
-			...(persistedFrontier === undefined ? {} : {memberFrontier: persistedFrontier})}, scope);
+			...(persistedFrontier === undefined ? {} : {memberFrontier: persistedFrontier}),
+			...(completedSourceCustody ? {completedSourceCustody: true} : {})}, scope);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
 		const future = {...before.rows, plans: [...before.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 		encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -11999,22 +12013,16 @@ async function readCreatorRecoveryDependencyCensus(
 					terminalFrontier,
 					vertexFacts
 				)?.digest === classified.authenticated.digest;
-			// A completed replacement entry's source that the close removing its author took custody of:
-			// pending, never published, and terminal because every replacement chunk is durably committed
-			// in its own epoch (that chunk's retained completion proof). Retained and charged as the same
-			// protected dependency, never re-offered (its entry stays completed).
-			const replacedEntry = scope.author === registration.issuanceScope.author && classified?.kind === "displaced" &&
-				row.publishState === "pending" && retainedCompletion !== undefined && retainedCompletion.completion === undefined &&
-				retainedCompletion.expiry === undefined && sameBytes(retainedCompletion.sourceDigest, row.digest)
-				? inheritancePlan?.entries.find(entry => entry.sourceSequence === row.authorSequence) : undefined;
-			const committedReplacementPending = replacedEntry !== undefined && replacedEntry.sourceContextDigest !== undefined &&
-				sameBytes(replacedEntry.sourceDigest, row.digest) && replacedEntry.replacementSequence !== null &&
-				(replacedEntry.disposition === "rebase" || replacedEntry.disposition === "transform") &&
-				(replacedEntry.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [replacedEntry.replacementSequence])
-					.every(sequence => {
-						const replacement = registration.historicalIssuance?.retainedSources?.get(sequence);
-						return replacement?.completion !== undefined && creatorRetainedCompletionMatchesPlan(replacement, sequence, inheritancePlan);
-					});
+			// A pending completed-replacement source in custody (its entry gained its displaced context at a
+			// close) is the dependency of its replacement chain while that chain is live: retained and
+			// charged, never re-offered (a completed entry is never replaced again). See
+			// replacementChainLive for the evidence each step rests on.
+			const replacedPending = scope.author === registration.issuanceScope.author && classified?.kind === "displaced" &&
+				row.publishState === "pending" && classified.sourceContract !== undefined && retainedCompletion !== undefined &&
+				retainedCompletion.completion === undefined && retainedCompletion.expiry === undefined &&
+				sameBytes(retainedCompletion.sourceDigest, row.digest) && sourceBound && observation.liveRegistration !== undefined &&
+				await replacementChainLive(observation.liveRegistration, registration, ObjectFreeze({ ...classified, row }),
+					inheritancePlan === null ? null : copySettlementPlan(inheritancePlan, scope) ?? null, nativeRows.issued, vertexFacts);
 			// C03 layer 3: the exact own author fence of a closed epoch whose startup drain committed it
 			// (published only after readiness) and died before publishing it. No plane admits it any
 			// more, it has nothing to replan (no intents, so no plan entry), and the new epoch's fence
@@ -12048,7 +12056,7 @@ async function readCreatorRecoveryDependencyCensus(
 					!openSource &&
 					!inheritedComplete &&
 					!terminalCoveredPending &&
-					!committedReplacementPending &&
+					!replacedPending &&
 					!unpublishedHistoricalFence)
 			)
 				return undefined;
@@ -12072,9 +12080,9 @@ async function readCreatorRecoveryDependencyCensus(
 					);
 				}
 
-				// A pending completed-replacement source (committedReplacementPending above) is the same
-				// completed own settlement, proven by its replacements' retained completions.
-				if (completedBranch || committedReplacementPending) dependencyKind = "source-bound-completed-issuance";
+				// A pending completed-replacement source with a live chain (replacedPending above) is the same
+				// completed own settlement, its link and every chain step authenticated.
+				if (completedBranch || replacedPending) dependencyKind = "source-bound-completed-issuance";
 				const adjacent =
 					sourceBound && displacedSource !== undefined && sourceDependencyTrust !== undefined
 						? authenticateRecoveryVertex(
@@ -12139,7 +12147,7 @@ async function readCreatorRecoveryDependencyCensus(
 					closedCovered !== undefined && closedCovered.digest === classified.authenticated.digest;
 				if (retainedClosedIssuance) dependencyKind = "authenticated-closed-issuance";
 				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch && !durablyExpired &&
-					!committedReplacementPending) {
+					!replacedPending) {
 					const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
 					if (
 						scope.author !== registration.issuanceScope.author ||
@@ -12175,7 +12183,11 @@ async function readCreatorRecoveryDependencyCensus(
 					settlementOwnRowFenceGuarded(await settledFences(
 						creatorOriginalIssuanceStore(registration), registration.issuanceScope),
 					classified.authenticated.vertex.epoch, row.authorSequence, windowFrontier.terminalThrough);
-				if (windowExpired) dependencyKind = "source-authenticated-expiry";
+				// The retirement store releases a pending source only on its plan's authenticated expiry
+				// (durablyExpired above). A pending row past its window without one (a completed-replacement
+				// source whose chain is live, replacedPending) stays a protected hole: naming it expired
+				// would drop it from the holes and the store would refuse the retirement.
+				if (windowExpired && row.publishState === "published") dependencyKind = "source-authenticated-expiry";
 			}
 			const vertex = classified.authenticated.vertex;
 			if (typeof vertex.anchor !== "string") return undefined;
@@ -17122,6 +17134,163 @@ type ClassifiedRebaseRow = Readonly<{
 }>;
 
 const verifiedNestedNativeSources = new WeakSet<ClassifiedRebaseRow>();
+
+type ReplacementIssuedRow = Readonly<{ objectId: string; author: string; authorSequence: number; canonicalPreimageBytes: Uint8Array;
+	signature: Uint8Array; digest: Uint8Array }>;
+
+/** How one proven replacement chunk ends: terminal, live, or a completed displaced link to walk on. */
+type ReplacementChunkEnd = "committed" | "expired" | "current" | "covered" | "open" | "completed";
+
+/** Every chunk named by every entry of the plan, counted (a chunk replaces exactly one source). */
+function replacementChunkClaims(plan: SettlementPlan): ReadonlyMap<number, number> {
+	const claims = new IntrinsicMap<number, number>();
+	for (const value of plan.entries)
+		for (const chunk of value.replacementProgress?.chunks.map(item => item.replacementSequence) ??
+			(value.replacementSequence === null ? [] : [value.replacementSequence]))
+			claims.set(chunk, (claims.get(chunk) ?? 0) + 1);
+	return claims;
+}
+
+/**
+ * The one owner of a replacement link's proof (lost-twice's chain walk and the replaced-source
+ * resolution's committed-replacement basis both use it). Given an authenticated displaced source and its
+ * completed rebase/transform entry, proves every replacement chunk from signed content, never from plan
+ * rows alone:
+ * - the chunk is after its source, claimed by exactly this one entry, present once in the native rows,
+ *   and authenticates (under its own retained source contract, or through this plane's classification),
+ *   signed by the author in a later epoch than the source;
+ * - the link is signed content: a portable chunk's settlementSource names exactly the source's signed row
+ *   and intent range; the chunks' signed operations together are exactly the source's permitted
+ *   replacement operations, derived again from the source's signed operations by the immutable policy,
+ *   with the entry's disposition and refusal;
+ * - its end: durably committed (retained completion proof matching the plan), durably expired (signed
+ *   abandonment receipt matching the plan), covered by a creator-signed frontier, current in this plane,
+ *   open displaced work (an unresolved entry or one awaiting its receipt), or a completed displaced link.
+ * @returns One proven step per chunk in plan order, or undefined when any of it is not proven.
+ */
+function proveReplacementLink(payload: PreparedV3LivePayload, registration: CreatorRecoveryCensusContext,
+	source: ClassifiedRebaseRow, entry: SettlementPlan["entries"][number], plan: SettlementPlan,
+	claims: ReadonlyMap<number, number>, issued: readonly ReplacementIssuedRow[], vertexFacts?: CreatorCensusVertexFacts):
+	readonly Readonly<{ chunk: number; replacement: ClassifiedRebaseRow; classified: boolean; end: ReplacementChunkEnd }>[] | undefined {
+	const policy = payload.input.settlementPolicy, scope = source.row.scope, sequence = source.row.authorSequence;
+	if (policy === undefined || policy.blueprintDigest !== payload.provenance.blueprintDigest || entry.replacementSequence === null ||
+		!sameBytes(entry.sourceDigest, source.row.digest) || (entry.disposition !== "rebase" && entry.disposition !== "transform") ||
+		source.authenticated.digest !== lowerHexDigest(source.row.digest)) return undefined;
+	const sourceOperations = settlementSourceOperations(payload, source.authenticated.vertex.operation);
+	if (sourceOperations === undefined || sourceOperations.length === 0) return undefined;
+	let derived: ReturnType<typeof derivePolicySettlement>;
+	try { derived = derivePolicySettlement(policy, sourceOperations); } catch { return undefined; }
+	const refusal = entry.transformRefusal;
+	if (derived.disposition !== entry.disposition || refusal !== undefined && (derived.disposition !== "transform" ||
+		!sameBytes(refusal.proposedIntentDigest, hashDomain("ts-drp/settlement-transform-proposal/v1",
+			encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS))))) return undefined;
+	const expected = refusal === undefined ? derived.operations : sourceOperations;
+	const retainedSources = registration.historicalIssuance?.retainedSources;
+	const chunks = entry.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [entry.replacementSequence];
+	const replaced: Readonly<Record<string, unknown>>[] = [];
+	const steps: Readonly<{ chunk: number; replacement: ClassifiedRebaseRow; classified: boolean; end: ReplacementChunkEnd }>[] = [];
+	let throughIntent = 0, portable = 0;
+	for (const [index, chunk] of chunks.entries()) {
+		if (chunk <= sequence || claims.get(chunk) !== 1 || steps.some(step => step.chunk === chunk)) return undefined;
+		const rows = issued.filter(value => value.objectId === scope.objectId && value.author === scope.author &&
+			value.authorSequence === chunk);
+		if (rows.length !== 1) return undefined;
+		const replacementRow = ObjectFreeze({ scope, authorSequence: chunk, canonicalPreimageBytes: rows[0]!.canonicalPreimageBytes,
+			signature: rows[0]!.signature, digest: rows[0]!.digest, publishState: "pending" as const }) as SnapshottedOutboxRow;
+		const retained = retainedSources?.get(chunk);
+		const retainedVertex = retained === undefined || !sameBytes(retained.sourceDigest, rows[0]!.digest) ? undefined
+			: authenticateRetainedSourceVertex(retained.contract, rows[0]!.canonicalPreimageBytes, rows[0]!.signature,
+				rows[0]!.digest, scope.author, chunk, vertexFacts);
+		const replacement: ClassifiedRebaseRow | undefined = retainedVertex !== undefined
+			? ObjectFreeze({ row: replacementRow, authenticated: retainedVertex, kind: "displaced" as const, sourceContract: retained!.contract })
+			: retained !== undefined ? undefined : classifyRebaseRow(registration, replacementRow, undefined, vertexFacts);
+		if (replacement === undefined || replacement.authenticated.digest !== lowerHexDigest(rows[0]!.digest) ||
+			replacement.authenticated.author !== scope.author || replacement.authenticated.authorSequence !== chunk ||
+			replacement.authenticated.admitted.epoch <= source.authenticated.admitted.epoch) return undefined;
+		const operations = settlementSourceOperations(payload, replacement.authenticated.vertex.operation);
+		if (operations === undefined) return undefined;
+		replaced.push(...operations);
+		const proof = replacement.authenticated.admitted.settlementSource;
+		const record = proof === undefined ? undefined : snapshotClosedRecord({ ...proof }, PORTABLE_SETTLEMENT_SOURCE_KEYS);
+		if (proof !== undefined && (record === undefined || record.sourceSequence !== sequence || record.sourceAuthor !== scope.author ||
+			record.sourceObjectId !== scope.objectId || record.sourceDigest !== lowerHexDigest(source.row.digest) ||
+			!sameBytes(record.sourcePreimage as Uint8Array, source.row.canonicalPreimageBytes) ||
+			!sameBytes(record.sourceSignature as Uint8Array, source.row.signature) || record.fromIntent !== throughIntent ||
+			!NumberIsSafeInteger(record.throughIntent) || (record.throughIntent as number) <= throughIntent ||
+			(entry.replacementProgress !== undefined && (record.intentDigest !== lowerHexDigest(entry.replacementProgress.intentDigest) ||
+				record.throughIntent !== entry.replacementProgress.chunks[index]!.throughIntent)))) return undefined;
+		if (record !== undefined) { throughIntent = record.throughIntent as number; portable++; }
+		const step = (end: ReplacementChunkEnd) => steps.push(ObjectFreeze({ chunk, replacement, classified: retainedVertex === undefined, end }));
+		if (retained?.completion !== undefined) {
+			if (!creatorRetainedCompletionMatchesPlan(retained, chunk, plan)) return undefined;
+			step("committed"); continue;
+		}
+		if (retained?.expiry !== undefined) {
+			if (!creatorRetainedExpiryMatchesPlan(retained, chunk, plan)) return undefined;
+			step("expired"); continue;
+		}
+		if (replacement.kind === "current") { step("current"); continue; }
+		if (replacement.kind === "covered-historical") { step("covered"); continue; }
+		const next = plan.entries.find(value => value.sourceSequence === chunk);
+		if (replacement.kind !== "displaced" || next === undefined || !sameBytes(next.sourceDigest, rows[0]!.digest) ||
+			next.disposition === "committed" || next.disposition === "inherited" ||
+			next.disposition === "expire" && next.replacementSequence !== null) return undefined;
+		step(next.replacementSequence === null ? "open" : "completed");
+	}
+	// Every chunk is either portable or not; the signed operations are exactly the permitted ones.
+	if (portable !== 0 && portable !== chunks.length ||
+		portable !== 0 && entry.replacementProgress !== undefined && throughIntent !== entry.replacementProgress.intentCount ||
+		!sameBytes(encodeCanonical(replaced), encodeCanonical(expected))) return undefined;
+	return ObjectFreeze(steps);
+}
+
+/**
+ * Whether the replacement chain of a pending completed-replacement source is live (lost-twice, design
+ * (1)). Walks source -> replacement chunks -> ..., bounded by the plan's entry count; a revisit or the
+ * bound REFUSES. Each link is proven by proveReplacementLink (the one owner); each walked node
+ * authenticates by custody (the root and every aged node: its entry carries its displaced plane's
+ * context and the row authenticates under that retained source contract) or, inside this plane's
+ * displaced adjacency, through this plane's classification. A completed link is walked on; every other
+ * end (committed, expired, covered, current, open) is live or terminal.
+ * @returns True only when every step is proven.
+ */
+async function replacementChainLive(live: V3PlaneRegistration, registration: CreatorRecoveryCensusContext,
+	source: ClassifiedRebaseRow, plan: SettlementPlan | null, issued: readonly ReplacementIssuedRow[],
+	vertexFacts?: CreatorCensusVertexFacts): Promise<boolean> {
+	if (plan === null) return false;
+	const scope = source.row.scope;
+	const retainedSources = registration.historicalIssuance?.retainedSources;
+	const bound = plan.entries.length;
+	const claims = replacementChunkClaims(plan);
+	const classifiedNodes = new WeakSet<ClassifiedRebaseRow>();
+	const visited = new IntrinsicSet<number>();
+	const stack: ClassifiedRebaseRow[] = [source];
+	let steps = 0;
+	while (stack.length > 0) {
+		const node = stack.pop()!;
+		const sequence = node.row.authorSequence;
+		if (visited.has(sequence) || ++steps > bound) return false;
+		visited.add(sequence);
+		const entry = plan.entries.find(value => value.sourceSequence === sequence);
+		if (entry === undefined || node.kind !== "displaced") return false;
+		const custody = retainedSources?.get(sequence);
+		const inCustody = custody !== undefined && custody.completion === undefined && custody.expiry === undefined &&
+			sameBytes(custody.sourceDigest, node.row.digest) && entry.sourceContextDigest !== undefined &&
+			node.sourceContract !== undefined && creatorRetainedSourceMatchesPlan(custody, sequence, plan) &&
+			authenticateRetainedSourceVertex(custody.contract, node.row.canonicalPreimageBytes, node.row.signature, node.row.digest,
+				scope.author, sequence, vertexFacts)?.digest === lowerHexDigest(node.row.digest);
+		if (!inCustody && (node === source || custody !== undefined || !classifiedNodes.has(node))) return false;
+		const proven = proveReplacementLink(live.payload, registration, node, entry, plan, claims, issued, vertexFacts);
+		if (proven === undefined) return false;
+		for (const step of proven) {
+			if (visited.has(step.chunk)) return false;
+			if (step.end !== "completed") { visited.add(step.chunk); continue; }
+			if (step.classified) classifiedNodes.add(step.replacement);
+			stack.push(step.replacement);
+		}
+	}
+	return true;
+}
 
 /** Protected native completion, not a portable source-membership grant. */
 async function ownSourceSettlementIsComplete(
@@ -25397,7 +25566,8 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
 		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks}),
-		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier})}, scope);
+		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier}),
+		...(prior.completedSourceCustody === true ? {completedSourceCustody: true} : {})}, scope);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -25654,7 +25824,8 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
 		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks}),
-		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier})}, scope);
+		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier}),
+		...(prior.completedSourceCustody === true ? {completedSourceCustody: true} : {})}, scope);
 	if (plan == null) throw new TypeError("creator source frontier resolution plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});

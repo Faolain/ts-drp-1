@@ -155,6 +155,14 @@ export interface SettlementPlan {
 	 * source-context domain. Older readers refuse the field (closed record).
 	 */
 	readonly memberFrontier?: SettlementSourceContext;
+	/**
+	 * Present (true) once a close of a still-authorized author took custody of a completed replacement
+	 * entry's source (its displaced-plane context on a `rebase`/`transform` entry whose replacement was
+	 * not committed in that close: the replacement may be lost too). Readers before that custody rule
+	 * cannot authenticate such a source and refuse the field (closed record) at open, before any write.
+	 * Written once; never changed or cleared.
+	 */
+	readonly completedSourceCustody?: true;
 }
 
 /** Byte ceiling of a plan's last-member frontier record (anchor, settlement record, Cut, commit QC). */
