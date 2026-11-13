@@ -20,6 +20,7 @@ import {
 	type CreatorRecipientRecoveryContext,
 	type CreatorSuccessorOffer,
 	maintainCreatorRecipientRecoveryPool,
+	stepCreatorRecipientRecoveryPool,
 	readCreatorSuccessorExport,
 	receiveCreatorSuccessorAdoption,
 	selectRetainedCreatorSuccessorAdoption,
@@ -139,6 +140,7 @@ import {
 	type RecoveryPoolAutoMaintenanceOptions,
 } from "./internal/recovery-pool-auto.js";
 import { type InterruptedCloseRetry, startInterruptedCloseRetry } from "./internal/interrupted-close-retry.js";
+import { createLullPassScheduler } from "./internal/lull-passes.js";
 import { createScheduledRecoveryPoolLull } from "./internal/recovery-pool-scheduled.js";
 import { retainedPublicationCancelled } from "./internal/retained-publication.js";
 import {
@@ -1843,6 +1845,8 @@ export const CREATOR_DEPARTED_CARRIERS_RETAINED = 16;
  * (the page's delivery) re-targets the newest offer, the same one included.
  */
 export const V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS = 120_000;
+/** A recipient lull whose boundary was unavailable (nothing ran) is tried again after this, in the same epoch. */
+const LULL_RETRY_MS = 500;
 
 /** A member's successor install that the creator's material did not reach within the deadline. */
 export class V3RoomSuccessorInstallExpired extends TypeError {
@@ -9454,56 +9458,88 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// Recipient half of the opt-in pool boundary; runs in the lifecycle FIFO.
 	// The next install's turnover predicate is state-based, so early turnover
 	// needs no resume token: once retired, the install finds nothing due.
-	const maintainRecipientRecoveryPool = async (): Promise<CreatorRecoveryPoolResult> => {
-		if (terminalFailure !== undefined || creatorRecipientRecoveryRequired)
-			return Object.freeze({ kind: "deferred", reason: "busy" });
-		await rebasePromise;
-		await migrationCompletionBarrier;
-		await refreshRoomHeadState();
-		if (
-			activeHandle === undefined ||
-			transport === undefined ||
-			openedRoomHeadState === undefined ||
-			openedRoomHeadState.pending !== null
-		)
-			return Object.freeze({ kind: "deferred", reason: "busy" });
-		if (openedRoomHeadState.stable.epoch < 2) return Object.freeze({ kind: "not-needed" });
-		let open!: () => void;
-		const barrier = new Promise<void>((resolve) => { open = resolve; });
-		poolMaintenanceBarrier = barrier;
-		try {
-			await drainPendingIssues();
-			assertSessionOpen();
-			const plane = activeHandle,
-				roomTransport = transport,
-				roomHead = openedRoomHeadState?.stable;
-			if (plane === undefined || roomTransport === undefined || roomHead === undefined)
-				return Object.freeze({ kind: "deferred", reason: "busy" });
-			let result: CreatorRecoveryPoolResult;
-			try {
-				result = await maintainCreatorRecipientRecoveryPool({
-					plane,
-					catalog: input.application.catalog,
-					expectedRoomHead: roomHead,
-					snapshotStore: await ownRecipientSnapshots(),
-					recoveryContext: await recipientRecoveryContext(),
-				});
-			} catch (error) {
-				// Same rule as a failed install: native custody may be uncertain, so the
-				// next install reacquires it through authenticated recovery first.
-				creatorRecipientRecoveryRequired = true;
-				throw error;
-			}
-			// Arrivals queued behind the boundary; any refused at the bounded input
-			// pool are repaired through the same authenticated retained path a reconnect uses.
-			// Not after close: close revoked the transport and the next open asks again.
-			if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
-				roomTransport.requestRetainedHistory();
-			return result;
-		} finally {
-			if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
-			open();
+	// Lull "A": the session's maintenance passes run one bounded step per lifecycle admission (each
+	// holding the issue barrier only for that step), so an install or a local move waits for at most
+	// one step, never a whole lull. internal/lull-passes.ts.
+	const lullPasses = createLullPassScheduler({
+		stopped: () => closed,
+		admit: (step) =>
+			enqueueLifetimeTransition(async () => {
+				// A close that began while this step was queued: the step does not run.
+				if (closed) return "deferred" as const;
+				assertSessionOpen();
+				await rebasePromise;
+				await migrationCompletionBarrier;
+				let open!: () => void;
+				const barrier = new Promise<void>((resolve) => { open = resolve; });
+				poolMaintenanceBarrier = barrier;
+				try {
+					await drainPendingIssues();
+					assertSessionOpen();
+					return await step();
+				} finally {
+					if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+					open();
+				}
+			}),
+	});
+	// The recipient lull's own pass: the SAME original turnover passes, one per step.
+	let recipientLullResult: CreatorRecoveryPoolResult = Object.freeze({ kind: "not-needed" });
+	let recipientLullRun: Promise<CreatorRecoveryPoolResult> | undefined;
+	const recipientLullStep = async (): Promise<"done" | "more" | "deferred"> => {
+		const busy = Object.freeze({ kind: "deferred" as const, reason: "busy" as const });
+		// An install is queued or running: it runs the SAME turnover inline (the backstop) unless a
+		// lull settled at its exact boundary, which a lull cut short by it never does. A pass now only
+		// delays the install; the install schedules the next epoch's lull.
+		if (terminalFailure !== undefined || creatorRecipientRecoveryRequired || creatorSuccessorAdoptionTask !== undefined) {
+			recipientLullResult = busy;
+			return "deferred";
 		}
+		await refreshRoomHeadState();
+		const plane = activeHandle,
+			roomTransport = transport,
+			roomHead = openedRoomHeadState?.stable;
+		if (plane === undefined || roomTransport === undefined || roomHead === undefined || openedRoomHeadState?.pending !== null) {
+			recipientLullResult = busy;
+			return "deferred";
+		}
+		if (roomHead.epoch < 2) {
+			recipientLullResult = Object.freeze({ kind: "not-needed" });
+			return "done";
+		}
+		let stepped: Awaited<ReturnType<typeof stepCreatorRecipientRecoveryPool>>;
+		try {
+			stepped = await stepCreatorRecipientRecoveryPool({
+				plane,
+				catalog: input.application.catalog,
+				expectedRoomHead: roomHead,
+				snapshotStore: await ownRecipientSnapshots(),
+				recoveryContext: await recipientRecoveryContext(),
+			});
+		} catch (error) {
+			// Same rule as a failed install: native custody may be uncertain, so the
+			// next install reacquires it through authenticated recovery first.
+			creatorRecipientRecoveryRequired = true;
+			throw error;
+		}
+		recipientLullResult = stepped.result;
+		// Arrivals queued behind the boundary; any refused at the bounded input
+		// pool are repaired through the same authenticated retained path a reconnect uses.
+		// Not after close: close revoked the transport and the next open asks again.
+		if (stepped.step === "done" && stepped.result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
+			roomTransport.requestRetainedHistory();
+		return stepped.step;
+	};
+	// A deferred lull (its boundary unavailable, nothing ran) is tried again in the same epoch.
+	let lullRetry: ReturnType<typeof setTimeout> | undefined;
+	const retryLullLater = (epoch: number | undefined): void => {
+		if (lullRetry !== undefined || closed) return;
+		lullRetry = setTimeout(() => {
+			lullRetry = undefined;
+			if (closed || epoch === undefined || session.authority()?.epoch !== epoch) return;
+			void session.maintainRecoveryPool().catch(() => undefined);
+		}, LULL_RETRY_MS);
+		(lullRetry as { unref?: () => void }).unref?.();
 	};
 	// A durable reopen right after this recipient completed a retirement at its
 	// current epoch (a lull's early turnover, or an install's received turnover)
@@ -9885,6 +9921,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		endSessionWaits();
 		autoPoolMaintenance?.stop();
 		scheduledLulls?.cancel();
+		if (lullRetry !== undefined) clearTimeout(lullRetry);
 		interruptedCloseRetry?.stop();
 		closePresentation();
 		revokeTransport();
@@ -10517,37 +10554,62 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult> {
 			// The session's own scheduled request claims synchronously, before it queues.
 			const scheduled = scheduledLulls?.claim() === true;
-			return enqueueLifetimeTransition(async (): Promise<CreatorRecoveryPoolResult> => {
-				if (redirectPromise !== undefined) await redirectPromise;
-				if (redirectedSession !== undefined) return redirectedSession.maintainRecoveryPool();
-				assertSessionOpen();
-				const lull = async (): Promise<CreatorRecoveryPoolResult> => {
-					if (input.receiveOnly || creatorCloseHandle === undefined) return maintainRecipientRecoveryPool();
-					// Creator maintenance signs retirements: deferred while a restore currency check runs or after a refusal.
-					if (
-						(creatorRestoreGate !== undefined && creatorRestoreGate.state() !== "current") ||
-						supersessionRefusal() !== undefined
-					)
-						return Object.freeze({ kind: "deferred" as const, reason: "busy" as const });
-					await rebasePromise;
-					await migrationCompletionBarrier;
-					let open!: () => void;
-					const barrier = new Promise<void>((resolve) => { open = resolve; });
-					poolMaintenanceBarrier = barrier;
-					try {
-						await drainPendingIssues();
-						assertSessionOpen();
-						const plane = activeHandle;
-						if (plane === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
-						return await maintainCreatorRecoveryPool(plane);
-					} finally {
-						if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
-						open();
-					}
-				};
+			return (async (): Promise<CreatorRecoveryPoolResult> => {
+				const routed = await enqueueLifetimeTransition(async (): Promise<CreatorRecoveryPoolResult | "recipient"> => {
+					if (redirectPromise !== undefined) await redirectPromise;
+					if (redirectedSession !== undefined) return redirectedSession.maintainRecoveryPool();
+					assertSessionOpen();
+					// A recipient's lull runs as bounded steps, each its own admission (below).
+					if (input.receiveOnly || creatorCloseHandle === undefined) return "recipient";
+					const lull = async (): Promise<CreatorRecoveryPoolResult> => {
+						// Creator maintenance signs retirements: deferred while a restore currency check runs or after a refusal.
+						if (
+							(creatorRestoreGate !== undefined && creatorRestoreGate.state() !== "current") ||
+							supersessionRefusal() !== undefined
+						)
+							return Object.freeze({ kind: "deferred" as const, reason: "busy" as const });
+						await rebasePromise;
+						await migrationCompletionBarrier;
+						let open!: () => void;
+						const barrier = new Promise<void>((resolve) => { open = resolve; });
+						poolMaintenanceBarrier = barrier;
+						try {
+							await drainPendingIssues();
+							assertSessionOpen();
+							const plane = activeHandle;
+							if (plane === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
+							return await maintainCreatorRecoveryPool(plane);
+						} finally {
+							if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+							open();
+						}
+					};
+					// One lull per epoch when scheduled: a settled epoch answers with its result.
+					return scheduledLulls === undefined ? lull() : scheduledLulls.run(scheduled, lull);
+				});
+				if (routed !== "recipient") {
+					// Passes other owners requested of this creator's lull run after it, step by step.
+					if (lullPasses.pending()) await lullPasses.runLull();
+					return routed;
+				}
+				const epoch = session.authority()?.epoch;
+				// One recipient lull at a time: a request while one runs joins it (its steps are admitted
+				// one by one outside any single transition, so two runs would interleave their passes).
+				const lull = (): Promise<CreatorRecoveryPoolResult> =>
+					(recipientLullRun ??= (async (): Promise<CreatorRecoveryPoolResult> => {
+						lullPasses.requestLullPass("recipient-turnover", recipientLullStep);
+						const answer = await lullPasses.runLull();
+						if (answer === "deferred") {
+							retryLullLater(epoch);
+							return Object.freeze({ kind: "deferred", reason: "busy" });
+						}
+						return recipientLullResult;
+					})().finally(() => {
+						recipientLullRun = undefined;
+					}));
 				// One lull per epoch when scheduled: a settled epoch answers with its result.
 				return scheduledLulls === undefined ? lull() : scheduledLulls.run(scheduled, lull);
-			});
+			})();
 		},
 		sealEpoch(): Promise<CreatorLiveCloseResult> {
 			if (input.receiveOnly) return Promise.reject(new TypeError("v3 room is receive-only"));
