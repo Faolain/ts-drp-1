@@ -237,5 +237,12 @@ Branch `feat/given-back-reissue-origins`.
   second. Every move accepted in this session is newer than any row issued before it, so `latest` is
   at least as new as the room's answer, and it is current between a new move and the next listing
   refresh.
+- **Backlog term: counted until a chain row counts itself.** `settlementBacklogMoves`
+  (issuance-store) counts an entry's move pending on its chain's last carrier, unless a row of the chain
+  is already counted by its own plan entry (rebase, transform, manual-review) or hand-back record. The
+  first version skipped the entry whenever the last carrier was displaced. Before the rebase scan gave
+  that row an entry, the move then counted zero times and `V3RoomLocalBacklogFull` admitted moves past
+  the record bound: slow-member native test 2 lost moves (it passes at base). A displaced last carrier
+  with no entry stays counted, because no creator row reaches it.
 - **Chat C1** applies to the window and shares formats, which keep admitted order. The lifetime format
   sorts messages by identity, so it keeps its existing order.
