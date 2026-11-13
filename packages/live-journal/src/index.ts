@@ -73,6 +73,8 @@ export {
 	journalRetirementDrainItemCount,
 	reconstructJournalRetirementDrainSource,
 	journalRetirementDrainSourceCounts,
+	createJournalRetirementDrainSourceMemo,
+	JournalRetirementDrainSourceMemo,
 	advanceJournalRetirementControl,
 	advanceJournalRetirementMutationControl,
 	journalRetirementImage,

@@ -2395,7 +2395,8 @@ export function reconstructJournalRetirementDrainSource(
 	control: LiveJournalRetirementControl | null,
 	image: LiveJournalRetirementImage,
 	frames: readonly Uint8Array[],
-	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array
+	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array,
+	memo?: JournalRetirementDrainSourceMemo
 ): LiveJournalRetirementDrainSource | undefined {
 	const state = control?.drain;
 	if (state == null || control === null) return undefined;
@@ -2412,9 +2413,47 @@ export function reconstructJournalRetirementDrainSource(
 		if (finished) return undefined;
 		throw new TypeError("retirement-stale");
 	}
+	if (memo === undefined) return deriveDrainSource(state, base, rows, frames, reconstructLocal).source;
+	const planBytes = encodeCanonical(state.plan);
+	const reused = memo.reuse(planBytes, state.cursor, frames);
+	if (reused !== undefined) {
+		drainSourceWork.reuses++;
+		const source = Object.freeze({
+			control: captureJournalRetirementControl(base),
+			image: Object.freeze({ ...reused.image }),
+			canonicalRows: Object.freeze(reused.original.map((bytes) => bytes.slice())),
+		});
+		if (drainSourceDebug()) {
+			const fresh = deriveDrainSource(state, base, rows, frames, reconstructLocal).source;
+			if (!equalNative(fresh, source)) throw new Error("journal drain source reuse diverged from a fresh derivation");
+		}
+		return source;
+	}
+	const derived = deriveDrainSource(state, base, rows, frames, reconstructLocal);
+	memo.remember(planBytes, derived);
+	return derived.source;
+}
+/** Debug mode (TS_DRP_DEBUG_DRAIN_SOURCE=1): every reused drain source is also derived afresh and compared. */
+function drainSourceDebug(): boolean {
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env?.TS_DRP_DEBUG_DRAIN_SOURCE === "1";
+}
+type DerivedDrainSource = Readonly<{
+	source: LiveJournalRetirementDrainSource;
+	/** The original frames in source order, each with its drain item index (-1: kept by the plan). */
+	original: readonly Readonly<{ bytes: Uint8Array; item: number }>[];
+}>;
+function deriveDrainSource(
+	state: NonNullable<LiveJournalRetirementControl["drain"]>,
+	base: LiveJournalRetirementControl,
+	rows: readonly JournalRetirementDrainItem[],
+	frames: readonly Uint8Array[],
+	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array
+): DerivedDrainSource {
 	drainSourceWork.derivations++;
 	const actual = decodeNativeFrames(frames),
 		original = [...actual], indexByKey = indexNativeDrainFrames(actual, rows);
+	const itemOf = new Map<NativeFrame, number>();
 	for (const [index, selected] of rows.entries()) {
 		const found = indexByKey.find(selected);
 		if (index < state.cursor) {
@@ -2426,17 +2465,75 @@ export function reconstructJournalRetirementDrainSource(
 			if (reconstructed === undefined || !matchesDrainFrame(reconstructed, selected))
 				throw new TypeError("retirement-stale");
 			original.push(reconstructed);
+			itemOf.set(reconstructed, index);
 		} else if (found.length !== 1 || found[0] === undefined || !matchesDrainFrame(found[0], selected))
 			throw new TypeError("retirement-stale");
+		else itemOf.set(found[0], index);
 	}
 	original.sort(compareFrameKeys);
 	const originalImage = imageOfFrames(original);
 	if (!equalNative(originalImage, state.plan.sourceImage)) throw new TypeError("retirement-stale");
 	return Object.freeze({
-		control: captureJournalRetirementControl(base),
-		image: originalImage,
-		canonicalRows: Object.freeze(original.map((frame) => frame.bytes.slice())),
+		source: Object.freeze({
+			control: captureJournalRetirementControl(base),
+			image: originalImage,
+			canonicalRows: Object.freeze(original.map((frame) => frame.bytes.slice())),
+		}),
+		original: Object.freeze(original.map((frame) => Object.freeze({ bytes: frame.bytes.slice(), item: itemOf.get(frame) ?? -1 }))),
 	});
+}
+function fnv1a(bytes: Uint8Array): number {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < bytes.length; index++) hash = Math.imul(hash ^ (bytes[index] as number), 0x01000193);
+	return hash >>> 0;
+}
+function sameFrameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index++) if (left[index] !== right[index]) return false;
+	return true;
+}
+/**
+ * One adapter's memo of the drain source it last derived (one drain at a time). A drain's original
+ * source is a pure function of its plan, so it is kept against the plan's exact canonical bytes; it is
+ * returned again only when the native frames read now are exactly, byte for byte, the original frames
+ * minus the items retired before the control's cursor (every residual frame present once and
+ * unchanged, every retired one absent). Any other input re-derives in full, so every refusal the full
+ * derivation makes ("retirement-stale") is unchanged. Nothing escapes: a reuse returns fresh copies.
+ */
+export class JournalRetirementDrainSourceMemo {
+	#planBytes: Uint8Array | undefined;
+	#original: readonly Readonly<{ bytes: Uint8Array; item: number }>[] = [];
+	#image: LiveJournalRetirementImage | undefined;
+	/** @internal */
+	remember(planBytes: Uint8Array, derived: DerivedDrainSource): void {
+		this.#planBytes = planBytes.slice();
+		this.#original = derived.original;
+		this.#image = Object.freeze({ ...derived.source.image });
+	}
+	/** @internal */
+	reuse(planBytes: Uint8Array, cursor: number, frames: readonly Uint8Array[]):
+		Readonly<{ image: LiveJournalRetirementImage; original: readonly Uint8Array[] }> | undefined {
+		if (this.#planBytes === undefined || this.#image === undefined || !sameFrameBytes(this.#planBytes, planBytes)) return undefined;
+		const residual = this.#original.filter((frame) => frame.item < 0 || frame.item >= cursor);
+		if (residual.length !== frames.length) return undefined;
+		const buckets = new Map<number, number[]>();
+		for (const [index, frame] of residual.entries()) {
+			const hash = fnv1a(frame.bytes), bucket = buckets.get(hash);
+			if (bucket === undefined) buckets.set(hash, [index]); else bucket.push(index);
+		}
+		const used = new Uint8Array(residual.length);
+		for (const bytes of frames) {
+			const bucket = buckets.get(fnv1a(bytes));
+			const match = bucket?.find((index) => used[index] === 0 && sameFrameBytes(residual[index]!.bytes, bytes));
+			if (match === undefined) return undefined;
+			used[match] = 1;
+		}
+		return { image: this.#image, original: this.#original.map((frame) => frame.bytes) };
+	}
+}
+/** @returns A fresh drain-source memo for one journal adapter. */
+export function createJournalRetirementDrainSourceMemo(): JournalRetirementDrainSourceMemo {
+	return new JournalRetirementDrainSourceMemo();
 }
 /** Detach only mutable leaves of this owner's already captured, deeply frozen
  * control. No result is retained across native reads or used as authorization.

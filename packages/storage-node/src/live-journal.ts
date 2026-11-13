@@ -61,6 +61,7 @@ import {
 	type LiveJournalSignedAnchorReadResult,
 	type LiveJournalSnapshotToken,
 	reconstructJournalRetirementDrainSource,
+	createJournalRetirementDrainSourceMemo,
 } from "@ts-drp/live-journal";
 import { compareBytes, encodeCanonical } from "@ts-drp/canonical";
 import type { NativeReadReservation } from "@ts-drp/storage";
@@ -1184,6 +1185,8 @@ export function createNodeDurableLiveJournalStore(
 	let retirementLeaseToken: object | undefined;
 	// One bounded detached image, valid only under this owner's exact native
 	// BEGIN IMMEDIATE reservation. It is never used by mutations or readback.
+	// The drain's original source, derived once per drain and reused while the residual frames match it exactly.
+	const drainSourceMemo = createJournalRetirementDrainSourceMemo();
 	let heldRetirementImage: Readonly<{
 		lease: NativeReadReservation;
 		objectId: string;
@@ -2159,7 +2162,7 @@ export function createNodeDurableLiveJournalStore(
 				image = retirementImage(database, objectId, frames);
 				control = readRetirementControl(database, objectId, retirementCodec);
 			}
-			const drainSource = reconstructJournalRetirementDrainSource(control, image, frames, retirementFrame);
+			const drainSource = reconstructJournalRetirementDrainSource(control, image, frames, retirementFrame, drainSourceMemo);
 			if (basis === undefined) {
 				if (drainSource !== undefined && control !== null) validateDrainNativeRows(database, control);
 				database.exec("COMMIT");
@@ -2252,7 +2255,7 @@ export function createNodeDurableLiveJournalStore(
 				compareBytes(encodeCanonical(observation.image), encodeCanonical(basis.image)) !== 0) return undefined;
 			const control = basis.controlBytes === undefined ? null :
 					retirementCodec.decode(basis.controlBytes.slice(), basis.planBytes?.slice());
-			const drainSource = reconstructJournalRetirementDrainSource(control, basis.image, basis.frames, retirementFrame);
+			const drainSource = reconstructJournalRetirementDrainSource(control, basis.image, basis.frames, retirementFrame, drainSourceMemo);
 			if ((drainSource === undefined) !== (observation.drainSource === undefined) || drainSource !== undefined &&
 				compareBytes(encodeCanonical(drainSource), encodeCanonical(observation.drainSource)) !== 0) return undefined;
 		} catch { return undefined; }
@@ -2289,7 +2292,7 @@ export function createNodeDurableLiveJournalStore(
 				return failed("not-installed");
 			}
 			const prior = readRetirementControl(database, objectId, retirementCodec);
-			drainSource = reconstructJournalRetirementDrainSource(prior, image, frames, retirementFrame);
+			drainSource = reconstructJournalRetirementDrainSource(prior, image, frames, retirementFrame, drainSourceMemo);
 			if (drainSource !== undefined && prior !== null) validateDrainNativeRows(database, prior);
 			database.exec("COMMIT");
 			active = false;
