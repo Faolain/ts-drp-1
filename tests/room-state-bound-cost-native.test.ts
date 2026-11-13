@@ -33,6 +33,8 @@ const FIRST_MOVE_DELAY_MS = Number(process.env.STATE_BOUND_FIRST_MOVE_DELAY_MS ?
  * its cost is sampled on every move instead of only the few that land before a seed finishes.
  */
 const EXACT_ONLY = process.env.STATE_BOUND_EXACT_ONLY === "1";
+/** The first moves after an install a run must sample (acceptance runs: 1000, with STATE_BOUND_MEASURE_EPOCHS=80). */
+const MIN_FIRST_MOVES = Number(process.env.STATE_BOUND_MIN_FIRST_MOVES ?? 1);
 
 /** The zone application with its resource bound reader lacking the incremental projection (seed and bound). */
 function withoutIncrementalProjection<Zone extends { readOrdinaryApplicationResourceBound?: unknown }>(zone: Zone): Zone {
@@ -316,7 +318,9 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	);
 	expect(refusal, "growth stops at the room's limit with the typed refusal").toMatch(/application state limit/u);
 	expect(summary.length).toBeGreaterThan(0);
-	// Profile M: a move admission after an install pays at most 1 ms of synchronous seed (walker) work at p99.
-	expect(walker.firstMoves).toBeGreaterThan(0);
+	// Profile M: no move admission after an install pays more than 1 ms of synchronous seed (walker) work,
+	// a forced finish's residual included (p50/p99 are reported alongside).
+	expect(walker.firstMoves).toBeGreaterThanOrEqual(MIN_FIRST_MOVES);
 	expect(walker.walkerP99Us, `synchronous seed work in move admissions after an install: ${JSON.stringify(walker)}`).toBeLessThanOrEqual(1000);
+	expect(walker.walkerMaxUs, `synchronous seed work in move admissions after an install: ${JSON.stringify(walker)}`).toBeLessThanOrEqual(1000);
 }, 3_600_000);
