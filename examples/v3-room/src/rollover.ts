@@ -762,7 +762,10 @@ export function createV3RoomRolloverPolicy(
 	// such a move supersedes is not offered again (the newer accepted move stands in its place). A
 	// superseded given-back move is still offered again with its record (only its own row may consume
 	// the record), and the newest accepted move of its identity is offered right after it, so the newer
-	// move lands last. Either is reported (V3RoomKeptMoveSuperseded), never silently dropped.
+	// move lands last. Either is reported (V3RoomKeptMoveSuperseded), never silently dropped. The newer
+	// move offered again is a kept re-offer like any other: it takes what the epoch's budget leaves, and
+	// with none left (or while it is kept already) it waits, kept, for a later epoch, still after the
+	// older move.
 	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<"next" | "stop-new" | "stop-all"> => {
 		const identity = identityOf(operation);
 		const newest = identity === undefined ? undefined : latest.get(identity);
@@ -779,6 +782,11 @@ export function createV3RoomRolloverPolicy(
 		if (answer !== "issued") return answer;
 		if (superseded) {
 			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), true));
+			if (kept.includes(newest.operation)) return "next";
+			if (!keptRoomLeft()) {
+				keep(newest.operation, currentEpoch());
+				return "next";
+			}
 			const again = await offerOne(newest.operation);
 			return again === "issued" ? "next" : again;
 		}
