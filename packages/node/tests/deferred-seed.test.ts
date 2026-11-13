@@ -123,6 +123,77 @@ describe("deferred seed runner", () => {
 		expect(discarded).toHaveLength(1);
 	});
 
+	it("finishNow completes the pending seed in the caller's turn, delivers it once and reports the residual cost", () => {
+		const clock = host();
+		const runner = createDeferredSeedRunner<object, string>({ ...clock, turnMs: 0.5, stepBytes: 512 });
+		const owner = {};
+		const log: string[] = [];
+		const results: [string | undefined, DeferredSeedStats][] = [];
+		runner.begin(owner, {
+			start: () => seedOver(clock, 32_768, 0.0001, "base-1", log),
+			current: () => true,
+			done: (result, stats) => void results.push([result, stats]),
+		});
+		clock.pump();
+		const walkedBefore = log.length;
+		expect(walkedBefore).toBeGreaterThan(0);
+		const before = clock.now();
+		const forced = runner.finishNow(owner);
+		expect(results, "delivered in the caller's turn").toHaveLength(1);
+		const [result, stats] = results[0]!;
+		expect(result).toBe("base-1");
+		expect(forced).toEqual(stats);
+		expect(stats.forced).toBe(true);
+		expect(stats.forcedUs, "only the residual: the bytes the deferred turn had not walked").toBe(Math.round((clock.now() - before) * 1000));
+		expect(stats.forcedUs).toBeLessThan(Math.round(32_768 * 0.0001 * 1000));
+		expect(log.at(-1)).toBe("base-1:32768");
+		expect(runner.pending(owner)).toBe(false);
+		clock.drain();
+		expect(results, "the queued turn delivers nothing more").toHaveLength(1);
+		expect(runner.finishNow(owner), "nothing pending").toBeUndefined();
+	});
+
+	it("finishNow before the first turn creates the seed and walks it whole; a seed no longer current is discarded", () => {
+		const clock = host();
+		const runner = createDeferredSeedRunner<object, string>({ ...clock, turnMs: 0.5, stepBytes: 512 });
+		const owner = {};
+		const results: (string | undefined)[] = [];
+		runner.begin(owner, {
+			start: () => seedOver(clock, 4096, 0.0001, "base-1", []),
+			current: () => true,
+			done: (result) => void results.push(result),
+		});
+		expect(runner.finishNow(owner)?.forcedUs).toBe(Math.round(4096 * 0.0001 * 1000));
+		expect(results).toEqual(["base-1"]);
+		const stale = {};
+		const discarded: DeferredSeedStats[] = [];
+		runner.begin(stale, {
+			start: () => seedOver(clock, 4096, 0.0001, "base-2", []),
+			current: () => false,
+			done: (result) => void results.push(result),
+			discarded: (stats) => void discarded.push(stats),
+		});
+		expect(runner.finishNow(stale)).toBeUndefined();
+		expect(discarded).toHaveLength(1);
+		expect(runner.pending(stale)).toBe(false);
+		expect(results).toEqual(["base-1"]);
+	});
+
+	it("a seed delivered by its own turns reports no forced residual", () => {
+		const clock = host();
+		const runner = createDeferredSeedRunner<object, string>({ ...clock, turnMs: 0.5, stepBytes: 512 });
+		const owner = {};
+		const stats: DeferredSeedStats[] = [];
+		runner.begin(owner, {
+			start: () => seedOver(clock, 4096, 0.0001, "base-1", []),
+			current: () => true,
+			done: (_result, delivered) => void stats.push(delivered),
+		});
+		clock.drain();
+		expect(stats[0]?.forced).toBe(false);
+		expect(stats[0]?.forcedUs).toBe(0);
+	});
+
 	it("a refusing seed delivers undefined once; a cancelled seed delivers nothing", () => {
 		const clock = host();
 		const runner = createDeferredSeedRunner<object, string>({ ...clock, turnMs: 0.5, stepBytes: 512 });
