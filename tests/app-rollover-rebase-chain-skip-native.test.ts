@@ -931,7 +931,9 @@ it("a census does not rescan the author's outbox for each expired row", async ()
 	expect((result.plan as Record<string, number>).expire ?? 0, "rows expired by the window").toBeGreaterThanOrEqual(16);
 	// One own-fence scan answers every row of one census check. A check the close hold's census cell answers
 	// with byte-identical complete reads (recoveryCensusReuses, decision row 90) was a complete census read
-	// before, so the bound counts both: the scans must not grow with the expired rows.
+	// before, so the bound counts both: reuses were reads before 5dc5fe20, so reads + reuses is the same
+	// quantity the bound always counted, not a relaxation (same box: base 60 reads / 68 scans; 5dc5fe20
+	// 28 reads plus reuses / 58 scans). The scans must not grow with the expired rows.
 	expect(result.ownFenceScans, "own-fence scans per census check").toBeLessThanOrEqual(
 		result.recoveryCensusReads + result.recoveryCensusReuses + 8);
 }, 900_000);
