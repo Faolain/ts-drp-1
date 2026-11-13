@@ -56,18 +56,31 @@ move lands after every move the author made since.
   plan effect that sets `reissueSequence`, so it is atomic with consumption.
   - The effect carries `originSequence`.
   - It is applied in `storage-browser`, `storage-node` and the conformance store.
-- **Dropped** by the plan write that observes the reissued row settled, in either of two ways:
-  - It is admitted (the creator reached it, or it is committed in a closed epoch's frontier).
-  - It is resolved. A window expiry of the reissued row, or of a replacement of it, writes the new
-    hand-back record with `originSequence` taken from the entry and drops the entry in the same write.
+- **Dropped** only by the plan write that observes the move settled, in either of two ways:
+  - **Admitted.** The chain's last carrier (the reissued row, or the newest replacement of it) is
+    admitted. "Admitted" is decided only from the signed frontier in the installed settlement
+    capability (frontier ≥ that carrier's sequence), never from local acceptance or relay evidence.
+  - **Expired.** A window expiry of the chain's last carrier writes the new hand-back record with
+    `originSequence` taken from the entry, and drops the entry in the same write.
+- **Never dropped by replacement.** When the reissued row is displaced and replaced (a "rebase" entry
+  with `replacementSequence`), the entry stays. A later expiry of the replacement walks the links back
+  to the reissued row and needs the entry there.
 - A plan write never drops an entry otherwise. This is the same contract as for unconsumed records.
 
-**Bound.** Unconsumed records plus entries never exceed 64.
+**Bounds.** These are two separate bounds, and the sizing reserve charges both.
 
-- A reissue turns one unconsumed record into one entry.
-- `settlementBacklogOf` counts an entry's reissued row as pending until the creator reaches it, in
-  place of today's consumed-record term.
-- So `V3RoomLocalBacklogFull` (64) covers entries as it covers records.
+- **Record bound (`SETTLEMENT_HAND_BACK_LIMITS.maxRecords`, 64) counts unconsumed records only.**
+  - Entries never take a record slot in `settlementHandBacksWith`. Today a consumed record is dropped
+    at the next write and holds no slot either.
+  - An entry can live for several epochs while a member is behind. If entries took record slots, a
+    behind member would get fewer hand-back slots, more moves would hit `windowDeferredMoves`, stay
+    live and be replaced again. That per-row replacement cost is the catch-up livelock.
+- **Entry bound (64, the backlog term).**
+  - `settlementBacklogOf` counts each entry's move as pending until the chain's last carrier is
+    admitted. This replaces today's consumed-record term, which ended at the next merge.
+  - A reissue moves one unit from the record term to the entry term, so the total does not grow.
+  - `V3RoomLocalBacklogFull` (64) refuses new moves past the total, so entries ≤ 64. The codec enforces
+    `reissueOrigins.length ≤ 64` as well.
 
 **Origin at expiry.** `settlementWindowExpired` already walks the replacement links from the displaced
 row back to the move's first row to find its origin epoch.
@@ -90,8 +103,13 @@ the one owner, `issuanceSourceCustodyPlanResourceForSizing` in packages/issuance
 - **`reissueOrigins`.**
   - Existing entries are charged exactly.
   - Every record that could still be consumed reserves one entry: `min(64 - entries, unconsumed + free
-    record slots)`.
+    record slots)`. This charges the entry bound (64, backlog term) separately from the record bound
+    (64 unconsumed records), so the reserve covers up to 64 records plus 64 entries.
   - An entry is at most 53 bytes; 64 entries in the field add 3,410 bytes (measured).
+  - The entry is written in the reissue row's own issuance transaction, not only at maintenance plan
+    writes. So the admission forecast of that row charges the plan effect plus the entry, through the
+    same reserve: the reissue admission's F already includes the reserved entry, so the write never
+    exceeds what admission sized.
 - **Worst case added:** about 5.0 KB. The cap does not change.
 - **Pinned by** extending `tests/source-custody-sizing-dispositions.test.ts`. For each written shape
   (record with origin, plan with 64 entries, consumption at the bound), sized ≥ written.
@@ -118,10 +136,15 @@ the one owner, `issuanceSourceCustodyPlanResourceForSizing` in packages/issuance
   fixes the order among given-backs.
 - For apps with a displacement identity (`displacedOperationIdentity` on "rebase" actions), an entry
   gains `supersededBy?: { authorSequence }`.
-  - It is set when an own issued row with a later origin and the same identity exists.
-  - It is computed in `handBackListing` from the issued records after `originSequence`. That range is
-    bounded by the backlog.
-- This is durable, so it survives a reload.
+  - It is set when an own issued row with a later ORIGIN and the same identity exists. "Later" compares
+    origins, not sequences: another given-back's reissue has a high sequence but an older origin, so a
+    row's origin is read through `reissueOrigins` (and the replacement links).
+  - It is computed at plan-write time (the merge that lists records, and the reissue transaction that
+    adds an entry), and kept with the in-memory listing, memoized by plan revision and lineage head.
+    `settlementStatus()` is polled every second by the policy, so the listing never reads issued rows
+    per poll: in the browser those reads are the IDB transactions this campaign is removing.
+- This is durable, since it is recomputed from the plan and issued rows at open, so it survives a
+  reload.
 
 **2. The policy (examples/v3-room rollover.ts; interaction with the supersession fix)**
 
@@ -158,10 +181,19 @@ the one owner, `issuanceSourceCustodyPlanResourceForSizing` in packages/issuance
 
 - **`settlement-window.qnt`**
   - Add the move's origin to the hand-back state and the reissue.
-  - Add the invariant `authorOrderPerIdentity`: among one author's admitted rows of one identity, the
-    last admitted row carries the greatest origin.
-  - Mutant `carrierOrder` (records ordered by carrier, no `supersededBy`) must violate it.
-  - Witness `handedBackTwiceKeepsOrigin` must be reachable.
+  - Add the invariant over what the store can guarantee, `listingInAuthorOrder`:
+    - the listing is sorted by origin;
+    - an entry has `supersededBy` exactly when an own row of the same identity with a greater origin is
+      issued.
+  - Model the policy step too (offer the superseded given-back with its record, then the newest move
+    again), and check `authorOrderPerIdentity` over it: among one author's admitted rows of one
+    identity, the last admitted row carries the greatest origin.
+  - Mutant `carrierOrder` (records ordered by carrier, no `supersededBy`) must violate both.
+  - Witnesses that must be reachable:
+    - `handedBackTwiceKeepsOrigin`;
+    - `reissuedReplacedExpiredKeepsOrigin`: reissued, displaced, replaced, then expired, with the origin
+      still kept. This exercises the "never dropped by replacement" rule.
+  - Admission in the model is decided by the signed frontier only.
 - **`issuance-image-capacity.qnt`**: the origin reserve above.
 - Run with `quint verify` (Apalache via openjdk@17), as for the existing settlement models.
 
