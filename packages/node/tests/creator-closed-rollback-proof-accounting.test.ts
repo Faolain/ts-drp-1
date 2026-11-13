@@ -6503,6 +6503,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			authorization: {kind: "latched-acl", value: {writers: ["writer"]}}, issuanceScope: {objectId: "room", author: "writer"},
 			historicalIssuance: {capability: {}, originalIssuanceStore: store, count: 1, countedSequences: counted, maxEpochVertices: 64, scopeAuthorMatches: true}};
 		const bindings = {ObjectIsFrozen: Object.isFrozen, ObjectFreeze: Object.freeze, Uint8ArrayConstructor: Uint8Array,
+			v3SettlementWorkCounts: {recoveryCensusReuses: 0},
 			ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values, SetIteratorNext: Object.getPrototypeOf(new Set().values()).next,
 			ISSUANCE_RETIREMENT_LIMITS: {maxRows: 4096}, AHE_BOUNDED_READ_LIMITS, preparedMigrationTargetFloors: floors,
 			creatorOriginalIssuanceStore: () => store, durableIssuancePruningMaintenanceForStore: (value: unknown) => value === store ? maintenance : undefined,

@@ -5389,10 +5389,13 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * (readCreatorRecoveryDependencyCensus), retained source contract preparations
  * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed, own-fence outbox
  * scans (scanOwnFences) and the own fence rows those scans authenticate (ownFenceAuthentications: one
- * registered-digest Ed25519 check each, through the exact-bytes verify memo). Monotonic
+ * registered-digest Ed25519 check each, through the exact-bytes verify memo). recoveryCensusReuses
+ * counts the checks a close hold's own census cell answered with byte-identical complete reads instead
+ * of a complete census (recoveryCensusReads + recoveryCensusReuses is the former count of complete
+ * reads). Monotonic
  * process-wide scalars; never authority, never reset by the runtime.
  */
-const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
+const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, recoveryCensusReuses: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
 	ownFenceScans: 0, ownFenceAuthentications: 0, dependencyTurnCensusReads: 0, maxDependencyTurnCensusReads: 0};
 // The complete census reads each recovery close hold made (its seal and every full check), by hold.
 const recoveryCloseHoldCensusReads = new WeakMap<CreatorSnapshotRecoveryCloseHold, () => number>();
@@ -11789,7 +11792,9 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 				try {if (!sameBytes(encodeCanonical(fresh), page.bytes)) return undefined;} catch {return undefined;}
 			}
 			if (!(await verifyReplay(held))) return false;
-			return available(held) && intact() ? true : undefined;
+			if (!available(held) || !intact()) return undefined;
+			if (preparedHeld === undefined) v3SettlementWorkCounts.recoveryCensusReuses += 1;
+			return true;
 		};
 	} catch {return undefined;} // Inconclusive preparation retains the full original route.
 }
