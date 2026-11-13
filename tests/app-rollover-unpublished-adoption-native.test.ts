@@ -3,7 +3,7 @@ import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import { CANVAS_GENESIS_PROFILE } from "../examples/canvas/src/profile.js";
 import { CANVAS_ROLLOVER_BUDGET } from "../examples/canvas/src/rollover.js";
@@ -22,6 +22,32 @@ import { toCanvasWireOperation } from "../packages/blueprints/src/v3-canvas.js";
 import { type CanvasProjection, createV3CanvasApplication } from "../packages/node/src/applications/canvas.js";
 import { DRPNode } from "../packages/node/src/index.js";
 import { createNodeV3RoomStorageHost } from "../packages/storage-node/src/v3-room-host.js";
+import type * as RollbackData from "../packages/node/src/internal/creator-closed-rollback-data.js";
+
+// The browser's seal failure, injected: the next sealed source acquisition inside a creator close
+// fails as the browser's did ("creator recovery role transfer source failed ... SUBSTRATE_FAILURE"),
+// once. Disarmed, every call is the real one.
+const injection = vi.hoisted(() => ({ armed: false, injected: 0 }));
+vi.mock("../packages/node/src/internal/creator-closed-rollback-data.js", async (importOriginal) => {
+	const real = await importOriginal<typeof RollbackData>();
+	return {
+		...real,
+		acquireCreatorForwardPromotionSource: (
+			...args: Parameters<typeof real.acquireCreatorForwardPromotionSource>
+		): ReturnType<typeof real.acquireCreatorForwardPromotionSource> => {
+			if (injection.armed && args[2]?.sealed === true) {
+				injection.armed = false;
+				injection.injected++;
+				return Promise.resolve({
+					ok: false,
+					kind: "ahe-rejected",
+					cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" },
+				} as unknown as Awaited<ReturnType<typeof real.acquireCreatorForwardPromotionSource>>);
+			}
+			return real.acquireCreatorForwardPromotionSource(...args);
+		},
+	};
+});
 
 // Successor-delivery liveness (browser Grid at a447a40c, .logs/realtime-resume-2026-11-10/browser-grid/fps-gbd1):
 // the creator ended at epoch 34 and the member at 33, for good. The creator's policy sealed 33 times
@@ -305,4 +331,44 @@ it("a member that reconnects to a creator whose room adopted outside its policy 
 		() => `member follows the room's own adoption after reconnecting ${JSON.stringify(state(fixture))}`
 	);
 	console.log(`UNPUBLISHED_ADOPTION own-retry-reconnect ${JSON.stringify({ installedAfterMs, ...state(fixture) })}`);
+}, 300_000);
+
+// Real-time bar: a member follows the room's own adoption about as fast as a policy rollover.
+const OWN_RETRY_FOLLOW_MS = Number(process.env.UNPUBLISHED_ADOPTION_OWN_RETRY_FOLLOW_MS ?? 2_000);
+
+it("the policy's seal fails, the room's own interrupted-close retry adopts the successor, and an idle member follows within 2 s", async () => {
+	const fixture = await canvasRoom();
+	const next = await rollThroughPolicy(fixture, 2, 0);
+	const before = epochOf(fixture.creator.room);
+	const rolled = fixture.creator.events.length;
+	const policy = required(fixture.creator.policy);
+	// The next rollover's seal fails inside the close, after staging, as in the browser.
+	injection.armed = true;
+	let index = next;
+	while (injection.injected === 0 && index < next + 4 * CANVAS_ROLLOVER_BUDGET.movesPerAuthor) {
+		await policy.issue(paint(index++));
+		await policy.settled();
+	}
+	expect(injection.injected, "the policy's seal met the injected failure").toBe(1);
+	expect(fixture.creator.events.length, "the policy's rollover failed").toBe(rolled);
+	// The room's own retry seals and adopts; nothing moves on the creator from here on.
+	const adoptedAfterMs = await until(
+		() => epochOf(fixture.creator.room) === before + 1,
+		30_000,
+		() => `the room's own retry adopts ${JSON.stringify(state(fixture))}`
+	);
+	const followedAfterMs = await until(
+		() => epochOf(fixture.member.room) === before + 1,
+		RECOVERY_MS,
+		() => `member follows the room's own retry ${JSON.stringify(state(fixture))}`
+	);
+	console.log(
+		`UNPUBLISHED_ADOPTION real-retry ${JSON.stringify({ adoptedAfterMs, followedAfterMs, ...state(fixture) })}`
+	);
+	expect(fixture.creator.events.length, "the policy did not roll").toBe(rolled);
+	expect(followedAfterMs, "the member installed within the real-time bound of the room's adoption").toBeLessThanOrEqual(
+		OWN_RETRY_FOLLOW_MS
+	);
+	await rollThroughPolicy(fixture, 1, index + 100);
+	expect(epochOf(fixture.member.room)).toBe(before + 2);
 }, 300_000);
