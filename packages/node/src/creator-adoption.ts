@@ -1439,13 +1439,29 @@ export async function stepCreatorRecipientRecoveryPool(input: Readonly<{
 	recoveryContext: CreatorRecipientRecoveryContext;
 }>): Promise<Readonly<{step: "done" | "more" | "deferred"; result: CreatorRecoveryPoolResult}>> {
 	const deferredBusy = Object.freeze({step: "deferred" as const, result: Object.freeze({kind: "deferred" as const, reason: "busy" as const})});
-	// Any lull entry, even one that defers, ends the previous lull's boundary.
+	const recorded = reconciledReceivedTurnovers.get(input.plane);
+	// Any lull entry, even one that defers, ends the previous lull's boundary (unless it is
+	// still current, below).
 	reconciledReceivedTurnovers.delete(input.plane);
 	const source = resolveCreatorRecipientRegistration(input.plane, false);
 	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
 		return Object.freeze({step: "done", result: Object.freeze({kind: "deferred", reason: "unsupported"})});
 	if (!sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust)) return deferredBusy;
 	const epoch = source.currentTrust.currentEpoch;
+	// A fresh lull at the exact boundary this plane's previous lull settled (same head, current
+	// Cut, recovery inventory and own settlement plan): those passes already reached the
+	// journal-drain fixpoint from these inputs, which is what lets the install skip its own
+	// turnover. Running them again reconciles nothing, so the lull keeps that boundary.
+	if (recorded !== undefined && !recipientLullProgress.has(input.plane)) {
+		try {
+			const current = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
+				(await source.inspectQueuedNativeHead()).candidates);
+			if (current !== undefined && sameReceivedTurnoverBoundary(current, recorded)) {
+				reconciledReceivedTurnovers.set(input.plane, recorded);
+				return Object.freeze({step: "done", result: Object.freeze({kind: "not-needed"})});
+			}
+		} catch { /* Unreadable: the lull runs its passes as before. */ }
+	}
 	// Written inside the boundary's callback, so held in an object (not narrowed across it).
 	const run: {progress?: Readonly<{epoch: number; state: ReceivedTurnoverPassState}>; input?: ReceivedTurnoverPassInput} = {};
 	run.progress = recipientLullProgress.get(input.plane);
