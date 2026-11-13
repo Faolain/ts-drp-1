@@ -152,7 +152,9 @@ async function canvasRoom() {
 			role,
 			objectId,
 			channel: createV3RoomSuccessorChannel(node, objectId),
-			hooks: { onError: (error) => errors.push(error) },
+			// As the pages wire it (examples/grid/src/v3-zone.ts): a member pulling from behind a successor
+			// the room adopted outside the policy has the policy publish it.
+			hooks: { onError: (error) => errors.push(error), onMemberBehind: () => void policy?.publishCurrent() },
 		});
 		closers.add(() => delivery.close());
 		const policy =

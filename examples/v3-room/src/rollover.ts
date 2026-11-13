@@ -1,3 +1,4 @@
+import { decodeCanonical } from "@ts-drp/canonical";
 import { isV3RoomClosePendingRefusal, V3RoomAwaitingAuthorFence, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
 import type { V3RoomAcceptedVertex, V3RoomHandBack, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
 
@@ -271,6 +272,17 @@ export interface V3RoomRolloverPolicy {
 	waiting(): number;
 	/** The state the page shows, with the moves a member kept (see V3RoomSuccessorUnavailable). */
 	status(): V3RoomRolloverStatus;
+	/**
+	 * Creator: publishes the successor its room adopted when this policy published none for it, and
+	 * nothing otherwise. The room adopts outside the policy when its own retry of an interrupted
+	 * close seals and adopts (the policy's failed seal handed the close to that retry), and a creator
+	 * reopened from storage starts at an epoch no offer of this page announced. The page calls it when
+	 * a member pulls from behind the room's epoch with no offer for it (the successor delivery's
+	 * `onMemberBehind`). It exports the room's successor (which also opens its material serving) and
+	 * hands it to `publishSuccessor`. A rollover in flight publishes its own successor, so this joins
+	 * it; one export at a time, serialized with rollovers. A member ignores it.
+	 */
+	publishCurrent(): Promise<void>;
 	/** Joins an in-flight rollover (tests and orderly shutdown). */
 	settled(): Promise<void>;
 	stats(): Readonly<{ epoch: number; rollovers: number; moves: number; weight: number }>;
@@ -336,6 +348,22 @@ function message(error: unknown): string {
 }
 
 /**
+ * The epoch an exported offer installs: its successor trust record's `currentEpoch`.
+ * @param offer - An offer the creator's room exported.
+ * @returns The successor epoch, or undefined when the record carries none.
+ */
+function offerSuccessorEpoch(offer: V3RoomSuccessorOffer): number | undefined {
+	let record: unknown;
+	try {
+		record = decodeCanonical(offer.exactCanonicalTrustStateRecordBytes);
+	} catch {
+		return undefined;
+	}
+	const epoch = record !== null && typeof record === "object" ? Reflect.get(record, "currentEpoch") : undefined;
+	return Number.isSafeInteger(epoch) && Number(epoch) >= 1 ? Number(epoch) : undefined;
+}
+
+/**
  * Runs `work` in a later host task, at idle priority where the host has one: the rollover is
  * background work and never runs inside the turn that admitted a move. The room's seal already
  * yields between its native phases and defers to registered foreground issues.
@@ -393,6 +421,8 @@ export function createV3RoomRolloverPolicy(
 	let scheduled = false;
 	let retryAt = 0;
 	let failures = 0;
+	// Creator: the highest successor epoch handed to publishSuccessor.
+	let published = 0;
 	let waiting = 0;
 	let successorWaits = 0;
 	const kept: Readonly<Record<string, unknown>>[] = [];
@@ -514,6 +544,7 @@ export function createV3RoomRolloverPolicy(
 			rollovers++;
 			failures = 0;
 			retryAt = 0;
+			published = Math.max(published, sealed.successorEpoch);
 			advance(sealed.successorEpoch);
 			hooks.onRollover?.(
 				Object.freeze({
@@ -547,6 +578,41 @@ export function createV3RoomRolloverPolicy(
 			.finally(() => {
 				rolling = undefined;
 				// Work admitted while the rollover ran counts in the successor epoch.
+				if (overBudget()) schedule("budget");
+			});
+		return rolling;
+	};
+	const publishCurrent = (): Promise<void> => {
+		const selected = room;
+		if (selected === undefined || closed || role !== "creator") return Promise.resolve();
+		// A rollover in flight (or this catch-up) publishes the successor it adopts.
+		if (rolling !== undefined) return rolling;
+		const current = currentEpoch();
+		if (current < 1 || current <= published) return Promise.resolve();
+		const task = (async (): Promise<void> => {
+			const offer = await selected.exportCreatorSuccessor();
+			const successorEpoch = offerSuccessorEpoch(offer);
+			// The room moved on during the export: a later pull publishes the newer successor.
+			if (closed || currentEpoch() !== current) return;
+			if (successorEpoch !== current)
+				throw new TypeError(`v3 room successor export is for epoch ${String(successorEpoch)}, the room is at ${current}`);
+			published = Math.max(published, current);
+			advance(current);
+			await hooks.publishSuccessor?.(offer, current);
+		})();
+		rolling = task
+			.then(
+				() => undefined,
+				(error: unknown) => {
+					if (SESSION_CLOSED.test(message(error))) {
+						close();
+						return;
+					}
+					hooks.onError?.(error);
+				}
+			)
+			.finally(() => {
+				rolling = undefined;
 				if (overBudget()) schedule("budget");
 			});
 		return rolling;
@@ -928,6 +994,7 @@ export function createV3RoomRolloverPolicy(
 			});
 		},
 		issue,
+		publishCurrent,
 		waiting: (): number => waiting,
 		status,
 		settled: async (): Promise<void> => {
