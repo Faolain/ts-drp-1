@@ -71,6 +71,7 @@ export {
 	createV3RoomRolloverPolicy,
 	V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS,
 	V3_ROOM_NOT_REACHING_HOST_MARGIN,
+	V3RoomAwaitingFence,
 	V3RoomNotReachingHost,
 	V3RoomReadOnly,
 	type V3RoomRolloverBudget,
@@ -105,6 +106,15 @@ export {
 	v3RoomLegacyDatabaseName,
 	v3RoomPlayerDatabaseName,
 } from "./player-database.js";
+export {
+	createV3RoomWorkerReservations,
+	V3_ROOM_WORKER_ERROR_CODECS,
+	v3RoomWorkerNodeConfig,
+	type V3RoomWorkerReservations,
+	type V3RoomWorkerIdentity,
+	v3RoomWorkerPeerCacheKeys,
+} from "./worker.js";
+export { forwardV3RoomWorkerObservation } from "./worker-observation.js";
 
 const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openAhe: (databaseName: string) => createBrowserAheDurableStore({ databaseName }),

@@ -23,6 +23,7 @@
 		"@ts-drp/outcome-commit": "workspace:*",
 		"@ts-drp/relay-policy": "0.11.0",
 		"@ts-drp/rendezvous": "0.11.0",
+		"@ts-drp/room-worker": "workspace:*",
 		"@ts-drp/routing-browser": "0.11.0",
 		"@ts-drp/tracer": "^0.11.0",
 		"@ts-drp/types": "^0.11.0"

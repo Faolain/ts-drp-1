@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { V3ZoneApi as ProductZoneApi } from "../examples/grid/src/v3-zone";
 
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+import { installRealtimeProbe } from "./fixtures/realtime-probe/page-probe.js";
 import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
 
 const { decodeCanonical } = (
@@ -75,7 +76,7 @@ interface NetworkSnapshot {
 	readonly connectionBudget: Readonly<{
 		readonly maxConnections: number;
 		readonly maxParallelDials: number;
-		readonly role: "browser";
+		readonly role: "browser" | "worker";
 	}>;
 	readonly connections: readonly unknown[];
 	readonly peerId: string;
@@ -85,6 +86,7 @@ declare global {
 	interface Window {
 		readonly __TS_DRP_GRID_SESSION__?: { snapshot(): NetworkSnapshot };
 		readonly __TS_DRP_V3_ZONE__?: ZoneApi;
+		readonly __TS_DRP_GRID_ROOM_WORKER__?: unknown;
 	}
 }
 
@@ -98,6 +100,9 @@ test("bounded real Grid movement overlaps placement and observes healthy rollove
 	// creator adoption must not advance a still-predecessor recipient's floor.
 	await installGridRoomHeadAuthority([contexts[0]!]);
 	await installGridRoomHeadAuthority([contexts[1]!], "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__", "create");
+	// rAF intervals, long tasks and ephemeral RTC entries come from the shared realtime probe
+	// (tests/fixtures/realtime-probe/page-probe.ts), started and stopped with each phase below.
+	for (const context of contexts) await installRealtimeProbe(context, {app: "none", injectBlockMs: 0, injectEveryFrames: 0, autoStart: false, heartbeatMs: 0});
 	await Promise.all(contexts.map(context => context.addInitScript(() => {
 		const nativePromise = globalThis.Promise;
 		// Observe the existing product hook, retaining only bounded primitive
@@ -125,21 +130,22 @@ test("bounded real Grid movement overlaps placement and observes healthy rollove
 		// Local test observations only: no packets, authorities, stores or handles
 		// are retained. Original RTC calls/listeners and application rendering run.
 		const limit = 128, rows: {kind: string; at: number; pending: boolean; detail?: string}[] = [];
-		let active = false, pending = false, truncated = false, frame = 0, timer = 0, droppedRows = 0;
-		let frameCount = 0, lastFrameAt: number | undefined, maximumObservedFrameGapMs = 0;
+		let active = false, pending = false, truncated = false, timer = 0, droppedRows = 0;
 		const stageLimit = 16, stageRows: {stage: string; edge: "start" | "complete"; at: number}[] = [];
 		let stage: string | undefined, droppedStageRows = 0;
 		const probeLimit = 64;
 		type Probe = {sequence: number; requestedPhase: string; expectedLeft: string; expectedTop: string; armedAt: number;
 			inputAt?: number; inputStage?: string; positionObservedAt?: number; positionObservedStage?: string; lastRtcMessageEntryAt?: number; messageEntriesAtPosition?: number};
 		const probes = new Map<number, Probe>();
-		let armedProbe: number | undefined, droppedProbes = 0, rtcSendEntries = 0, rtcMessageEntries = 0;
-		let lastRtcMessageEntryAt: number | undefined;
+		let armedProbe: number | undefined, droppedProbes = 0;
 		let startedAt: number | undefined, completedAt: number | undefined;
 		let input: {at: number; pending: boolean; key: string} | undefined;
 		let keydownCount = 0;
-		let longTaskObserver: PerformanceObserver | undefined;
-		let longTaskCount = 0, longTaskMilliseconds = 0, maximumLongTaskMilliseconds = 0;
+		type ProbeTotals = {frameCallbacks: number; maxFrameIntervalMs: number; lastFrameAt: number | null; longTasks: number; longTaskMs: number;
+			maxLongTaskMs: number; rtcSendEntries: number; rtcMessageEntries: number; lastRtcMessageEntryAt: number | null};
+		const realtime = Reflect.get(globalThis, "__TS_DRP_REALTIME_PROBE__") as {start(): void; stop(): void; reset(): void; totals(): ProbeTotals;
+			subscribe(listener: (kind: string, detail?: string) => void): () => void} | undefined;
+		if (realtime === undefined) throw Error("D9346_REALTIME_PROBE_ABSENT");
 		// Invocation counters only: never retain a request, transaction, key or result.
 		// The enclosing evidence phase supplies placement/rollover identity; these
 		// three buckets classify the call against the original pending marker.
@@ -267,22 +273,9 @@ test("bounded real Grid movement overlaps placement and observes healthy rollove
 				try {watchChannel(this);} catch { /* Original native close still runs. */ }
 				lifecycle("channel-close-call", undefined, this); return Reflect.apply(nativeChannelClose, this, args);
 			}});
-		const nativeSend = RTCDataChannel.prototype.send, nativeListen = RTCDataChannel.prototype.addEventListener;
-		const watched = new WeakSet<RTCDataChannel>();
-		Object.defineProperty(RTCDataChannel.prototype, "send", {configurable: true, writable: true,
-			value: function (this: RTCDataChannel, data: unknown) {
-				if (this.label === "ts-drp-ephemeral/1") {if (active) rtcSendEntries++; record("rtc-send-entry");}
-				return Reflect.apply(nativeSend, this, [data]);
-			}});
-		Object.defineProperty(RTCDataChannel.prototype, "addEventListener", {configurable: true, writable: true,
-			value: function (this: RTCDataChannel, type: string, listener: unknown, options?: unknown) {
-				if (type === "message" && this.label === "ts-drp-ephemeral/1" && !watched.has(this)) {
-						watched.add(this); Reflect.apply(nativeListen, this, ["message", () => {
-							if (active) {rtcMessageEntries++; lastRtcMessageEntryAt = performance.now();} record("rtc-message-entry");
-						}]);
-				}
-				return Reflect.apply(nativeListen, this, [type, listener, options]);
-			}});
+		// Shared probe events enter this phase trace exactly as the inline observers recorded them.
+		const sharedKinds = new Set(["animation-frame-opportunity", "long-task", "rtc-send-entry", "rtc-message-entry"]);
+		realtime.subscribe((kind, detail) => {if (sharedKinds.has(kind)) record(kind, detail);});
 		window.addEventListener("keydown", event => {
 			if (active) {
 				keydownCount++; input = {at: performance.now(), pending, key: event.key};
@@ -298,43 +291,25 @@ test("bounded real Grid movement overlaps placement and observes healthy rollove
 				rows.length = 0; truncated = false; droppedRows = 0; active = true; pending = false;
 				rtcLifecycleRows.length = 0;
 				for (const kind of Object.keys(rtcLifecycleTotals) as RtcLifecycleKind[]) {rtcLifecycleTotals[kind] = 0; rtcLifecycleOverflow[kind] = 0;}
-				frameCount = 0; lastFrameAt = undefined; maximumObservedFrameGapMs = 0;
 				stageRows.length = 0; stage = undefined; droppedStageRows = 0;
-				probes.clear(); armedProbe = undefined; droppedProbes = 0; rtcSendEntries = 0; rtcMessageEntries = 0; lastRtcMessageEntryAt = undefined;
+				probes.clear(); armedProbe = undefined; droppedProbes = 0;
 				startedAt = undefined; completedAt = undefined; input = undefined; keydownCount = 0; observedKinds.clear();
-				longTaskCount = 0; longTaskMilliseconds = 0; maximumLongTaskMilliseconds = 0;
 				getKeyTotals.fill(0); getKeyOverflow.fill(0); getKeyStores.clear(); getKeyNameTruncated = false;
-				if (PerformanceObserver.supportedEntryTypes.includes("longtask")) {
-					longTaskObserver = new PerformanceObserver(list => {
-						if (!active) return;
-						for (const entry of list.getEntries()) {
-							longTaskCount++; longTaskMilliseconds += entry.duration;
-							maximumLongTaskMilliseconds = Math.max(maximumLongTaskMilliseconds, entry.duration);
-							record("long-task", JSON.stringify({startTime: entry.startTime, duration: entry.duration}));
-						}
-					});
-					longTaskObserver.observe({type: "longtask", buffered: false});
-				}
+				realtime.reset(); realtime.start();
 				const grid = document.getElementById("grid");
 				if (grid === null) throw Error("D9346_REAL_RENDERER_ABSENT");
 				mutation = new MutationObserver(() => {
 					const dot = [...grid.querySelectorAll<HTMLElement>("[data-glowing-peer-id]")].find(value => value.dataset.glowingPeerId === peerId);
 					if (dot !== undefined) for (const probe of probes.values()) {
 						if (probe.positionObservedAt === undefined && dot.style.left === probe.expectedLeft && dot.style.top === probe.expectedTop) {
-							probe.positionObservedAt = performance.now(); probe.positionObservedStage = stage; probe.lastRtcMessageEntryAt = lastRtcMessageEntryAt;
-							probe.messageEntriesAtPosition = rtcMessageEntries;
+							const shared = realtime.totals();
+							probe.positionObservedAt = performance.now(); probe.positionObservedStage = stage; probe.lastRtcMessageEntryAt = shared.lastRtcMessageEntryAt ?? undefined;
+							probe.messageEntriesAtPosition = shared.rtcMessageEntries;
 						}
 					}
 					record("dom-update-observed", dot === undefined ? "absent" : `${dot.style.left};${dot.style.top}`);
 				});
 				mutation.observe(grid, {childList: true, subtree: true, attributes: true});
-				const next = (): void => {
-					const at = performance.now(); frameCount++;
-					if (lastFrameAt !== undefined) maximumObservedFrameGapMs = Math.max(maximumObservedFrameGapMs, at - lastFrameAt);
-					lastFrameAt = at; record("animation-frame-opportunity", document.visibilityState);
-					if (active) frame = requestAnimationFrame(next);
-				};
-				frame = requestAnimationFrame(next);
 				let due = performance.now() + 50;
 				timer = window.setInterval(() => {record("timer-drift", String(Math.max(0, performance.now() - due))); due = performance.now() + 50;}, 50);
 			},
@@ -352,7 +327,10 @@ test("bounded real Grid movement overlaps placement and observes healthy rollove
 				armedProbe = sequence;
 			},
 			get started() {return startedAt !== undefined;},
-			stop() {const activeAtStop = active, stoppedAt = performance.now(); active = false; mutation?.disconnect(); longTaskObserver?.disconnect(); cancelAnimationFrame(frame); clearInterval(timer);
+			stop() {const activeAtStop = active, stoppedAt = performance.now(); active = false; mutation?.disconnect(); realtime.stop(); clearInterval(timer);
+				const shared = realtime.totals(), frameCount = shared.frameCallbacks, lastFrameAt = shared.lastFrameAt ?? undefined;
+				const maximumObservedFrameGapMs = shared.maxFrameIntervalMs, rtcSendEntries = shared.rtcSendEntries, rtcMessageEntries = shared.rtcMessageEntries;
+				const longTaskCount = shared.longTasks, longTaskMilliseconds = shared.longTaskMs, maximumLongTaskMilliseconds = shared.maxLongTaskMs;
 				return {timeOrigin: performance.timeOrigin, visibility: document.visibilityState, rows: [...rows], truncated, droppedRows, limit, activeAtStop,
 					nativeRtcLifecycle: {rows: [...rtcLifecycleRows], limit: rtcLifecycleLimit, stackByteLimit: rtcStackByteLimit,
 						totals: {...rtcLifecycleTotals}, overflow: {...rtcLifecycleOverflow},
@@ -664,18 +642,29 @@ function escaped(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
-async function openGrid(page: Page): Promise<void> {
-	await page.goto("/");
+/**
+ * D9346_ROOM_WORKER opts the two-client scenario's pages into the room worker (`?roomWorker`):
+ * "both", or one role ("creator" or "joiner") for a main-thread tab beside a worker tab. Unset,
+ * every page runs the zone on the main thread, as before.
+ */
+const ROOM_WORKER_ROLES = process.env.D9346_ROOM_WORKER ?? "";
+
+async function openGrid(page: Page, role?: "creator" | "joiner"): Promise<void> {
+	const worker = role !== undefined && (ROOM_WORKER_ROLES === "both" || ROOM_WORKER_ROLES === role);
+	await page.goto(worker ? "/?roomWorker" : "/");
+	if (worker) await page.waitForFunction(() => window.__TS_DRP_GRID_ROOM_WORKER__ !== undefined);
 	await page.waitForFunction(() => window.__TS_DRP_GRID_SESSION__ !== undefined);
 	await expect(page.locator("#loadingMessage")).toBeHidden();
 	await page.waitForFunction(() => window.__TS_DRP_V3_ZONE__ !== undefined, undefined, { timeout: 10_000 });
 }
 
 async function zone(page: Page): Promise<ZoneSnapshot> {
-	return page.evaluate(() => {
+	return page.evaluate(async () => {
 		const api = window.__TS_DRP_V3_ZONE__;
 		if (api === undefined) throw new Error("D9346_V3_ZONE_API_ABSENT");
-		return api.snapshot();
+		// A room-worker zone's snapshot() is the zone it last published; refresh() reads the current one.
+		const refresh = Reflect.get(api, "refresh") as (() => Promise<ZoneSnapshot>) | undefined;
+		return refresh === undefined ? api.snapshot() : await refresh.call(api);
 	});
 }
 
@@ -747,8 +736,10 @@ async function expectOneMeasuredRawMovement(input: {
 	}
 }
 
-function expectWithinInstalledBudget(snapshot: NetworkSnapshot): void {
-	expect(snapshot.connectionBudget).toEqual({ maxConnections: 48, maxParallelDials: 6, role: "browser" });
+function expectWithinInstalledBudget(snapshot: NetworkSnapshot, role?: "creator" | "joiner"): void {
+	// A room worker's node resolves the worker profile, the same budget as the browser's.
+	const worker = role !== undefined && (ROOM_WORKER_ROLES === "both" || ROOM_WORKER_ROLES === role);
+	expect(snapshot.connectionBudget).toEqual({ maxConnections: 48, maxParallelDials: 6, role: worker ? "worker" : "browser" });
 	expect(snapshot.connections.length).toBeLessThanOrEqual(snapshot.connectionBudget.maxConnections);
 }
 
@@ -762,10 +753,10 @@ test("two real network clients recover and converge one durable v3 zone while mo
 	const creator = await creatorContext.newPage();
 	let joiner = await joinerContext.newPage();
 	try {
-		await Promise.all([openGrid(creator), openGrid(joiner)]);
+		await Promise.all([openGrid(creator, "creator"), openGrid(joiner, "joiner")]);
 		const [creatorNetwork, joinerNetwork] = await Promise.all([networkSnapshot(creator), networkSnapshot(joiner)]);
-		expectWithinInstalledBudget(creatorNetwork);
-		expectWithinInstalledBudget(joinerNetwork);
+		expectWithinInstalledBudget(creatorNetwork, "creator");
+		expectWithinInstalledBudget(joinerNetwork, "joiner");
 		const creatorPeerId = creatorNetwork.peerId;
 		const joinerPeerId = joinerNetwork.peerId;
 		const [creatorEnrollment, joinerEnrollment] = await Promise.all([zone(creator), zone(joiner)]);
@@ -842,7 +833,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await expect(creator.locator('[data-block-id="offline"]')).toBeVisible();
 
 		joiner = await joinerContext.newPage();
-		await openGrid(joiner);
+		await openGrid(joiner, "joiner");
 		const reopened = await zone(joiner);
 		expect(reopened.enrollment).toBe(joinerEnrollment.enrollment);
 		expect(reopened.localAuthor).toBe(joinerEnrollment.localAuthor);
@@ -902,7 +893,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		});
 		await expect.poll(async () => (await zone(creator)).zoneId).toBe(targetObjectId);
 		joiner = await joinerContext.newPage();
-		await openGrid(joiner);
+		await openGrid(joiner, "joiner");
 		await joiner.fill("#gridInput", created.invite);
 		await joiner.click("#joinGrid");
 		await expect.poll(async () => (await zone(joiner)).zoneId).toBe(targetObjectId);
@@ -921,7 +912,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.close());
 		await joiner.close();
 		joiner = await joinerContext.newPage();
-		await openGrid(joiner);
+		await openGrid(joiner, "joiner");
 		await joiner.fill("#gridInput", created.invite);
 		await joiner.click("#joinGrid");
 		await expect.poll(async () => (await zone(joiner)).zoneId).toBe(targetObjectId);
