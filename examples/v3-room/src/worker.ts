@@ -22,7 +22,14 @@ import { errorCodec, type RoomWorkerErrorCodec } from "@ts-drp/room-worker";
 import type { DRPNodeConfig } from "@ts-drp/types";
 
 import { V3RoomPlayerDatabaseMigrationUnavailable } from "./player-database.js";
-import { V3RoomAwaitingFence, V3RoomNotReachingHost, V3RoomReadOnly, V3RoomSuccessorUnavailable } from "./rollover.js";
+import {
+	V3RoomAwaitingFence,
+	V3RoomBusy,
+	V3RoomKeptMoveRefused,
+	V3RoomNotReachingHost,
+	V3RoomReadOnly,
+	V3RoomSuccessorUnavailable,
+} from "./rollover.js";
 
 /** Codecs of every exported V3Room* error, and the coded DRPError. */
 export const V3_ROOM_WORKER_ERROR_CODECS: readonly RoomWorkerErrorCodec[] = Object.freeze([
@@ -35,6 +42,8 @@ export const V3_ROOM_WORKER_ERROR_CODECS: readonly RoomWorkerErrorCodec[] = Obje
 	errorCodec("V3RoomReadOnly", V3RoomReadOnly),
 	errorCodec("V3RoomNotReachingHost", V3RoomNotReachingHost),
 	errorCodec("V3RoomAwaitingFence", V3RoomAwaitingFence),
+	errorCodec("V3RoomBusy", V3RoomBusy),
+	errorCodec("V3RoomKeptMoveRefused", V3RoomKeptMoveRefused),
 	errorCodec("V3RoomPlayerDatabaseMigrationUnavailable", V3RoomPlayerDatabaseMigrationUnavailable),
 	// DRPError carries a symbol brand (isDRPError) a data copy cannot restore: rebuild it.
 	errorCodec("DRPError", DRPError, {
