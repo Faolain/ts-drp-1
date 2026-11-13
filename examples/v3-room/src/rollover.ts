@@ -243,7 +243,7 @@ type RolloverRoom = Pick<
 	V3RoomSession,
 	"adoptCreatorSuccessor" | "authority" | "exportCreatorSuccessor" | "issue" | "sealEpoch"
 > &
-	Partial<Pick<V3RoomSession, "settlementStatus">>;
+	Partial<Pick<V3RoomSession, "settlementStatus" | "onAdopted">>;
 
 export interface V3RoomRolloverPolicy {
 	/** "creator" seals; a "member" (Writer) never seals and only re-offers refused moves. */
@@ -276,9 +276,10 @@ export interface V3RoomRolloverPolicy {
 	 * Creator: publishes the successor its room adopted when this policy published none for it, and
 	 * nothing otherwise. The room adopts outside the policy when its own retry of an interrupted
 	 * close seals and adopts (the policy's failed seal handed the close to that retry), and a creator
-	 * reopened from storage starts at an epoch no offer of this page announced. The page calls it when
+	 * reopened from storage starts at an epoch no offer of this page announced. The policy calls it as
+	 * soon as its room reports such an adoption (the session's `onAdopted`), and the page calls it when
 	 * a member pulls from behind the room's epoch with no offer for it (the successor delivery's
-	 * `onMemberBehind`). It exports the room's successor (which also opens its material serving) and
+	 * `onMemberBehind`, the backstop for an adoption no event reported, such as one at reopen). It exports the room's successor (which also opens its material serving) and
 	 * hands it to `publishSuccessor`. A rollover in flight publishes its own successor, so this joins
 	 * it; one export at a time, serialized with rollovers. A member ignores it.
 	 */
@@ -448,8 +449,11 @@ export function createV3RoomRolloverPolicy(
 	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastStatus = "";
 	const epochWaiters = new Set<() => void>();
+	let stopAdoptions: (() => void) | undefined;
 	function close(): void {
 		closed = true;
+		stopAdoptions?.();
+		stopAdoptions = undefined;
 		if (idleTimer !== undefined) clearTimeout(idleTimer);
 		if (keptTimer !== undefined) clearTimeout(keptTimer);
 		if (settlementTimer !== undefined) clearTimeout(settlementTimer);
@@ -970,6 +974,8 @@ export function createV3RoomRolloverPolicy(
 			if (room !== undefined) throw new TypeError("v3 room rollover policy is already bound");
 			// The room's epoch is read at the policy's first decision, not here.
 			room = selected;
+			// A successor the room adopted by itself (its interrupted-close retry) is published at once.
+			if (role === "creator") stopAdoptions = selected.onAdopted?.(() => void publishCurrent());
 			watchSettlement();
 		},
 		observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void {

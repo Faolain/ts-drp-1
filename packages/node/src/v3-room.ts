@@ -754,6 +754,14 @@ export interface V3RoomIssueReceipt {
 	readonly published: Promise<void>;
 }
 
+/**
+ * A successor the creator's session adopted by itself, not through a host's `adoptCreatorSuccessor`:
+ * `"retry"` is its own retry of an interrupted close (a failed or killed close is sealed again and its
+ * successor adopted with no host call). A host that announces successors (the rollover policy's
+ * `publishSuccessor`) exports and publishes it, since no host call returned it.
+ */
+export type V3RoomCreatorAdoption = Readonly<{ epoch: number; source: "retry" }>;
+
 export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
 	/** Ordinary close retains custody; explicit retirement permanently abandons this local incarnation only. */
 	readonly localSession?: Readonly<{ selector: V3RoomLocalSessionSelector; retire(): Promise<void> }>;
@@ -832,6 +840,12 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	sealEpoch(): Promise<CreatorLiveCloseResult>;
 	status(): CreatorLiveCloseStatus;
+	/**
+	 * Creator: every successor this session adopts by itself (V3RoomCreatorAdoption), reported once
+	 * the adoption completed, to each listener registered then. A listener's throw is contained.
+	 * @returns Unsubscribe.
+	 */
+	onAdopted?(listener: (adoption: V3RoomCreatorAdoption) => void): () => void;
 	/**
 	 * Sync before sending: "current" once this session may sign new moves. A writer that reopened
 	 * its own lineage from storage is "not-yet-current" until it installs a creator successor in this
@@ -6243,6 +6257,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		| Readonly<{ sealed: Promise<CreatorLiveCloseResult>; adopted: Promise<void> }>
 		| undefined;
 	let joinedRetryAdoption: Promise<void> | undefined;
+	// Listeners for the adoptions this session performs by itself (its interrupted-close retry).
+	const adoptionListeners = new Set<(adoption: V3RoomCreatorAdoption) => void>();
 	// Opt-in lull once per epoch, requested right after adoption or install (Track Z). The
 	// request is held until the next lifecycle admission, so the export of the successor an
 	// adoption produced is admitted ahead of the lull and the offer is not published behind a
@@ -10549,6 +10565,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				return scheduledLulls === undefined ? lull() : scheduledLulls.run(scheduled, lull);
 			});
 		},
+		onAdopted(listener: (adoption: V3RoomCreatorAdoption) => void): () => void {
+			adoptionListeners.add(listener);
+			return () => {
+				adoptionListeners.delete(listener);
+			};
+		},
 		sealEpoch(): Promise<CreatorLiveCloseResult> {
 			if (input.receiveOnly) return Promise.reject(new TypeError("v3 room is receive-only"));
 			// The session's own retry of an interrupted close is in flight: this is
@@ -10692,6 +10714,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					await adopted;
 				} finally {
 					if (interruptedCloseRetryJoin === join) interruptedCloseRetryJoin = undefined;
+				}
+				// No host call returned this successor: tell the host so it can export and announce it.
+				const epoch = session.authority()?.epoch;
+				if (epoch === undefined || closed) return;
+				const adoption: V3RoomCreatorAdoption = Object.freeze({ epoch, source: "retry" });
+				for (const listener of [...adoptionListeners]) {
+					try {
+						listener(adoption);
+					} catch {
+						// A listener's failure is its own; the adoption stands.
+					}
 				}
 			},
 			setTimer: (callback, milliseconds) => {

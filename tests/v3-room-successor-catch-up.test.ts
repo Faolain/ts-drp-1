@@ -208,3 +208,30 @@ it("a member pulling from behind a successor its creator room adopted outside th
 	expect(fixture.calls.exports).toEqual([2]);
 	expect(errors).toEqual([]);
 }, 20_000);
+
+it("a successor the room reports adopting by itself (onAdopted) is published at once, with no member pull", async () => {
+	const fixture = creatorRoom();
+	const listeners = new Set<(adoption: { epoch: number; source: "retry" }) => void>();
+	const room = {
+		...fixture.room,
+		onAdopted: (listener: (adoption: { epoch: number; source: "retry" }) => void) => {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+	};
+	const published: number[] = [];
+	const errors: unknown[] = [];
+	const policy = creatorPolicy(room as never, published, errors);
+	expect(listeners.size, "the creator policy subscribes at bind").toBe(1);
+	await policy.publishCurrent();
+	fixture.adoptOutsidePolicy();
+	const started = performance.now();
+	for (const listener of listeners) listener({ epoch: 2, source: "retry" });
+	await policy.settled();
+	expect(published).toEqual([1, 2]);
+	expect(performance.now() - started, "an export, no poll").toBeLessThan(500);
+	expect(fixture.calls.exports).toEqual([1, 2]);
+	policy.close();
+	expect(listeners.size, "closing the policy unsubscribes").toBe(0);
+	expect(errors).toEqual([]);
+});
