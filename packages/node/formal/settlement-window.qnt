@@ -558,3 +558,275 @@ module settlementWindowTwo {
     .then(creatorAdvance).then(installWith(Set()))
     .then(all { assert(backlog == 0 and moveState.get(0) == "done" and moveState.get(1) == "done" and safety), creatorAdvance })
 }
+
+// Given-back author order (track 46, reissueOrigins). One author, one displacement identity (every move
+// overwrites the same cell, as a Grid block placement), seen after a reload (the policy has no
+// in-memory history: only the room's durable listing and its supersededBy).
+//
+// Facts the model takes from the code:
+//   - A move's origin is the author sequence of its first row. A replacement (plan entry
+//     replacementSequence) and a reissue keep it; a fresh move (an ask, or the policy's re-offer of
+//     the newest move) starts a new one.
+//   - Admission is decided by the creator's signed frontier only (terminalThrough). An install admits
+//     the undecided own rows up to the frontier (an author's admitted slots are causally closed) and
+//     displaces the rest; the frontier can pass rows an earlier install displaced (a later own fence
+//     is admitted). The install's drain replaces the displaced moves in sequence order before any new
+//     own move, or keeps a row retained (unknown work) for a later frontier resolution.
+//   - The window expiry of a displaced row, or the frontier resolution of a retained one, writes a
+//     hand-back record with the move's origin, read by walking the plan's replacement links back until
+//     a reissueOrigins entry (that write drops the entry) or the move's first row
+//     (settlementMoveOrigin). A full record bound defers it (windowDeferredMoves): the move stays live
+//     (replaced again) or retained; no entry is dropped.
+//   - The reissue consumes the record and adds the row's entry (reissueSequence -> origin) in its own
+//     issuance transaction; the plan effect refuses it at the entry bound. Replacement never drops an
+//     entry; the window walk stops at an entry.
+//   - The room lists the unconsumed records sorted by origin, each with supersededBy: the author's
+//     newest issued row of the identity by origin (origins read through the entries and links), when
+//     its origin is greater than the record's.
+//   - The policy offers the first listed record again with its record; when its supersededBy is a
+//     different move, it offers that move again right after (V3RoomKeptMoveSuperseded), so the newer
+//     move lands last. The two issues are one step here (the model does not refuse the second).
+//
+// Variants:
+//   fixed         the design: an entry is dropped when the frontier ADMITTED its chain's last carrier
+//                 (or when the move expires, in the expiry's write);
+//   carrierOrder  before track 46: records ordered by their carrier row, no entries, no supersededBy;
+//   terminalDrop  an entry is dropped once its chain's last carrier is at or below the frontier,
+//                 admitted or not: a retained carrier the frontier passed loses its origin before its
+//                 frontier resolution gives it back.
+//
+// Invariants: listingInAuthorOrder (every listed record carries its move's true origin, so the
+// listing is in author order, and the move its supersededBy names, as the policy reads it, is the
+// author's newest move of the identity when that is a different move) and authorOrderPerIdentity
+// (once every row is decided and handled and no record is listed, the last admitted row carries the
+// newest move among the admitted rows). Witnesses (must be reachable): handedBackTwiceKeepsOrigin,
+// reissuedReplacedExpiredKeepsOrigin, quiescentWithReissue, deferredSeen.
+module settlementAuthorOrder {
+  pure val NM = 2          // fresh moves the author asks for; content k is the author's k-th move
+  pure val MAXSEQ = 7      // own rows
+  pure val RMAX = 1        // SETTLEMENT_HAND_BACK_LIMITS.maxRecords (64): unconsumed records
+  pure val EMAX = 2        // the reissueOrigins entry bound (64)
+  pure val NONE = -1
+
+  // kind: "new" (an ask or a re-offer), "replace" (from = the replaced row), "reissue".
+  // chain: ghost, the true origin of the move the row carries.
+  type Row = { content: int, chain: int, kind: str, from: int }
+  type Given = { source: int, origin: int, content: int, chain: int }
+  type Ent = { reissue: int, origin: int }
+
+  var rows: int -> Row
+  var nextSeq: int
+  var asked: int
+  var frontier: int            // terminalThrough
+  var admitted: Set[int]
+  var displaced: Set[int]
+  var retained: Set[int]       // displaced rows the drain kept as unknown work
+  var handled: Set[int]        // displaced rows replaced or given back
+  var records: Set[Given]      // unconsumed hand-back records
+  var entries: Set[Ent]        // reissueOrigins
+  var mode: str
+  var deferred: bool
+
+  def seqs: Set[int] = rows.keys()
+  def undecided(s: int): bool = not(admitted.contains(s)) and not(displaced.contains(s))
+  // The drain's pending rows: displaced, neither handled nor retained.
+  def pending: Set[int] = displaced.filter(s => not(handled.contains(s)) and not(retained.contains(s)))
+  def drained: bool = pending.size() == 0
+  def firstPending(s: int): bool = pending.contains(s) and pending.forall(t => s <= t)
+
+  // The stored origin of a row (settlementMoveOrigin): links back to an entry or the first row.
+  def storedOrigin(s: int): int = {
+    val walk = 0.to(MAXSEQ).fold({ cur: s, res: NONE }, (acc, i) =>
+      if (acc.res != NONE) acc
+      else if (entries.exists(e => e.reissue == acc.cur))
+        { cur: acc.cur, res: entries.filter(e => e.reissue == acc.cur).fold(NONE, (x, e) => e.origin) }
+      else if (rows.get(acc.cur).kind == "replace") { cur: rows.get(acc.cur).from, res: NONE }
+      else { cur: acc.cur, res: acc.cur })
+    walk.res
+  }
+  // The row a walk from `s` stops at (the entry's reissued row, or the move's first row).
+  def walkStop(s: int): int = {
+    val walk = 0.to(MAXSEQ).fold({ cur: s, done: false }, (acc, i) =>
+      if (acc.done) acc
+      else if (entries.exists(e => e.reissue == acc.cur)) { cur: acc.cur, done: true }
+      else if (rows.get(acc.cur).kind == "replace") { cur: rows.get(acc.cur).from, done: false }
+      else { cur: acc.cur, done: true })
+    walk.cur
+  }
+  // A chain's last carrier: replacement links followed forward (settlementReissueLastCarrier).
+  def lastCarrier(s: int): int =
+    0.to(MAXSEQ).fold(s, (cur, i) => {
+      val succ = seqs.filter(t => rows.get(t).kind == "replace" and rows.get(t).from == cur)
+      if (succ.size() == 0) cur else succ.fold(cur, (x, t) => t)
+    })
+
+  // The room's supersededBy for a record, as the policy reads it: the newest row by stored origin
+  // (then sequence), when its origin is greater and it carries a different move; else NONE.
+  def storedNewest: int = seqs.filter(s => seqs.forall(t =>
+    storedOrigin(t) < storedOrigin(s) or (storedOrigin(t) == storedOrigin(s) and t <= s))).fold(NONE, (x, s) => s)
+  def supersedingContent(r: Given): int =
+    if (mode == "carrierOrder" or seqs.size() == 0) NONE
+    else {
+      val n = storedNewest
+      if (storedOrigin(n) > r.origin and rows.get(n).content != r.content) rows.get(n).content else NONE
+    }
+  // The same question over the true origins.
+  def trueNewest: int = seqs.filter(s => seqs.forall(t =>
+    rows.get(t).chain < rows.get(s).chain or (rows.get(t).chain == rows.get(s).chain and t <= s))).fold(NONE, (x, s) => s)
+  def trueSupersedingContent(r: Given): int =
+    if (seqs.size() == 0) NONE
+    else {
+      val n = trueNewest
+      if (rows.get(n).chain > r.chain and rows.get(n).content != r.content) rows.get(n).content else NONE
+    }
+  // The listing's first record (lowest origin, then source).
+  def firstListed: Set[Given] = records.filter(r => records.forall(q => r.origin < q.origin or
+    (r.origin == q.origin and r.source <= q.source)))
+
+  action initWith(v: str): bool = all {
+    rows' = Map(), nextSeq' = 0, asked' = 0, frontier' = NONE, admitted' = Set(), displaced' = Set(),
+    retained' = Set(), handled' = Set(), records' = Set(), entries' = Set(), mode' = v, deferred' = false,
+  }
+  action init = initWith("fixed")
+  action initCarrierOrder = initWith("carrierOrder")
+  action initTerminalDrop = initWith("terminalDrop")
+
+  action stutter = all {
+    rows' = rows, nextSeq' = nextSeq, asked' = asked, frontier' = frontier, admitted' = admitted, displaced' = displaced,
+    retained' = retained, handled' = handled, records' = records, entries' = entries, mode' = mode, deferred' = deferred,
+  }
+
+  // The author asks for its next move (after the drain).
+  action ask = all {
+    asked < NM, nextSeq < MAXSEQ, drained,
+    rows' = rows.put(nextSeq, { content: asked, chain: nextSeq, kind: "new", from: NONE }),
+    nextSeq' = nextSeq + 1, asked' = asked + 1,
+    frontier' = frontier, admitted' = admitted, displaced' = displaced, retained' = retained, handled' = handled,
+    records' = records, entries' = entries, mode' = mode, deferred' = deferred,
+  }
+
+  // An install with the creator's signed frontier k: the undecided rows up to k are admitted, the
+  // other undecided rows are displaced.
+  action install(k: int): bool = all {
+    drained, frontier <= k, k < nextSeq,
+    frontier' = k,
+    admitted' = admitted.union(seqs.filter(s => undecided(s) and s <= k)),
+    displaced' = displaced.union(seqs.filter(s => undecided(s) and s > k)),
+    rows' = rows, nextSeq' = nextSeq, asked' = asked, retained' = retained, handled' = handled,
+    records' = records, entries' = entries, mode' = mode, deferred' = deferred,
+  }
+
+  // A plan write drops the entries whose move settled (v3-room settlementReissueOriginsUnsettled).
+  def settled(e: Ent): bool = {
+    val last = lastCarrier(e.reissue)
+    last <= frontier and (mode == "terminalDrop" or admitted.contains(last))
+  }
+  action settleEntries = all {
+    entries.exists(e => settled(e)),
+    entries' = entries.filter(e => not(settled(e))),
+    rows' = rows, nextSeq' = nextSeq, asked' = asked, frontier' = frontier, admitted' = admitted,
+    displaced' = displaced, retained' = retained, handled' = handled, records' = records, mode' = mode, deferred' = deferred,
+  }
+
+  // The drain, in sequence order: replace the first pending row (same move, new row; the entry stays) ...
+  action replace(s: int): bool = all {
+    firstPending(s), nextSeq < MAXSEQ,
+    rows' = rows.put(nextSeq, { content: rows.get(s).content, chain: rows.get(s).chain, kind: "replace", from: s }),
+    nextSeq' = nextSeq + 1, handled' = handled.union(Set(s)),
+    asked' = asked, frontier' = frontier, admitted' = admitted, displaced' = displaced, retained' = retained,
+    records' = records, entries' = entries, mode' = mode, deferred' = deferred,
+  }
+  // ... or keep it retained (unknown work) ...
+  action retain(s: int): bool = all {
+    firstPending(s), retained' = retained.union(Set(s)),
+    rows' = rows, nextSeq' = nextSeq, asked' = asked, frontier' = frontier, admitted' = admitted,
+    displaced' = displaced, handled' = handled, records' = records, entries' = entries, mode' = mode, deferred' = deferred,
+  }
+  // ... or give it back at the window bound; a retained row is given back by a later frontier
+  // resolution. Its record carries the move's origin and the entry the walk stopped at leaves in the
+  // same write. With the record bound full nothing is written (deferred: replaced again or kept retained).
+  action giveBack(s: int): bool = all {
+    firstPending(s) or retained.contains(s),
+    if (records.size() < RMAX) {
+      val stop = walkStop(s)
+      val origin = if (mode == "carrierOrder") s else storedOrigin(s)
+      all {
+        records' = records.union(Set({ source: s, origin: origin, content: rows.get(s).content, chain: rows.get(s).chain })),
+        entries' = entries.filter(e => e.reissue != stop),
+        handled' = handled.union(Set(s)), retained' = retained.exclude(Set(s)), deferred' = deferred,
+      }
+    } else all {
+      records' = records, entries' = entries, handled' = handled, retained' = retained, deferred' = true,
+    },
+    rows' = rows, nextSeq' = nextSeq, asked' = asked, frontier' = frontier, admitted' = admitted,
+    displaced' = displaced, mode' = mode,
+  }
+
+  // The policy (after a reload) offers the first listed record again, then its supersededBy move.
+  action offerKept = all {
+    records.size() > 0, nextSeq + 2 <= MAXSEQ, drained,
+    mode == "carrierOrder" or entries.size() < EMAX,
+    nondet r = firstListed.oneOf()
+    val newer = supersedingContent(r)
+    all {
+      records' = records.exclude(Set(r)),
+      entries' = if (mode == "carrierOrder") entries else entries.union(Set({ reissue: nextSeq, origin: r.origin })),
+      rows' = if (newer == NONE) rows.put(nextSeq, { content: r.content, chain: r.chain, kind: "reissue", from: NONE })
+        else rows.put(nextSeq, { content: r.content, chain: r.chain, kind: "reissue", from: NONE })
+          .put(nextSeq + 1, { content: newer, chain: nextSeq + 1, kind: "new", from: NONE }),
+      nextSeq' = nextSeq + (if (newer == NONE) 1 else 2),
+    },
+    asked' = asked, frontier' = frontier, admitted' = admitted, displaced' = displaced, retained' = retained,
+    handled' = handled, mode' = mode, deferred' = deferred,
+  }
+
+  action step = any {
+    ask, settleEntries, offerKept,
+    nondet s = NONE.to(MAXSEQ - 1).oneOf()
+    any { install(s), replace(s), retain(s), giveBack(s) },
+  }
+
+  // ---- Properties. ----
+  val listingInAuthorOrder = records.forall(r => r.origin == r.chain and supersedingContent(r) == trueSupersedingContent(r))
+  def quiescent: bool = seqs.forall(s => admitted.contains(s) or handled.contains(s)) and records.size() == 0
+  def lastAdmitted: int = admitted.fold(NONE, (x, s) => if (s > x) s else x)
+  val authorOrderPerIdentity = not(quiescent) or admitted.size() == 0 or
+    admitted.forall(s => rows.get(s).content <= rows.get(lastAdmitted).content)
+  val safety = listingInAuthorOrder and authorOrderPerIdentity
+
+  // Witnesses: violated means reachable.
+  val handedBackTwiceKeepsOrigin = not(records.exists(r => rows.get(r.source).kind == "reissue" and r.origin == r.chain))
+  val reissuedReplacedExpiredKeepsOrigin = not(records.exists(r => rows.get(r.source).kind == "replace" and
+    rows.get(rows.get(r.source).from).kind == "reissue" and r.origin == r.chain))
+  val quiescentWithReissue = not(quiescent and admitted.exists(s => rows.get(s).kind == "reissue"))
+  val deferredSeen = not(deferred)
+
+  // ---- Deterministic runs. ----
+  // Two moves of one cell, both displaced: the older one (A) is replaced (row 2), the newer one (B)
+  // given back and reissued (row 3, its entry). Both displaced again: A is given back from row 2 (by
+  // carrier after B's record), B's reissue is replaced (row 4, its origin read through the entry).
+  action bothGivenBack(start: bool): bool =
+    start.then(ask).then(ask).then(install(NONE)).then(replace(0)).then(giveBack(1)).then(offerKept)
+      .then(install(NONE)).then(giveBack(2)).then(replace(3))
+  run originOrderTest = bothGivenBack(init)
+    .then(all { assert(rows.get(3).content == 1 and records.exists(r => r.origin == 0 and r.source == 2) and safety), offerKept })
+    .then(all { assert(rows.get(5).content == 0 and rows.get(6).content == 1 and safety), install(6) })
+    .then(all { assert(quiescent and rows.get(lastAdmitted).content == 1 and safety), stutter })
+  run carrierOrderBreaksTest = bothGivenBack(initCarrierOrder)
+    .then(all { assert(records.exists(r => r.origin == 2 and r.chain == 0) and not(listingInAuthorOrder)), offerKept })
+    .then(install(5))
+    .then(all { assert(quiescent and rows.get(lastAdmitted).content == 0 and not(authorOrderPerIdentity)), stutter })
+  // Reissued, displaced, replaced, then given back: the entry survives the replacement.
+  action reissued(start: bool): bool = start.then(ask).then(install(NONE)).then(giveBack(0)).then(offerKept)
+  run reissuedReplacedExpiredTest = reissued(init).then(install(NONE)).then(replace(1)).then(install(NONE)).then(giveBack(2))
+    .then(all { assert(not(reissuedReplacedExpiredKeepsOrigin) and safety and entries.size() == 0), stutter })
+  // The reissued row is retained; the frontier passes it (a later own move admitted). Dropping the
+  // entry then (terminalDrop) loses the origin at the frontier resolution that gives it back.
+  action retainedPassed(start: bool): bool =
+    reissued(start).then(install(NONE)).then(retain(1)).then(ask).then(install(2))
+  run terminalDropLosesOriginTest = retainedPassed(initTerminalDrop).then(settleEntries).then(giveBack(1))
+    .then(all { assert(records.exists(r => r.origin == 1 and r.chain == 0) and not(listingInAuthorOrder)), stutter })
+  run fixedKeepsOriginPastFrontierTest = retainedPassed(init)
+    .then(all { assert(entries.size() == 1 and entries.forall(e => not(settled(e)))), giveBack(1) })
+    .then(all { assert(listingInAuthorOrder and records.exists(r => r.origin == 0 and r.source == 1)), stutter })
+}
