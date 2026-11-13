@@ -38,7 +38,8 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // leaves 0 < replaced-in-chunk < chunk). The fallback (a store without transactIssueBatch: one
 // replacement per transaction, as before) has its own edge (DRAIN_BATCH_CRASH_SINGLES=1, SINGLES_EDGES):
 //   between-issues: the commit of the drain's second single replacement (some rows replaced);
-//   single-marker:  the commit of the first single replacement's entered marker (the singles' chunk-marker).
+//   single-marker:  the commit of the first single replacement's entered marker (the singles' chunk-marker;
+//                   its earlier reserved marker is cancellable, an entered one is resumed).
 // (The drain's one transform-refusal plan CAS needs an application whose displaced moves transform;
 // Grid and Chat rebase.)
 // The test reopens the same directory, reconnects, and requires every move to be admitted by the
@@ -107,7 +108,7 @@ function writerTimes(file: string, author: string) {
 		db.close();
 	}
 }
-/** The plan effect kind of the Writer's entered marker, if any (a single's or a batch's). */
+/** The plan effect kind and phase of the Writer's pending marker, if any (a single's or a batch's). */
 function writerMarkerEffect(file: string, author: string): string | null {
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
@@ -115,8 +116,8 @@ function writerMarkerEffect(file: string, author: string): string | null {
 			| { pending_unsigned: Uint8Array | null }
 			| undefined;
 		if (row?.pending_unsigned == null) return null;
-		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as { planEffect?: { kind?: string } };
-		return pending.planEffect?.kind ?? "none";
+		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as { phase: string; planEffect?: { kind?: string } };
+		return `${pending.planEffect?.kind ?? "none"}:${pending.phase}`;
 	} finally {
 		db.close();
 	}
@@ -275,7 +276,7 @@ it.runIf(INNER)(
 					if (edge === "between-chunks" && replaced.length === CHUNK)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 					if (edge === "between-journal" && replaced.length === CHUNK) watch.journalCommits ??= 0;
-					if (edge === "single-marker" && replaced.length === 0 && writerMarkerEffect(file, watch.author) === "replacement")
+					if (edge === "single-marker" && replaced.length === 0 && writerMarkerEffect(file, watch.author) === "replacement:entered")
 						die({ marker: 1, rebase: rebase.length });
 					if (edge === "between-issues" && replaced.length === 2)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
