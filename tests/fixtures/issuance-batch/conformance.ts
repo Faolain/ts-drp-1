@@ -27,7 +27,7 @@ import type {
 
 export type BatchStoreFactory = (name: string) => Promise<DurableIssuanceStore>;
 
-const SCOPE: DurableIssueScope = Object.freeze({ objectId: "issuance-batch-room", author: "c".repeat(64) });
+export const SCOPE: DurableIssueScope = Object.freeze({ objectId: "issuance-batch-room", author: "c".repeat(64) });
 const hex = (seed: number): string => seed.toString(16).padStart(64, "0");
 const digestOf = (bytes: Uint8Array) => hashDomain("ts-drp/vertex/v3", bytes);
 
@@ -85,7 +85,7 @@ type BatchOptions = Readonly<{
 }>;
 
 /** One batch, driven as the drain drives it; returns the commits or the refusal, and the signatures made. */
-async function issueBatch(store: DurableIssuanceStore, rows: readonly Row[], options: BatchOptions = {}) {
+export async function issueBatch(store: DurableIssuanceStore, rows: readonly Row[], options: BatchOptions = {}) {
 	const signed: number[] = [];
 	const batch = store.transactIssueBatch;
 	if (batch === undefined) throw new Error("store has no transactIssueBatch");
@@ -128,7 +128,7 @@ const rebase = (sourceSequence: number, sourceDigest: Uint8Array): SettlementPla
 });
 
 /** Epoch-0 moves, then the plan over them and its fence (single issue), as an install leaves them. */
-async function settledStore(factory: BatchStoreFactory, name: string, moves: number, progress?: Readonly<Record<number, Uint8Array>>) {
+export async function settledStore(factory: BatchStoreFactory, name: string, moves: number, progress?: Readonly<Record<number, Uint8Array>>) {
 	const store = await factory(name);
 	const sources: DurableIssueCommit[] = [];
 	for (let index = 0; index < moves; index++) sources.push(await issueOne(store, { bytes: (sequence) => move(sequence, 0) }));
@@ -152,12 +152,12 @@ async function settledStore(factory: BatchStoreFactory, name: string, moves: num
 	return { store, sources };
 }
 
-const replacement = (sourceSequence: number): Row => ({
+export const replacement = (sourceSequence: number): Row => ({
 	effect: { kind: "replacement", sourceSequence },
 	bytes: (sequence) => preimage(sequence, 1, { action: "place", id: `m-${sourceSequence}`, x: 1, y: 2 }),
 });
 
-async function snapshot(store: DurableIssuanceStore, from: number, through: number) {
+export async function snapshot(store: DurableIssuanceStore, from: number, through: number) {
 	const lineage = await store.readLineage(SCOPE);
 	const issued: (number | null)[] = [];
 	for (let sequence = from; sequence <= through; sequence++)
