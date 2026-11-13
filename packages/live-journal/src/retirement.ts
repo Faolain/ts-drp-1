@@ -2376,6 +2376,18 @@ function compareFrameKeys(left: Pick<NativeFrame, "table" | "key">, right: Pick<
 	}
 	return 0;
 }
+/** Work counts of the drain-source reconstruction in this process: full derivations of the
+ * original image (decode every frame, rebuild every retired row, re-encode and compare) and
+ * verified reuses of an earlier derivation. Measurement only. */
+export interface JournalRetirementDrainSourceCounts {
+	readonly derivations: number;
+	readonly reuses: number;
+}
+const drainSourceWork = { derivations: 0, reuses: 0 };
+/** @returns This process's drain-source reconstruction work counts so far. */
+export function journalRetirementDrainSourceCounts(): JournalRetirementDrainSourceCounts {
+	return Object.freeze({ ...drainSourceWork });
+}
 /** Reconstructs original local metadata through the adapter codec and received
  * detail through its exact captured native frame. Consumers still own protocol reauthentication.
  * A finished checkpoint with newer legitimate work is not an old-source view. */
@@ -2400,6 +2412,7 @@ export function reconstructJournalRetirementDrainSource(
 		if (finished) return undefined;
 		throw new TypeError("retirement-stale");
 	}
+	drainSourceWork.derivations++;
 	const actual = decodeNativeFrames(frames),
 		original = [...actual], indexByKey = indexNativeDrainFrames(actual, rows);
 	for (const [index, selected] of rows.entries()) {
