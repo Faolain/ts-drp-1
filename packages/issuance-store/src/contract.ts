@@ -915,6 +915,67 @@ export function settlementReissueOriginsUnsettled(
 	return kept.length === 0 ? undefined : kept.length === origins.length ? origins : kept;
 }
 
+/**
+ * The settlement backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one
+ * per intent). Each move is counted exactly once:
+ * - each live replaced move, by the entry of its newest displaced row whose replacement is not itself
+ *   displaced, or which is not yet replaced;
+ * - each retained source's moves (manual-review);
+ * - every unconsumed hand-back record;
+ * - every reissued move (a reissueOrigins entry, kept until the plan write that sees the move settled),
+ *   pending on its chain's last carrier. A chain whose reissued row or last carrier the rebase scan lists
+ *   displaced is counted by its newest displaced row's entry instead (reissue, displace, replace and
+ *   expire keep the count: tests/settlement-reissue-origins-store.test.ts).
+ * A reissue moves one unit from the record term to the entry term, so the total does not grow. A move
+ * whose newest row is a replacement or a reissue is `pending`: it leaves the count once a creator row
+ * reaches every such row (the creator admitted it), the evidence that removes new moves. A row counts
+ * all its moves: Grid batches moves made together into one row, and each of them needs its own record
+ * when the window gives it back, so counting the row once let the Writer accept moves past the record
+ * bound.
+ * @param plan - The durable plan.
+ * @param displaced - The displaced own rows of the last rebase scan, with their moves.
+ * @returns The moves counted until the next plan write, and the pending ones.
+ */
+export function settlementBacklogMoves(
+	plan: Pick<SettlementPlan, "entries" | "handBacks" | "reissueOrigins"> | null,
+	displaced: ReadonlyMap<number, number>
+): Readonly<{ fixed: number; pending: readonly Readonly<{ rows: readonly number[]; moves: number }>[] }> {
+	// A row the scan no longer lists counts one move (it is retired or proven, never more than its record).
+	const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
+	let fixed = 0;
+	const pending: Readonly<{ rows: readonly number[]; moves: number }>[] = [];
+	for (const entry of plan?.entries ?? []) {
+		if (entry.sourceObjectId !== undefined) continue;
+		if (entry.disposition === "manual-review") {
+			fixed += moves(entry.sourceSequence);
+			continue;
+		}
+		if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
+		if (!displaced.has(entry.sourceSequence)) continue;
+		if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
+		if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
+		const rows = [
+			...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
+			...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
+		];
+		if (rows.length === 0) fixed += moves(entry.sourceSequence);
+		else pending.push(Object.freeze({ rows: Object.freeze([...new Set(rows)]), moves: moves(entry.sourceSequence) }));
+	}
+	const entries = new Set((plan?.reissueOrigins ?? []).map((entry) => entry.reissueSequence));
+	for (const record of plan?.handBacks ?? []) {
+		if (record.reissueSequence === null) fixed += 1;
+		// A consumed record written before reissueOrigins existed has no entry: its reissue counts here.
+		else if (!entries.has(record.reissueSequence))
+			pending.push(Object.freeze({ rows: Object.freeze([record.reissueSequence]), moves: 1 }));
+	}
+	for (const reissued of entries) {
+		const last = plan === null ? reissued : settlementReissueLastCarrier(plan, reissued);
+		if (displaced.has(reissued) || displaced.has(last)) continue;
+		pending.push(Object.freeze({ rows: Object.freeze([last]), moves: 1 }));
+	}
+	return Object.freeze({ fixed, pending: Object.freeze(pending) });
+}
+
 function settlementHandBacksEqual(left: SettlementHandBack, right: SettlementHandBack): boolean {
 	return (
 		left.sourceSequence === right.sourceSequence &&

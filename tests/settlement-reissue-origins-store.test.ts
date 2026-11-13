@@ -13,6 +13,7 @@ import {
 	copySettlementPlan,
 	copySettlementPlanEffect,
 	isClosedDurableIssuanceRecord,
+	settlementBacklogMoves,
 	settlementHandBacksWith,
 	settlementMoveOrigin,
 	settlementPlanHasExactEffectLink,
@@ -324,6 +325,45 @@ describe("settlement reissue origins: codec", () => {
 		expect(merged.reissueOrigins).toBeUndefined();
 		const after = copied({ ...plan(6, { entries: before.entries }), handBacks: merged.handBacks });
 		expect(() => assertSettlementPlanProgressTransition(before, after)).not.toThrow();
+	});
+
+	it("backlog: a reissued move counts once through reissue, displacement, replacement and expiry", () => {
+		// slow-member review: a move counted zero times while displaced would let V3RoomLocalBacklogFull
+		// admit a 65th move. The entry counts while the chain is live; the displaced row's own entry counts
+		// it while the rebase scan lists it; the record counts it once it expires.
+		const total = (value: SettlementPlan, displaced: ReadonlyMap<number, number>) => {
+			const backlog = settlementBacklogMoves(value, displaced);
+			return backlog.fixed + backlog.pending.reduce((sum, move) => sum + move.moves, 0);
+		};
+		const given = copied(plan(1, { handBacks: [record()] }));
+		expect(total(given, new Map())).toBe(1);
+		// The reissue (row 20) consumes the record and adds its entry in the same transaction.
+		const reissued = applySettlementPlanEffect(given, copySettlementPlanEffect(effect({ originSequence: 7 }))!, 20);
+		expect(snapshot(reissued.reissueOrigins)).toEqual(snapshot([origin(20, 7)]));
+		expect(total(reissued, new Map())).toBe(1);
+		expect(settlementBacklogMoves(reissued, new Map()).pending.map((move) => move.rows)).toEqual([[20]]);
+		// The next install displaces row 20: its rebase entry counts it, the entry does not.
+		const rebase = { disposition: "rebase", sourceDigest: new Uint8Array(32).fill(0xd2), sourceSequence: 20 };
+		const displacedPlan = copied(plan(2, { entries: [expired(), { ...rebase, replacementSequence: null }], reissueOrigins: [origin(20, 7)] }));
+		expect(total(displacedPlan, new Map([[20, 1]]))).toBe(1);
+		// The drain replaces it (row 24): pending on the replacement, once, whether or not the scan still lists 20.
+		const replaced = copied(plan(3, { entries: [expired(), { ...rebase, replacementSequence: 24 }], reissueOrigins: [origin(20, 7)] }));
+		for (const displaced of [new Map([[20, 1]]), new Map<number, number>()]) {
+			expect(total(replaced, displaced)).toBe(1);
+			expect(settlementBacklogMoves(replaced, displaced).pending.map((move) => move.rows)).toEqual([[24]]);
+		}
+		// Row 24 displaced and expired: the record holds the origin, the entry is dropped, still one move.
+		const merged = settlementWindowHandBacks(replaced, [
+			{ sourceSequence: 24, sourceDigest: new Uint8Array(32).fill(0xd3), sourceEpoch: 9, operations: [OPERATION] },
+		]);
+		expect(merged.handBacks?.map((value) => [value.sourceSequence, value.originSequence])).toEqual([[24, 7]]);
+		expect(merged.reissueOrigins).toBeUndefined();
+		const expiredPlan = copied({
+			...plan(4, { entries: [expired(), { ...rebase, replacementSequence: 24 }, expired(24)] }),
+			handBacks: merged.handBacks,
+		});
+		expect(total(expiredPlan, new Map([[20, 1], [24, 1]]))).toBe(1);
+		expect(total(expiredPlan, new Map())).toBe(1);
 	});
 
 	it("a plan write keeps or drops an entry, never adds or alters one", () => {

@@ -1,5 +1,6 @@
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
+	settlementBacklogMoves,
 	settlementMoveOrigin,
 	settlementReissueOriginsUnsettled,
 	settlementWindowHandBacks,
@@ -6910,61 +6911,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The displaced sources of the last rebase scan (recordSettlementStatus), for a status recomputed
 	// after the same drain resolves retained rows.
 	let settlementSources: readonly DisplacedSource[] = [];
-	/**
-	 * The backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one per
-	 * intent): each live replaced move once (the entry of its newest displaced row, whose replacement is
-	 * not itself displaced, or which is not yet replaced), each retained source's moves (manual-review),
-	 * every unconsumed hand-back record, and every reissued move (a reissueOrigins entry, kept until the
-	 * plan write that sees the move settled; a chain the rebase scan lists displaced is counted by its
-	 * newest displaced row instead). A reissue moves one unit from the record term to the entry term, so
-	 * the total does not grow. A move whose
-	 * newest row is a replacement or a reissue is `pending`: it leaves the count once a creator row
-	 * reaches every such row (the creator admitted it; settlementBacklogNow), the evidence that removes
-	 * new moves (markCreatorReached). A row counts all its moves: Grid batches moves made together into
-	 * one row, and each of them needs its own record when the window gives it back, so counting the row
-	 * once let the Writer accept moves past the record bound.
-	 * @param plan - The durable plan.
-	 * @param displaced - The displaced own rows of the last rebase scan, with their moves.
-	 * @returns The moves counted until the next plan write, and the pending ones.
-	 */
-	const settlementBacklogOf = (
-		plan: RoomSettlementPlan | null,
-		displaced: ReadonlyMap<number, number>
-	): Readonly<{ fixed: number; pending: readonly Readonly<{ rows: readonly number[]; moves: number }>[] }> => {
-		// A row the scan no longer lists counts one move (it is retired or proven, never more than its record).
-		const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
-		let fixed = 0;
-		const pending: Readonly<{ rows: readonly number[]; moves: number }>[] = [];
-		for (const entry of plan?.entries ?? []) {
-			if (entry.sourceObjectId !== undefined) continue;
-			if (entry.disposition === "manual-review") {
-				fixed += moves(entry.sourceSequence);
-				continue;
-			}
-			if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
-			if (!displaced.has(entry.sourceSequence)) continue;
-			if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
-			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
-			const rows = [
-				...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
-				...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
-			];
-			if (rows.length === 0) fixed += moves(entry.sourceSequence);
-			else pending.push(Object.freeze({ rows: Object.freeze([...new Set(rows)]), moves: moves(entry.sourceSequence) }));
-		}
-		const entries = new Set((plan?.reissueOrigins ?? []).map((entry) => entry.reissueSequence));
-		for (const record of plan?.handBacks ?? []) {
-			if (record.reissueSequence === null) fixed += 1;
-			// A consumed record written before reissueOrigins existed has no entry: its reissue counts here.
-			else if (!entries.has(record.reissueSequence))
-				pending.push(Object.freeze({ rows: Object.freeze([record.reissueSequence]), moves: 1 }));
-		}
-		for (const reissued of entries) {
-			if (displaced.has(reissued)) continue;
-			pending.push(Object.freeze({ rows: Object.freeze([reissued]), moves: 1 }));
-		}
-		return Object.freeze({ fixed, pending: Object.freeze(pending) });
-	};
+	// The backlog V3RoomLocalBacklogFull bounds, in moves: settlementBacklogMoves (issuance-store).
+	const settlementBacklogOf = settlementBacklogMoves;
 	const recordSettlementBacklog = (plan: RoomSettlementPlan | null): void => {
 		const backlog = settlementBacklogOf(plan, settlementDisplaced);
 		settlementBacklog = backlog.fixed;
