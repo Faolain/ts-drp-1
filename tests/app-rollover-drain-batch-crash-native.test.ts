@@ -239,14 +239,23 @@ it.runIf(INNER)(
 		const journal = journalFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
 		const watch = { author: "", armed: false, inside: false, journalCommits: null as number | null };
+		// Native write transactions since the drain's fence committed (observation only: the per-row cost).
+		const since = { fenced: false, issuance: 0, journal: 0 };
 		const die = (detail: Record<string, unknown>) => {
 			const times = writerTimes(file, watch.author);
-			writeFileSync(deathFile, JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...times, ...detail }));
+			writeFileSync(
+				deathFile,
+				JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...times, commitsSinceFence: since, ...detail })
+			);
 			process.kill(process.pid, "SIGKILL");
 			throw Error("SIGKILL_DID_NOT_TERMINATE");
 		};
 		DatabaseSync.prototype.exec = function (sql: string) {
 			const result = exec.call(this, sql);
+			if (since.fenced && (sql === "COMMIT" || sql.endsWith("COMMIT"))) {
+				if (this.location()?.endsWith(`/${basename(file)}`) === true) since.issuance += 1;
+				if (this.location()?.endsWith(`/${basename(journal)}`) === true) since.journal += 1;
+			}
 			if (
 				watch.journalCommits !== null &&
 				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
@@ -268,6 +277,10 @@ it.runIf(INNER)(
 					// A chunk commits whole: replaced counts only ever land on chunk boundaries.
 					if (!singles && rebase.length === MOVES && replaced.length % CHUNK !== 0 && replaced.length !== MOVES)
 						writeFileSync(partialFile, JSON.stringify({ replaced: replaced.length, rebase: rebase.length }));
+					if (fence !== null && rebase.length === MOVES && replaced.length === 0 && !since.fenced) {
+						since.fenced = true;
+						since.issuance = 0;
+					}
 					if (edge === "fence" && fence !== null && rebase.length === MOVES && replaced.length === 0)
 						die({ fence, rebase: rebase.length });
 					const marker = writerBatchMarker(file, watch.author);
