@@ -396,12 +396,17 @@ export function createV3RoomRolloverPolicy(
 	let waiting = 0;
 	let successorWaits = 0;
 	const kept: Readonly<Record<string, unknown>>[] = [];
-	// The epoch each kind of kept move waits to be past: new moves, and moves the room gave back.
+	// The epoch kept new moves wait to be past, and the epoch each given-back move waits to be past.
 	let keptEpoch = 0;
-	let givenBackEpoch = 0;
+	const givenBackWait = new WeakMap<object, number>();
+	// The epoch in which a given-back move's re-offer was refused for good, by its hand-back record: the
+	// next listing of that record waits to be past it (one offer per record per epoch).
+	const refusedGivenBack = new Map<string, number>();
 	let keptTimer: ReturnType<typeof setTimeout> | undefined;
 	// The kept moves' re-offer runs one batch at a time, each move after the previous one's answer.
 	let reoffering = false;
+	// This session's own moves accepted in the current epoch (the page may not observe them yet).
+	let acceptedThisEpoch = 0;
 	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
 	// has already kept this session (by their durable hand-back record). A kept given-back operation
 	// is offered again with its record, whose consumption is part of the new row's own issuance
@@ -472,6 +477,7 @@ export function createV3RoomRolloverPolicy(
 		epoch = next;
 		moves.clear();
 		weights.clear();
+		acceptedThisEpoch = 0;
 		for (const wake of [...epochWaiters]) wake();
 	};
 	// The room can advance without this policy (a host's own seal, a member's install); its
@@ -598,6 +604,17 @@ export function createV3RoomRolloverPolicy(
 			poll();
 		});
 
+	// A member's kept moves take only what the epoch's budget leaves: the creator seals once any author's
+	// accepted moves reach it, so a kept move offered past that point targets an epoch being closed and is
+	// displaced, then replaced at the next install. The forecast follows the epoch's fill as observed
+	// (every author's moves and this session's own accepted ones). Only kept re-offers are paced: new
+	// moves, the creator and other members never are.
+	const keptRoomLeft = (): boolean => {
+		if (role !== "member") return true;
+		advance(currentEpoch());
+		if (budget.weight !== undefined && most(weights) >= budget.weight.perAuthor) return false;
+		return Math.max(acceptedThisEpoch, most(moves)) < budget.movesPerAuthor;
+	};
 	// Kept moves are offered again, in order, once the room is past the epoch that kept them. A move
 	// the room gave back carries its hand-back record: the room never refuses it at the undelivered-move
 	// bound and the record bound limits how many recirculate, so it is offered whatever
@@ -615,7 +632,9 @@ export function createV3RoomRolloverPolicy(
 			}
 			const now = currentEpoch();
 			const givenBack =
-				now > givenBackEpoch && !readOnly() ? kept.filter((operation) => handBackOf.has(operation)) : [];
+				!readOnly()
+					? kept.filter((operation) => handBackOf.has(operation) && now > (givenBackWait.get(operation) ?? 0))
+					: [];
 			const fresh =
 				now > keptEpoch && !readOnly() && !notReachingHost()
 					? kept.filter((operation) => !handBackOf.has(operation))
@@ -635,6 +654,11 @@ export function createV3RoomRolloverPolicy(
 				const batch = [...givenBack, ...fresh];
 				try {
 					for (const [index, operation] of batch.entries()) {
+						if (!keptRoomLeft()) {
+							// The epoch's budget is spent: the rest of the batch waits for a later epoch, in order.
+							for (const unoffered of batch.slice(index)) keep(unoffered, currentEpoch());
+							break;
+						}
 						const answer = await offerKept(operation);
 						if (answer === "next" || (answer === "stop-new" && index < givenBack.length)) continue;
 						// Refused at the bound (new moves) or busy (every move), and kept by issue(): the rest of
@@ -679,6 +703,7 @@ export function createV3RoomRolloverPolicy(
 			if (handBack !== undefined) {
 				handBackOf.delete(operation);
 				takenBack.delete(handBackKey(handBack));
+				refusedGivenBack.set(handBackKey(handBack), refusedIn);
 			} else keep(operation, refusedIn);
 			hooks.onError?.(new V3RoomKeptMoveRefused(operation, refusedIn, { cause: error }));
 		}
@@ -688,7 +713,7 @@ export function createV3RoomRolloverPolicy(
 	// a move that may be offered again in the same epoch).
 	const keep = (operation: Readonly<Record<string, unknown>>, waitPast: number): void => {
 		kept.push(operation);
-		if (handBackOf.has(operation)) givenBackEpoch = Math.max(givenBackEpoch, waitPast);
+		if (handBackOf.has(operation)) givenBackWait.set(operation, waitPast);
 		else keptEpoch = Math.max(keptEpoch, waitPast);
 		reportStatus();
 		watchKept();
@@ -712,13 +737,22 @@ export function createV3RoomRolloverPolicy(
 						listed.add(key);
 						if (takenBack.has(key)) continue;
 						takenBack.add(key);
+						// A given-back move may be offered again in the epoch it is listed in. Its record exists only
+						// for a frontier-displaced row the window expired: that row's epoch is closed and the
+						// creator's signed cut excludes it, ingress admits only the current anchor, and no live
+						// replacement carries the move (the drain never replaces an "expire" entry), so the
+						// creator can never settle the original. Only the row offering it again, whose issuance
+						// consumes the record, carries the move. Waiting for a later epoch kept the move forever
+						// once the creator went idle in the member's epoch. A record whose re-offer was refused for
+						// good waits to be past that epoch.
 						for (const operation of given.operations) {
 							handBackOf.set(operation, given.handBack);
-							keep(operation, next.epoch);
+							keep(operation, refusedGivenBack.get(key) ?? next.epoch - 1);
 						}
 					}
 					// The room lists a given-back move until the row offering it again consumes its record.
 					for (const key of [...takenBack]) if (!listed.has(key)) takenBack.delete(key);
+					for (const key of [...refusedGivenBack.keys()]) if (!listed.has(key)) refusedGivenBack.delete(key);
 				}
 			} catch (error) {
 				hooks.onError?.(error);
@@ -749,6 +783,8 @@ export function createV3RoomRolloverPolicy(
 				const handBack = handBackOf.get(operation);
 				await selected.issue(operation, handBack === undefined ? undefined : { handBack });
 				handBackOf.delete(operation);
+				advance(currentEpoch());
+				if (currentEpoch() === attempted) acceptedThisEpoch++;
 				// A given-back move's reissue never counted against the bound; only a new move reopens it.
 				// Any move, a reissue too, still waits for the author fence (the node refuses it until then).
 				if ((handBack === undefined && backlogFullEpoch !== undefined) || awaitingFenceEpoch !== undefined) {

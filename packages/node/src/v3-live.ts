@@ -835,6 +835,19 @@ export type V3EgressResult =
 			readonly detail: string;
 	  }>;
 
+/**
+ * Rows one drain dependency turn may carry (per-drain batching). The turn's native reservations
+ * exclude every issuance and journal writer while it runs (publication marks included), so a drain
+ * of more rows runs one turn per chunk of this many and yields between them (lull rule iii): ingress,
+ * local moves and installs queued meanwhile run between chunks, so a chunk stays well under an epoch.
+ * Chosen by the 100x16 / slow-member A/B (4 vs 8; 32 held the registration gate long enough to lose
+ * the member its epochs).
+ */
+export const V3_SETTLEMENT_DRAIN_TURN_ROWS = 8;
+// The genuine rebase sources this module minted, with their runtime and held source: a batched
+// preparation accepts only these, never a look-alike.
+const rebaseSourceOwners = new WeakMap<object, Readonly<{ registration: V3PlaneRegistration; source: ClassifiedRebaseRow }>>();
+
 type V3RebaseSource = Readonly<{
 	readonly author: string;
 	readonly authorSequence: number;
@@ -850,6 +863,9 @@ type V3RebaseSource = Readonly<{
 	/** Current ordinary Writer authority or genuine fixed creator needs no foreign selection callback. */
 	readonly requiresCreatorSelection: boolean;
 	prepareReplacement(): Promise<NativeReplacementPreparation>;
+	/** Several sources of the same runtime prepared in one dependency turn (at most
+	 * V3_SETTLEMENT_DRAIN_TURN_ROWS); same decisions as prepareReplacement on each, in order. */
+	prepareReplacements(peers: readonly V3RebaseSource[]): Promise<readonly NativeReplacementPreparation[]>;
 	/** Explicit creator selection; this never grants authority merely from the local source capability. */
 	authorizeReplacement(
 		sign: (request: Readonly<{ exactCanonicalSelectionBytes: Uint8Array; digest: Uint8Array }>) => Promise<Uint8Array>
@@ -11085,6 +11101,8 @@ function creatorRuntimeActiveCensusFields(
 		pendingRoots: readonly unknown[];
 		wireByteCharge: number;
 		activeSource?: Readonly<{ sourceSequence: number; sourceDigest: Uint8Array }>;
+		// Every source of one batched drain preparation (more than one), in the batch's order.
+		activeBatch?: readonly Readonly<{ sourceSequence: number; sourceDigest: Uint8Array }>[];
 		unsettledSources: readonly unknown[];
 		cursor: number | null;
 		cacheSourceSequences: readonly number[];
@@ -11100,6 +11118,7 @@ function creatorRuntimeActiveCensusFields(
 		},
 		activeUnsettled: {
 			...(input.activeSource ?? {}),
+			...(input.activeBatch === undefined ? {} : { batch: input.activeBatch }),
 			sources: input.unsettledSources,
 			cursor: input.cursor,
 			cacheSourceSequences: input.cacheSourceSequences,
@@ -11753,7 +11772,7 @@ async function readCreatorRecoveryDependencyCensus(
 			pendingIngressBytes: number;
 			pendingCurrent(): boolean;
 			index: V3PlaneRegistration["index"];
-			activeSource: ClassifiedRebaseRow | undefined;
+			activeSource: ClassifiedRebaseRow | readonly ClassifiedRebaseRow[] | undefined;
 			rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
 			rebaseCursor: number | undefined;
 		}>;
@@ -11782,7 +11801,10 @@ async function readCreatorRecoveryDependencyCensus(
 	const pendingIngress = active?.pendingIngress ?? [];
 	const pendingIngressBytes = active?.pendingIngressBytes;
 	const pendingCurrent = (): boolean => active !== undefined && active.pendingCurrent();
+	// One displaced source, or every source of one batched drain preparation (prepareReplacements).
 	const activeSource = active?.activeSource;
+	const activeSources: readonly ClassifiedRebaseRow[] =
+		activeSource === undefined ? [] : ArrayIsArray(activeSource) ? activeSource : [activeSource as ClassifiedRebaseRow];
 	const rebaseSnapshot = active?.rebaseSnapshot;
 	const rebaseCursor = active?.rebaseCursor;
 
@@ -11841,7 +11863,7 @@ async function readCreatorRecoveryDependencyCensus(
 		}
 		if (wireByteCharge !== pendingIngressBytes || !pendingCurrent()) return undefined;
 	}
-	if (activeSource !== undefined) {
+	for (const activeSource of activeSources) {
 		const selectedStore =
 			activeSource.row.scope.objectId === registration.displacedSource?.prepared.provenance.objectId
 				? (registration.displacedSource.issuanceStore ?? registration.issuanceStore)
@@ -12532,11 +12554,8 @@ async function readCreatorRecoveryDependencyCensus(
 			observation.stage = `settlement-plan-eligibility:${Number(activeObservation)}:${Number(plan?.fenceSequence !== null)}:${Number(plan !== undefined && settlementPlanPermitsAuthenticatedPruning(plan))}`;
 			return undefined;
 		}
-		if (
-			activeSource !== undefined &&
-			scope.author === activeSource.row.scope.author &&
-			settlementProfileFor(currentTrust.profileId) === "v1"
-		) {
+		for (const activeSource of activeSources) {
+			if (scope.author !== activeSource.row.scope.author || settlementProfileFor(currentTrust.profileId) !== "v1") continue;
 			const entry = plan?.entries.find((row) => row.sourceSequence === activeSource.row.authorSequence);
 			if (
 				entry === undefined ||
@@ -12655,14 +12674,21 @@ async function readCreatorRecoveryDependencyCensus(
 						: creatorRuntimeActiveCensusFields({
 								pendingRoots,
 								wireByteCharge,
-								...(activeSource === undefined
+								...(activeSources.length === 0
 									? {}
-									: {
-											activeSource: {
-												sourceSequence: activeSource.row.authorSequence,
-												sourceDigest: activeSource.row.digest,
-											},
-										}),
+									: activeSources.length === 1
+										? {
+												activeSource: {
+													sourceSequence: activeSources[0]!.row.authorSequence,
+													sourceDigest: activeSources[0]!.row.digest,
+												},
+											}
+										: {
+												activeBatch: activeSources.map((source) => ({
+													sourceSequence: source.row.authorSequence,
+													sourceDigest: source.row.digest,
+												})),
+											}),
 								unsettledSources,
 								cursor: rebaseCursor ?? null,
 								cacheSourceSequences: rebaseSnapshot?.map((row) => row.row.authorSequence) ?? [],
@@ -13370,7 +13396,7 @@ function sealCreatorOrdinaryIssuanceRuntime(registration: V3PlaneRegistration, c
 async function sealCreatorRecoveryDependencies(
 	registration: V3PlaneRegistration,
 	required = false,
-	activeSource?: ClassifiedRebaseRow,
+	activeSource?: ClassifiedRebaseRow | readonly ClassifiedRebaseRow[],
 	closePlane: V3PlaneHandle = registration.handle,
 	observation?: "issuance-preview" | "received-replacement" | "received-append",
 	received?: Readonly<{ signing: CreatorSigningRecoveryOwner; completeRetirement(observation: object): Promise<void> }>,
@@ -13705,7 +13731,7 @@ async function sealCreatorRecoveryDependencies(
 /** The original queue admits a bounded read turn; native views end before settlement writes. */
 async function withActiveRebaseDependencies(
 	registration: V3PlaneRegistration,
-	selected: ClassifiedRebaseRow | undefined,
+	selected: ClassifiedRebaseRow | readonly ClassifiedRebaseRow[] | undefined,
 	consume: (read: CreatorSnapshotRecoveryCloseDependencyRead, proofByteCharge: number) => Promise<void>,
 	ownedIssueCustody?: LocalReplacementCustody,
 	additionalProtectedBytes: readonly Uint8Array[] = []
@@ -18848,6 +18874,59 @@ async function readRebaseOutbox(
 			}
 		);
 	}
+	// One drain's preparations in ONE dependency turn (per-drain batching): every source's decision is
+	// derived inside one check bracket from one consistent native view, the turn's reservations
+	// excluding every writer for its whole duration, and the census authenticates every source row
+	// (not only one). The decisions are the same pure derivations prepareReplacement makes for each
+	// source alone; none reads another source's refusal or replacement (all are written after).
+	function prepareReplacements(
+		this: V3RebaseSource,
+		peers: readonly V3RebaseSource[]
+	): Promise<readonly NativeReplacementPreparation[]> {
+		if (this !== resultSource || !currentRegistration(registration))
+			return Promise.reject(new TypeError("replacement preparation owner is stale or foreign"));
+		if (!ArrayIsArray(peers) || peers.length === 0 || peers.length > V3_SETTLEMENT_DRAIN_TURN_ROWS)
+			return Promise.reject(new TypeError("replacement preparation batch is malformed"));
+		const sources: ClassifiedRebaseRow[] = [];
+		const seen = new Set<object>();
+		for (const peer of peers) {
+			const owner = rebaseSourceOwners.get(peer);
+			if (owner === undefined || owner.registration !== registration || seen.has(peer))
+				return Promise.reject(new TypeError("replacement preparation batch source is foreign or repeated"));
+			seen.add(peer);
+			sources.push(owner.source);
+		}
+		const batch = ObjectFreeze(sources);
+		return enqueueRegistrationTask(
+			registration,
+			() => async () => {
+				const decisions: NativeReplacementPreparation[] = [];
+				await withActiveRebaseDependencies(registration, batch, async (read) => {
+					await read.checkWhile(async () => {
+						decisions.length = 0;
+						for (const source of batch)
+							decisions.push(
+								deriveOwnedReplacement(
+									registration,
+									source,
+									{ planEffect: { kind: "replacement", sourceSequence: source.row.authorSequence }, operations: [] },
+									true
+								)
+							);
+						await Promise.resolve();
+					});
+				});
+				if (decisions.length !== batch.length) throw new TypeError("replacement preparation source check failed");
+				return ObjectFreeze(decisions);
+			},
+			{
+				pool: "read-control",
+				refuse: (): never => {
+					throw new TypeError("replacement preparation admission capacity exhausted");
+				},
+			}
+		);
+	}
 	function authorizeReplacement(
 		this: V3RebaseSource,
 		sign: (request: Readonly<{ exactCanonicalSelectionBytes: Uint8Array; digest: Uint8Array }>) => Promise<Uint8Array>
@@ -18917,6 +18996,7 @@ async function readRebaseOutbox(
 					withDependencies,
 					issueReplacement,
 					prepareReplacement,
+					prepareReplacements,
 					authorizeReplacement,
 				})
 			: ObjectFreeze({
@@ -18929,8 +19009,10 @@ async function readRebaseOutbox(
 					withDependencies,
 					issueReplacement,
 					prepareReplacement,
+					prepareReplacements,
 					authorizeReplacement,
 				});
+	rebaseSourceOwners.set(resultSource, ObjectFreeze({ registration, source: heldSource }));
 	return ObjectFreeze({ kind: "displaced" as const, ok: true as const, source: resultSource });
 }
 
