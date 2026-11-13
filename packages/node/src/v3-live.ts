@@ -19520,8 +19520,12 @@ async function republishRetained(
 			if (targetPeerId === undefined) {
 				published = await registration.networkNode.publishMessage(registration.topic, message);
 			} else {
+				// Track 46: the replay paces itself by awaiting each row, so each waits for the
+				// target's receipt; a send that resolved on the local write would land the
+				// whole window in the target's input pool at once.
 				await registration.networkNode.sendMessage(targetPeerId, message, {
 					signal: AbortSignal.any([signal, AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)]),
+					acknowledged: true,
 				});
 				published = true;
 			}

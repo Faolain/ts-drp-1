@@ -3026,15 +3026,22 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 	/**
 	 * Send a message to a peer over its direct-message session (or the legacy protocol for a peer that
-	 * has none). Resolves once the frame was accepted by the stream; it is not a delivery receipt.
+	 * has none). Resolves once the frame was accepted by the stream; it is not a delivery receipt,
+	 * unless `acknowledged`: then it resolves once the peer admitted the frame to its message queue.
+	 * A caller that paces itself by awaiting each send (the targeted retained replay) asks for that.
 	 * Every failure rejects: the abort reason when the caller's signal aborted, otherwise a
 	 * {@link DirectMessageSendError} naming the cause. A failed send never resolves.
 	 * @param peerId - The peer ID to send the message to.
 	 * @param message - The message to send.
 	 * @param options
 	 * @param options.signal
+	 * @param options.acknowledged
 	 */
-	async sendMessage(peerId: string, message: Message, options: { readonly signal?: AbortSignal } = {}): Promise<void> {
+	async sendMessage(
+		peerId: string,
+		message: Message,
+		options: { readonly signal?: AbortSignal; readonly acknowledged?: boolean } = {}
+	): Promise<void> {
 		const messageBuffer = this.encodeEligibleMessage(message);
 		const probe: StreamSendSample | undefined = streamDiagnosticsEnabled
 			? recordSend({
@@ -3065,6 +3072,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}
 			await this._directSessions.send(connection, messageBuffer, {
 				signal: options.signal,
+				acknowledged: options.acknowledged === true,
 				legacyOnly: isSyncProtocolMessage(message),
 				onWriteStart:
 					probe === undefined

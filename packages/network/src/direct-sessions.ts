@@ -52,6 +52,11 @@ export interface DirectSendOptions {
 	readonly signal?: AbortSignal;
 	/** Sync-family messages keep the legacy protocol (the negotiated sync fallback). */
 	readonly legacyOnly?: boolean;
+	/**
+	 * Resolve only once the receiver admitted the frame to its message queue: on a session, when the
+	 * receiver's credit covers it; on the legacy protocol, when the receiver closed the stream.
+	 */
+	readonly acknowledged?: boolean;
 	/** Measurement hook: the frame starts its write (after queueing and credit). */
 	onWriteStart?(): void;
 }
@@ -59,10 +64,13 @@ export interface DirectSendOptions {
 interface Pending {
 	readonly bytes: Uint8Array;
 	readonly signal?: AbortSignal;
+	readonly acknowledged: boolean;
 	onWriteStart?(): void;
 	resolve(): void;
 	reject(error: unknown): void;
 	started: boolean;
+	/** The write completed; an acknowledged frame now waits only for its receipt. */
+	written: boolean;
 	settled: boolean;
 	/** Removes the frame from whichever queue holds it now. */
 	cancel?(): void;
@@ -70,6 +78,7 @@ interface Pending {
 }
 
 const CREDIT_MAX_BYTES = 16;
+const RESET_BEFORE_RECEIPT = "The direct-message session reset before the receiver admitted the frame";
 
 /** Bytes in the varint encoding of `value`: the longest length prefix a frame of `value` bytes needs. */
 function varintLength(value: number): number {
@@ -125,16 +134,18 @@ function isOpen(stream: Stream): boolean {
 	return stream.status === "open";
 }
 
-function waitClosed(stream: Stream, timeoutMs: number): Promise<void> {
-	if (stream.status !== "open" && stream.status !== "closing") return Promise.resolve();
-	return new Promise<void>((resolve) => {
-		const done = (): void => {
+/** Waits for both ends of the stream to close, at most `timeoutMs`; true if it closed in time. */
+function waitClosed(stream: Stream, timeoutMs: number): Promise<boolean> {
+	if (stream.status !== "open" && stream.status !== "closing") return Promise.resolve(true);
+	return new Promise<boolean>((resolve) => {
+		const done = (closed: boolean): void => {
 			clearTimeout(timer);
-			stream.removeEventListener("close", done);
-			resolve();
+			stream.removeEventListener("close", onClose);
+			resolve(closed);
 		};
-		const timer = setTimeout(done, timeoutMs);
-		stream.addEventListener("close", done, { once: true });
+		const onClose = (): void => done(true);
+		const timer = setTimeout(() => done(false), timeoutMs);
+		stream.addEventListener("close", onClose, { once: true });
 	});
 }
 
@@ -230,6 +241,11 @@ class OutboundSession {
 	#writing = false;
 	#opening?: AbortController;
 	#closed?: DirectMessageSendError;
+	/** Frames written on the current stream, and frames the receiver's credit has covered. */
+	#written = 0;
+	#granted = 0;
+	/** Acknowledged frames written and not yet covered by credit, in write order. */
+	readonly #receipts: { readonly seq: number; readonly pending: Pending }[] = [];
 
 	constructor(
 		private readonly owner: ConnectionDirect,
@@ -312,6 +328,8 @@ class OutboundSession {
 		});
 		this.#creditFrames = this.#limits.windowFrames;
 		this.#creditBytes = this.#limits.windowBytes;
+		this.#written = 0;
+		this.#granted = 0;
 		this.#state = "open";
 		void this.#readCredit(stream, this.#lp);
 		this.#pump();
@@ -327,8 +345,15 @@ class OutboundSession {
 		try {
 			for (;;) {
 				const credit = decodeCredit((await lp.read()).subarray());
+				if (this.#stream !== stream) return;
 				this.#creditFrames = Math.min(this.#limits.windowFrames, this.#creditFrames + credit.frames);
 				this.#creditBytes = Math.min(this.#limits.windowBytes, this.#creditBytes + credit.bytes);
+				// The receiver admits in order, so its credit is a cumulative receipt for written frames.
+				this.#granted += credit.frames;
+				for (let head = this.#receipts[0]; head !== undefined && head.seq <= this.#granted; head = this.#receipts[0]) {
+					this.#receipts.shift();
+					settle(head.pending);
+				}
 				this.#pump();
 			}
 		} catch (error) {
@@ -347,10 +372,17 @@ class OutboundSession {
 		this.#creditFrames -= 1;
 		this.#creditBytes -= pending.bytes.byteLength;
 		this.#writing = true;
+		const seq = ++this.#written;
 		pending.onWriteStart?.();
 		try {
 			await lp.write(pending.bytes);
-			settle(pending, pending.signal?.aborted === true ? pending.signal.reason : undefined);
+			pending.written = true;
+			if (pending.signal?.aborted === true) settle(pending, pending.signal.reason);
+			else if (pending.acknowledged && this.#granted < seq && this.#stream === stream)
+				this.#receipts.push({ seq, pending });
+			else if (pending.acknowledged && this.#granted < seq)
+				settle(pending, new DirectMessageSendError("DIRECT_SESSION_RESET", RESET_BEFORE_RECEIPT));
+			else settle(pending);
 		} catch (cause) {
 			settle(
 				pending,
@@ -372,6 +404,9 @@ class OutboundSession {
 		if (this.#stream !== stream) return;
 		this.#stream = undefined;
 		this.#lp = undefined;
+		// Written but not yet admitted: their delivery is unknown.
+		for (const { pending } of this.#receipts.splice(0))
+			settle(pending, new DirectMessageSendError("DIRECT_SESSION_RESET", RESET_BEFORE_RECEIPT, { cause }));
 		if (isOpen(stream)) stream.abort(cause instanceof Error ? cause : new Error(String(cause)));
 		if (this.#closed !== undefined) return;
 		this.#state = "idle";
@@ -387,6 +422,7 @@ class OutboundSession {
 		this.#opening?.abort(error);
 		this.#opening = undefined;
 		for (const pending of this.#queue.splice(0)) settle(pending, error);
+		for (const { pending } of this.#receipts.splice(0)) settle(pending, error);
 		this.#queuedBytes = 0;
 		const stream = this.#stream;
 		this.#stream = undefined;
@@ -468,6 +504,12 @@ class LegacySender {
 			pending.signal?.throwIfAborted();
 			pending.onWriteStart?.();
 			await uint8ArrayToStream(stream, pending.bytes);
+			// A legacy receiver closes its end only after it admitted the frame: that close is the receipt.
+			if (
+				pending.acknowledged &&
+				(!(await waitClosed(stream, LEGACY_CLOSE_DEADLINE_MS)) || stream.status !== "closed")
+			)
+				throw new Error("The legacy receiver did not close the stream after the frame");
 			settle(pending);
 		} catch (cause) {
 			settle(
@@ -530,15 +572,18 @@ export class DirectMessageSessions {
 			const pending: Pending = {
 				bytes,
 				signal,
+				acknowledged: options.acknowledged === true,
 				onWriteStart: options.onWriteStart,
 				resolve,
 				reject,
 				started: false,
+				written: false,
 				settled: false,
 			};
 			if (signal !== undefined) {
 				const onAbort = (): void => {
-					if (pending.started) return;
+					// Mid-write the frame completes first; waiting only for a receipt, the caller is released now.
+					if (pending.started && !pending.written) return;
 					pending.cancel?.();
 					settle(pending, signal.reason);
 				};
