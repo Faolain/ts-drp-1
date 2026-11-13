@@ -278,7 +278,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(source.match(/closedJournalRowsEqual\([^()]*(?:\(\))?[^()]*(?:canonicalRows|rows)\)/gu)?.length).toBe(6);
 		const cap = {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128};
 		const bindings = {encodeCanonical, compareBytes, CLOSED_RETIREMENT_BYTES: cap};
-		const rowsEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual", "closedJournalRowsEqual"],
+		const rowsEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual", "closedJournalRowsEqual", "plainClosedRowBytes"],
 			"closedJournalRowsEqual", bindings);
 		const wholeEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual"], "closedRetirementEqual", bindings);
 		const rows = (count: number, bytes: number, mark = 0) => Array.from({length: count}, (_, index) => {
