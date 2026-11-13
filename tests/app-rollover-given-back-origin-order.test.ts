@@ -60,7 +60,8 @@ function memberRoom(displacementIdentity?: (operation: Readonly<Record<string, u
 			operation: Readonly<Record<string, unknown>>,
 			options?: { handBack?: { sourceSequence: number; intent: number } }
 		) => {
-			const key = options?.handBack === undefined ? undefined : `${options.handBack.sourceSequence}:${options.handBack.intent}`;
+			const key =
+				options?.handBack === undefined ? undefined : `${options.handBack.sourceSequence}:${options.handBack.intent}`;
 			const record = key === undefined ? undefined : listed.get(key);
 			// A reissue keeps its record's move origin.
 			rows.push({ sequence: ++sequence, origin: record?.origin ?? sequence, operation });
@@ -132,10 +133,22 @@ async function rollThrough(install: (next: number) => void) {
 
 it("Chat: a given-back message is shown in the author's order among the author's messages", async () => {
 	// Chat's displacement identity: each message is its own (its client operation id).
-	const { room, admitted, displace, giveBack, install } = memberRoom((operation) => `message\u0000${String(operation.clientOperationId)}`);
+	const { room, admitted, displace, giveBack, install } = memberRoom(
+		(operation) => `message\u0000${String(operation.clientOperationId)}`
+	);
 	const policy = policyFor(room);
-	const first = Object.freeze({ action: "message", clientOperationId: "m-1", displayTimeMs: 1_791_662_400_000, text: "first" });
-	const second = Object.freeze({ action: "message", clientOperationId: "m-2", displayTimeMs: 1_791_662_401_000, text: "second" });
+	const first = Object.freeze({
+		action: "message",
+		clientOperationId: "m-1",
+		displayTimeMs: 1_791_662_400_000,
+		text: "first",
+	});
+	const second = Object.freeze({
+		action: "message",
+		clientOperationId: "m-2",
+		displayTimeMs: 1_791_662_401_000,
+		text: "second",
+	});
 	await policy.issue(first);
 	await policy.issue(second);
 	// The first message's row never reached the creator inside the window; the second's did.

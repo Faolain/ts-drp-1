@@ -50,10 +50,19 @@ const record = (overrides: Readonly<Record<string, unknown>> = {}) =>
 		...overrides,
 	});
 const expired = (sourceSequence = 7) =>
-	Object.freeze({ disposition: "expire", replacementSequence: null, sourceDigest: new Uint8Array(32).fill(0xd1), sourceSequence });
+	Object.freeze({
+		disposition: "expire",
+		replacementSequence: null,
+		sourceDigest: new Uint8Array(32).fill(0xd1),
+		sourceSequence,
+	});
 const plan = (
 	revision: number,
-	fields: Readonly<{ handBacks?: readonly unknown[]; reissueOrigins?: readonly unknown[]; entries?: readonly unknown[] }> = {}
+	fields: Readonly<{
+		handBacks?: readonly unknown[];
+		reissueOrigins?: readonly unknown[];
+		entries?: readonly unknown[];
+	}> = {}
 ) =>
 	Object.freeze({
 		entries: Object.freeze([...(fields.entries ?? [expired()])]),
@@ -130,7 +139,9 @@ let browserId = 0;
 async function openStore(kind: "browser" | "memory" | "node", directory?: string): Promise<Store> {
 	if (kind === "memory") return createEphemeralDurableIssuanceStore() as unknown as Store;
 	if (kind === "browser")
-		return (await createBrowserDurableIssuanceStore({ primaryDatabaseName: `reissue-origins-${browserId++}` })) as unknown as Store;
+		return (await createBrowserDurableIssuanceStore({
+			primaryDatabaseName: `reissue-origins-${browserId++}`,
+		})) as unknown as Store;
 	const selected = directory ?? (await mkdtemp(join(tmpdir(), "reissue-origins-store-")));
 	if (directory === undefined) directories.push(selected);
 	return createNodeDurableIssuanceStore({ primaryFilename: join(selected, "primary.sqlite") }) as unknown as Store;
@@ -191,17 +202,29 @@ describe("settlement reissue origins: codec", () => {
 			[{ ...origin(9, 2), extra: 1 }],
 			Array.from({ length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords + 1 }, (_, index) => origin(100 + index, 1)),
 		])
-			expect(copySettlementPlan(plan(0, { reissueOrigins: bad }), SCOPE), JSON.stringify(bad).slice(0, 60)).toBeUndefined();
+			expect(
+				copySettlementPlan(plan(0, { reissueOrigins: bad }), SCOPE),
+				JSON.stringify(bad).slice(0, 60)
+			).toBeUndefined();
 		expect(copySettlementPlanEffect(effect({ originSequence: 8 }))).toBeUndefined();
 		expect(copySettlementPlanEffect(effect({ originSequence: -1 }))).toBeUndefined();
-		expect(snapshot(copySettlementPlanEffect(effect({ originSequence: 2 })))).toEqual(snapshot(effect({ originSequence: 2 })));
+		expect(snapshot(copySettlementPlanEffect(effect({ originSequence: 2 })))).toEqual(
+			snapshot(effect({ originSequence: 2 }))
+		);
 		expect(snapshot(copySettlementPlanEffect(effect()))).toEqual(snapshot(effect()));
 	});
 
 	it("older readers refuse a plan carrying either field at open (closed record)", () => {
 		// The closed key sets of the plan and record readers before track 46.
 		const olderPlanKeys = ["entries", "fenceSequence", "handBacks", "revision", "scope"];
-		const olderRecordKeys = ["exactCanonicalOperationBytes", "intent", "reissueSequence", "sourceDigest", "sourceEpoch", "sourceSequence"];
+		const olderRecordKeys = [
+			"exactCanonicalOperationBytes",
+			"intent",
+			"reissueSequence",
+			"sourceDigest",
+			"sourceEpoch",
+			"sourceSequence",
+		];
 		const withEntry = copied(plan(0, { handBacks: [record({ reissueSequence: 9 })], reissueOrigins: [origin(9, 7)] }));
 		expect(isClosedDurableIssuanceRecord(withEntry, olderPlanKeys)).toBe(false);
 		const withOrigin = copied(plan(0, { handBacks: [record({ sourceSequence: 9, originSequence: 2 })] }));
@@ -214,14 +237,25 @@ describe("settlement reissue origins: codec", () => {
 	});
 
 	it("the hand-back effect adds the entry with the record's origin, atomically with consumption", () => {
-		const base = copied(plan(0, { handBacks: [record({ sourceSequence: 9, originSequence: 2 })], entries: [expired(9)] }));
-		const linked = applySettlementPlanEffect(base, copySettlementPlanEffect(effect({ sourceSequence: 9, originSequence: 2 }))!, 12);
+		const base = copied(
+			plan(0, { handBacks: [record({ sourceSequence: 9, originSequence: 2 })], entries: [expired(9)] })
+		);
+		const linked = applySettlementPlanEffect(
+			base,
+			copySettlementPlanEffect(effect({ sourceSequence: 9, originSequence: 2 }))!,
+			12
+		);
 		expect(snapshot(linked.reissueOrigins)).toEqual(snapshot([origin(12, 2)]));
 		expect(linked.handBacks?.[0]?.reissueSequence).toBe(12);
-		expect(settlementPlanHasExactEffectLink(linked, effect({ sourceSequence: 9, originSequence: 2 }) as never, 12)).toBe(true);
+		expect(
+			settlementPlanHasExactEffectLink(linked, effect({ sourceSequence: 9, originSequence: 2 }) as never, 12)
+		).toBe(true);
 		// An effect written before the field takes the record's origin.
-		expect(snapshot(applySettlementPlanEffect(base, copySettlementPlanEffect(effect({ sourceSequence: 9 }))!, 12).reissueOrigins))
-			.toEqual(snapshot([origin(12, 2)]));
+		expect(
+			snapshot(
+				applySettlementPlanEffect(base, copySettlementPlanEffect(effect({ sourceSequence: 9 }))!, 12).reissueOrigins
+			)
+		).toEqual(snapshot([origin(12, 2)]));
 		// An origin other than the record's is refused.
 		expect(() =>
 			applySettlementPlanEffect(base, copySettlementPlanEffect(effect({ sourceSequence: 9, originSequence: 3 }))!, 12)
@@ -232,14 +266,20 @@ describe("settlement reissue origins: codec", () => {
 		const full = Array.from({ length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords }, (_, index) =>
 			record({ sourceSequence: 1_000 + index, exactCanonicalOperationBytes: new Uint8Array([index + 1]) })
 		);
-		const origins = Array.from({ length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords }, (_, index) => origin(2_000 + index, 1 + index));
+		const origins = Array.from({ length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords }, (_, index) =>
+			origin(2_000 + index, 1 + index)
+		);
 		// 64 unconsumed records and 64 entries in one plan.
 		const atBound = copied(plan(0, { handBacks: full, reissueOrigins: origins }));
 		expect(atBound.handBacks).toHaveLength(64);
 		expect(atBound.reissueOrigins).toHaveLength(64);
 		// The entry bound refuses one more reissue; the record stays unconsumed.
 		expect(
-			code(thrown(() => applySettlementPlanEffect(atBound, copySettlementPlanEffect(effect({ sourceSequence: 1_000 }))!, 3_000)))
+			code(
+				thrown(() =>
+					applySettlementPlanEffect(atBound, copySettlementPlanEffect(effect({ sourceSequence: 1_000 }))!, 3_000)
+				)
+			)
 		).toBe("ISSUANCE_RETRY_REQUIRED");
 		expect(atBound.handBacks?.[0]?.reissueSequence).toBeNull();
 		// A merge drops consumed records: they hold no slot, the entry keeps the move.
@@ -249,7 +289,12 @@ describe("settlement reissue origins: codec", () => {
 			3_000
 		);
 		const merged = settlementWindowHandBacks(consumed, [
-			{ sourceSequence: 3_001, sourceDigest: new Uint8Array(32).fill(7), sourceEpoch: 9, operations: [new Uint8Array([200])] },
+			{
+				sourceSequence: 3_001,
+				sourceDigest: new Uint8Array(32).fill(7),
+				sourceEpoch: 9,
+				operations: [new Uint8Array([200])],
+			},
 		]);
 		expect(merged.deferredMoves).toBe(0);
 		expect(merged.handBacks).toHaveLength(64);
@@ -263,7 +308,12 @@ describe("settlement reissue origins: codec", () => {
 		);
 		const before = copied(plan(5, { handBacks: full, reissueOrigins: [origin(2_000, 3), origin(2_001, 4)] }));
 		const merged = settlementWindowHandBacks(before, [
-			{ sourceSequence: 2_001, sourceDigest: new Uint8Array(32).fill(7), sourceEpoch: 9, operations: [new Uint8Array([200])] },
+			{
+				sourceSequence: 2_001,
+				sourceDigest: new Uint8Array(32).fill(7),
+				sourceEpoch: 9,
+				operations: [new Uint8Array([200])],
+			},
 		]);
 		expect(merged.deferredMoves).toBe(1);
 		expect(merged.expired.has(2_001)).toBe(false);
@@ -275,14 +325,23 @@ describe("settlement reissue origins: codec", () => {
 		// Row 20 reissued the move that began at 3; it was displaced and replaced by 24, which expires.
 		const before = copied(
 			plan(5, {
-				entries: [{ disposition: "rebase", replacementSequence: 24, sourceDigest: new Uint8Array(32).fill(0xd2), sourceSequence: 20 }],
+				entries: [
+					{
+						disposition: "rebase",
+						replacementSequence: 24,
+						sourceDigest: new Uint8Array(32).fill(0xd2),
+						sourceSequence: 20,
+					},
+				],
 				reissueOrigins: [origin(20, 3)],
 			})
 		);
 		expect(settlementMoveOrigin(before, 24)).toEqual({ originSequence: 3, reissue: origin(20, 3) });
 		expect(settlementReissueLastCarrier(before, 20)).toBe(24);
 		// Replacement never drops the entry: the frontier admitted the reissued row's sequence, not the carrier.
-		expect(snapshot(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 20))).toEqual(snapshot([origin(20, 3)]));
+		expect(snapshot(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 20))).toEqual(
+			snapshot([origin(20, 3)])
+		);
 		expect(settlementReissueOriginsUnsettled(before, before.reissueOrigins, null)).toBe(before.reissueOrigins);
 		expect(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 24)).toBeUndefined();
 		// At or below the frontier is not admitted: a last carrier displaced in this write, or with an own
@@ -334,10 +393,14 @@ describe("settlement reissue origins: codec", () => {
 		expect(settlementBacklogMoves(reissued, new Map()).pending.map((move) => move.rows)).toEqual([[20]]);
 		// The next install displaces row 20: its rebase entry counts it, the entry does not.
 		const rebase = { disposition: "rebase", sourceDigest: new Uint8Array(32).fill(0xd2), sourceSequence: 20 };
-		const displacedPlan = copied(plan(2, { entries: [expired(), { ...rebase, replacementSequence: null }], reissueOrigins: [origin(20, 7)] }));
+		const displacedPlan = copied(
+			plan(2, { entries: [expired(), { ...rebase, replacementSequence: null }], reissueOrigins: [origin(20, 7)] })
+		);
 		expect(total(displacedPlan, new Map([[20, 1]]))).toBe(1);
 		// The drain replaces it (row 24): pending on the replacement, once, whether or not the scan still lists 20.
-		const replaced = copied(plan(3, { entries: [expired(), { ...rebase, replacementSequence: 24 }], reissueOrigins: [origin(20, 7)] }));
+		const replaced = copied(
+			plan(3, { entries: [expired(), { ...rebase, replacementSequence: 24 }], reissueOrigins: [origin(20, 7)] })
+		);
 		for (const displaced of [new Map([[20, 1]]), new Map<number, number>()]) {
 			expect(total(replaced, displaced)).toBe(1);
 			expect(settlementBacklogMoves(replaced, displaced).pending.map((move) => move.rows)).toEqual([[24]]);
@@ -352,19 +415,33 @@ describe("settlement reissue origins: codec", () => {
 			...plan(4, { entries: [expired(), { ...rebase, replacementSequence: 24 }, expired(24)] }),
 			handBacks: merged.handBacks,
 		});
-		expect(total(expiredPlan, new Map([[20, 1], [24, 1]]))).toBe(1);
+		expect(
+			total(
+				expiredPlan,
+				new Map([
+					[20, 1],
+					[24, 1],
+				])
+			)
+		).toBe(1);
 		expect(total(expiredPlan, new Map())).toBe(1);
 	});
 
 	it("a plan write keeps or drops an entry, never adds or alters one", () => {
 		const before = copied(plan(1, { reissueOrigins: [origin(9, 7)] }));
 		expect(() => assertSettlementPlanProgressTransition(before, copied(plan(2)))).not.toThrow();
-		expect(() => assertSettlementPlanProgressTransition(before, copied(plan(2, { reissueOrigins: [origin(9, 7)] })))).not.toThrow();
+		expect(() =>
+			assertSettlementPlanProgressTransition(before, copied(plan(2, { reissueOrigins: [origin(9, 7)] })))
+		).not.toThrow();
 		for (const candidate of [[origin(9, 6)], [origin(9, 7), origin(10, 7)]])
-			expect(code(thrown(() => assertSettlementPlanProgressTransition(before, copied(plan(2, { reissueOrigins: candidate })))))).toBe(
-				"ISSUANCE_RETRY_REQUIRED"
-			);
-		expect(() => assertSettlementPlanProgressTransition(null, copied(plan(0, { reissueOrigins: [origin(9, 7)] })))).toThrow();
+			expect(
+				code(
+					thrown(() => assertSettlementPlanProgressTransition(before, copied(plan(2, { reissueOrigins: candidate }))))
+				)
+			).toBe("ISSUANCE_RETRY_REQUIRED");
+		expect(() =>
+			assertSettlementPlanProgressTransition(null, copied(plan(0, { reissueOrigins: [origin(9, 7)] })))
+		).toThrow();
 	});
 });
 
@@ -390,7 +467,11 @@ describe("settlement reissue origins: stores", () => {
 						await failure(
 							store.transactWriteSettlementPlan({
 								expectedRevision: 0,
-								plan: plan(1, { handBacks: [given, record()], entries: [expired(), expired(9)], reissueOrigins: [origin(9, 2)] }),
+								plan: plan(1, {
+									handBacks: [given, record()],
+									entries: [expired(), expired(9)],
+									reissueOrigins: [origin(9, 2)],
+								}),
 								scope: SCOPE,
 							})
 						)
@@ -415,7 +496,11 @@ describe("settlement reissue origins: stores", () => {
 				).toBe("ISSUANCE_RETRY_REQUIRED");
 				expect((await store.readLineage(SCOPE)).next).toBe(11);
 				// A merge drops the consumed record and keeps the entry; altering it is refused.
-				const merged = plan(2, { handBacks: [record()], entries: [expired(), expired(9)], reissueOrigins: [origin(10, 2)] });
+				const merged = plan(2, {
+					handBacks: [record()],
+					entries: [expired(), expired(9)],
+					reissueOrigins: [origin(10, 2)],
+				});
 				expect(
 					code(
 						await failure(
@@ -455,7 +540,13 @@ describe("settlement reissue origins: stores", () => {
 		store = await openStore("node", directory);
 		try {
 			expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(
-				snapshot(plan(1, { handBacks: [{ ...given, reissueSequence: 10 }], entries: [expired(9)], reissueOrigins: [origin(10, 2)] }))
+				snapshot(
+					plan(1, {
+						handBacks: [{ ...given, reissueSequence: 10 }],
+						entries: [expired(9)],
+						reissueOrigins: [origin(10, 2)],
+					})
+				)
 			);
 		} finally {
 			await store.close();

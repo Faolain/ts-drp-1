@@ -6936,7 +6936,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let handBackSupersession:
 		| Readonly<{ revision: number; head: number; superseded: ReadonlyMap<string, HandBackSupersededBy> }>
 		| undefined;
-	const rowIdentities = new Map<number, readonly Readonly<{ key: string; operation: Readonly<Record<string, unknown>> }>[]>();
+	const rowIdentities = new Map<
+		number,
+		readonly Readonly<{ key: string; operation: Readonly<Record<string, unknown>> }>[]
+	>();
 	const handBackKeyOf = (record: Pick<RoomHandBack, "intent" | "sourceSequence">): string =>
 		`${record.sourceSequence}:${record.intent}`;
 	const displacementKeyOf = (operation: Readonly<Record<string, unknown>>): string | undefined => {
@@ -6962,7 +6965,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const batch = Reflect.get(operation, "action") === "applicationBatch" ? Reflect.get(operation, "batch") : undefined;
 		const entries = batch !== null && typeof batch === "object" ? Reflect.get(batch, "entries") : undefined;
 		const operations = Array.isArray(entries)
-			? entries.map((entry: unknown) => (entry !== null && typeof entry === "object" ? Reflect.get(entry, "operation") : undefined))
+			? entries.map((entry: unknown) =>
+					entry !== null && typeof entry === "object" ? Reflect.get(entry, "operation") : undefined
+				)
 			: [operation];
 		return operations.flatMap((child: unknown) => {
 			if (child === null || typeof child !== "object" || Array.isArray(child)) return [];
@@ -7012,14 +7017,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			rowIdentities.set(sequence, row === null ? [] : ownRowIdentities(row.envelope.canonicalPreimageBytes));
 		}
 		const keys = new Set(keyed.map(({ key }) => key));
-		const newest = new Map<string, Readonly<{ origin: number; authorSequence: number; operation: Readonly<Record<string, unknown>> }>>();
+		const newest = new Map<
+			string,
+			Readonly<{ origin: number; authorSequence: number; operation: Readonly<Record<string, unknown>> }>
+		>();
 		for (const [sequence, identities] of rowIdentities) {
 			if (sequence >= head) continue;
 			const origin = settlementMoveOrigin(plan, sequence).originSequence;
 			for (const { key, operation } of identities) {
 				if (!keys.has(key)) continue;
 				const prior = newest.get(key);
-				if (prior === undefined || origin > prior.origin || (origin === prior.origin && sequence >= prior.authorSequence))
+				if (
+					prior === undefined ||
+					origin > prior.origin ||
+					(origin === prior.origin && sequence >= prior.authorSequence)
+				)
 					newest.set(key, Object.freeze({ origin, authorSequence: sequence, operation }));
 			}
 		}
@@ -7027,7 +7039,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		for (const { record, key, origin } of keyed) {
 			const later = newest.get(key);
 			if (later !== undefined && later.origin > origin)
-				superseded.set(handBackKeyOf(record), Object.freeze({ authorSequence: later.authorSequence, operation: later.operation }));
+				superseded.set(
+					handBackKeyOf(record),
+					Object.freeze({ authorSequence: later.authorSequence, operation: later.operation })
+				);
 		}
 		if (
 			handBackSupersession !== undefined &&
@@ -7046,7 +7061,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	 * @returns The listing, oldest first.
 	 */
 	const handBackListing = (plan: RoomSettlementPlan | null): V3RoomSettlementStatus["undelivered"] => {
-		const superseded = handBackSupersession?.revision === (plan?.revision ?? -1) ? handBackSupersession.superseded : undefined;
+		const superseded =
+			handBackSupersession?.revision === (plan?.revision ?? -1) ? handBackSupersession.superseded : undefined;
 		return Object.freeze(
 			(plan?.handBacks ?? [])
 				.filter((record) => record.reissueSequence === null)
@@ -7194,7 +7210,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
 		prunedSources: ReadonlySet<number> = new Set(),
 		windowExpired: ReadonlySet<number> = new Set(),
-		handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter((record) => record.reissueSequence === null),
+		handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter(
+			(record) => record.reissueSequence === null
+		),
 		reissueOrigins: RoomSettlementPlan["reissueOrigins"] = current?.reissueOrigins
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
 		const selectedHandBacks = handBacks === undefined || handBacks.length === 0 ? undefined : handBacks;

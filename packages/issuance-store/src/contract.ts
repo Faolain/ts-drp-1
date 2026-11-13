@@ -632,7 +632,8 @@ function copySettlementHandBack(value: unknown): SettlementHandBack | undefined 
 		]) ||
 		!isValidDurableAuthorSequence(value.sourceSequence) ||
 		// Written only when it differs from the source (the origin is always older).
-		(hasOrigin && (!isValidDurableAuthorSequence(value.originSequence) || value.originSequence >= value.sourceSequence)) ||
+		(hasOrigin &&
+			(!isValidDurableAuthorSequence(value.originSequence) || value.originSequence >= value.sourceSequence)) ||
 		!isValidDurableAuthorSequence(value.sourceEpoch) ||
 		!isValidDurableAuthorSequence(value.intent) ||
 		value.intent >= SETTLEMENT_HAND_BACK_LIMITS.maxRecords ||
@@ -713,7 +714,8 @@ function copySettlementHandBacks(value: unknown): SettlementHandBack[] | undefin
  * @returns The detached entries, or undefined when invalid.
  */
 function copySettlementReissueOrigins(value: unknown): SettlementReissueOrigin[] | undefined {
-	if (!Array.isArray(value) || value.length === 0 || value.length > SETTLEMENT_HAND_BACK_LIMITS.maxRecords) return undefined;
+	if (!Array.isArray(value) || value.length === 0 || value.length > SETTLEMENT_HAND_BACK_LIMITS.maxRecords)
+		return undefined;
 	const entries: SettlementReissueOrigin[] = [];
 	for (const raw of value) {
 		const prior = entries.at(-1);
@@ -791,17 +793,26 @@ export function settlementHandBacksAtOrigin(
 	current: readonly SettlementHandBack[] | undefined,
 	origins: readonly SettlementReissueOrigin[] | undefined,
 	added: readonly SettlementHandBack[]
-): Readonly<{ handBacks: readonly SettlementHandBack[]; reissueOrigins: readonly SettlementReissueOrigin[] | undefined }> | undefined {
+):
+	| Readonly<{
+			handBacks: readonly SettlementHandBack[];
+			reissueOrigins: readonly SettlementReissueOrigin[] | undefined;
+	  }>
+	| undefined {
 	const source = added[0]?.sourceSequence;
 	if (source === undefined || added.some((record) => record.sourceSequence !== source)) return undefined;
 	const origin = settlementMoveOrigin(plan, source);
 	const handBacks = settlementHandBacksWith(
 		current,
-		origin.originSequence === source ? added : added.map((record) => ({ ...record, originSequence: origin.originSequence }))
+		origin.originSequence === source
+			? added
+			: added.map((record) => ({ ...record, originSequence: origin.originSequence }))
 	);
 	if (handBacks === undefined) return undefined;
-	const remaining = origin.reissue === undefined ? origins
-		: origins?.filter((entry) => entry.reissueSequence !== origin.reissue?.reissueSequence);
+	const remaining =
+		origin.reissue === undefined
+			? origins
+			: origins?.filter((entry) => entry.reissueSequence !== origin.reissue?.reissueSequence);
 	return { handBacks, reissueOrigins: remaining === undefined || remaining.length === 0 ? undefined : remaining };
 }
 
@@ -830,7 +841,9 @@ export function settlementWindowHandBacks(
 	expired: ReadonlySet<number>;
 	deferredMoves: number;
 }> {
-	let handBacks: readonly SettlementHandBack[] | undefined = plan?.handBacks?.filter((record) => record.reissueSequence === null);
+	let handBacks: readonly SettlementHandBack[] | undefined = plan?.handBacks?.filter(
+		(record) => record.reissueSequence === null
+	);
 	let reissueOrigins = plan?.reissueOrigins;
 	const expired = new Set<number>();
 	let deferredMoves = 0;
@@ -874,9 +887,13 @@ export function settlementWindowHandBacks(
 export function settlementReissueLastCarrier(plan: Pick<SettlementPlan, "entries">, reissueSequence: number): number {
 	let current = reissueSequence;
 	for (let depth = 0; depth <= plan.entries.length; depth++) {
-		const entry = plan.entries.find((candidate) => candidate.sourceObjectId === undefined && candidate.sourceSequence === current);
-		const next = entry === undefined ? undefined
-			: (entry.replacementSequence ?? entry.replacementProgress?.chunks.at(-1)?.replacementSequence);
+		const entry = plan.entries.find(
+			(candidate) => candidate.sourceObjectId === undefined && candidate.sourceSequence === current
+		);
+		const next =
+			entry === undefined
+				? undefined
+				: (entry.replacementSequence ?? entry.replacementProgress?.chunks.at(-1)?.replacementSequence);
 		if (next === undefined || next <= current) break;
 		current = next;
 	}
@@ -909,7 +926,8 @@ export function settlementReissueOriginsUnsettled(
 		sequence <= admittedThrough &&
 		!displaced.has(sequence) &&
 		!plan.entries.some(
-			(entry) => entry.sourceObjectId === undefined && entry.sourceSequence === sequence && entry.disposition !== "committed"
+			(entry) =>
+				entry.sourceObjectId === undefined && entry.sourceSequence === sequence && entry.disposition !== "committed"
 		);
 	const kept = origins.filter((entry) => !admitted(settlementReissueLastCarrier(plan, entry.reissueSequence)));
 	return kept.length === 0 ? undefined : kept.length === origins.length ? origins : kept;
@@ -999,7 +1017,8 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
 			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
-			...(hasReissueOrigins ? ["reissueOrigins"] : [])]) ||
+			...(hasReissueOrigins ? ["reissueOrigins"] : []),
+		]) ||
 		(hasCompletedSourceCustody && value.completedSourceCustody !== true) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
@@ -1155,11 +1174,23 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 						sourceSequence: record.sourceSequence,
 					})),
 				}),
-		...(plan.memberFrontier === undefined ? {} : {memberFrontier: {digest: new Uint8Array(plan.memberFrontier.digest),
-			exactCanonicalContextBytes: new Uint8Array(plan.memberFrontier.exactCanonicalContextBytes)}}),
-		...(plan.completedSourceCustody === true ? {completedSourceCustody: true as const} : {}),
-		...(plan.reissueOrigins === undefined ? {} : {reissueOrigins: plan.reissueOrigins.map((entry) => ({
-			originSequence: entry.originSequence, reissueSequence: entry.reissueSequence}))}),
+		...(plan.memberFrontier === undefined
+			? {}
+			: {
+					memberFrontier: {
+						digest: new Uint8Array(plan.memberFrontier.digest),
+						exactCanonicalContextBytes: new Uint8Array(plan.memberFrontier.exactCanonicalContextBytes),
+					},
+				}),
+		...(plan.completedSourceCustody === true ? { completedSourceCustody: true as const } : {}),
+		...(plan.reissueOrigins === undefined
+			? {}
+			: {
+					reissueOrigins: plan.reissueOrigins.map((entry) => ({
+						originSequence: entry.originSequence,
+						reissueSequence: entry.reissueSequence,
+					})),
+				}),
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};

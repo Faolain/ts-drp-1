@@ -273,8 +273,12 @@ describe("Track W: Chat's device archive", () => {
 		const older = message(A, "older", "older", T);
 		const between = message(B, "between", "between", T + 5);
 		const newer = message(A, "newer", "newer", T + 10);
-		expect(shippingChatHistory([newer, between, older], []).map(identity)).toEqual([older, between, newer].map(identity));
-		expect(shippingChatDisplayOrder([newer, between, older]).map(identity)).toEqual([older, between, newer].map(identity));
+		expect(shippingChatHistory([newer, between, older], []).map(identity)).toEqual(
+			[older, between, newer].map(identity)
+		);
+		expect(shippingChatDisplayOrder([newer, between, older]).map(identity)).toEqual(
+			[older, between, newer].map(identity)
+		);
 	});
 
 	it("a forged or skewed display time reorders only its own author's messages, never another author's", () => {
