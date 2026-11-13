@@ -27,7 +27,7 @@ import type {
 // - precondition:  an entry already replaced refuses the batch before any signature, nothing written;
 // - progress:      a source split in two replacement chunks across two batches leaves the plan in the
 //                  same partial and final progress states as the same singles;
-// - sizing (native stores only): a batch of 8 whose last rows cross the store's byte bound is refused
+// - sizing (native stores only): a batch of 8 whose last row crosses the store's byte bound is refused
 //                  whole before its marker (no signature, nothing written); the 7 that fit commit, and
 //                  the batch charge sized before the marker is at least the bytes the commit wrote;
 // - resume (native stores only): a batch that fails after its entered marker reports
@@ -338,8 +338,8 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 		};
 	}
 	if (native) {
-		// Sizing at the bound: each replacement is ~100 KB, so 8 cross the 786,432-byte image bound and 7 fit.
-		const pad = "p".repeat(100_000);
+		// Sizing at the bound: each replacement is ~2/15 of the store's image byte bound, so 7 fit and 8 cross it.
+		const pad = "p".repeat(Math.floor(ISSUANCE_RETIREMENT_LIMITS.maxBytes / 7.5));
 		const big = (sourceSequence: number): Row => ({
 			effect: { kind: "replacement", sourceSequence },
 			bytes: (sequence) => preimage(sequence, 1, { action: "place", id: `m-${sourceSequence}`, pad }),
