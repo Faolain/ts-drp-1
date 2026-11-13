@@ -2014,7 +2014,7 @@ export class V3RoomLocalBacklogFull extends Error {
 	constructor(
 		readonly backlog: number,
 		readonly bound: number,
-		readonly handBackSlots: number
+		readonly handBackSlots = 0
 	) {
 		super(
 			`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host` +
