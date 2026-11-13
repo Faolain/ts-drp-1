@@ -1,0 +1,13 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/room-worker": ["./src/index.ts"],
+			"@ts-drp/room-worker/page": ["./src/page.ts"],
+			"@ts-drp/room-worker/worker": ["./src/worker.ts"]
+		}
+	},
+	"include": ["src/**/*.ts", "tests/**/*.ts"]
+}

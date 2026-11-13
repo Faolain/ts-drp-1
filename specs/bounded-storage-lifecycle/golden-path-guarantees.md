@@ -81,3 +81,23 @@ and [20-track-r2-r3-watermark-retirement](../../docs/realtime-latency/tracks/20-
   - the host floor stays a separate database, fenced per owner.
 
   G28 still needs three-engine and SIGKILL evidence. This design is being specified as slices S1–S6 (Track R3).
+
+## Hosting a room in a worker (Track 45)
+
+An app may host its room in a dedicated worker (`@ts-drp/room-worker`, opt-in). The worker runs the same
+room code, so every guarantee above holds as on the main thread. The worker boundary adds the following
+obligations, each with its evidence in
+[docs/realtime-latency/tracks/45-room-worker](../../docs/realtime-latency/tracks/45-room-worker/README.md):
+
+- **G4.** Every bridge message carries its session, and a stale session's messages are dropped. A reopened
+  worker is a new session on a new port.
+- **G3, G15, G17.** A call that dies with its worker has an unknown outcome, never an assumed one. The app
+  resolves it from the reopened room's durable state by the operation's own identity before it offers it
+  again. A fresh identity would turn one intent into two operations.
+- **G12, G13.** The room's IndexedDB connections and Web Locks live in the worker, and the page's identity
+  lock stays on the page. Neither is exclusion or authority beyond what it already was. What the page
+  lends the worker (a native read reservation) is released only after `worker.terminate()` has run,
+  never on a timeout: a live worker that lost its reservation could read a torn image.
+- **G21.** The bridge's queues and depths are bounded, with fixed reviewed limits. A stream value is
+  bounded too: a log that grows with the session is read on demand, never streamed.
+- **G28.** Worker hosting needs three-engine evidence, as any native requirement does.

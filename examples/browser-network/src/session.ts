@@ -20,12 +20,16 @@ import type { BrowserRoutingTrace } from "@ts-drp/routing-browser";
 import type { ControlPlaneEvent, DRPConnectionBudget, DRPNodeConfig } from "@ts-drp/types";
 
 import { allowsInsecureNetworkFixture, type BrowserNetworkEnv, parseRelayOperatorGroups } from "./config";
+import { createControlPlaneEventLog } from "./control-plane-event-log";
 
 export interface ModularBrowserNetworkSnapshot {
 	readonly bootstrapPeers: readonly string[];
 	readonly connectionBudget: DRPConnectionBudget;
 	readonly connections: ReturnType<DRPNetworkNode["getControlPlaneConnections"]>;
+	/** The newest control-plane events (at most CONTROL_PLANE_EVENT_LOG_CAP), oldest first. */
 	readonly controlPlaneEvents: readonly ControlPlaneEvent[];
+	/** Control-plane events dropped from the log to stay within its cap. */
+	readonly controlPlaneEventsDropped: number;
 	readonly membershipMode: "invite";
 	readonly peerId: string;
 	readonly relayPolicy?: RelayPolicyResult;
@@ -57,7 +61,7 @@ export function createModularBrowserNetwork(
 	}
 	const fixture = allowsInsecureNetworkFixture(environment);
 	const operatorGroups = parseRelayOperatorGroups(environment.relayOperatorGroups);
-	const controlPlaneEvents: ControlPlaneEvent[] = [];
+	const controlPlaneEvents = createControlPlaneEventLog<ControlPlaneEvent>();
 	let lastRelayPolicy: RelayPolicyResult | undefined;
 	let connectionBudget: DRPConnectionBudget | undefined;
 	let relayHost: Libp2pRelayClientOptions["host"] | undefined;
@@ -160,7 +164,8 @@ export function createModularBrowserNetwork(
 				bootstrapPeers: [...(runtimeConfig.network_config?.bootstrap_peers ?? [])],
 				connectionBudget,
 				connections: network.getControlPlaneConnections(),
-				controlPlaneEvents: [...controlPlaneEvents],
+				controlPlaneEvents: controlPlaneEvents.events(),
+				controlPlaneEventsDropped: controlPlaneEvents.dropped,
 				membershipMode: "invite",
 				peerId: network.peerId,
 				...(lastRelayPolicy === undefined ? {} : { relayPolicy: lastRelayPolicy }),

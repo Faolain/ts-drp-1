@@ -34,6 +34,7 @@ import {
 } from "@ts-drp/outcome-commit";
 
 import { GRID_GENESIS_PROFILE } from "./profile.js";
+import { fabricAgeOfInformation, fabricPercentile } from "./age-of-information.js";
 import { GRID_ROLLOVER_BUDGET } from "./rollover.js";
 import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
 import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
@@ -1965,32 +1966,6 @@ function fabricTrialView(trial: FabricTrialState, durableVertexCount: number): F
 		sampleCount: trial.sampleCount,
 		trialId: trial.trialId,
 	});
-}
-
-function fabricAgeOfInformation(
-	observations: readonly FabricObservation[],
-	startedAtMs: number,
-	deadlineMs: number,
-	intervalMs: number
-): readonly number[] {
-	const delivered = [...observations].sort((left, right) => left.receivedAtMs - right.receivedAtMs);
-	const ages: number[] = [];
-	let cursor = 0;
-	let freshestSentAt = startedAtMs;
-	for (let sampledAt = startedAtMs; sampledAt <= deadlineMs; sampledAt += intervalMs) {
-		while (cursor < delivered.length && (delivered[cursor]?.receivedAtMs ?? Number.POSITIVE_INFINITY) <= sampledAt) {
-			freshestSentAt = Math.max(freshestSentAt, delivered[cursor]?.sentAtMs ?? freshestSentAt);
-			cursor += 1;
-		}
-		ages.push(sampledAt - freshestSentAt);
-	}
-	return ages;
-}
-
-function fabricPercentile(values: readonly number[], quantile: number): number {
-	if (values.length === 0) return 0;
-	const sorted = [...values].sort((left, right) => left - right);
-	return sorted[Math.ceil(sorted.length * quantile) - 1] ?? 0;
 }
 
 function decodePosition(payload: Uint8Array): Readonly<{ x: number; y: number }> | undefined {
