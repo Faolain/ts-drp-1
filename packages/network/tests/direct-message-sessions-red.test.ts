@@ -404,6 +404,107 @@ describe("direct message sessions", () => {
 	});
 });
 
+// Acknowledged sends (track 46, admission-rejected root cause): a caller that paces itself by awaiting
+// each send (the targeted retained replay) relied on the legacy stream's completion, which came only
+// after the receiver read the frame and closed the stream. A session send resolves on the local write,
+// so such a caller bursts. `acknowledged` restores the receipt: the send resolves once the receiver
+// admitted the frame to its message queue (its credit came back).
+describe("direct message acknowledged sends", () => {
+	function holdAdmission(receiver: DRPNetworkNode) {
+		const sessions = Reflect.get(receiver, "_directSessions") as object;
+		const admit = Reflect.get(sessions, "admit") as (...args: unknown[]) => Promise<void>;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		Reflect.set(sessions, "admit", async (...args: unknown[]) => {
+			await gate;
+			return admit(...args);
+		});
+		return release;
+	}
+
+	function state(sending: Promise<void>) {
+		return Promise.race([
+			sending.then(
+				() => "resolved",
+				(error: unknown) => codeOf(error)
+			),
+			new Promise((resolve) => setTimeout(() => resolve("pending"), 300)),
+		]);
+	}
+
+	it("resolves only once the receiver admitted the frame", { timeout: 30_000 }, async () => {
+		const f = await pair();
+		await f.sender.sendMessage(f.receiver.peerId, message("warm"));
+		expect(await until(() => f.arrivals.includes("warm"))).toBe(true);
+		const release = holdAdmission(f.receiver);
+		const acknowledged = f.sender.sendMessage(f.receiver.peerId, message("acked"), { acknowledged: true });
+		const plain = f.sender.sendMessage(f.receiver.peerId, message("plain"));
+		expect(await state(plain)).toBe("resolved");
+		expect(await state(acknowledged)).toBe("pending");
+		release();
+		await expect(acknowledged).resolves.toBeUndefined();
+		expect(await until(() => f.arrivals.includes("acked"))).toBe(true);
+	});
+
+	it("rejects when the session resets before the receiver admitted the frame", { timeout: 30_000 }, async () => {
+		const f = await pair();
+		await f.sender.sendMessage(f.receiver.peerId, message("warm"));
+		expect(await until(() => f.arrivals.includes("warm"))).toBe(true);
+		holdAdmission(f.receiver);
+		const acknowledged = f.sender.sendMessage(f.receiver.peerId, message("acked"), { acknowledged: true });
+		expect(await state(acknowledged)).toBe("pending");
+		const inbound = host(f.receiver)
+			.getConnections(host(f.sender).peerId)
+			.flatMap((connection) => connection.streams)
+			.find((stream: Stream) => stream.protocol === RT && stream.direction === "inbound");
+		inbound?.abort(new Error("receiver reset"));
+		expect(await state(acknowledged)).toEqual({ name: "DirectMessageSendError", code: "DIRECT_SESSION_RESET" });
+	});
+
+	it("rejects with the abort reason when the caller gives up while waiting for the receipt", { timeout: 30_000 }, async () => {
+		const f = await pair();
+		await f.sender.sendMessage(f.receiver.peerId, message("warm"));
+		expect(await until(() => f.arrivals.includes("warm"))).toBe(true);
+		holdAdmission(f.receiver);
+		const controller = new AbortController();
+		const acknowledged = f.sender.sendMessage(f.receiver.peerId, message("acked"), {
+			acknowledged: true,
+			signal: controller.signal,
+		});
+		expect(await state(acknowledged)).toBe("pending");
+		controller.abort(new Error("caller gave up"));
+		await expect(acknowledged).rejects.toThrow("caller gave up");
+	});
+
+	it(
+		"over the legacy protocol, resolves only once the receiver closed the stream after admitting",
+		{ timeout: 30_000 },
+		async () => {
+			const f = await pair();
+			// An old receiver that reads the frame, then holds before it admits and closes.
+			await host(f.receiver).unhandle([RT, BULK, LEGACY]);
+			let release!: () => void;
+			const gate = new Promise<void>((resolve) => (release = resolve));
+			await host(f.receiver).handle(
+				LEGACY,
+				(stream: Stream) =>
+					void (async () => {
+						await lpStream(stream).read();
+						await gate;
+						await stream.close();
+					})(),
+				{ maxInboundStreams: 8 }
+			);
+			const plain = f.sender.sendMessage(f.receiver.peerId, message("plain-legacy"));
+			const acknowledged = f.sender.sendMessage(f.receiver.peerId, message("acked-legacy"), { acknowledged: true });
+			expect(await state(plain)).toBe("resolved");
+			expect(await state(acknowledged)).toBe("pending");
+			release();
+			await expect(acknowledged).resolves.toBeUndefined();
+		}
+	);
+});
+
 describe("direct message compatibility", () => {
 	it("a new sender delivers a burst to an old receiver over the legacy protocol", { timeout: 30_000 }, async () => {
 		const f = await pair();
