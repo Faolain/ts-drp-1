@@ -169,6 +169,7 @@ import {
 	readCreatorOrdinaryPreimageCapacityForSizing,
 	readProspectiveCreatorSnapshotTurnoverForSizing,
 	createCreatorSnapshotRecoveryMaintenanceJob,
+	JOURNAL_POSTIMAGE_NOT_GROWN,
 	reconcileCreatorRoomRetentionFromLedger,
 	reconcileCreatorSnapshotRecoveryRoles,
 	resolveCreatorForwardPromotionSource,
@@ -3839,6 +3840,12 @@ export async function bindCreatorLiveClose(
 					// its primary error. Never treat that uncertain release as a
 					// capacity refusal that permits a fresh close capture.
 					if (primary instanceof AggregateError) maintenanceReleaseFailure = primary;
+					// A journal postimage that did not grow over the retained source's capture: that
+					// capture no longer describes this admission's journal. Drop the hint so the
+					// retained row's next attempt primes a fresh source instead of repeating this one.
+					if (String((primary as {message?: unknown} | undefined)?.message ?? primary).includes(JOURNAL_POSTIMAGE_NOT_GROWN)) {
+						ordinaryProofSource = undefined; ordinaryTemplateReady = false;
+					}
 					try {
 						await quote?.proof.release();
 					} catch (cleanup) {
