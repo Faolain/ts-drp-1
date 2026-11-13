@@ -88,6 +88,7 @@ export {
 	createV3RoomSuccessorChannel,
 	createV3RoomSuccessorDelivery,
 	openV3RoomSuccessorDelivery,
+	V3_ROOM_SUCCESSOR_CATCH_UP_GRACE_MS,
 	V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES,
 	V3_ROOM_SUCCESSOR_POLL_MS,
 	v3RoomCreatorPeer,

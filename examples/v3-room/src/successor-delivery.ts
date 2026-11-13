@@ -33,6 +33,13 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  *   creator's latest offer, the same one included: the member never stops following.
  * - Material comes from the creator only (members never serve successor material), so the
  *   install's peers are the creator.
+ * - The creator serves its room's current successor, not only the last one its policy handed over.
+ *   A room can adopt a successor no policy exports or publishes: its own retry of an interrupted
+ *   close (v3-room's interrupted-close retry seals and adopts by itself), or a reopen from storage.
+ *   A member behind the room's epoch that pulls while the delivery holds no offer for that epoch has
+ *   the creator export the room's successor (which also opens its material serving) and publish it,
+ *   once V3_ROOM_SUCCESSOR_CATCH_UP_GRACE_MS passed without the policy's own publish (its export
+ *   follows its adoption). One export at a time; only a member's pull starts one, never a move.
  * - Sync before sending (owner decision B): a member already at the creator's epoch gets the
  *   creator's currency statement instead (its current epoch, anchor and admitted frontiers). The
  *   member hands it to its room (`confirmCurrent`) only when it came from the creator's peer, the
@@ -64,6 +71,12 @@ const SEND_DEADLINE_MS = 10_000;
 const KNOWN_PEERS_MAX = 64;
 const FAILED_OFFERS_MAX = 8;
 const RETRY_BACKOFF_MS = [2_000, 5_000, 15_000, 30_000] as const;
+/**
+ * Creator: how long a successor the room adopted stays unpublished before a member's pull has the
+ * delivery export it itself. Above the policy's own adopt-to-publish (an export, p99 0.4 s in a
+ * browser), so the policy's publish is not duplicated.
+ */
+export const V3_ROOM_SUCCESSOR_CATCH_UP_GRACE_MS = 2_000;
 const OFFER_KIND = "ts-drp-v3-successor-offer";
 const REQUEST_KIND = "ts-drp-v3-successor-offer-request";
 const CURRENCY_KIND = "ts-drp-v3-room-currency";
@@ -218,6 +231,8 @@ export type V3RoomSuccessorDeliveryStats = Readonly<{
 	currencyAnswered: number;
 	/** Member: creator statements its room confirmed as current. */
 	currencyConfirmed: number;
+	/** Creator: successors the room adopted outside its policy, exported and published on a member's pull. */
+	caughtUp: number;
 }>;
 
 export interface V3RoomSuccessorDeliveryHooks {
@@ -227,7 +242,12 @@ export interface V3RoomSuccessorDeliveryHooks {
 }
 
 type DeliveryRoom = Pick<V3RoomSession, "authority" | "connectedPeers" | "installCreatorSuccessor"> &
-	Partial<Pick<V3RoomSession, "currencyStatement" | "confirmCurrent" | "localIssueCurrency" | "creatorCurrencyEvidence">>;
+	Partial<
+		Pick<
+			V3RoomSession,
+			"currencyStatement" | "confirmCurrent" | "localIssueCurrency" | "creatorCurrencyEvidence" | "exportCreatorSuccessor"
+		>
+	>;
 
 export interface V3RoomSuccessorDelivery {
 	readonly role: "creator" | "member";
@@ -401,6 +421,22 @@ function decodeFrame(bytes: Uint8Array): Frame | undefined {
 	};
 }
 
+/**
+ * The epoch an exported offer's successor trust record installs (its `currentEpoch`).
+ * @param offer - An offer the creator's room exported.
+ * @returns The successor epoch, or undefined when the record does not carry one.
+ */
+function offerSuccessorEpoch(offer: V3RoomSuccessorOffer): number | undefined {
+	let record: unknown;
+	try {
+		record = decodeCanonical(offer.exactCanonicalTrustStateRecordBytes, { maxBytes: V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES });
+	} catch {
+		return undefined;
+	}
+	const epoch = record !== null && typeof record === "object" ? Reflect.get(record, "currentEpoch") : undefined;
+	return Number.isSafeInteger(epoch) && Number(epoch) >= 1 ? Number(epoch) : undefined;
+}
+
 /** The room's typed install expiry (V3RoomSuccessorInstallExpired, row 72), by name: no runtime import. */
 function installExpired(error: unknown): boolean {
 	for (let value: unknown = error, depth = 0; value instanceof Error && depth < 8; value = value.cause, depth++)
@@ -455,10 +491,14 @@ export function createV3RoomSuccessorDelivery(
 		largestOfferBytes: 0,
 		currencyAnswered: 0,
 		currencyConfirmed: 0,
+		caughtUp: 0,
 		lastError: undefined as string | undefined,
 	};
 	// Creator.
 	let latest: Readonly<{ successorEpoch: number; bytes: Uint8Array }> | undefined;
+	// Creator: a member's pull found the room past the latest published offer; the export waits out the grace.
+	let catchUpTimer: ReturnType<typeof setTimeout> | undefined;
+	let catchingUp = false;
 	const known = new Set<string>();
 	const answeredAt = new Map<string, number>();
 	// Member: when it last answered each peer's member-view request (creator restore currency).
@@ -500,6 +540,50 @@ export function createV3RoomSuccessorDelivery(
 			if (oldest !== undefined) known.delete(oldest);
 		}
 		known.add(peerId);
+	};
+	const oversize = (bytes: Uint8Array): RangeError | undefined => {
+		if (bytes.byteLength <= V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES) return undefined;
+		stats.oversize++;
+		return new RangeError(`v3 room successor offer is ${bytes.byteLength} bytes, above ${V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES}`);
+	};
+	const announce = async (bytes: Uint8Array, successorEpoch: number): Promise<void> => {
+		stats.largestOfferBytes = Math.max(stats.largestOfferBytes, bytes.byteLength);
+		latest = Object.freeze({ successorEpoch, bytes });
+		for (const peerId of room?.connectedPeers() ?? []) remember(peerId);
+		const connected = new Set(channel.peers());
+		const targets = [...known].filter((peerId) => connected.has(peerId));
+		stats.announced += targets.length;
+		await Promise.all(targets.map((peerId) => send(peerId, bytes)));
+	};
+	// Creator: the room is past the latest offer this delivery published (it adopted outside its policy).
+	const unpublished = (): boolean => epoch() > (latest?.successorEpoch ?? 0);
+	const catchUp = (): void => {
+		if (closed || role !== "creator" || catchUpTimer !== undefined || catchingUp) return;
+		if (room?.exportCreatorSuccessor === undefined) return;
+		catchUpTimer = setTimeout(() => {
+			catchUpTimer = undefined;
+			const selected = room;
+			// The policy's own publish landed meanwhile, or nothing exports.
+			if (closed || selected?.exportCreatorSuccessor === undefined || !unpublished()) return;
+			catchingUp = true;
+			void (async (): Promise<void> => {
+				const offer = await selected.exportCreatorSuccessor!();
+				const successorEpoch = offerSuccessorEpoch(offer);
+				if (successorEpoch === undefined) throw new TypeError("v3 room successor export carries no successor epoch");
+				if (closed || successorEpoch <= (latest?.successorEpoch ?? 0)) return;
+				const bytes = encodeOffer(offer, successorEpoch);
+				const tooLarge = oversize(bytes);
+				if (tooLarge !== undefined) throw tooLarge;
+				stats.caughtUp++;
+				await announce(bytes, successorEpoch);
+			})()
+				.catch((error: unknown) => {
+					if (!closed) report(error);
+				})
+				.finally(() => {
+					catchingUp = false;
+				});
+		}, V3_ROOM_SUCCESSOR_CATCH_UP_GRACE_MS);
 	};
 
 	const request = (): void => {
@@ -663,6 +747,8 @@ export function createV3RoomSuccessorDelivery(
 		if (frame.kind === "request") {
 			if (role !== "creator") return;
 			remember(sender);
+			// A member behind a successor this delivery never published: export and publish it.
+			if (frame.epoch < epoch() && unpublished()) catchUp();
 			const now = Date.now();
 			const newer = latest !== undefined && latest.successorEpoch > frame.epoch;
 			// Sync before sending: a member at this creator's epoch learns that it is current.
@@ -826,19 +912,9 @@ export function createV3RoomSuccessorDelivery(
 		async publish(offer: V3RoomSuccessorOffer, successorEpoch: number): Promise<void> {
 			if (closed || role !== "creator") return;
 			const bytes = encodeOffer(offer, successorEpoch);
-			if (bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES) {
-				stats.oversize++;
-				throw new RangeError(
-					`v3 room successor offer is ${bytes.byteLength} bytes, above ${V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES}`
-				);
-			}
-			stats.largestOfferBytes = Math.max(stats.largestOfferBytes, bytes.byteLength);
-			latest = Object.freeze({ successorEpoch, bytes });
-			for (const peerId of room?.connectedPeers() ?? []) remember(peerId);
-			const connected = new Set(channel.peers());
-			const targets = [...known].filter((peerId) => connected.has(peerId));
-			stats.announced += targets.length;
-			await Promise.all(targets.map((peerId) => send(peerId, bytes)));
+			const tooLarge = oversize(bytes);
+			if (tooLarge !== undefined) throw tooLarge;
+			await announce(bytes, successorEpoch);
 		},
 		request,
 		creatorReachable: (): boolean =>
@@ -852,6 +928,7 @@ export function createV3RoomSuccessorDelivery(
 			closed = true;
 			lifetime.abort(new TypeError("v3 room successor delivery is closed"));
 			if (pollTimer !== undefined) clearTimeout(pollTimer);
+			if (catchUpTimer !== undefined) clearTimeout(catchUpTimer);
 			for (const timer of viewDeferred.values()) clearTimeout(timer);
 			viewDeferred.clear();
 			for (const stop of unsubscribe.splice(0)) stop();
