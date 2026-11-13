@@ -12,7 +12,16 @@ import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-lon
 // armed, the sealed source acquisitions after `skip` more return the given primary refusal, as
 // browser Grid's close did ("creator recovery role transfer source failed: ...SUBSTRATE_FAILURE" or
 // "...internal-invariant"). Unarmed, it is the real acquisition.
-type RoleSourceFault = { skip: number; fail: number; refusal: Readonly<Record<string, unknown>>; injected: number[] };
+// `onFail` runs as the refusal is returned (after `delayMs`), so a test can put concurrent work
+// across the failed close.
+type RoleSourceFault = {
+	skip: number;
+	fail: number;
+	refusal: Readonly<Record<string, unknown>>;
+	injected: number[];
+	delayMs?: number;
+	onFail?: () => void;
+};
 const roleSourceFault: { armed?: RoleSourceFault } = {};
 vi.mock("../packages/node/src/internal/creator-closed-rollback-data.js", async (importOriginal) => {
 	const original = await importOriginal<typeof import("../packages/node/src/internal/creator-closed-rollback-data.js")>();
@@ -25,6 +34,8 @@ vi.mock("../packages/node/src/internal/creator-closed-rollback-data.js", async (
 				else {
 					fault.fail--;
 					fault.injected.push(args[1]);
+					fault.onFail?.();
+					if (fault.delayMs !== undefined) await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
 					return Object.freeze({ ...fault.refusal });
 				}
 			}
@@ -138,10 +149,29 @@ async function playPastCeiling(
 	moves: number,
 	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>,
 	creatorMoves: (ordinal: number) => boolean = () => true,
-	toleratedErrors?: RegExp
+	toleratedErrors?: RegExp,
+	// A burst of creator moves outside the sequential loop (as a page's placements and moves keep
+	// coming), started when `arm`'s callback runs: `count` moves, one every `everyMs`, not awaited
+	// one by one. Every one must be accepted.
+	burst?: Readonly<{ count: number; everyMs: number; arm: (start: () => void) => void }>
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
+	const burstMoves: Promise<void>[] = [];
+	const burstErrors: string[] = [];
+	burst?.arm(() => {
+		for (let index = 0; index < burst.count; index++) {
+			const ordinal = 100_000 + index;
+			burstMoves.push(
+				new Promise((resolve) => setTimeout(resolve, index * burst.everyMs))
+					.then(() => creator.issue(0, ordinal))
+					.then(
+						() => void accepted.push({ role: 0, ordinal }),
+						(error: unknown) => void burstErrors.push(`${ordinal}: ${error instanceof Error ? error.message : String(error)}`)
+					)
+			);
+		}
+	});
 	const writer = recipient === "writer";
 	const delivered: (number | null)[] = [null, null];
 	const wire = successorWire(() => peers);
@@ -218,6 +248,8 @@ async function playPastCeiling(
 			accepted.push({ role: 1, ordinal });
 			await deliver(1);
 		}
+		step = "burst";
+		await Promise.all(burstMoves);
 		// Quiesce: the last rollover joins, its offer is installed, and every row is delivered.
 		step = "quiesce";
 		for (let round = 0; round < 4; round++) {
@@ -239,6 +271,8 @@ async function playPastCeiling(
 	);
 	const delivery = await other.successorDelivery?.();
 	process.stdout.write(`ROLLOVER_DELIVERY ${app}/${recipient} ${JSON.stringify(delivery)}\n`);
+	if (burst !== undefined) process.stdout.write(`ROLLOVER_BURST ${app}/${recipient} ${JSON.stringify({ moves: burstMoves.length, errors: burstErrors })}\n`);
+	expect(burstErrors, "every concurrent creator move is accepted").toEqual([]);
 	expect(delivery?.installed ?? 0, "the member's own delivery installed the successors").toBeGreaterThan(0);
 	expect((policy?.errors ?? ["no creator policy"]).filter((error) => toleratedErrors?.test(error) !== true)).toEqual([]);
 	expect(member?.waiting ?? 0).toBe(0);
@@ -312,6 +346,40 @@ it.each([
 			process.stdout.write(`FAILED_CLOSE_FAULT ${JSON.stringify({ injected: fault.injected, errors: policy?.errors })}\n`);
 			expect(fault.injected, "the fault fired in a close").toHaveLength(1);
 			expect(policy?.rollovers ?? 0).toBeGreaterThanOrEqual(3);
+		} finally {
+			roleSourceFault.armed = undefined;
+			restore();
+		}
+	},
+	1_200_000
+);
+
+// The same failed close with creator moves still coming (browser Grid places a block every 400 ms
+// and moves every 100 ms through the policy; sg5-pub-4, sg5b-pub-5 and sf1-base-2 each stopped play
+// on a placement refused with "creator issuance maintenance authority is unavailable" about a second
+// after such a close). A burst of creator moves spans the failure, the session's retry (250 ms
+// later) and its adoption; every move must be accepted.
+it.each([
+	["SUBSTRATE_FAILURE", { ok: false, kind: "ahe-rejected", cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" } }, 25],
+	["internal-invariant", { ok: false, kind: "internal-invariant" }, 10],
+] as const)(
+	"grid with a writer: creator moves that overlap a failed close (%s) and its retry are all accepted",
+	async (_name, refusal, everyMs) => {
+		const restore = await installEnvironment("node", () => undefined);
+		const fault: RoleSourceFault = { skip: 2, fail: 1, refusal, injected: [], delayMs: 30 };
+		roleSourceFault.armed = fault;
+		try {
+			const policy = await playPastCeiling(
+				"grid",
+				"writer",
+				Number(process.env.FAILED_CLOSE_MOVES ?? 60),
+				undefined,
+				undefined,
+				/role transfer source failed|promotion source failed/u,
+				{ count: Number(process.env.FAILED_CLOSE_BURST ?? 60), everyMs, arm: (start) => (fault.onFail = start) }
+			);
+			process.stdout.write(`FAILED_CLOSE_FAULT ${JSON.stringify({ injected: fault.injected, errors: policy?.errors })}\n`);
+			expect(fault.injected, "the fault fired in a close").toHaveLength(1);
 		} finally {
 			roleSourceFault.armed = undefined;
 			restore();
