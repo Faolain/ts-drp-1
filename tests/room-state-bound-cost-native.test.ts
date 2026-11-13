@@ -36,8 +36,14 @@ type BoundEvent = {
 	sortsLast: boolean;
 	durationUs: number;
 	stateBytes?: number;
+	receiver?: string;
+	/** The exact path judged this move because its plane's bound seed had not finished (sorts-last candidates). */
+	seedPending?: boolean;
 };
-type Sample = BoundEvent & { site: string; phase: string };
+/** walkerUs: synchronous seed work (a self-seed, or a pending seed finished in the admission) this admission paid. */
+type Sample = BoundEvent & { site: string; phase: string; walkerUs: number; firstAfterInstall: boolean };
+/** Seeds run inside an admission check (synchronous walker work); every other mode runs in its own turns. */
+const SYNC_SEED_MODES = new Set(["self", "forced"]);
 
 const explain = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -72,6 +78,10 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 		startUs: number; turnUs: number[] };
 	const seeds: Seed[] = [];
 	let discardedSeeds = 0;
+	// Synchronous seed work paid inside the admission check now running, per receiver (its seed event precedes its admission event).
+	const walkerPaid = new Map<string, number>();
+	// Receivers that already admitted a move since the last install (the first one is "the first move after install").
+	const movedSinceInstall = new Set<string>();
 	let site = "none";
 	let phase = "grow";
 	let stateBytes = 0;
@@ -79,9 +89,17 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	Reflect.set(globalThis, "__warmProofEvent", (event: Readonly<Record<string, unknown>>) => {
 		if (event.kind === "application-state-bound") {
 			const bound = event as unknown as BoundEvent;
-			samples.push({ ...bound, site, phase });
+			const receiver = String(bound.receiver);
+			const walkerUs = walkerPaid.get(receiver) ?? 0;
+			walkerPaid.delete(receiver);
+			const move = site !== "none" && site !== "seal";
+			const firstAfterInstall = move && !movedSinceInstall.has(receiver);
+			if (move) movedSinceInstall.add(receiver);
+			samples.push({ ...bound, site, phase, walkerUs, firstAfterInstall });
 			if (bound.admitted && bound.stateBytes !== undefined && site === "creator-issue") stateBytes = bound.stateBytes;
 		}
+		if (event.kind === "application-state-bound-seed" && SYNC_SEED_MODES.has(String(event.mode)))
+			walkerPaid.set(String(event.receiver), (walkerPaid.get(String(event.receiver)) ?? 0) + Number(event.durationUs));
 		if (event.kind === "application-state-bound-seed")
 			seeds.push({ covered: event.covered === true, durationUs: Number(event.durationUs), receiver: String(event.receiver),
 				mode: String(event.mode), turns: Number(event.turns ?? 1), maxTurnUs: Number(event.maxTurnUs ?? event.durationUs),
@@ -136,6 +154,7 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 		Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
 		await writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
 		site = "none";
+		movedSinceInstall.clear();
 		epoch++;
 		expect(writer.room.authority()?.epoch).toBe(epoch);
 		if (FIRST_MOVE_DELAY_MS > 0) await new Promise((resolve) => setTimeout(resolve, FIRST_MOVE_DELAY_MS));
@@ -191,6 +210,27 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 		});
 	}
 	const growth = samples.filter((sample) => sample.phase === "grow" && sample.site !== "none");
+	const moves = samples.filter((sample) => sample.site !== "none" && sample.site !== "seal");
+	const firstMoves = moves.filter((sample) => sample.firstAfterInstall);
+	const firstWalker = firstMoves.map((sample) => sample.walkerUs);
+	const whilePending = moves.filter((sample) => sample.seedPending === true).map((sample) => sample.durationUs);
+	const perThousand = (count: number): number => Math.round((count * 1000 * 10) / Math.max(1, firstMoves.length)) / 10;
+	const walker = {
+		// Every move admission after an install, the population a pending seed can reach.
+		firstMoves: firstMoves.length,
+		walkerP50Us: percentile(firstWalker, 0.5),
+		walkerP99Us: percentile(firstWalker, 0.99),
+		walkerMaxUs: Math.max(0, ...firstWalker),
+		paidPer1000: perThousand(firstWalker.filter((us) => us > 0).length),
+		nonSortsLastPer1000: perThousand(firstMoves.filter((sample) => !sample.sortsLast).length),
+		seedPendingPer1000: perThousand(firstMoves.filter((sample) => sample.seedPending === true).length),
+		allMovesWalkerMaxUs: Math.max(0, ...moves.map((sample) => sample.walkerUs)),
+		allMovesPaid: moves.filter((sample) => sample.walkerUs > 0).length,
+		moves: moves.length,
+		// The exact path's one apply for a sorts-last move while its plane's seed is pending.
+		exactWhilePending: { count: whilePending.length, p50Us: percentile(whilePending, 0.5), p99Us: percentile(whilePending, 0.99),
+			maxUs: Math.max(0, ...whilePending) },
+	};
 	console.log(
 		`STATE_BOUND_COST ${JSON.stringify({
 			idBytes: ID_BYTES,
@@ -219,11 +259,13 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 							startMaxUs: Math.max(0, ...rows.map((seed) => seed.startUs)),
 							turnsMax: Math.max(0, ...rows.map((seed) => seed.turns)),
 							wallP50Us: percentile(rows.map((seed) => seed.wallUs), 0.5),
+							wallP95Us: percentile(rows.map((seed) => seed.wallUs), 0.95),
 							wallMaxUs: Math.max(0, ...rows.map((seed) => seed.wallUs)),
 						}];
 					})
 				),
 			},
+			walker,
 			rounds: ROUNDS,
 			epochs: epoch,
 			refusal,
@@ -242,4 +284,7 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	);
 	expect(refusal, "growth stops at the room's limit with the typed refusal").toMatch(/application state limit/u);
 	expect(summary.length).toBeGreaterThan(0);
+	// Profile M: a move admission after an install pays at most 1 ms of synchronous seed (walker) work at p99.
+	expect(walker.firstMoves).toBeGreaterThan(0);
+	expect(walker.walkerP99Us, `synchronous seed work in move admissions after an install: ${JSON.stringify(walker)}`).toBeLessThanOrEqual(1000);
 }, 3_600_000);
