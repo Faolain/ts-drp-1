@@ -261,9 +261,19 @@ export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): n
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
 
-/** Source-context and entry fields are sized by the original plan codec. Every
- * existing entry/context remains whole. One future current-epoch context and
- * every potentially unresolved own row and its terminal receipt are charged without inventing bytes. */
+/** Source-context and entry fields are sized by the original plan codec (G22: one bound). The charged set:
+ * - every existing entry and context stays whole. An entry is charged at the widest form it can still take
+ *   (frontier expiry, or replaced-source resolution).
+ * - one open current-epoch context.
+ * - rule D (model issuance-image-capacity.qnt): each potential row and each unresolved entry ends as a
+ *   member of one new completion or with one expiry receipt, never both. The widest split is charged, and
+ *   terminal entries may also be members.
+ * - one replaced-source receipt (rule R) for each completed replacement that is still resolvable, and
+ *   for each potential row.
+ * - one displaced-source context and the completed-source custody marker when a completed replacement
+ *   still lacks its context.
+ * - the hand-back reserve (HB), and the last-member frontier when the geometry gives one.
+ * Pinned by tests/source-custody-sizing-dispositions.test.ts. */
 export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
 	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry,
 	maxHandBackOperationByteLength: number = SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes): Readonly<{
