@@ -635,7 +635,10 @@ function deriveResidualEntry(
 			undefined, frames, true, undefined);
 		if (full.imageDigest !== derived.image.imageDigest || full.scopeCount !== derived.image.scopeCount ||
 			full.rowCount !== derived.image.rowCount || full.byteCharge !== derived.image.byteCharge ||
-			frames.length !== derived.frames.length || frames.some((frame, index) => !sameBytes(frame, derived.frames[index]!)))
+			frames.length !== derived.frames.length || frames.some((frame, index) => {
+				const kept = derived.frames[index];
+				return kept === undefined || !sameBytes(frame, kept);
+			}))
 			throw new Error("journal residual image diverged from a full native capture");
 		countResidualCrossCheck();
 	}
@@ -2514,19 +2517,20 @@ export function createNodeDurableLiveJournalStore(
 									deletingScope = undefined;
 								}
 							}
-							const after = journalConnectionCurrency(database);
+							const after = journalConnectionCurrency(database), pre = verified;
 							// Exactly these rows changed (see internal/journal-residual-image.ts).
-							const exact = verified !== undefined && after.schemaVersion === before.schemaVersion &&
+							const exact = pre !== undefined && after.schemaVersion === before.schemaVersion &&
 								after.totalChanges - before.totalChanges === deletions.length;
-							const residual = exact ? deriveResidualEntry(database, objectId, verified!, deletions) : undefined;
+							const residual = exact ? deriveResidualEntry(database, objectId, pre, deletions) : undefined;
 							const residualImage = residual?.image ?? retirementImage(database, objectId);
 							if (next.drain == null || residualImage.imageDigest !== next.drain.residualImageDigest)
 								throw new Error("retirement-stale");
 							const nextProof = drainRowsProof(residual ?? verifiedImageEntry(database, objectId, residualImage),
 								nextCarriers.planBytes);
-							if (residual !== undefined && nextProof !== undefined && carriers.planBytes !== undefined &&
-								sameBytes(carriers.planBytes, nextProof.planBytes) && extendsDrainValidation(actual, next, deletions) &&
-								drainValidated(database, verified!, carriers.planBytes, actual.drain!.cursor)) {
+							if (residual !== undefined && pre !== undefined && nextProof !== undefined && carriers.planBytes !== undefined &&
+								actual.drain != null && sameBytes(carriers.planBytes, nextProof.planBytes) &&
+								extendsDrainValidation(actual, next, deletions) &&
+								drainValidated(database, pre, carriers.planBytes, actual.drain.cursor)) {
 								if (journalResidualImageDebug()) validateDrainNativeRowsInFull(database, next.drain);
 								rememberDrainValidated(database, residual, nextProof.planBytes, next.drain.cursor);
 							} else validateDrainNativeRows(database, next, nextProof);

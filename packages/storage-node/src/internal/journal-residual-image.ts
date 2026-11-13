@@ -78,8 +78,10 @@ export type DerivedResidual = Readonly<{
  * @returns The residual, or undefined when any deleted item is not exactly one of the entry's rows or a
  * frame is not of the capture's exact shape (the caller then captures the residual in full).
  */
-export function deriveResidual(entry: Readonly<JournalImageEntry>, deletions: readonly JournalRetirementDrainItem[]):
-	DerivedResidual | undefined {
+export function deriveResidual(
+	entry: Readonly<JournalImageEntry>,
+	deletions: readonly JournalRetirementDrainItem[]
+): DerivedResidual | undefined {
 	const frames = entry.frames;
 	if (frames === undefined || frames.length !== entry.rows.length) return undefined;
 	const keys = entry.rows.map(frameKey);
@@ -87,12 +89,13 @@ export function deriveResidual(entry: Readonly<JournalImageEntry>, deletions: re
 	for (const selected of deletions) {
 		let found = -1;
 		for (let index = 0; index < keys.length; index++) {
-			const key = keys[index];
+			const key = keys[index],
+				table = entry.rows[index]?.[0];
 			if (key === undefined) return undefined;
-			const table = entry.rows[index]![0];
-			const matches = "row" in selected
-				? table === "accepted_entries" && sameScope(key, selected.scope) && key[3] === selected.row.journalSequence
-				: table === "scopes" && sameScope(key, selected.scope);
+			const matches =
+				"row" in selected
+					? table === "accepted_entries" && sameScope(key, selected.scope) && key[3] === selected.row.journalSequence
+					: table === "scopes" && sameScope(key, selected.scope);
 			if (!matches) continue;
 			if (found !== -1 || deleted[index] === 1) return undefined;
 			found = index;
@@ -100,13 +103,18 @@ export function deriveResidual(entry: Readonly<JournalImageEntry>, deletions: re
 		if (found === -1) return undefined;
 		deleted[found] = 1;
 	}
-	const rows: JournalImageRowKey[] = [], kept: Uint8Array[] = [], captured: JournalRetirementCapturedFrame[] = [];
+	const rows: JournalImageRowKey[] = [],
+		kept: Uint8Array[] = [],
+		captured: JournalRetirementCapturedFrame[] = [];
 	for (let index = 0; index < keys.length; index++) {
 		if (deleted[index] === 1) continue;
-		const row = entry.rows[index]!, bytes = frames[index]!;
+		const row = entry.rows[index],
+			bytes = frames[index],
+			key = keys[index];
+		if (row === undefined || bytes === undefined || key === undefined || typeof row[0] !== "string") return undefined;
 		rows.push(row);
 		kept.push(bytes);
-		captured.push({ table: row[0] as string, key: keys[index]!, bytes });
+		captured.push({ table: row[0], key, bytes });
 	}
 	const image = journalRetirementImageOfCapturedFrames(captured);
 	if (image === undefined) return undefined;
@@ -127,18 +135,26 @@ export function extendsDrainValidation(
 	next: LiveJournalRetirementControl,
 	deletions: readonly JournalRetirementDrainItem[]
 ): boolean {
-	const state = actual.drain, after = next.drain;
+	const state = actual.drain,
+		after = next.drain;
 	if (state == null || after == null || after.cursor !== state.cursor + deletions.length) return false;
 	const plan = state.plan;
-	let index = 0, matched = 0;
+	let index = 0,
+		matched = 0;
 	const inBatch = (): boolean => index >= state.cursor && index < after.cursor;
 	for (const prefix of plan.prefixes) {
 		for (const row of prefix.rows) {
 			if (inBatch()) {
 				const selected = deletions[index - state.cursor];
-				if (selected === undefined || !("row" in selected) || selected.row.journalSequence !== row.journalSequence ||
-					selected.scope.objectId !== prefix.scope.objectId || selected.scope.epoch !== prefix.scope.epoch ||
-					selected.scope.anchorDigest !== prefix.scope.anchorDigest) return false;
+				if (
+					selected === undefined ||
+					!("row" in selected) ||
+					selected.row.journalSequence !== row.journalSequence ||
+					selected.scope.objectId !== prefix.scope.objectId ||
+					selected.scope.epoch !== prefix.scope.epoch ||
+					selected.scope.anchorDigest !== prefix.scope.anchorDigest
+				)
+					return false;
 				matched++;
 			}
 			index++;
@@ -147,11 +163,24 @@ export function extendsDrainValidation(
 	for (const header of plan.retiredEmptyHeaders ?? []) {
 		if (inBatch()) {
 			const selected = deletions[index - state.cursor];
-			if (selected === undefined || "row" in selected || selected.scope.objectId !== header.scope.objectId ||
-				selected.scope.epoch !== header.scope.epoch || selected.scope.anchorDigest !== header.scope.anchorDigest) return false;
+			if (
+				selected === undefined ||
+				"row" in selected ||
+				selected.scope.objectId !== header.scope.objectId ||
+				selected.scope.epoch !== header.scope.epoch ||
+				selected.scope.anchorDigest !== header.scope.anchorDigest
+			)
+				return false;
 			// A deleted header must not be one a prefix's validation reads.
-			if (plan.prefixes.some((prefix) => prefix.scope.objectId === header.scope.objectId &&
-				prefix.scope.epoch === header.scope.epoch && prefix.scope.anchorDigest === header.scope.anchorDigest)) return false;
+			if (
+				plan.prefixes.some(
+					(prefix) =>
+						prefix.scope.objectId === header.scope.objectId &&
+						prefix.scope.epoch === header.scope.epoch &&
+						prefix.scope.anchorDigest === header.scope.anchorDigest
+				)
+			)
+				return false;
 			matched++;
 		}
 		index++;
@@ -171,7 +200,12 @@ const validations = new WeakMap<DatabaseSync, Readonly<{ entry: object; planByte
  */
 export function drainValidated(database: DatabaseSync, entry: object, planBytes: Uint8Array, cursor: number): boolean {
 	const known = validations.get(database);
-	return known !== undefined && known.entry === entry && known.cursor === cursor && compareBytes(known.planBytes, planBytes) === 0;
+	return (
+		known !== undefined &&
+		known.entry === entry &&
+		known.cursor === cursor &&
+		compareBytes(known.planBytes, planBytes) === 0
+	);
 }
 
 /**
@@ -181,6 +215,11 @@ export function drainValidated(database: DatabaseSync, entry: object, planBytes:
  * @param planBytes - The exact plan carrier bytes.
  * @param cursor - The validated cursor.
  */
-export function rememberDrainValidated(database: DatabaseSync, entry: object, planBytes: Uint8Array, cursor: number): void {
+export function rememberDrainValidated(
+	database: DatabaseSync,
+	entry: object,
+	planBytes: Uint8Array,
+	cursor: number
+): void {
 	validations.set(database, Object.freeze({ entry, planBytes: planBytes.slice(), cursor }));
 }
