@@ -208,3 +208,34 @@ the one owner, `issuanceSourceCustodyPlanResourceForSizing` in packages/issuance
   move (origin kept across the crash).
 - Make the RED green: `tests/app-rollover-given-back-origin-order.test.ts`. The Grid reload case needs
   `supersededBy`; the Chat case also needs C1.
+
+## Implementation notes (where the code differs from the text above)
+
+Branch `feat/given-back-reissue-origins`.
+
+- **Entry drop: admitted, not just within the frontier.** `terminalThrough` can pass a displaced own
+  row (a later own fence admitted), and such a row is still given back later, by its window expiry or
+  its frontier resolution, which needs the entry for the origin. So `settlementReissueOriginsUnsettled`
+  keeps an entry while its chain's last carrier is displaced in the write, or has an own plan entry
+  other than `committed`, even at or below the frontier. Found by `settlement-window.qnt`
+  `settlementAuthorOrder`: variant `terminalDrop` (the first rule) violates `listingInAuthorOrder`.
+- **Origin reserve counts consumed records.** A consumed record stays in the plan until a window write
+  drops it, and that frees its slot for a new record that may be reissued in turn. The reserve is
+  therefore `min(64 - entries, records + free record slots)`, counting every record, not only
+  unconsumed ones. Otherwise that maintenance write raises the forecast: in
+  `issuance-image-capacity.qnt`, mutant `originReserveIgnoresConsumed` violates
+  `forecastOnlyGrowsByAdmission`. The worst case is unchanged.
+- **`noOriginReserve`.** That model checks `imageWithinForecast` against the sound formula, so no
+  forecast-formula mutant can violate it as written; `noHandBackReserve` and
+  `replacedReceiptUncharged` fail `maintenanceAdmits` in the same way. The model therefore has
+  `imageWithinForecastOf(m)`, and the deterministic run `noOriginReserveViolatesTest` shows that the
+  forecast without the origin entries does not bound the image. Under its own step the mutant also
+  violates `allProperties` (`maintenanceAdmits`).
+- **`supersededBy` carries `operation`** as well as `authorSequence`. After a reload the policy has no
+  history, and it needs the newer move itself to offer it again.
+- **Policy precedence.** The session's in-memory `latest` is read first and the room's `supersededBy`
+  second. Every move accepted in this session is newer than any row issued before it, so `latest` is
+  at least as new as the room's answer, and it is current between a new move and the next listing
+  refresh.
+- **Chat C1** applies to the window and shares formats, which keep admitted order. The lifetime format
+  sorts messages by identity, so it keeps its existing order.
