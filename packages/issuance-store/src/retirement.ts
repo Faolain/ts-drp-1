@@ -344,8 +344,8 @@ export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): n
  * - one displaced-source context and the completed-source custody marker when a completed replacement
  *   still lacks its context.
  * - the hand-back reserve (HB), each record with its origin, and the reissue-origin reserve (one entry per
- *   record that could still be consumed, within the entry bound), and the last-member frontier when the
- *   geometry gives one.
+ *   record slot that could still yield one, consumed records included, within the entry bound), and the
+ *   last-member frontier when the geometry gives one.
  * Pinned by tests/source-custody-sizing-dispositions.test.ts. */
 export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
 	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry,
@@ -486,13 +486,15 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 			...Array.from({length: freeHandBacks}, () => handBackShape)]),
 	};
 	// Reissue origins (a separate bound from the records): existing entries exactly, and one more entry for
-	// every record that could still be consumed (each unconsumed or reserved free record), up to the entry
-	// bound. A reissue writes its entry in its own issuance transaction; its admission sizes the plan after
-	// that effect, so the reserve here is what covers it.
+	// every record slot that could still yield one, up to the entry bound: each unconsumed record, each
+	// reserved free record, and each consumed record (a window write drops it and frees its slot for a new
+	// record; counting it only once dropped would let that maintenance write raise the forecast: model
+	// issuance-image-capacity.qnt, O, mutant originReserveIgnoresConsumed). A reissue writes its entry in its
+	// own issuance transaction; its admission sizes the plan after that effect, so the reserve here is what
+	// covers it.
 	const existingOrigins = captured?.reissueOrigins ?? [];
-	const unconsumedHandBacks = existingHandBacks.filter(record => record.reissueSequence === null).length;
 	const freeOrigins = Math.min(Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingOrigins.length),
-		unconsumedHandBacks + freeHandBacks);
+		existingHandBacks.length + freeHandBacks);
 	const originWidth = unsignedRecordWidth({}, {originSequence: integer, reissueSequence: integer});
 	const originShape = unsignedRecordShape({}, {originSequence: leaf, reissueSequence: leaf});
 	const reissueOrigins = existingOrigins.length + freeOrigins === 0 ? undefined : {

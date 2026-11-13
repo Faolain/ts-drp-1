@@ -19,7 +19,8 @@ import {SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, type 
 // - one displaced-source context when a completed replacement still lacks its context, plus the
 //   completed-source custody marker.
 // - the HB reserve, each record with its move's origin (track 46), the reissue-origin reserve (one entry
-//   per record that could still be consumed, within the entry bound of 64), and the member frontier when
+//   per record slot that could still yield one, consumed records included, within the entry bound of 64),
+//   and the member frontier when
 //   the geometry gives one.
 const scope = {objectId: "source-custody-sizing-dispositions", author: "writer"};
 const geometry = {maxContextByteLength: 74_107, maxCompletionByteLength: 70_432, maxCompletionMemberByteLength: 512,
@@ -147,7 +148,7 @@ describe("merged custody sizing covers every written disposition (G22)", () => {
 });
 
 // Track 46 (reissueOrigins): every new written shape is sized. A record carries its move's origin; every
-// record that could still be consumed reserves one reissue-origin entry, a separate bound from the records
+// record slot that could still yield one reserves one reissue-origin entry, a separate bound from the records
 // (64 unconsumed records plus 64 entries); the reissue's admission sizes the plan after its own effect
 // (consumption plus the entry), and later writes stay within the reserve.
 describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", () => {
@@ -196,6 +197,19 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		const full = copySettlementPlan({...written, handBacks: [...written.handBacks!, {...written.handBacks![0]!, sourceSequence: 5_000,
 			reissueSequence: null, originSequence: 4_000}]}, scope)!;
 		expect(() => applySettlementPlanEffect(full, {kind: "hand-back", sourceSequence: 5_000, intent: 0}, Number.MAX_SAFE_INTEGER - 1)).toThrow();
+	});
+
+	it("consumed records still reserve their slots' entries: 64 consumed records whose entries settled", () => {
+		// Model issuance-image-capacity.qnt, O (mutant originReserveIgnoresConsumed): a window write drops the
+		// consumed records, new records take their slots and are reissued in turn. The plan sized while the
+		// consumed records were still present covers the 64 entries those reissues write.
+		const consumed = consumeAll(withRecords(SETTLEMENT_HAND_BACK_LIMITS.maxRecords, 0), 2_000_000);
+		const prior = copySettlementPlan({...consumed, reissueOrigins: undefined}, scope)!;
+		expect(prior.reissueOrigins).toBeUndefined();
+		expect(prior.handBacks!.every(record => record.reissueSequence !== null)).toBe(true);
+		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 0, geometry, OPERATION);
+		expect(consumed.reissueOrigins).toHaveLength(64);
+		measured(consumed, resource, "64 consumed records and 64 new entries");
 	});
 
 	it("records with origin and 64 entries in one plan: 64 unconsumed records plus 64 entries", () => {
