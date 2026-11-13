@@ -103,13 +103,16 @@ async function openApp(
  * @param recipient - The other role.
  * @param moves - Moves per role.
  * @param rolloverBudget - Test-only trigger values replacing the application's.
+ * @param creatorMoves - Which ordinals the creator moves at (default every one); a sparser creator makes a
+ * Writer the hot author. Its rows carry admission evidence of the Writer's moves (their causal past).
  * @returns The creator's policy observation.
  */
 async function playPastCeiling(
 	app: AppKind,
 	recipient: Recipient,
 	moves: number,
-	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>
+	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>,
+	creatorMoves: (ordinal: number) => boolean = () => true
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
@@ -174,10 +177,12 @@ async function playPastCeiling(
 	}, 30_000);
 	try {
 		for (let ordinal = 0; ordinal < moves; ordinal++) {
-			step = `creator#${ordinal}`;
-			await creator.issue(0, ordinal);
-			accepted.push({ role: 0, ordinal });
-			await deliver(0);
+			if (creatorMoves(ordinal)) {
+				step = `creator#${ordinal}`;
+				await creator.issue(0, ordinal);
+				accepted.push({ role: 0, ordinal });
+				await deliver(0);
+			}
 			// The member's own rows go to the creator even when it makes no move: each install
 			// publishes the member's settlement of the epoch it leaves.
 			await deliver(1);
@@ -253,11 +258,12 @@ it.each(cases)(
 );
 
 // The refusal path: with trigger values too high to fire, the creator's move at the native
-// ceiling (Canvas: the 41st) or at Chat's allowance (the 15th short message, for the creator and
+// ceiling (Canvas: the 169th since fix/maintenance-image-capacity; the 41st before, when the next
+// two epochs then admitted none) or at Chat's allowance (the 15th short message, for the creator and
 // for a Writer, who cannot seal and waits for the next installed epoch) is refused, rolled over
 // and offered again, and is accepted.
 it.each([
-	["canvas", "receive-only", 60],
+	["canvas", "receive-only", 200],
 	["chat", "writer", 25],
 ] as const)(
 	"%s with a %s recipient: a move refused at the ceiling is accepted after the rollover it triggers",
@@ -273,3 +279,31 @@ it.each([
 	},
 	1_200_000
 );
+
+// The received-move refusal path (liveness (a)/(b)) needs several Writers' combined load: see
+// app-rollover-received-refusal-native.test.ts. One hot Writer reaches its own settlement reserve
+// first (the next case).
+
+// Writer-side admission and maintenance agree (fix/maintenance-image-capacity): a hot Writer's
+// moves the creator closed an epoch without are replaced at the successor's install, under the
+// Writer's own issuance row and byte bound. At about 505 moves the Writer admitted moves whose
+// replacements its store then refused (row bound) inside the install's drainRebaseOutbox, so it
+// never installed. Its admission must reserve one replacement per own move of the epoch and refuse
+// (typed, retry after rollover) otherwise; then every admitted move settles. The Writer cannot seal:
+// its refused move waits for the creator's next rollover (a received refusal, or the idle timer).
+it("grid with a hot writer: no admitted move's settlement is refused by the Writer's own store", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	try {
+		// 700: past the deadlock (about writer move 505 without the reserve) and under the grid
+		// state's canonical bound (each move adds a block; about 900 blocks exceed it).
+		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 700);
+		// The creator moves every 8 Writer moves (admission evidence, as an online room has).
+		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 8);
+		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 },
+			(ordinal) => ordinal % creatorEvery === 0);
+		process.stdout.write(`HOT_WRITER_SETTLEMENT ${JSON.stringify({ writerMoves, creatorEvery, rollovers: policy?.rollovers,
+			triggers: policy?.events.map((event) => event.trigger) })}\n`);
+	} finally {
+		restore();
+	}
+}, 3_600_000);

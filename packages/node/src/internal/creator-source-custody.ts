@@ -149,7 +149,12 @@ export function creatorSourceCustodyGeometryForSizing(trust: CurrentAnchorTrust,
 	const maxMemberFrontierByteLength = creatorMemberFrontierWidth(trust);
 	return Object.freeze({maxContextByteLength: emptyParameters + MAX_PARAMETERS + varuintWidth(MAX_PARAMETERS) - 1,
 		maxCompletionByteLength, maxCompletionMemberByteLength, maxExpiryByteLength, ...(maxMemberFrontierByteLength === undefined ? {} : {maxMemberFrontierByteLength}),
-		maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+		maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes,
+		// Rule B (issuance-image-capacity.qnt): a plan write for a close adds entries only for own rows
+		// signed in that closed epoch, and the plane of epoch E exists only after the close of E-1 was
+		// applied (retainCreatorAcceptedSourceCustody runs inside that transition). So only rows of the
+		// current epoch or later can still become new sources.
+		minSourceEpoch: trust.currentEpoch});
 }
 
 /** Historical authority only: no inclusion, noninclusion, current Writer grant or native currency. */

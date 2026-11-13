@@ -794,6 +794,8 @@ export function createV3ZoneApi(
 				migrationDatabaseNamespace: `${localAuthor}:${zoneId}`,
 				objectId: zoneId,
 				onAcceptedVertex: (vertex) => policy.observe(vertex),
+				// A hot Writer's move refused at the creator's capacity: seal now, it lands in the successor.
+				onIngressCapacityRefusal: (reason) => policy.refused(reason),
 				onMigrationTarget: (target, targetObjectId): void => {
 					redirectedDuringOpen = target;
 					if (sourceRoom !== undefined) retainedSourceBridges.add(sourceRoom);

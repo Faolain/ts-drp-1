@@ -61,6 +61,11 @@ function fixture() {
 		requireLaw: (condition: unknown, reason: string) => {if (!condition) throw Error(reason);},
 		proofMaterialOwners: materialOwners,
 		closedRetirementBytes: encodeCanonical, decodeCanonical, compareBytes,
+		// The owner's own capture-journal detach (its in-memory drainSource never reaches the encoder).
+		detachClosedCaptureJournal: Function("decodeCanonical", "closedRetirementBytes", `"use strict"; ${ts.transpile(
+			ast.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) &&
+				node.name?.text === "detachClosedCaptureJournal")!.getText(ast), {target: ts.ScriptTarget.ES2022})}; return detachClosedCaptureJournal;`)(
+			decodeCanonical, encodeCanonical),
 		creatorIssuanceMaintenanceObservationCarriers: (value: unknown) => [value],
 		createCreatorOrdinaryFinishingMaterialIndex: (bytes: unknown, annotations: unknown) => ({bytes, annotations}),
 		maintenanceTerminalCustody: publishRegistry,

@@ -66,7 +66,8 @@ function fixture() {
 			readiness: {reader, sourceIdentity: identity, geometry: {graphVersion: 3, baseGraphCount: 2, basePreimageCount: 1,
 				baseWitnessPayloadBytes: 4100, acceptedWitnessPayloadBytes: 0, acceptedCount: 0, localIssuedCount: 0,
 				runtimeWidths,
-				journalObservationFields: {control: resource(null), image: resource(journal.image), canonicalRows: resource(journal.canonicalRows)}}}}};
+				journalObservationFields: {control: resource(null), image: resource(journal.image), canonicalRows: resource(journal.canonicalRows)},
+				journalContextControlWidth: 0}}}};
 	const current = {runtime: {kind: "pending-local-issuance", objectId: "room", epoch: 2, anchorDigest: anchor,
 		profileId: "creator-trusted-settlement-v1", issuanceScope: scope, graphVersion: 3, epochBytes: 10000},
 		parameters: {maxEpochVertices: 8192, maxEpochBytes: 8388608}, currentEpochVertexCount: 2,
@@ -105,6 +106,8 @@ function fixture() {
 		creatorOrdinarySizingRecordValue: decodeCanonical, closedRetirementEqual: equal, record: decodeCanonical,
 		settlementProfileFor: () => "v1", CREATOR_MAINTENANCE_PROOF_MAX_BYTES: 4194304, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1310720,
 		LIVE_JOURNAL_RETIREMENT_LIMITS: {maxRows: 8192},
+		// The close's per-carrier encode cap (CLOSED_RETIREMENT_BYTES, AHE maxUnionBytes).
+		CLOSED_RETIREMENT_BYTES: {maxBytes: 786_432, maxItems: 65_536, maxDepth: 128},
 		maintenanceWidthSum: (parts: readonly number[]) => {const n = parts.reduce((a, b) => a + b, 0); if (n > 4194304) throw Error("finite arithmetic"); return n;},
 		creatorOrdinaryPreimageResourceGeometryForSizing: ({canonicalOperationByteLength: n}: any) =>
 			({canonicalPreimageByteLength: Math.max(512, n) + 1536, canonicalEpochVertexByteLength: Math.max(512, n) + 1400}),

@@ -50,6 +50,7 @@ import {
 	captureDurableIssuancePruningInput,
 	captureDurableIssuanceRecoveryCensusInput,
 	captureIssuanceNativeSignContext,
+	issuanceSettlementReplacementReserveCharge,
 	captureIssuanceNativeSignInput,
 	captureIssuancePendingUnsignedIntent,
 	captureIssuanceRetirementObject,
@@ -81,6 +82,7 @@ import {
 	issuanceRetirementImageBound,
 	issuanceRetirementRefusal,
 	issuanceRetirementTransitionRows,
+	issuanceRetirementTransitionPlanBefore,
 	issuanceUnsignedPostimageCharge,
 	issuanceUnsignedPostimageWidths,
 	issuanceUnsignedOwnMaterialByteLength,
@@ -102,7 +104,7 @@ import { connectionRevision, RevisionReadMemo } from "./sqlite-revision.js";
 import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const PAGE_SIZE = 4096;
 const BUSY_TIMEOUT = 1000;
 
@@ -146,14 +148,29 @@ const RETIREMENT_TRIGGERS = ["lineages", "issued_records", "issuance_outbox", "s
 		})
 	)
 	.sort((a, b) => a.name.localeCompare(b.name));
-const DDL = [...V3_DDL, RETIREMENT_DDL, ...RETIREMENT_TRIGGERS.map((t) => t.sql)];
-const EXPECTED_CATALOG = [
+/**
+ * Schema 6 (rule A, issuance-image-capacity.qnt): one side row per object holding the exact BEFORE
+ * plan images of the completed control-2 preparation (issuanceRetirementPlanBeforeRecord). It sits
+ * outside the census and the control and is read only to reconstruct the committed source. Schema 5
+ * reopens by adding the empty table; older code refuses schema 6 (ISSUANCE_UNSUPPORTED_SCHEMA).
+ */
+const PLAN_BEFORE_DDL =
+	"CREATE TABLE retirement_plan_before (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID";
+const DDL = [...V3_DDL, RETIREMENT_DDL, PLAN_BEFORE_DDL, ...RETIREMENT_TRIGGERS.map((t) => t.sql)];
+const V5_EXPECTED_CATALOG = [
 	...V3_EXPECTED_CATALOG.map((row) => (row.name === "lineages" ? { ...row, sql: LINEAGES_DDL } : row)),
 	{ name: "retirement_controls", sql: RETIREMENT_DDL, type: "table" },
 ]
 	.sort((a, b) => a.name.localeCompare(b.name))
 	.concat(RETIREMENT_TRIGGERS.map((t) => ({ name: t.name, sql: t.sql, type: "trigger", table: t.table })));
-const V4_EXPECTED_CATALOG = EXPECTED_CATALOG.map((row) =>
+const EXPECTED_CATALOG = [
+	...V3_EXPECTED_CATALOG.map((row) => (row.name === "lineages" ? { ...row, sql: LINEAGES_DDL } : row)),
+	{ name: "retirement_controls", sql: RETIREMENT_DDL, type: "table" },
+	{ name: "retirement_plan_before", sql: PLAN_BEFORE_DDL, type: "table" },
+]
+	.sort((a, b) => a.name.localeCompare(b.name))
+	.concat(RETIREMENT_TRIGGERS.map((t) => ({ name: t.name, sql: t.sql, type: "trigger", table: t.table })));
+const V4_EXPECTED_CATALOG = V5_EXPECTED_CATALOG.map((row) =>
 	row.name === "lineages" ? { ...row, sql: LINEAGES_V4_DDL } : row
 );
 
@@ -384,23 +401,30 @@ function admit(database: DatabaseSync, initialization: "create" | "reopen" = "cr
 			database.exec("DROP TABLE lineages_v1");
 			database.exec(SETTLEMENT_PLANS_DDL);
 			database.exec(RETIREMENT_DDL);
+			database.exec(PLAN_BEFORE_DDL);
 			for (const t of RETIREMENT_TRIGGERS) database.exec(t.sql);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion === 2 && catalogMatches(lockedCatalog, V2_EXPECTED_CATALOG)) {
 			migrateUnsignedLineage(database);
 			database.exec(SETTLEMENT_PLANS_DDL);
 			database.exec(RETIREMENT_DDL);
+			database.exec(PLAN_BEFORE_DDL);
 			for (const t of RETIREMENT_TRIGGERS) database.exec(t.sql);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion === 3 && catalogMatches(lockedCatalog, V3_EXPECTED_CATALOG)) {
 			migrateUnsignedLineage(database);
 			database.exec(RETIREMENT_DDL);
+			database.exec(PLAN_BEFORE_DDL);
 			for (const t of RETIREMENT_TRIGGERS) database.exec(t.sql);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion === 4 && catalogMatches(lockedCatalog, V4_EXPECTED_CATALOG)) {
 			for (const trigger of RETIREMENT_TRIGGERS) database.exec(`DROP TRIGGER ${trigger.name}`);
 			migrateUnsignedLineage(database);
 			for (const trigger of RETIREMENT_TRIGGERS) database.exec(trigger.sql);
+			database.exec(PLAN_BEFORE_DDL);
+			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+		} else if (lockedVersion === 5 && catalogMatches(lockedCatalog, V5_EXPECTED_CATALOG)) {
+			database.exec(PLAN_BEFORE_DDL);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion !== SCHEMA_VERSION || !catalogMatches(lockedCatalog)) {
 			throw unsupported("existing issuance SQLite authority is unsupported");
@@ -878,7 +902,8 @@ function reserveUnsignedIntent(
 		throw issuanceRetirementRefusal("native unsigned lineage changed");
 	if (
 		context !== undefined &&
-		!isClosedDurableIssuanceRecord(context, Object.hasOwn(context, "planEffect") ? ["planEffect"] : [])
+		!isClosedDurableIssuanceRecord(context, ["planEffect", "settlementReplacementReserve"]
+			.filter((key) => Object.hasOwn(context, key)))
 	)
 		throw invalid("native unsigned settlement context is malformed");
 	const planEffect = context?.planEffect === undefined ? undefined : copySettlementPlanEffect(context.planEffect);
@@ -945,6 +970,10 @@ function reserveUnsignedIntent(
 			canonicalPreimageBytes: captured.bytes, digest: captured.digest,
 		}, priorControl);
 	}
+	// A fresh Writer move only: a resumed intent is already durable and is never refused here.
+	if (old === undefined && context?.settlementReplacementReserve !== undefined)
+		issuanceSettlementReplacementReserveCharge(rows, scope, pending,
+			context.settlementReplacementReserve as Readonly<{ maxDependencies: number }>);
 	assertRetirementRow(database, scope, captured.sequence, captured.bytes, captured.digest);
 	if (priorControl === null)
 		configuredStatement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
@@ -1433,6 +1462,14 @@ class NodeIssuanceImplementation {
 				const targetRows = issuanceRetirementTransitionRows(current, next, rows);
 				if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
 					throw issuanceRetirementRefusal("issuance retirement target stale");
+				// Rule A: the commit moves the BEFORE images to the one side row (or drops a stale one).
+				const planBefore = issuanceRetirementTransitionPlanBefore(current, next, rows);
+				if (planBefore === null)
+					configuredStatement(this.#database, "DELETE FROM retirement_plan_before WHERE object_id=?").run(objectId);
+				else if (planBefore !== undefined)
+					configuredStatement(this.#database,
+						"INSERT INTO retirement_plan_before(object_id,record) VALUES(?,?) ON CONFLICT(object_id) DO UPDATE SET record=excluded.record"
+					).run(objectId, planBefore);
 				for (let index = 0; index < rows.plans.length; index++) {
 					const before = rows.plans[index]!, after = targetRows.plans[index]!;
 					if (after === before) continue;
@@ -1499,6 +1536,13 @@ class NodeIssuanceImplementation {
 				? primary
 				: new DurableIssuanceContractError("ISSUANCE_OUTCOME_UNKNOWN", "issuance retirement readback ambiguous");
 		});
+	}
+	async readRetirementPlanBefore(input: { readonly objectId: string }): Promise<Uint8Array | null> {
+		this.#assertAvailable();
+		const objectId = captureIssuanceRetirementObject(input);
+		const row = configuredStatement(this.#database, "SELECT record FROM retirement_plan_before WHERE object_id=?")
+			.get(objectId) as { record: Uint8Array } | undefined;
+		return row === undefined ? null : new Uint8Array(row.record);
 	}
 	#retirementSnapshot(objectId: string): {
 		rows: IssuanceRetirementRows;
@@ -2108,7 +2152,14 @@ class NodeIssuanceImplementation {
 					database,
 					detached,
 					captured,
-					capturedContext?.planEffect === undefined ? undefined : { planEffect: capturedContext.planEffect },
+					capturedContext?.planEffect === undefined && capturedContext?.settlementReplacementReserve === undefined
+						? undefined
+						: {
+								...(capturedContext.planEffect === undefined ? {} : { planEffect: capturedContext.planEffect }),
+								...(capturedContext.settlementReplacementReserve === undefined
+									? {}
+									: { settlementReplacementReserve: capturedContext.settlementReplacementReserve }),
+							},
 					ordinaryRows
 				);
 				ownedPending = prior.pendingUnsigned;
@@ -2983,6 +3034,8 @@ export function createNodeDurableIssuanceStoreImplementation(
 				implementation.withNativeSignAdmission(input, sign),
 			acquireRetirementControl: (input: { readonly objectId: string }) =>
 				implementation.acquireRetirementControl(input),
+			readRetirementPlanBefore: (input: { readonly objectId: string }) =>
+				implementation.readRetirementPlanBefore(input),
 			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),

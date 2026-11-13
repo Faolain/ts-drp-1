@@ -706,6 +706,24 @@ test.each([[64, 0], [128, 0], [128, 2]])("R10 received append capacity widths pr
 		const final = must(await store.readRetirementImage({ objectId: current.scope.objectId }));
 		check(predicted.afterSuccessorLocal, final.canonicalRows);
 		check(browser.afterSuccessorLocal, browserFrames(final.canonicalRows));
+		// fix/maintenance-image-capacity (j22, bx_6ytwadfw): readiness reserves exactly the horizon the successor's
+		// mandatory fence quote checks. That quote is this same function from the post-install journal (preclose:
+		// no membership), so the ordinary quote's fenceHorizon equals its after-successor phases, on both shapes.
+		const next = anchorMaterial(2);
+		const nextUnsigned = { objectId: next.install.objectId,
+			exactCanonicalAnchorPreimageBytes: next.install.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalParametersCarrierBytes: next.install.exactCanonicalParametersCarrierBytes };
+		const fenceAppend = local(fence.authorSequence, successor.scope), nextFence = { author: issuer, authorSequence: fence.authorSequence + 1 };
+		for (const [frames, shape] of [[(rows: readonly Uint8Array[]) => rows, "sqlite"], [browserFrames, "browser"]] as const) {
+			const horizon = journalFutureAppendPostimageWidths(frames(before.canonicalRows), candidate, unsigned, fence, continuations,
+				{ ...options, fenceHorizon: true }).fenceHorizon;
+			const fenceQuote = journalFutureAppendPostimageWidths(frames(installed.canonicalRows), fenceAppend, nextUnsigned, nextFence);
+			expect(horizon, shape).toEqual({ afterSuccessor: fenceQuote.afterSuccessor, afterSuccessorLocal: fenceQuote.afterSuccessorLocal });
+		}
+		expect(() => journalFutureAppendPostimageWidths(before.canonicalRows, candidate, unsigned, fence, continuations,
+			{ ...options, fenceHorizon: 1 as unknown as boolean })).toThrow("malformed-input");
+		expect(journalFutureAppendPostimageWidths(before.canonicalRows, candidate, unsigned, fence, continuations,
+			{ ...options, fenceHorizon: false }).fenceHorizon).toBeUndefined();
 		const nativeRows = final.canonicalRows.map(bytes => decodeCanonical(bytes) as [string, unknown, Record<string, unknown>]);
 		expect(nativeRows.filter(([table, , row]) => table !== "scopes" && row.source_kind === "received")).toHaveLength(writers);
 		expect(nativeRows.filter(([table, , row]) => table !== "scopes" && row.source_kind === "local-issued")).toHaveLength(2 + continuationCount);

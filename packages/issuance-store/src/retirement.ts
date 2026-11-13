@@ -22,6 +22,7 @@ import {
 	type DurableIssueScope,
 	type DurableIssueSignContext,
 	type DurableLineage,
+	SETTLEMENT_HAND_BACK_LIMITS,
 	SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	type SettlementPlan,
@@ -47,18 +48,40 @@ export interface DurableIssuanceRetirementPreparation {
 	readonly decisionDigest: string;
 	readonly sourceProofDigest: string;
 	readonly throughEpoch: number;
+	/**
+	 * Rule H (model issuance-image-capacity.qnt): rows at or below the floor retire unless listed in
+	 * protectedRecords; rows above it are kept by the floor itself, so the rollback window costs no
+	 * record. Present exactly in a control-2 preparation; a legacy (control-1) preparation's floor is
+	 * its throughEpoch. See issuanceRetirementFloor.
+	 */
+	readonly floorEpoch?: number;
 	readonly protectedRecords: readonly DurableIssuanceRetirementHole[];
 	/** Bounded exact native image delta. This is recovery custody, never eligibility. */
 	readonly planRewrite?: DurableIssuanceRetirementPlanRewrite;
 }
-export interface DurableIssuanceRetirementPlanRewrite {
+/**
+ * The native plan delta of one retirement. Legacy (-1) carries both exact plan images inline. Rule A
+ * (-2) carries only their digests: while the preparation is active its BEFORE plan is the live plan
+ * row and AFTER is derived again by the forward law; the commit moves the BEFORE bytes to the
+ * store's one side row (issuanceRetirementPlanBeforeRecord), read only to reconstruct the source.
+ */
+export type DurableIssuanceRetirementPlanRewrite = DurableIssuanceRetirementPlanRewriteBytes |
+	DurableIssuanceRetirementPlanRewriteDigests;
+export interface DurableIssuanceRetirementPlanRewriteBytes {
 	readonly kind: "v3-issuance-retirement-plan-rewrite-1";
 	readonly sourceImageDigest: string;
 	readonly targetImageDigest: string;
 	readonly plans: readonly Readonly<{ before: Uint8Array; after: Uint8Array }>[];
 }
+export interface DurableIssuanceRetirementPlanRewriteDigests {
+	readonly kind: "v3-issuance-retirement-plan-rewrite-2";
+	readonly sourceImageDigest: string;
+	readonly targetImageDigest: string;
+	readonly plans: readonly Readonly<{ author: string; beforeDigest: string; afterDigest: string }>[];
+}
+export type DurableIssuanceRetirementControlKind = "v3-issuance-retirement-control-1" | "v3-issuance-retirement-control-2";
 export interface DurableIssuanceRetirementControl {
-	readonly kind: "v3-issuance-retirement-control-1";
+	readonly kind: DurableIssuanceRetirementControlKind;
 	readonly objectId: string;
 	readonly incarnation: string;
 	readonly revision: number;
@@ -154,6 +177,33 @@ export interface IssuanceSourceCustodyGeometry {
 	readonly maxNativeReadByteLength: number;
 	/** The last-member frontier a removing close may persist once (absent: none charged). */
 	readonly maxMemberFrontierByteLength?: number;
+	/** The epoch whose close is the next one a plan write can apply: only own rows signed in it or
+	 * later can still become new settlement sources (a close adds entries only for rows of its own
+	 * epoch). Absent: every retained own row is a potential source. */
+	readonly minSourceEpoch?: number;
+}
+
+/** Own rows that can still become NEW settlement sources (model issuance-image-capacity.qnt, rule
+ * B): rows without an entry in the own plan (existing entries are charged exactly) whose signed
+ * epoch is at least the geometry's minSourceEpoch. A row whose epoch does not decode counts. The
+ * widest own preimage bounds a hand-back record's operation bytes. */
+export function issuancePotentialSourceCustody(rows: Readonly<{issued: readonly Readonly<{
+	objectId: string; author: string; authorSequence: number; canonicalPreimageBytes: Uint8Array;
+}>[]; plans: readonly SettlementPlan[]}>, scope: DurableIssueScope, geometry: IssuanceSourceCustodyGeometry | undefined):
+	Readonly<{count: number; maxPreimageByteLength: number}> {
+	const own = rows.plans.find(plan => plan.scope.objectId === scope.objectId && plan.scope.author === scope.author);
+	const entered = new Set((own?.entries ?? []).filter(entry => entry.sourceObjectId === undefined).map(entry => entry.sourceSequence));
+	let count = 0, maxPreimageByteLength = 0;
+	for (const row of rows.issued) {
+		if (row.objectId !== scope.objectId || row.author !== scope.author) continue;
+		maxPreimageByteLength = Math.max(maxPreimageByteLength, row.canonicalPreimageBytes.byteLength);
+		if (entered.has(row.authorSequence)) continue;
+		const epoch = geometry?.minSourceEpoch === undefined ? undefined :
+			decodeDurableIssuancePreimage(row.canonicalPreimageBytes, row, row.authorSequence)?.epoch;
+		if (geometry?.minSourceEpoch !== undefined && epoch !== undefined && epoch < geometry.minSourceEpoch) continue;
+		count++;
+	}
+	return Object.freeze({count, maxPreimageByteLength});
 }
 
 export const CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND = "canonical-settlement-plan-1";
@@ -211,20 +261,35 @@ export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): n
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
 
-/** Source-context and entry fields are sized by the original plan codec. Every
- * existing entry/context remains whole. One future current-epoch context and
- * every potentially unresolved own row and its terminal receipt are charged without inventing bytes. */
+/** Source-context and entry fields are sized by the original plan codec (G22: one bound). The charged set:
+ * - every existing entry and context stays whole. An entry is charged at the widest form it can still take
+ *   (frontier expiry, or replaced-source resolution).
+ * - one open current-epoch context.
+ * - rule D (model issuance-image-capacity.qnt): each potential row and each unresolved entry ends as a
+ *   member of one new completion or with one expiry receipt, never both. The widest split is charged, and
+ *   terminal entries may also be members.
+ * - one replaced-source receipt (rule R) for each completed replacement that is still resolvable, and
+ *   for each potential row.
+ * - one displaced-source context and the completed-source custody marker when a completed replacement
+ *   still lacks its context.
+ * - the hand-back reserve (HB), and the last-member frontier when the geometry gives one.
+ * Pinned by tests/source-custody-sizing-dispositions.test.ts. */
 export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
-	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry): Readonly<{
+	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry,
+	maxHandBackOperationByteLength: number = SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes): Readonly<{
 		byteLength: number; items: number; maxDepth: number; nativeStorageByteLength: number;
 	}> {
 	assertDurableIssueScope(scope);
 	const captured = prior === null ? null : copySettlementPlan(prior, scope);
 	const hasMemberFrontierGeometry = typeof geometry === "object" && geometry !== null && Object.hasOwn(geometry, "maxMemberFrontierByteLength");
-	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, ["maxContextByteLength", "maxCompletionByteLength", "maxCompletionMemberByteLength", "maxExpiryByteLength", "maxNativeReadByteLength",
-		...(hasMemberFrontierGeometry ? ["maxMemberFrontierByteLength"] : [])]) ||
+	const geometryKeys = ["maxContextByteLength", "maxCompletionByteLength", "maxCompletionMemberByteLength", "maxExpiryByteLength",
+		"maxNativeReadByteLength", ...(hasMemberFrontierGeometry ? ["maxMemberFrontierByteLength"] : []),
+		...(typeof geometry === "object" && geometry !== null && Object.hasOwn(geometry, "minSourceEpoch") ? ["minSourceEpoch"] : [])];
+	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, geometryKeys) ||
 		(hasMemberFrontierGeometry && (!Number.isSafeInteger(geometry.maxMemberFrontierByteLength) ||
 			Number(geometry.maxMemberFrontierByteLength) < 1 || Number(geometry.maxMemberFrontierByteLength) > SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES)) ||
+		(geometry.minSourceEpoch !== undefined && (!Number.isSafeInteger(geometry.minSourceEpoch) || geometry.minSourceEpoch < 0)) ||
+		!Number.isSafeInteger(maxHandBackOperationByteLength) || maxHandBackOperationByteLength < 0 ||
 		!Number.isSafeInteger(maxSourceCount) || maxSourceCount < 0 || maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
 		!Number.isSafeInteger(geometry.maxContextByteLength) || geometry.maxContextByteLength < 1 ||
 		!Number.isSafeInteger(geometry.maxCompletionByteLength) || geometry.maxCompletionByteLength < 1 ||
@@ -271,36 +336,71 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	// bound only; actual retention must still authenticate and classify each row.
 	for (let index = 0; index < maxSourceCount; index++) { entryWidths.push(entryWidth); entryShapes.push(entryShape); }
 	const contexts = captured?.sourceContexts ?? [];
-	const contextWidths = contexts.map(context => encodeCanonical(context, unsignedEncodingLimits).byteLength);
+	const existingContextWidths = contexts.map(context => encodeCanonical(context, unsignedEncodingLimits).byteLength);
 	const contextShape = unsignedRecordShape({}, {digest: leaf, exactCanonicalContextBytes: leaf});
 	const contextShapes = [...contexts.map(unsignedCanonicalShape)];
-	// One signed receipt per potential row and per existing entry that may still gain one (an expiry or
-	// a replaced-source resolution).
-	const expiryCount = maxSourceCount + originalEntries.filter(entry => entry.sourceResolutionDigest === undefined &&
-		entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null).length +
-		originalEntries.filter(replacedSourceResolvable).length;
-	// A completed replacement entry still without a context may gain its displaced source's context
-	// once, at the close that removes its author: one more context (one displaced plane per close).
+	// Rule D (model issuance-image-capacity.qnt): a potential source or an unresolved entry ends
+	// either as a completion member or with one expiry context, never both - the native plan
+	// transition law changes a disposition only from unresolved, and a resolution never changes. A
+	// terminal entry can still be a member of a new completion. The widest split is charged.
+	// Outside the split, each completed replacement that may still gain a replaced-source resolution
+	// (replacedSourceResolvable) adds one signed receipt, and a completed rebase/transform replacement
+	// still without a context may gain its displaced source's context once, at the close that removes
+	// its author (one displaced plane per close): one more open-sized context.
+	// A potential row may also be replaced and then resolved as a replaced source: a terminal entry
+	// stays a possible completion member, so such a row is charged as a member AND one receipt (this
+	// dominates its expiry form, the receipt being expiry-sized). The split then ranges only over the
+	// existing unresolved entries.
+	const unresolved = originalEntries.filter(entry => entry.sourceResolutionDigest === undefined &&
+		entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null).length;
+	const either = maxSourceCount + unresolved, terminal = originalEntries.length - unresolved;
+	const potentialReplacedSources = maxSourceCount;
+	const replacedSourceReceipts = originalEntries.filter(replacedSourceResolvable).length + potentialReplacedSources;
 	const completedWithoutContext = originalEntries.some(entry => entry.sourceContextDigest === undefined &&
 		entry.replacementSequence !== null && (entry.disposition === "rebase" || entry.disposition === "transform"));
-	const additionalContexts = [geometry.maxContextByteLength, geometry.maxCompletionByteLength +
-		(maxSourceCount + originalEntries.length) * geometry.maxCompletionMemberByteLength,
-		...Array.from({length: expiryCount}, () => geometry.maxExpiryByteLength),
-		...(completedWithoutContext ? [geometry.maxContextByteLength] : [])];
-	for (const length of additionalContexts) {
-		contextWidths.push(unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(length)}));
-		contextShapes.push(contextShape);
+	const fixedExtraContexts = replacedSourceReceipts + (completedWithoutContext ? 1 : 0);
+	const contextWidth = (length: number) => unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(length)});
+	const existingContextBytes = contexts.reduce((sum, context) => sum + context.exactCanonicalContextBytes.byteLength, 0);
+	const existingWidth = existingContextWidths.reduce((sum, width) => sum + width, 0);
+	const expiryWidth = contextWidth(geometry.maxExpiryByteLength), openWidth = contextWidth(geometry.maxContextByteLength);
+	const fixedExtraWidth = replacedSourceReceipts * expiryWidth + (completedWithoutContext ? openWidth : 0);
+	const fixedExtraBytes = replacedSourceReceipts * geometry.maxExpiryByteLength + (completedWithoutContext ? geometry.maxContextByteLength : 0);
+	let sourceContextsWidth = 0, rawContextBytes = 0;
+	for (let members = potentialReplacedSources; members <= either; members++) {
+		const completion = geometry.maxCompletionByteLength + (terminal + members) * geometry.maxCompletionMemberByteLength;
+		const expiries = either - members;
+		sourceContextsWidth = Math.max(sourceContextsWidth, 1 + unsignedVaruintWidth(contexts.length + 2 + expiries + fixedExtraContexts) +
+			existingWidth + openWidth + contextWidth(completion) + expiries * expiryWidth + fixedExtraWidth);
+		rawContextBytes = Math.max(rawContextBytes, existingContextBytes + geometry.maxContextByteLength + completion +
+			expiries * geometry.maxExpiryByteLength + fixedExtraBytes);
 	}
-	if (contexts.reduce((sum, context) => sum + context.exactCanonicalContextBytes.byteLength, 0) +
-		additionalContexts.reduce((sum, length) => sum + length, 0) > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes)
+	// Shapes: the most contexts (every split source an expiry, plus the fixed extra receipts).
+	for (let index = 0; index < 2 + either - potentialReplacedSources + fixedExtraContexts; index++) contextShapes.push(contextShape);
+	if (rawContextBytes > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes)
 		throw issuanceRetirementRefusal("source custody contexts exceed original plan bound");
-	// Hand-back records already in the plan are charged exactly. Records a later frontier resolution adds
-	// are bounded by SETTLEMENT_HAND_BACK_LIMITS (contract), far below the native read bound; reserving
-	// that cap here for every author made each creator close quote exceed its prospective census.
-	const existingHandBacks = captured?.handBacks;
-	const handBacks = existingHandBacks === undefined ? undefined : {
-		width: encodeCanonical(existingHandBacks, unsignedEncodingLimits).byteLength,
-		shape: unsignedCanonicalShape(existingHandBacks),
+	// Hand-back records already in the plan are charged exactly. A frontier resolution of any
+	// unresolved entry or potential source may add records (model issuance-image-capacity.qnt, HB):
+	// while any such source exists, every free record slot is reserved. A record's operation is at
+	// most the widest own source preimage (an intent's operation is part of its row's operation), and
+	// the plan codec bounds all records' operations together by maxOperationBytes: the reserve takes
+	// each free record's fixed fields at the widest length header plus the shared operation budget.
+	const existingHandBacks = captured?.handBacks ?? [];
+	const operationBudget = Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes -
+		existingHandBacks.reduce((sum, record) => sum + record.exactCanonicalOperationBytes.byteLength, 0));
+	const freeHandBacks = either === 0 ? 0 : Math.min(operationBudget,
+		Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingHandBacks.length));
+	const recordOperation = Math.min(operationBudget, maxHandBackOperationByteLength);
+	const handBackFields = {sourceSequence: integer, sourceDigest: digest, sourceEpoch: integer, intent: integer,
+		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer};
+	const handBackOverhead = unsignedRecordWidth({}, handBackFields) - recordOperation;
+	const reservedOperation = Math.min(operationBudget, freeHandBacks * recordOperation);
+	const handBackShape = unsignedRecordShape({}, Object.fromEntries(Object.keys(handBackFields).map(key => [key, leaf])));
+	const handBacks = existingHandBacks.length + freeHandBacks === 0 ? undefined : {
+		width: unsignedArrayWidth([...existingHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
+			...Array.from({length: freeHandBacks}, (_, index) => handBackOverhead +
+				Math.floor(reservedOperation / freeHandBacks) + Number(index < reservedOperation % freeHandBacks))]),
+		shape: unsignedArrayShape([...existingHandBacks.map(unsignedCanonicalShape),
+			...Array.from({length: freeHandBacks}, () => handBackShape)]),
 	};
 	// The last-member frontier: the stored record exactly, or the one a removing close may persist.
 	const memberFrontierLength = captured?.memberFrontier?.exactCanonicalContextBytes.byteLength ??
@@ -311,7 +411,7 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const completedSourceCustody = captured?.completedSourceCustody === true || completedWithoutContext
 		? encodeCanonical(true).byteLength : undefined;
 	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
-		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths),
+		entries: unsignedArrayWidth(entryWidths), sourceContexts: sourceContextsWidth,
 		...(handBacks === undefined ? {} : {handBacks: handBacks.width}),
 		...(memberFrontier === undefined ? {} : {memberFrontier}),
 		...(completedSourceCustody === undefined ? {} : {completedSourceCustody})});
@@ -326,14 +426,15 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	return Object.freeze({byteLength, ...shape, nativeStorageByteLength});
 }
 
-function sourceCustodyPlanWidths(plans: readonly SettlementPlan[], scope: DurableIssueScope, sourceCount: number,
+function sourceCustodyPlanWidths(plans: readonly SettlementPlan[], scope: DurableIssueScope,
+	sources: Readonly<{count: number; maxPreimageByteLength: number}>,
 	geometry: IssuanceSourceCustodyGeometry | undefined, nativeMaterialWithoutPlans: number): Readonly<{
 		widths: readonly number[]; shapes: readonly IssuanceUnsignedCanonicalShape[];
 	}> {
 	if (geometry === undefined) return {widths: plans.map(plan => encodeCanonical(plan, unsignedEncodingLimits).byteLength),
 		shapes: plans.map(unsignedCanonicalShape)};
 	const own = plans.find(plan => plan.scope.objectId === scope.objectId && plan.scope.author === scope.author);
-	const resource = issuanceSourceCustodyPlanResourceForSizing(scope, own ?? null, sourceCount, geometry);
+	const resource = issuanceSourceCustodyPlanResourceForSizing(scope, own ?? null, sources.count, geometry, sources.maxPreimageByteLength);
 	const widths = plans.map(plan => plan === own ? resource.byteLength : encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 	const shapes = plans.map(plan => plan === own ? resource : unsignedCanonicalShape(plan));
 	if (own === undefined) { widths.push(resource.byteLength); shapes.push(resource); }
@@ -584,6 +685,94 @@ export function issuanceUnsignedPostimageCharge(
 	return unsignedRowsWidth(unsignedFinalRows(rows, scope, pending));
 }
 
+const settlementReserveDigest = new Uint8Array(32);
+// One plan entry at its widest ordinary shape: every optional digest present and one
+// replacement-progress chunk. A replacement split into further chunks is not reserved.
+const SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES = encodeCanonical({
+	sourceContextDigest: settlementReserveDigest,
+	sourceResolutionDigest: settlementReserveDigest,
+	sourceResolutionKind: "frontier",
+	sourceSequence: Number.MAX_SAFE_INTEGER,
+	sourceDigest: settlementReserveDigest,
+	disposition: "manual-review",
+	replacementSequence: Number.MAX_SAFE_INTEGER,
+	replacementProgress: {
+		version: 1,
+		intentCount: Number.MAX_SAFE_INTEGER,
+		intentDigest: settlementReserveDigest,
+		chunks: [{ replacementSequence: Number.MAX_SAFE_INTEGER, throughIntent: Number.MAX_SAFE_INTEGER,
+			lastLogicalTime: Number.MAX_SAFE_INTEGER }],
+	},
+}).byteLength;
+// A replacement's preimage differs from its source's in its dependencies (at most
+// maxDependencies lowercase-hex digests), its epoch, anchor and logical time. The anchor is a
+// digest of the same width; the scalars are each at most one maximal integer wider.
+const SETTLEMENT_RESERVE_DEPENDENCY_BYTES = encodeCanonical("0".repeat(64)).byteLength;
+const SETTLEMENT_RESERVE_SCALAR_BYTES = 3 * encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength + 8;
+// The unsigned row of this move still lacks its 64-byte signature field.
+const SETTLEMENT_RESERVE_SIGNATURE_BYTES = encodeCanonical("signature").byteLength + 1 + unsignedVaruintWidth(64) + 64;
+// The next settlement's fence: a header-only vertex (small control operation) and its outbox row.
+const SETTLEMENT_RESERVE_FENCE_BYTES = 1_024;
+
+/**
+ * Admission of a settlement-profile Writer's own new move against its later settlement: the
+ * eventual postimage of this move, plus one settlement replacement for every own issued row of
+ * this move's epoch (this one included), plus the next settlement's fence pair and, when absent,
+ * its plan row, fits the same row and byte bound the replacements are issued under. The creator
+ * may close the epoch without any of these rows (it has accepted none of them yet, as far as this
+ * Writer knows); the Writer then replaces each one at its successor's install, which must not be
+ * refused. Own rows are ordered by author sequence and their epochs never decrease, so the epoch's
+ * rows are a suffix found by binary search over memoized preimage headers.
+ * @param rows - Complete normalized native rows before this move.
+ * @param scope - The move's lineage.
+ * @param pending - The move's exact pending intent.
+ * @param reserve - The caller's settlement replacement reserve parameters.
+ * @returns The reserved row and byte counts (diagnostic); throws the typed row/byte refusal.
+ */
+export function issuanceSettlementReplacementReserveCharge(
+	rows: IssuanceRetirementRows,
+	scope: DurableIssueScope,
+	pending: Pick<DurableIssuancePendingUnsignedIntent, "authorSequence" | "canonicalPreimageBytes" | "digest">,
+	reserve: Readonly<{ maxDependencies: number }>
+): Readonly<{ rowCount: number; logicalBytes: number; sources: number }> {
+	const { maxDependencies } = captureSettlementReplacementReserve(reserve);
+	const finalRows = unsignedFinalRows(rows, scope, pending);
+	const final = unsignedRowsWidth(finalRows);
+	const epochOf = (bytes: Uint8Array): number => {
+		const epoch = durablePreimageHeader(bytes).epoch;
+		if (typeof epoch !== "number" || !Number.isSafeInteger(epoch) || epoch < 0) throw invalid();
+		return epoch;
+	};
+	const epoch = epochOf(pending.canonicalPreimageBytes);
+	const own = finalRows.issued
+		.filter((row) => row.author === scope.author && row.objectId === scope.objectId)
+		.sort((left, right) => left.authorSequence - right.authorSequence);
+	let low = 0;
+	for (let high = own.length; low < high; ) {
+		const middle = (low + high) >>> 1;
+		if (epochOf((own[middle] as (typeof own)[number]).canonicalPreimageBytes) < epoch) low = middle + 1;
+		else high = middle;
+	}
+	const sources = own.slice(low);
+	const perSourceSlack = SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES + SETTLEMENT_RESERVE_SCALAR_BYTES +
+		maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES + 1 + unsignedVaruintWidth(maxDependencies);
+	const hasPlan = finalRows.plans.some((plan) => plan.scope.author === scope.author && plan.scope.objectId === scope.objectId);
+	const rowCount = 2 * sources.length + 2 + (hasPlan ? 0 : 1);
+	let logicalBytes = 2 * (SETTLEMENT_RESERVE_FENCE_BYTES + maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES) +
+		(hasPlan ? 0 : SETTLEMENT_RESERVE_FENCE_BYTES);
+	for (const source of sources) {
+		const outbox = { ...scope, authorSequence: source.authorSequence, digest: source.digest, publishState: "published" };
+		logicalBytes += encodeCanonical(source, unsignedEncodingLimits).byteLength +
+			("signature" in source ? 0 : SETTLEMENT_RESERVE_SIGNATURE_BYTES) +
+			encodeCanonical(outbox, unsignedEncodingLimits).byteLength + perSourceSlack;
+	}
+	if (final.rowCount + rowCount > ISSUANCE_RETIREMENT_LIMITS.maxRows)
+		throw issuanceRetirementRefusal("unsigned postimage exceeds row bound with its settlement replacement reserve");
+	if (final.logicalBytes + logicalBytes > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
+		throw issuanceRetirementRefusal("unsigned postimage exceeds byte bound with its settlement replacement reserve");
+	return Object.freeze({ rowCount, logicalBytes, sources: sources.length });
+}
+
 /**
  * Sizes complete original native reserve/entered/pair census carriers.
  * Unknown born incarnation STRING64, imageDigest STRING64 and signature BYTES64
@@ -689,8 +878,7 @@ export function issuanceUnsignedPostimageWidths(
 		const nativeMaterial = finalRows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
 			(phase === "final" ? 0 : intentWidth);
 		const planWidths = sourceCustodyPlanWidths(selectedRows.plans, scope,
-			finalRows.issued.filter(row => row.author === scope.author && row.objectId === scope.objectId).length,
-			sourceCustody, nativeMaterial).widths;
+			issuancePotentialSourceCustody(finalRows, scope, sourceCustody), sourceCustody, nativeMaterial).widths;
 		const delta =
 			(inherited === undefined ? 1 : 0) +
 			(phase === "reserved" || inherited?.phase === "entered" ? 0 : 1) +
@@ -877,8 +1065,11 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		authorSequence: integerWidth, canonicalPreimageBytes: preimageWidth, digest: digestWidth,
 		incarnation: control === null ? signatureWidth : encodeCanonical(control.incarnation).byteLength,
 	});
-	const custodySourceCount = rows.issued.filter(row => row.objectId === scope.objectId && row.author === scope.author).length + count;
-	const custody = sourceCustodyPlanWidths(rows.plans, scope, custodySourceCount, input.sourceCustody,
+	const potentialSources = issuancePotentialSourceCustody(rows, scope, input.sourceCustody);
+	const custodySourceCount = potentialSources.count + count;
+	const handBackOperationBytes = Math.max(potentialSources.maxPreimageByteLength, preimage);
+	const custody = sourceCustodyPlanWidths(rows.plans, scope,
+		{count: custodySourceCount, maxPreimageByteLength: handBackOperationBytes}, input.sourceCustody,
 		rows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
 		aggregatePreimageBytes + count * 96 + intentWidth);
 	const plans = custody.widths;
@@ -899,7 +1090,8 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		// the original room preview/frontier before using the one-fence domain.
 		successorPlan = issuanceOrdinarySuccessorPlanResourceForSizing(scope, ownPlan ?? null);
 		const custodyPlan = input.sourceCustody === undefined ? undefined :
-			issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null, custodySourceCount + fenceCount + reserveCount, input.sourceCustody);
+			issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null, custodySourceCount + fenceCount + reserveCount, input.sourceCustody,
+				handBackOperationBytes);
 		const fencePlanWidth = Math.max(successorPlan.byteLength, custodyPlan?.byteLength ?? 0);
 		successorPlans = ownPlan === undefined ? [...plans, fencePlanWidth] :
 			plans.map((width, index) => rows.plans[index] === ownPlan ? fencePlanWidth : width);
@@ -914,7 +1106,7 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 			exactCanonicalPlanBytes: bytesWidth(fencePlanWidth),
 		});
 		if (input.sourceCustody !== undefined) sourceCustodyPlanWidths(rows.plans, scope,
-			custodySourceCount + fenceCount + reserveCount, input.sourceCustody,
+			{count: custodySourceCount + fenceCount + reserveCount, maxPreimageByteLength: handBackOperationBytes}, input.sourceCustody,
 			rows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
 			aggregatePreimageBytes + count * 96 + (1 + reserveCount) * (preimage + 96) + fenceIntentWidth);
 		fencePendingLineages = lineageWidths.map((width, index) => index === lineageIndex
@@ -953,7 +1145,7 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 			? successorPlan : unsignedCanonicalShape(row));
 	if (input.sourceCustody !== undefined && fenceCount === 1) {
 		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null,
-			custodySourceCount + fenceCount + reserveCount, input.sourceCustody);
+			custodySourceCount + fenceCount + reserveCount, input.sourceCustody, handBackOperationBytes);
 		successorPlanShapes = ownPlan === undefined ? [...planShapes.slice(0, -1), resource] :
 			rows.plans.map(row => row === ownPlan ? resource : unsignedCanonicalShape(row));
 	}
@@ -1007,7 +1199,8 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		finalNativeCensusByteLength: currentFinal.nativeCensusBytes,
 		additionalIssuedByteLength: count * ordinaryRowOverhead + aggregatePreimageBytes});
 	const planRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(rows.plans,
-		input.sourceCustody === undefined ? undefined : {scope, maxSourceCount: custodySourceCount + fenceCount + reserveCount, geometry: input.sourceCustody});
+		input.sourceCustody === undefined ? undefined : {scope, maxSourceCount: custodySourceCount + fenceCount + reserveCount, geometry: input.sourceCustody,
+			maxHandBackOperationByteLength: handBackOperationBytes});
 	return Object.freeze({ordinaryPending: withImageCapacity(ordinaryPending), ordinaryFinal: withImageCapacity(ordinaryFinal),
 		successorPending: withImageCapacity(successorPending), successorFinal: withImageCapacity(successorFinal),
 		currentAdmission, canonicalRowsShape, nativeImageByteLength, nativeImageShape,
@@ -1037,33 +1230,34 @@ export function issuanceOrdinarySuccessorPlanResourceForSizing(scope: DurableIss
 		items: shape.items, maxDepth: shape.maxDepth});
 }
 
-/** Numerical capacity of any entry-removal rewrite of these original plans.
- * Both byte leaves use the original complete plan with a widened revision. No
- * target plan, authority, digest or receipt is fabricated by this projection. */
+/** Numerical capacity of any entry-removal rewrite of these original plans, in rule A's digest
+ * form (plan-rewrite-2): one {author, beforeDigest, afterDigest} record per plan that can change.
+ * The BEFORE images live in the store's side row, outside the census; the custody plan geometry is
+ * still checked against the native read bound here, since the side row holds that plan. No target
+ * plan, authority, digest or receipt is fabricated by this projection. */
 export function issuanceRetirementPlanRewriteResourceForSizing(plans: readonly SettlementPlan[],
-	sourceCustody?: Readonly<{scope: DurableIssueScope; maxSourceCount: number; geometry: IssuanceSourceCustodyGeometry}>):
+	sourceCustody?: Readonly<{scope: DurableIssueScope; maxSourceCount: number; geometry: IssuanceSourceCustodyGeometry;
+		maxHandBackOperationByteLength?: number}>):
 	Readonly<{byteLength: number; items: number; maxDepth: number}> | undefined {
 	const own = sourceCustody === undefined ? undefined : plans.find(plan =>
 		plan.scope.objectId === sourceCustody.scope.objectId && plan.scope.author === sourceCustody.scope.author);
-	const lengths = plans.filter(plan => plan !== own && plan.entries.length !== 0).map(plan => {
-		const captured = copySettlementPlan(plan, plan.scope);
-		if (captured === undefined) throw invalid();
-		const {revision: _revision, fenceSequence: _fence, ...fields} = captured;
-		const integerWidth = encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength;
-		return unsignedRecordWidth(fields, {revision: integerWidth, fenceSequence: integerWidth});
+	const authors = plans.filter(plan => plan !== own && plan.entries.length !== 0).map(plan => {
+		if (copySettlementPlan(plan, plan.scope) === undefined) throw invalid();
+		return plan.scope.author;
 	});
-	if (sourceCustody !== undefined) lengths.push(issuanceSourceCustodyPlanResourceForSizing(sourceCustody.scope,
-		own ?? null, sourceCustody.maxSourceCount, sourceCustody.geometry).byteLength);
-	if (lengths.length === 0) return undefined;
-	const scalar = {items: 1, maxDepth: 0};
-	const pairShape = unsignedRecordShape({}, {before: scalar, after: scalar});
-	const known = {kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: "0".repeat(64),
+	if (sourceCustody !== undefined) {
+		issuanceSourceCustodyPlanResourceForSizing(sourceCustody.scope, own ?? null, sourceCustody.maxSourceCount,
+			sourceCustody.geometry, sourceCustody.maxHandBackOperationByteLength);
+		authors.push(sourceCustody.scope.author);
+	}
+	if (authors.length === 0) return undefined;
+	const known = {kind: "v3-issuance-retirement-plan-rewrite-2", sourceImageDigest: "0".repeat(64),
 		targetImageDigest: "0".repeat(64)};
-	const shape = unsignedRecordShape(known, {plans: unsignedArrayShape(lengths.map(() => pairShape))});
-	const width = unsignedRecordWidth(known, {plans: unsignedArrayWidth(lengths.map(length => {
-		const bytes = 1 + unsignedVaruintWidth(length) + length;
-		return unsignedRecordWidth({}, {before: bytes, after: bytes});
-	}))});
+	const digestFields = {beforeDigest: "0".repeat(64), afterDigest: "0".repeat(64)};
+	const shape = unsignedRecordShape(known, {plans: unsignedArrayShape(authors.map(author =>
+		unsignedRecordShape({author, ...digestFields}, {})))});
+	const width = unsignedRecordWidth(known, {plans: unsignedArrayWidth(authors.map(author =>
+		unsignedRecordWidth({author, ...digestFields}, {})))});
 	return Object.freeze({byteLength: width, ...shape});
 }
 
@@ -1362,8 +1556,9 @@ export function issuanceUnsignedSuccessorFenceWidths(
 				)
 			)
 			.map((p) => phase === "final" && p === plan ? finalPlan : p);
-		const planWidths = sourceCustodyPlanWidths(phasePlans, scope,
-			immediate.issued.filter(row => row.author === scope.author && row.objectId === scope.objectId).length + 1,
+		const immediateSources = issuancePotentialSourceCustody({issued: immediate.issued, plans: phasePlans}, scope, sourceCustody);
+		const planWidths = sourceCustodyPlanWidths(phasePlans, scope, {count: immediateSources.count + 1,
+			maxPreimageByteLength: Math.max(immediateSources.maxPreimageByteLength, successor.canonicalPreimageByteLength)},
 			sourceCustody, immediate.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
 				successor.canonicalPreimageByteLength + 96 + (phase === "final" ? 0 : intentWidth)).widths;
 		const controlRevisionDelta = revisionDeltas[phase];
@@ -1408,7 +1603,7 @@ export function captureIssuanceNativeSignContext(input: unknown): DurableIssueSi
 	if (input === undefined) return undefined;
 	if (typeof input !== "object" || input === null) throw invalid();
 	const keys = Reflect.ownKeys(input);
-	const allowed = ["planEffect", "expectedIssuanceImageDigest", "expectedIssuanceControlBytes"];
+	const allowed = ["planEffect", "expectedIssuanceImageDigest", "expectedIssuanceControlBytes", "settlementReplacementReserve"];
 	if (
 		keys.some((k) => typeof k !== "string" || !allowed.includes(k)) ||
 		!isClosedDurableIssuanceRecord(input, keys as string[])
@@ -1416,10 +1611,14 @@ export function captureIssuanceNativeSignContext(input: unknown): DurableIssueSi
 		throw invalid();
 	const effect = input.planEffect === undefined ? undefined : copySettlementPlanEffect(input.planEffect);
 	if (input.planEffect !== undefined && effect === undefined) throw invalid();
+	const reserve = Object.hasOwn(input, "settlementReplacementReserve")
+		? captureSettlementReplacementReserve(input.settlementReplacementReserve) : undefined;
+	if (reserve !== undefined && effect !== undefined && effect.kind !== "hand-back") throw invalid();
+	const reserved = reserve === undefined ? {} : { settlementReplacementReserve: reserve };
 	const hasImage = Object.hasOwn(input, "expectedIssuanceImageDigest");
 	const hasControl = Object.hasOwn(input, "expectedIssuanceControlBytes");
 	if (hasImage !== hasControl) throw invalid();
-	if (!hasImage) return Object.freeze(effect === undefined ? {} : { planEffect: effect });
+	if (!hasImage) return Object.freeze(effect === undefined ? reserved : { planEffect: effect, ...reserved });
 	const expectedIssuanceImageDigest = digest(input.expectedIssuanceImageDigest);
 	const rawControlBytes = input.expectedIssuanceControlBytes;
 	let controlView: Uint8Array | null = null;
@@ -1454,9 +1653,19 @@ export function captureIssuanceNativeSignContext(input: unknown): DurableIssueSi
 	}
 	return Object.freeze({
 		...(effect === undefined ? {} : { planEffect: effect }),
+		...reserved,
 		expectedIssuanceImageDigest,
 		expectedIssuanceControlBytes: bytes,
 	});
+}
+
+function captureSettlementReplacementReserve(input: unknown): Readonly<{ maxDependencies: number }> {
+	if (!isClosedDurableIssuanceRecord(input, ["maxDependencies"])) throw invalid();
+	const maxDependencies = input.maxDependencies;
+	if (typeof maxDependencies !== "number" || !Number.isSafeInteger(maxDependencies) || maxDependencies < 1 ||
+		maxDependencies > 1024)
+		throw invalid();
+	return Object.freeze({ maxDependencies });
 }
 
 /** Captures the original serializer's exact unsigned bytes; not source/ACL authority. */
@@ -1624,6 +1833,8 @@ function retirementPlanFromBytes(input: unknown): SettlementPlan {
 }
 
 function captureIssuanceRetirementPlanRewrite(input: unknown): DurableIssuanceRetirementPlanRewrite {
+	if (isClosedDurableIssuanceRecord(input, ["kind", "sourceImageDigest", "targetImageDigest", "plans"]) &&
+		input.kind === "v3-issuance-retirement-plan-rewrite-2") return captureIssuanceRetirementPlanRewriteDigests(input);
 	if (!isClosedDurableIssuanceRecord(input, ["kind", "sourceImageDigest", "targetImageDigest", "plans"]) ||
 		input.kind !== "v3-issuance-retirement-plan-rewrite-1" || !Array.isArray(input.plans) ||
 		Object.getPrototypeOf(input.plans) !== Array.prototype || input.plans.length === 0 ||
@@ -1648,6 +1859,43 @@ function captureIssuanceRetirementPlanRewrite(input: unknown): DurableIssuanceRe
 	return Object.freeze({ kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: digest(input.sourceImageDigest),
 		targetImageDigest: digest(input.targetImageDigest), plans: Object.freeze(plans) });
 }
+/** Rule A digest form: one record per changed author plan, ordered by author. */
+function captureIssuanceRetirementPlanRewriteDigests(input: Readonly<Record<string, unknown>>): DurableIssuanceRetirementPlanRewriteDigests {
+	const plans = input.plans;
+	if (!Array.isArray(plans) || Object.getPrototypeOf(plans) !== Array.prototype || plans.length === 0 ||
+		plans.length > ISSUANCE_RETIREMENT_LIMITS.maxRows || Reflect.ownKeys(plans).length !== plans.length + 1) throw invalid();
+	let prior: string | undefined;
+	const captured: { author: string; beforeDigest: string; afterDigest: string }[] = [];
+	for (let index = 0; index < plans.length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(plans, String(index));
+		if (!descriptor || !("value" in descriptor) || !descriptor.enumerable ||
+			!isClosedDurableIssuanceRecord(descriptor.value, ["author", "beforeDigest", "afterDigest"]) ||
+			!isValidDurableScopeField(descriptor.value.author)) throw invalid();
+		const author = descriptor.value.author;
+		if (prior !== undefined && JSON.stringify(author) <= JSON.stringify(prior)) throw invalid();
+		prior = author;
+		const beforeDigest = digest(descriptor.value.beforeDigest), afterDigest = digest(descriptor.value.afterDigest);
+		if (beforeDigest === afterDigest) throw invalid();
+		captured.push(Object.freeze({ author, beforeDigest, afterDigest }));
+	}
+	return Object.freeze({ kind: "v3-issuance-retirement-plan-rewrite-2", sourceImageDigest: digest(input.sourceImageDigest),
+		targetImageDigest: digest(input.targetImageDigest), plans: Object.freeze(captured) });
+}
+
+/** The exact digest of one canonical plan image, bound by rule A's digest form and side row. */
+export function issuanceRetirementPlanDigest(bytes: Uint8Array): string {
+	return issuanceRetirementHex(hashDomain("ts-drp/issuance-retirement-plan/v1", bytes));
+}
+
+/**
+ * Rule H: the epoch at or below which a preparation retires every row it does not list.
+ * @param p - A captured preparation.
+ * @returns floorEpoch for a control-2 preparation, throughEpoch for a legacy one.
+ */
+export function issuanceRetirementFloor(p: Pick<DurableIssuanceRetirementPreparation, "throughEpoch" | "floorEpoch">): number {
+	return p.floorEpoch ?? p.throughEpoch;
+}
+
 /**
  *
  * @param input - Untrusted closed input.
@@ -1655,9 +1903,10 @@ function captureIssuanceRetirementPlanRewrite(input: unknown): DurableIssuanceRe
  */
 export function captureIssuanceRetirementPreparation(input: unknown): DurableIssuanceRetirementPreparation {
 	const hasRewrite = typeof input === "object" && input !== null && Object.hasOwn(input, "planRewrite");
+	const hasFloor = typeof input === "object" && input !== null && Object.hasOwn(input, "floorEpoch");
 	if (
 		!isClosedDurableIssuanceRecord(input, ["decisionDigest", "sourceProofDigest", "throughEpoch", "protectedRecords",
-			...(hasRewrite ? ["planRewrite"] : [])])
+			...(hasFloor ? ["floorEpoch"] : []), ...(hasRewrite ? ["planRewrite"] : [])])
 	)
 		throw invalid();
 	const records = input.protectedRecords;
@@ -1691,12 +1940,20 @@ export function captureIssuanceRetirementPreparation(input: unknown): DurableIss
 			throw invalid();
 		holes.push(h);
 	}
+	const throughEpoch = integer(input.throughEpoch);
+	const floorEpoch = hasFloor ? integer(input.floorEpoch) : undefined;
+	const planRewrite = hasRewrite ? captureIssuanceRetirementPlanRewrite(input.planRewrite) : undefined;
+	// A control-2 preparation (it has a floor) carries only the digest rewrite; a legacy one only the
+	// inline-bytes rewrite. Its floor never passes its cut.
+	if (floorEpoch !== undefined && floorEpoch > throughEpoch ||
+		planRewrite !== undefined && (planRewrite.kind === "v3-issuance-retirement-plan-rewrite-2") !== hasFloor) throw invalid();
 	const result = Object.freeze({
 		decisionDigest: digest(input.decisionDigest),
 		sourceProofDigest: digest(input.sourceProofDigest),
-		throughEpoch: integer(input.throughEpoch),
+		throughEpoch,
+		...(floorEpoch === undefined ? {} : { floorEpoch }),
 		protectedRecords: Object.freeze(holes),
-		...(hasRewrite ? { planRewrite: captureIssuanceRetirementPlanRewrite(input.planRewrite) } : {}),
+		...(planRewrite === undefined ? {} : { planRewrite }),
 	});
 	encodeCanonical(result, {
 		maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
@@ -1710,21 +1967,35 @@ function advanceAllowed(
 	next: DurableIssuanceRetirementPreparation
 ): boolean {
 	// Every newly retained old address must already be a retained hole. Newly obsolete epoch
-	// holes are checked against the original canonical native row by the backend capture.
-	return next.throughEpoch >= prior.throughEpoch;
+	// holes are checked against the original canonical native row by the backend capture. The floor
+	// is monotone too: a row the completed floor retired never comes back above a lower one.
+	return next.throughEpoch >= prior.throughEpoch && issuanceRetirementFloor(next) >= issuanceRetirementFloor(prior);
 }
 /**
  *
  * @param value - Native complete carrier.
  * @returns The detached owner result or a typed refusal.
  */
-/** Original native field owner; scalar resource slots do not authorize a control. */
+/** Original native field owner; scalar resource slots do not authorize a control. The kind is
+ * control-2 exactly when a preparation has a floor (rule H, rule A), so a store that never
+ * prepared under this code keeps writing the legacy control-1 bytes. */
 export function issuanceRetirementControlFields<O, I, R, S, A, C>(input: Readonly<{
 	objectId: O; incarnation: I; revision: R; sequence: S; active: A; completed: C;
 }>) {
-	return {kind: "v3-issuance-retirement-control-1" as const, objectId: input.objectId,
+	return {kind: issuanceRetirementControlKind(input.active, input.completed), objectId: input.objectId,
 		incarnation: input.incarnation, revision: input.revision, sequence: input.sequence,
 		active: input.active, completed: input.completed};
+}
+/**
+ * The control format its preparations need: control-2 when any preparation has a floor.
+ * @param active - The active slot (its preparation is read when present).
+ * @param completed - The completed preparation.
+ * @returns The control kind.
+ */
+export function issuanceRetirementControlKind(active: unknown, completed: unknown): DurableIssuanceRetirementControlKind {
+	const preparation = typeof active === "object" && active !== null ? Reflect.get(active, "preparation") : undefined;
+	const floored = (value: unknown) => typeof value === "object" && value !== null && Object.hasOwn(value, "floorEpoch");
+	return floored(preparation) || floored(completed) ? "v3-issuance-retirement-control-2" : "v3-issuance-retirement-control-1";
 }
 export function captureIssuanceRetirementControl(value: unknown): DurableIssuanceRetirementControl {
 	if (
@@ -1737,7 +2008,7 @@ export function captureIssuanceRetirementControl(value: unknown): DurableIssuanc
 			"active",
 			"completed",
 		]) ||
-		value.kind !== "v3-issuance-retirement-control-1"
+		(value.kind !== "v3-issuance-retirement-control-1" && value.kind !== "v3-issuance-retirement-control-2")
 	)
 		throw invalid();
 	const objectId = captureIssuanceRetirementObject({ objectId: value.objectId });
@@ -1798,9 +2069,10 @@ export function decodeIssuanceRetirementControl(value: unknown): DurableIssuance
 function detachIssuanceRetirementPreparation(p: DurableIssuanceRetirementPreparation): DurableIssuanceRetirementPreparation {
 	// Frozen digests and protected records are shared; only the embedded plan bytes are mutable.
 	const rewrite = p.planRewrite;
-	return Object.freeze({ ...p, ...(rewrite === undefined ? {} : { planRewrite: Object.freeze({ ...rewrite,
+	if (rewrite === undefined || rewrite.kind === "v3-issuance-retirement-plan-rewrite-2") return Object.freeze({ ...p });
+	return Object.freeze({ ...p, planRewrite: Object.freeze({ ...rewrite,
 		plans: Object.freeze(rewrite.plans.map(plan => Object.freeze({ before: new Uint8Array(plan.before),
-			after: new Uint8Array(plan.after) }))) }) }) });
+			after: new Uint8Array(plan.after) }))) }) });
 }
 /** Fresh frozen control around shared frozen leaves and freshly copied plan bytes. */
 function detachIssuanceRetirementControl(control: DurableIssuanceRetirementControl): DurableIssuanceRetirementControl {
@@ -1839,7 +2111,7 @@ export function issuanceRetirementAllows(
 	if (!decoded || control.objectId !== scope.objectId) return false;
 	const allows = (p: DurableIssuanceRetirementPreparation | null): boolean =>
 		p === null ||
-		decoded.epoch > p.throughEpoch ||
+		decoded.epoch > issuanceRetirementFloor(p) ||
 		p.protectedRecords.some(
 			(h) => h.author === scope.author && h.authorSequence === sequence && h.digest === issuanceRetirementHex(rowDigest)
 		);
@@ -2065,7 +2337,7 @@ function retirementKeepsRow(control: DurableIssuanceRetirementControl | null,
 	const epoch = decodeDurableIssuancePreimage(row.canonicalPreimageBytes, row, row.authorSequence)?.epoch;
 	if (epoch === undefined) throw issuanceRetirementRefusal("issuance retirement row is unclassified");
 	return issuanceRetirementAllows(control, row, row.authorSequence, row.canonicalPreimageBytes, row.digest) &&
-		(epoch > p.throughEpoch || p.protectedRecords.some(hole => hole.author === row.author &&
+		(epoch > issuanceRetirementFloor(p) || p.protectedRecords.some(hole => hole.author === row.author &&
 			hole.authorSequence === row.authorSequence && hole.digest === issuanceRetirementHex(row.digest)));
 }
 
@@ -2203,19 +2475,21 @@ function retirementEntrySequences(entry: SettlementPlan["entries"][number]): rea
  * resurrects a permanently retired row or grants retirement eligibility. */
 export function closeIssuanceRetirementProtectedRecords(input: Readonly<{
 	control: DurableIssuanceRetirementControl | null; rows: IssuanceRetirementRows;
-	throughEpoch: number; protectedRecords: readonly DurableIssuanceRetirementHole[];
+	throughEpoch: number; floorEpoch?: number; protectedRecords: readonly DurableIssuanceRetirementHole[];
 }>): readonly DurableIssuanceRetirementHole[] {
 	const { control, rows } = input;
 	const holes = new Map(input.protectedRecords.map(hole => [key(hole), hole]));
 	const preparation = (): DurableIssuanceRetirementPreparation => ({decisionDigest: "0".repeat(64),
-		sourceProofDigest: "0".repeat(64), throughEpoch: input.throughEpoch, protectedRecords: [...holes.values()]});
+		sourceProofDigest: "0".repeat(64), throughEpoch: input.throughEpoch,
+		...(input.floorEpoch === undefined ? {} : {floorEpoch: input.floorEpoch}), protectedRecords: [...holes.values()]});
+	const floor = input.floorEpoch ?? input.throughEpoch;
 	const protect = (author: string, sequence: number): void => {
 		const row = rows.issued.find(value => value.author === author && value.authorSequence === sequence);
 		if (row === undefined || !issuanceRetirementAllows(control, row, sequence, row.canonicalPreimageBytes, row.digest))
 			throw issuanceRetirementRefusal("issuance retirement retained plan dependency is absent or permanently retired");
 		const epoch = decodeDurableIssuancePreimage(row.canonicalPreimageBytes, row, sequence)?.epoch;
 		if (epoch === undefined) throw issuanceRetirementRefusal("issuance retirement dependency epoch is unclassified");
-		if (epoch <= input.throughEpoch) {
+		if (epoch <= floor) {
 			const hole = {author, authorSequence: sequence, digest: issuanceRetirementHex(row.digest)};
 			holes.set(key(hole), hole);
 		}
@@ -2325,9 +2599,71 @@ export function issuanceRetirementPreparationWithPlanRewrite(control: DurableIss
 		return ka < kb ? -1 : ka > kb ? 1 : 0;
 	});
 	if (plans.length === 0) return captureIssuanceRetirementPreparation(plain);
+	const targetImageDigest = issuanceRetirementImage(target, objectId).imageDigest;
+	// Rule A: a control-2 preparation names both images by digest only.
+	if (plain.floorEpoch !== undefined) return captureIssuanceRetirementPreparation({...plain, planRewrite: {
+		kind: "v3-issuance-retirement-plan-rewrite-2", sourceImageDigest: sourceImage.imageDigest, targetImageDigest,
+		plans: plans.map(({before, after}) => ({author: verifiedRetirementPlan(before).plan.scope.author,
+			beforeDigest: issuanceRetirementPlanDigest(before), afterDigest: issuanceRetirementPlanDigest(after)}))}});
 	return captureIssuanceRetirementPreparation({...plain, planRewrite: {
 		kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: sourceImage.imageDigest,
-		targetImageDigest: issuanceRetirementImage(target, objectId).imageDigest, plans}});
+		targetImageDigest, plans}});
+}
+
+const PLAN_BEFORE_KIND = "v3-issuance-retirement-plan-before-1";
+/**
+ * Rule A's side row: the exact BEFORE plan images of a control-2 preparation, written by the native
+ * commit in the same transaction that installs the AFTER plans, and read only to reconstruct the
+ * committed source (reconstructIssuanceRetirementSourceRows). The store keeps at most one per object;
+ * the next commit replaces or deletes it.
+ * @param objectId - The addressed object.
+ * @param p - The preparation being committed.
+ * @param rows - The complete native rows before the commit.
+ * @returns The exact record bytes, or null when the preparation has no digest rewrite.
+ */
+export function issuanceRetirementPlanBeforeRecord(objectId: string, p: DurableIssuanceRetirementPreparation,
+	rows: IssuanceRetirementRows): Uint8Array | null {
+	const rewrite = captureIssuanceRetirementPreparation(p).planRewrite;
+	if (rewrite?.kind !== "v3-issuance-retirement-plan-rewrite-2") return null;
+	if (issuanceRetirementImage(rows, objectId).imageDigest !== rewrite.sourceImageDigest)
+		throw issuanceRetirementRefusal("issuance retirement rewrite source changed");
+	const plans = rewrite.plans.map(change => {
+		const plan = rows.plans.find(value => value.scope.objectId === objectId && value.scope.author === change.author);
+		const bytes = plan === undefined ? undefined : retirementPlanBytes(plan);
+		if (bytes === undefined || issuanceRetirementPlanDigest(bytes) !== change.beforeDigest)
+			throw issuanceRetirementRefusal("issuance retirement rewrite plan changed");
+		return bytes;
+	});
+	return encodeCanonical({kind: PLAN_BEFORE_KIND, objectId, decisionDigest: p.decisionDigest,
+		targetImageDigest: rewrite.targetImageDigest, plans}, {maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
+		maxDepth: 4, maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 2 + 16});
+}
+
+/**
+ * Opens rule A's side row for exactly this completed preparation.
+ * @param bytes - The stored side row, or null when the store has none.
+ * @param objectId - The addressed object.
+ * @param p - The completed control-2 preparation.
+ * @returns The BEFORE plan images in the rewrite's order.
+ */
+export function openIssuanceRetirementPlanBefore(bytes: Uint8Array | null, objectId: string,
+	p: DurableIssuanceRetirementPreparation): readonly Uint8Array[] {
+	const rewrite = p.planRewrite;
+	if (rewrite?.kind !== "v3-issuance-retirement-plan-rewrite-2" || bytes === null ||
+		bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw issuanceRetirementRefusal("issuance retirement plan before is unavailable");
+	const value = decodeCanonical(new Uint8Array(bytes));
+	if (!isClosedDurableIssuanceRecord(value, ["kind", "objectId", "decisionDigest", "targetImageDigest", "plans"]) ||
+		value.kind !== PLAN_BEFORE_KIND || value.objectId !== objectId || value.decisionDigest !== p.decisionDigest ||
+		value.targetImageDigest !== rewrite.targetImageDigest || !Array.isArray(value.plans) ||
+		value.plans.length !== rewrite.plans.length) throw issuanceRetirementRefusal("issuance retirement plan before is stale");
+	const stored = value.plans as readonly unknown[];
+	return Object.freeze(rewrite.plans.map((change, index) => {
+		const verified = verifiedRetirementPlan(stored[index]);
+		if (verified.plan.scope.objectId !== objectId || verified.plan.scope.author !== change.author ||
+			issuanceRetirementPlanDigest(verified.bytes) !== change.beforeDigest)
+			throw issuanceRetirementRefusal("issuance retirement plan before is stale");
+		return verified.bytes;
+	}));
 }
 
 /** Native commit's plan projection. Exact source/control CAS still belongs to the
@@ -2348,19 +2684,43 @@ export function issuanceRetirementTransitionRows(control: DurableIssuanceRetirem
 	return checkedIssuanceRetirementTargetRows(control, control.active.preparation, rows);
 }
 
+/**
+ * Rule A: what a control transition does to the store's one plan-before side row, in the same
+ * native transaction. Only the prepared commit changes it: the committed preparation's BEFORE
+ * images replace the row (a control-2 digest rewrite), or the row is deleted (anything else), since
+ * the superseded completed preparation can no longer be reconstructed.
+ * @param control - The actual current control.
+ * @param next - The proposed control.
+ * @param rows - The complete native rows before the transition.
+ * @returns undefined when the row stays, null to delete it, or the exact replacement bytes.
+ */
+export function issuanceRetirementTransitionPlanBefore(control: DurableIssuanceRetirementControl,
+	next: DurableIssuanceRetirementControl, rows: IssuanceRetirementRows): Uint8Array | null | undefined {
+	if (control.active === null || next.active !== null || next.completed === null ||
+		!issuanceRetirementBytesEqual(encodeCanonical(control.active.preparation), encodeCanonical(next.completed))) return undefined;
+	return issuanceRetirementPlanBeforeRecord(control.objectId, control.active.preparation, rows);
+}
+
 /** Inverts only the exact committed target image, then repeats the forward row law.
  * Callers must also reauthenticate their source and durable coordinator commitment. */
 export function reconstructIssuanceRetirementSourceRows(control: DurableIssuanceRetirementControl,
-	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): IssuanceRetirementRows {
+	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows, planBefore: Uint8Array | null = null): IssuanceRetirementRows {
 	const rewrite = p.planRewrite;
 	if (rewrite === undefined) return rows;
 	if (issuanceRetirementImage(rows, control.objectId).imageDigest !== rewrite.targetImageDigest)
 		throw issuanceRetirementRefusal("issuance retirement rewrite target changed");
 	const plans = [...rows.plans];
-	for (const change of rewrite.plans) {
-		const before = retirementPlanFromBytes(change.before), after = verifiedRetirementPlan(change.after).plan;
-		const index = plans.findIndex(plan => plan.scope.objectId === after.scope.objectId && plan.scope.author === after.scope.author);
-		if (index < 0 || !issuanceRetirementBytesEqual(retirementPlanBytes(plans[index]!), change.after))
+	// Rule A: the digest form takes its BEFORE images from the store's side row.
+	const changes = rewrite.kind === "v3-issuance-retirement-plan-rewrite-1"
+		? rewrite.plans.map(change => ({author: verifiedRetirementPlan(change.after).plan.scope.author,
+			before: change.before, matches: (bytes: Uint8Array) => issuanceRetirementBytesEqual(bytes, change.after)}))
+		: openIssuanceRetirementPlanBefore(planBefore, control.objectId, p).map((before, index) => ({
+			author: rewrite.plans[index]!.author, before,
+			matches: (bytes: Uint8Array) => issuanceRetirementPlanDigest(bytes) === rewrite.plans[index]!.afterDigest}));
+	for (const change of changes) {
+		const before = retirementPlanFromBytes(change.before);
+		const index = plans.findIndex(plan => plan.scope.objectId === control.objectId && plan.scope.author === change.author);
+		if (index < 0 || !change.matches(retirementPlanBytes(plans[index]!)))
 			throw issuanceRetirementRefusal("issuance retirement rewrite plan changed");
 		plans[index] = before;
 	}
@@ -2398,6 +2758,7 @@ function checkedIssuanceRetirementTargetRows(
 	if (rows.lineages.some(l => l.pendingUnsigned !== undefined))
 		throw issuanceRetirementRefusal("issuance entered or reserved unsigned intent is unresolved");
 	const closed = closeIssuanceRetirementProtectedRecords({control, rows, throughEpoch: p.throughEpoch,
+		...(p.floorEpoch === undefined ? {} : {floorEpoch: p.floorEpoch}),
 		protectedRecords: p.protectedRecords});
 	if (!issuanceRetirementBytesEqual(encodeCanonical(closed), encodeCanonical(p.protectedRecords)))
 		throw issuanceRetirementRefusal("issuance retirement protected records are not dependency closed");
@@ -2409,9 +2770,9 @@ function checkedIssuanceRetirementTargetRows(
 		const epoch = r && decodeDurableIssuancePreimage(r.canonicalPreimageBytes, r, r.authorSequence)?.epoch;
 		if (
 			epoch === undefined ||
-			epoch > p.throughEpoch ||
+			epoch > issuanceRetirementFloor(p) ||
 			(control.completed &&
-				epoch <= control.completed.throughEpoch &&
+				epoch <= issuanceRetirementFloor(control.completed) &&
 				!control.completed.protectedRecords.some((old) => key(old) === key(h)))
 		)
 			throw issuanceRetirementRefusal("issuance retirement hole is absent or permanently retired");

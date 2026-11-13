@@ -17,6 +17,7 @@ import {
 	issuanceRetirementImage,
 	encodeIssuanceRetirementControl,
 	issuanceRetirementPlanRewriteResourceForSizing,
+	reconstructIssuanceRetirementSourceRows,
 } from "@ts-drp/issuance-store/maintenance";
 import { createNodeDurableIssuanceStore } from "../src/issuance.js";
 import { createBrowserDurableIssuanceStore } from "../../storage-browser/src/issuance.js";
@@ -37,17 +38,24 @@ it("SQLite SIGKILL reopens exact prepared-old or completed-new at every rewrite 
 		outfile: childFilename, bundle: true, platform: "node", format: "esm", target: "node22",
 		alias: {"@ts-drp/issuance-store/maintenance": new URL("../../issuance-store/src/maintenance.ts", import.meta.url).pathname,
 			"@ts-drp/issuance-store": new URL("../../issuance-store/src/index.ts", import.meta.url).pathname}});
-	for (const edge of ["before-plan-write", "after-plan-write", "after-control-write", "before-commit", "after-commit"]) {
-		const primaryFilename = join(directory, `${edge}.sqlite`);
+	// Legacy (control-1 byte rewrite) and floored (control-2 digest rewrite whose BEFORE images the
+	// same transaction writes to the native side row).
+	for (const [floorEpoch, edge] of [undefined, 3].flatMap(floor => ["before-plan-write", "after-plan-write",
+		"after-control-write", ...(floor === undefined ? [] : ["after-plan-before-write"]), "before-commit", "after-commit"]
+		.map(value => [floor, value] as const))) {
+		const primaryFilename = join(directory, `${edge}-${floorEpoch ?? "legacy"}.sqlite`);
 		let store = createNodeDurableIssuanceStore({primaryFilename}); stores.push(store);
 		await seed(store);
 		const owner = durableIssuancePruningMaintenanceForStore(store)!;
 		const read = await owner.acquireRetirementControl!({objectId: scope.objectId});
 		const source = await owner.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+		const floor = floorEpoch === undefined ? {} : {floorEpoch};
 		const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: source.rows,
-			throughEpoch: 3, protectedRecords: []});
-		const p = issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+			throughEpoch: 3, ...floor, protectedRecords: []});
+		const p = issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3, ...floor,
 			decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, source.rows);
+		expect(p.planRewrite?.kind).toBe(floorEpoch === undefined ? "v3-issuance-retirement-plan-rewrite-1" :
+			"v3-issuance-retirement-plan-rewrite-2");
 		const target = issuanceRetirementCommitRows(read.control, p, source.rows);
 		const preparedControl = await read.prepareFence(p);
 		await read.release(); await store.close(); stores.splice(stores.indexOf(store), 1);
@@ -75,9 +83,15 @@ it("SQLite SIGKILL reopens exact prepared-old or completed-new at every rewrite 
 			active: null, completed: p} : preparedControl);
 		expect(census.rows, edge).toEqual(committed ? target : source.rows);
 		expect(census.image.imageDigest, edge).toBe(issuanceRetirementImage(committed ? target : source.rows, scope.objectId).imageDigest);
+		// The side row commits atomically with the control: present exactly after a committed digest rewrite.
+		const before = await reopened.readRetirementPlanBefore!({objectId: scope.objectId});
+		if (committed && floorEpoch !== undefined) {
+			expect(before, edge).toBeInstanceOf(Uint8Array);
+			expect(reconstructIssuanceRetirementSourceRows(observed.control, p, census.rows, before), edge).toEqual(source.rows);
+		} else expect(before, edge).toBeNull();
 		await observed.release();
 	}
-}, 60_000);
+}, 120_000);
 const scope = {objectId: "rewrite-room", author: "writer"};
 /** Rows 0..4 with completed rebase entries 0 -> 1, 1 -> 2, 2 -> 3 and fence 4. A completed
  * entry is custody while its source is held, so the retirement rewrite drops only the
@@ -120,9 +134,10 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 			try {
 				const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
 				const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
-					throughEpoch: 3, protectedRecords: []});
+					throughEpoch: 3, floorEpoch: 3, protectedRecords: []});
 				expect(protectedRecords.some(hole => hole.authorSequence === 0)).toBe(false);
-				const p = issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+				// A new preparation is floored (control-2, rule A digest rewrite with a native side row).
+				const p = issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3, floorEpoch: 3,
 					decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, native.rows);
 				if (p.planRewrite !== undefined) expect(encodeCanonical(p.planRewrite).byteLength).toBeLessThanOrEqual(
 					issuanceRetirementPlanRewriteResourceForSizing(native.rows.plans)!.byteLength);

@@ -252,6 +252,13 @@ export interface V3RoomRolloverPolicy {
 	/** Every accepted vertex, own and remote (the session's `onAcceptedVertex`). */
 	observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void;
 	/**
+	 * Creator: the room refused a received move at a capacity a rollover clears (the session's
+	 * `onIngressCapacityRefusal`). The creator seals at once, as for its own refused move, so a hot
+	 * Writer's held move lands in the successor (its Writer offers it again) instead of waiting for
+	 * the budget or idle trigger. A member ignores it.
+	 */
+	refused(reason: string): void;
+	/**
 	 * Issues one move. A move refused at a capacity that a rollover clears is never dropped: the
 	 * creator rolls over at once and offers the same move again; a member offers it again once
 	 * its room has installed a later epoch. A move refused because the epoch is closing (sealed
@@ -270,8 +277,13 @@ export interface V3RoomRolloverPolicy {
 	close(): void;
 }
 
-/** Native refusals that end with the epoch: the creator's issuance image and proof capacities. */
-const ROLLOVER_REFUSAL = /MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
+/**
+ * Native refusals that end with the epoch: the creator's issuance image and proof capacities, and
+ * ISSUANCE_CAPACITY_FORECAST_EXCEEDED (a creator's or Writer's admission refused before signing
+ * because the issuance maintenance forecast would exceed its bound; a rollover clears it).
+ */
+const ROLLOVER_REFUSAL =
+	/ISSUANCE_CAPACITY_FORECAST_EXCEEDED|MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
 /** Refusals that clear once admitted work joins, without a rollover. */
 const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
 /**
@@ -869,6 +881,15 @@ export function createV3RoomRolloverPolicy(
 				);
 			armIdle();
 			if (overBudget()) schedule("budget");
+		},
+		refused(reason: string): void {
+			if (closed || role !== "creator" || !clearedByRollover(new Error(reason))) return;
+			// A rollover under way (or backing off after a failure) already ends this epoch.
+			if (rolling !== undefined || Date.now() < retryAt) return;
+			const refusedIn = currentEpoch();
+			later(() => {
+				if (!closed && currentEpoch() === refusedIn) void roll("refusal");
+			});
 		},
 		issue,
 		waiting: (): number => waiting,
