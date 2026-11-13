@@ -19325,7 +19325,10 @@ async function readRebaseOutbox(
 				const captured: CapturedLocalIssueInput[] = [];
 				for (let index = 0; index < rawInputs.length; index += 1) {
 					const input = capturedLocalIssueInput(registration.payload, rawInputs[index]!, captureCustody);
-					if ("ok" in input) return () => Promise.resolve(input);
+					if ("ok" in input) {
+						const refused: V3ReplacementBatchResult = input.ok ? localIssueFailure("malformed-input", "replacement batch input is invalid") : input;
+						return () => Promise.resolve(refused);
+					}
 					captured.push(ObjectFreeze({ ...input, settlementSource: owners[index]!.source }));
 				}
 				return async () => {

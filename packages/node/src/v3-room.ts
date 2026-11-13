@@ -6777,7 +6777,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
 			{ ok: true; kind: "displaced" }
 		>["source"]["prepareReplacements"];
-		issueReplacements?: Extract<
+		issueReplacements: Extract<
 			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
 			{ ok: true; kind: "displaced" }
 		>["source"]["issueReplacements"];

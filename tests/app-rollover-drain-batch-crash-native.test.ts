@@ -22,18 +22,31 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 
 // Per-drain batching across process death (SIGKILL right after a real SQLite COMMIT of the Writer's
 // issuance store). A one-epoch install displaces the Writer's moves (they never reached the creator)
-// and its drain prepares every row in one dependency turn, issues the author fence, then issues one
-// replacement per row, each its own durable transaction. The whole process dies at:
+// and its drain prepares every row in one dependency turn, issues the author fence, then issues the
+// replacements one chunk of V3_SETTLEMENT_DRAIN_TURN_ROWS (8) at a time, each chunk ONE batched
+// issuance (transactIssueBatch: one entered-marker commit, then one commit of every row). The whole
+// process dies at:
 //   fence:          the commit that issues the drain's author fence (every row prepared, none replaced);
-//   between-issues: the commit of the drain's second replacement (some rows replaced, the rest not).
+//   chunk-marker:   the commit of the first chunk's entered marker (signed nothing, replaced nothing);
+//                   the reopened Writer resumes the marker whole before any plan write;
+//   between-chunks: the commit of the first chunk (8 rows replaced, the other 2 not).
+// Every commit of the Writer's issuance store is watched: a chunk is never partly replaced (no commit
+// leaves 0 < replaced-in-chunk < chunk). The fallback (a store without transactIssueBatch: one
+// replacement per transaction, as before) has its own edge (DRAIN_BATCH_CRASH_SINGLES=1, SINGLES_EDGES):
+//   between-issues: the commit of the drain's second single replacement (some rows replaced).
 // (The drain's one transform-refusal plan CAS needs an application whose displaced moves transform;
 // Grid and Chat rebase.)
 // The test reopens the same directory, reconnects, and requires every move to be admitted by the
 // creator exactly once: no loss, no double apply. No native write, signature or transaction is mocked.
 const INNER = process.env.RUN_DRAIN_BATCH_CRASH === "1";
-const EDGES = ["fence", "between-issues"] as const;
-type Edge = (typeof EDGES)[number];
-const MOVES = 6;
+type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-issues";
+/** The fallback edge: run with DRAIN_BATCH_CRASH_SINGLES=1 against a build whose issuance store has no
+ * transactIssueBatch (the drain then issues one replacement per transaction, as before batching). */
+const SINGLES_EDGES: readonly Edge[] = ["between-issues"];
+const EDGES: readonly Edge[] =
+	process.env.DRAIN_BATCH_CRASH_SINGLES === "1" ? SINGLES_EDGES : ["fence", "chunk-marker", "between-chunks"];
+const MOVES = 10;
+const CHUNK = 8;
 
 const track = {
 	rooms: new Set<{ close(): Promise<void> }>(),
@@ -66,6 +79,20 @@ const issuanceFile = (directory: string, name: string) =>
 	);
 
 type PlanEntry = { disposition: string; sourceSequence: number; replacementSequence: number | null };
+/** The size of the entered batch marker in the Writer's lineage (null: none, or a single's marker). */
+function writerBatchMarker(file: string, author: string): number | null {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const row = db.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(author) as
+			| { pending_unsigned: Uint8Array | null }
+			| undefined;
+		if (row?.pending_unsigned == null) return null;
+		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as { followingIntents?: unknown[] };
+		return Array.isArray(pending.followingIntents) ? pending.followingIntents.length + 1 : null;
+	} finally {
+		db.close();
+	}
+}
 /** The Writer's settlement plan, read straight from its SQLite file. */
 function writerPlan(file: string, author: string) {
 	const db = new DatabaseSync(file, { readOnly: true });
@@ -162,7 +189,9 @@ it.runIf(INNER)(
 		const directory = process.env.DRAIN_BATCH_CRASH_DIRECTORY!;
 		const edge = process.env.DRAIN_BATCH_CRASH_EDGE as Edge;
 		const deathFile = join(directory, "death.json"),
-			setupFile = join(directory, "setup.json");
+			setupFile = join(directory, "setup.json"),
+			partialFile = join(directory, "partial-chunk.json");
+		const singles = process.env.DRAIN_BATCH_CRASH_SINGLES === "1";
 		const file = issuanceFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
 		const watch = { author: "", armed: false, inside: false };
@@ -184,8 +213,16 @@ it.runIf(INNER)(
 					const { entries, fence } = writerPlan(file, watch.author);
 					const rebase = entries.filter((entry) => entry.disposition === "rebase");
 					const replaced = rebase.filter((entry) => entry.replacementSequence !== null);
+					// A chunk commits whole: replaced counts only ever land on chunk boundaries.
+					if (!singles && rebase.length === MOVES && replaced.length % CHUNK !== 0 && replaced.length !== MOVES)
+						writeFileSync(partialFile, JSON.stringify({ replaced: replaced.length, rebase: rebase.length }));
 					if (edge === "fence" && fence !== null && rebase.length === MOVES && replaced.length === 0)
 						die({ fence, rebase: rebase.length });
+					const marker = writerBatchMarker(file, watch.author);
+					if (edge === "chunk-marker" && marker !== null && replaced.length === 0)
+						die({ marker, rebase: rebase.length });
+					if (edge === "between-chunks" && replaced.length === CHUNK)
+						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 					if (edge === "between-issues" && replaced.length === 2)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 				} finally {
@@ -257,6 +294,9 @@ it.skipIf(INNER).each(EDGES)(
 		const setup = JSON.parse(readFileSync(join(directory, "setup.json"), "utf8")) as Setup;
 		process.stdout.write(`DRAIN_BATCH_CRASH_DEATH ${JSON.stringify({ death, setup })}\n`);
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
+	expect(existsSync(join(directory, "partial-chunk.json")), "a chunk was partly replaced").toBe(false);
+	if (edge === "chunk-marker") expect(death).toMatchObject({ marker: CHUNK, rebase: MOVES });
+	if (edge === "between-chunks") expect((death.replaced as number[]).length).toBe(CHUNK);
 
 		const restore = await installEnvironment("node", () => undefined);
 		try {
