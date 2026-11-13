@@ -342,6 +342,14 @@ it("the policy's seal fails, the room's own interrupted-close retry adopts the s
 	const before = epochOf(fixture.creator.room);
 	const rolled = fixture.creator.events.length;
 	const policy = required(fixture.creator.policy);
+	// Stamp the moment each room reaches the next epoch, sampled from here on, so the bound is
+	// measured from the adoption itself even when it lands while the policy is still issuing.
+	const reached: { creator?: number; member?: number } = {};
+	const sampler = setInterval(() => {
+		const now = performance.now();
+		if (reached.creator === undefined && epochOf(fixture.creator.room) > before) reached.creator = now;
+		if (reached.member === undefined && epochOf(fixture.member.room) > before) reached.member = now;
+	}, 10);
 	// The next rollover's seal fails inside the close, after staging, as in the browser.
 	injection.armed = true;
 	let index = next;
@@ -352,19 +360,23 @@ it("the policy's seal fails, the room's own interrupted-close retry adopts the s
 	expect(injection.injected, "the policy's seal met the injected failure").toBe(1);
 	expect(fixture.creator.events.length, "the policy's rollover failed").toBe(rolled);
 	// The room's own retry seals and adopts; nothing moves on the creator from here on.
-	const adoptedAfterMs = await until(
-		() => epochOf(fixture.creator.room) === before + 1,
-		30_000,
-		() => `the room's own retry adopts ${JSON.stringify(state(fixture))}`
-	);
-	const followedAfterMs = await until(
-		() => epochOf(fixture.member.room) === before + 1,
-		RECOVERY_MS,
-		() => `member follows the room's own retry ${JSON.stringify(state(fixture))}`
-	);
-	console.log(
-		`UNPUBLISHED_ADOPTION real-retry ${JSON.stringify({ adoptedAfterMs, followedAfterMs, ...state(fixture) })}`
-	);
+	try {
+		await until(
+			() => reached.creator !== undefined,
+			30_000,
+			() => `the room's own retry adopts ${JSON.stringify(state(fixture))}`
+		);
+		await until(
+			() => reached.member !== undefined,
+			RECOVERY_MS,
+			() => `member follows the room's own retry ${JSON.stringify(state(fixture))}`
+		);
+	} finally {
+		clearInterval(sampler);
+	}
+	expect(epochOf(fixture.creator.room), "the room's own retry adopted exactly one successor").toBe(before + 1);
+	const followedAfterMs = Math.round(required(reached.member) - required(reached.creator));
+	console.log(`UNPUBLISHED_ADOPTION real-retry ${JSON.stringify({ followedAfterMs, ...state(fixture) })}`);
 	expect(fixture.creator.events.length, "the policy did not roll").toBe(rolled);
 	expect(followedAfterMs, "the member installed within the real-time bound of the room's adoption").toBeLessThanOrEqual(
 		OWN_RETRY_FOLLOW_MS
