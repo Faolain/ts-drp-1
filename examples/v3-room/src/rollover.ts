@@ -590,15 +590,16 @@ export function createV3RoomRolloverPolicy(
 		const current = currentEpoch();
 		if (current < 1 || current <= published) return Promise.resolve();
 		const task = (async (): Promise<void> => {
-			const offer = await selected.exportCreatorSuccessor();
-			const successorEpoch = offerSuccessorEpoch(offer);
+			// Named apart from the rollover's own export (tests/fixtures/realtime-probe brackets that one).
+			const adopted = await selected.exportCreatorSuccessor();
+			const successorEpoch = offerSuccessorEpoch(adopted);
 			// The room moved on during the export: a later pull publishes the newer successor.
 			if (closed || currentEpoch() !== current) return;
 			if (successorEpoch !== current)
 				throw new TypeError(`v3 room successor export is for epoch ${String(successorEpoch)}, the room is at ${current}`);
 			published = Math.max(published, current);
 			advance(current);
-			await hooks.publishSuccessor?.(offer, current);
+			await hooks.publishSuccessor?.(adopted, current);
 		})();
 		rolling = task
 			.then(
