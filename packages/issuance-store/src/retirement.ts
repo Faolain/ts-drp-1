@@ -327,7 +327,7 @@ function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boo
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
 	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
-		plan.completedSourceCustody === undefined
+		plan.completedSourceCustody === undefined && plan.reissueOrigins === undefined
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -2073,10 +2073,12 @@ function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan
 		const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 		const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 		const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
+		const hasReissueOrigins = typeof value === "object" && value !== null && Object.hasOwn(value, "reissueOrigins");
 		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])])) throw invalid();
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+			...(hasReissueOrigins ? ["reissueOrigins"] : [])])) throw invalid();
 		assertDurableIssueScope(value.scope);
 		const verified = copySettlementPlan(value, value.scope);
 		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();

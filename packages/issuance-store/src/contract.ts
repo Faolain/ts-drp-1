@@ -15,6 +15,7 @@ import type {
 	SettlementInheritance,
 	SettlementPlan,
 	SettlementPlanEntry,
+	SettlementReissueOrigin,
 	SettlementSourceContext,
 	SettlementReplacementChunk,
 	SettlementReplacementProgress,
@@ -331,6 +332,9 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
 								? {
 										intent: commit.planEffect.intent,
 										kind: "hand-back" as const,
+										...(commit.planEffect.originSequence === undefined
+											? {}
+											: { originSequence: commit.planEffect.originSequence }),
 										sourceSequence: commit.planEffect.sourceSequence,
 									}
 							: "fromIntent" in commit.planEffect
@@ -352,12 +356,20 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
  * @returns The detached effect, or undefined when invalid.
  */
 export function copySettlementPlanEffect(value: unknown): SettlementPlanEffect | undefined {
-	if (isClosedDurableIssuanceRecord(value, ["intent", "kind", "sourceSequence"])) {
+	const withOrigin = isClosedDurableIssuanceRecord(value, ["intent", "kind", "originSequence", "sourceSequence"]);
+	if (withOrigin || isClosedDurableIssuanceRecord(value, ["intent", "kind", "sourceSequence"])) {
 		return value.kind === "hand-back" &&
 			isValidDurableAuthorSequence(value.sourceSequence) &&
 			isValidDurableAuthorSequence(value.intent) &&
-			value.intent < SETTLEMENT_HAND_BACK_LIMITS.maxRecords
-			? { intent: value.intent, kind: "hand-back", sourceSequence: value.sourceSequence }
+			value.intent < SETTLEMENT_HAND_BACK_LIMITS.maxRecords &&
+			(!withOrigin ||
+				(isValidDurableAuthorSequence(value.originSequence) && value.originSequence <= value.sourceSequence))
+			? {
+					intent: value.intent,
+					kind: "hand-back",
+					...(withOrigin ? { originSequence: value.originSequence as number } : {}),
+					sourceSequence: value.sourceSequence,
+				}
 			: undefined;
 	}
 	if (!isClosedDurableIssuanceRecord(value, ["kind"])) {
@@ -607,16 +619,20 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
  * @returns The detached plan, or undefined when invalid.
  */
 function copySettlementHandBack(value: unknown): SettlementHandBack | undefined {
+	const hasOrigin = typeof value === "object" && value !== null && Object.hasOwn(value, "originSequence");
 	if (
 		!isClosedDurableIssuanceRecord(value, [
 			"exactCanonicalOperationBytes",
 			"intent",
+			...(hasOrigin ? ["originSequence"] : []),
 			"reissueSequence",
 			"sourceDigest",
 			"sourceEpoch",
 			"sourceSequence",
 		]) ||
 		!isValidDurableAuthorSequence(value.sourceSequence) ||
+		// Written only when it differs from the source (the origin is always older).
+		(hasOrigin && (!isValidDurableAuthorSequence(value.originSequence) || value.originSequence >= value.sourceSequence)) ||
 		!isValidDurableAuthorSequence(value.sourceEpoch) ||
 		!isValidDurableAuthorSequence(value.intent) ||
 		value.intent >= SETTLEMENT_HAND_BACK_LIMITS.maxRecords ||
@@ -636,6 +652,7 @@ function copySettlementHandBack(value: unknown): SettlementHandBack | undefined 
 	return {
 		exactCanonicalOperationBytes: operation,
 		intent: value.intent,
+		...(hasOrigin ? { originSequence: value.originSequence as number } : {}),
 		reissueSequence: value.reissueSequence,
 		sourceDigest,
 		sourceEpoch: value.sourceEpoch,
@@ -644,29 +661,73 @@ function copySettlementHandBack(value: unknown): SettlementHandBack | undefined 
 }
 
 /**
- * Validates a plan's hand-back records: present only when non-empty, ordered by (source, intent)
- * without duplicates, and within SETTLEMENT_HAND_BACK_LIMITS.
+ * The author's order of hand-back records: by the move's origin (originSequence ?? sourceSequence), then
+ * by the carrier row (the chunks of one replaced move carry its intents in order), then by intent.
+ * @param left - One record.
+ * @param right - The other.
+ * @returns Negative, zero or positive by that order.
+ */
+export function compareSettlementHandBacks(
+	left: Pick<SettlementHandBack, "intent" | "originSequence" | "sourceSequence">,
+	right: Pick<SettlementHandBack, "intent" | "originSequence" | "sourceSequence">
+): number {
+	return (
+		(left.originSequence ?? left.sourceSequence) - (right.originSequence ?? right.sourceSequence) ||
+		left.sourceSequence - right.sourceSequence ||
+		left.intent - right.intent
+	);
+}
+
+/**
+ * Validates a plan's hand-back records: present only when non-empty, in the author's order
+ * (compareSettlementHandBacks) without duplicates, and within SETTLEMENT_HAND_BACK_LIMITS.
  * @param value - Untrusted records.
  * @returns The detached records, or undefined when invalid.
  */
 function copySettlementHandBacks(value: unknown): SettlementHandBack[] | undefined {
 	if (!Array.isArray(value) || value.length === 0 || value.length > SETTLEMENT_HAND_BACK_LIMITS.maxRecords) return undefined;
 	const records: SettlementHandBack[] = [];
+	const keys = new Set<string>();
 	let bytes = 0;
 	for (const raw of value) {
 		const record = copySettlementHandBack(raw);
 		const prior = records.at(-1);
+		const key = record === undefined ? "" : `${record.sourceSequence}:${record.intent}`;
 		if (
 			record === undefined ||
-			(prior !== undefined &&
-				(record.sourceSequence < prior.sourceSequence ||
-					(record.sourceSequence === prior.sourceSequence && record.intent <= prior.intent))) ||
+			(prior !== undefined && compareSettlementHandBacks(prior, record) >= 0) ||
+			keys.has(key) ||
 			(bytes += record.exactCanonicalOperationBytes.byteLength) > SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes
 		)
 			return undefined;
+		keys.add(key);
 		records.push(record);
 	}
 	return records;
+}
+
+/**
+ * Validates a plan's reissue origins: present only when non-empty, sorted by reissueSequence without
+ * duplicates, each origin older than its reissue, at most SETTLEMENT_HAND_BACK_LIMITS.maxRecords.
+ * @param value - Untrusted entries.
+ * @returns The detached entries, or undefined when invalid.
+ */
+function copySettlementReissueOrigins(value: unknown): SettlementReissueOrigin[] | undefined {
+	if (!Array.isArray(value) || value.length === 0 || value.length > SETTLEMENT_HAND_BACK_LIMITS.maxRecords) return undefined;
+	const entries: SettlementReissueOrigin[] = [];
+	for (const raw of value) {
+		const prior = entries.at(-1);
+		if (
+			!isClosedDurableIssuanceRecord(raw, ["originSequence", "reissueSequence"]) ||
+			!isValidDurableAuthorSequence(raw.reissueSequence) ||
+			!isValidDurableAuthorSequence(raw.originSequence) ||
+			raw.originSequence >= raw.reissueSequence ||
+			(prior !== undefined && raw.reissueSequence <= prior.reissueSequence)
+		)
+			return undefined;
+		entries.push({ originSequence: raw.originSequence, reissueSequence: raw.reissueSequence });
+	}
+	return entries;
 }
 
 /**
@@ -680,10 +741,165 @@ export function settlementHandBacksWith(
 	current: readonly SettlementHandBack[] | undefined,
 	added: readonly SettlementHandBack[]
 ): readonly SettlementHandBack[] | undefined {
-	const merged = [...(current ?? []), ...added].sort((left, right) =>
-		left.sourceSequence === right.sourceSequence ? left.intent - right.intent : left.sourceSequence - right.sourceSequence
-	);
+	const merged = [...(current ?? []), ...added].sort(compareSettlementHandBacks);
 	return copySettlementHandBacks(merged);
+}
+
+/**
+ * The origin of the move an own row carries: the plan's replacement links are walked back from `sequence`
+ * (a replacement, or a chunk of one, links to its source) until a reissued row (a reissueOrigins entry,
+ * whose origin it returns with the entry) or the move's first row (its own sequence). Plan data only.
+ * @param plan - The durable plan (absent when none).
+ * @param sequence - The carrier row.
+ * @returns The move's origin, and the reissueOrigins entry it was read from, if any.
+ */
+export function settlementMoveOrigin(
+	plan: Pick<SettlementPlan, "entries" | "reissueOrigins"> | null | undefined,
+	sequence: number
+): Readonly<{ originSequence: number; reissue?: SettlementReissueOrigin }> {
+	let current = sequence;
+	// A chain is at most one link per plan entry; the bound only guards a malformed plan.
+	for (let depth = 0; depth <= (plan?.entries.length ?? 0); depth++) {
+		const reissue = plan?.reissueOrigins?.find((entry) => entry.reissueSequence === current);
+		if (reissue !== undefined) return { originSequence: reissue.originSequence, reissue };
+		const link = plan?.entries.find(
+			(entry) =>
+				entry.sourceObjectId === undefined &&
+				entry.sourceSequence < current &&
+				(entry.replacementSequence === current ||
+					entry.replacementProgress?.chunks.some((chunk) => chunk.replacementSequence === current) === true)
+		);
+		if (link === undefined) break;
+		current = link.sourceSequence;
+	}
+	return { originSequence: current };
+}
+
+/**
+ * The hand-back records of one expired or frontier-resolved own row, each carrying its move's origin
+ * (settlementMoveOrigin) when it differs from the row, merged into the plan's records; and the plan's
+ * reissue origins without the entry that origin was read from (the move is settled: the entry's job
+ * passes to the new records in the same write). Undefined when the records do not fit.
+ * @param plan - The durable plan, for links and reissue origins.
+ * @param current - The records so far in this write (unconsumed ones).
+ * @param origins - The reissue origins so far in this write.
+ * @param added - The row's new unconsumed records, without origins.
+ * @returns The merged records and remaining origins, or undefined.
+ */
+export function settlementHandBacksAtOrigin(
+	plan: Pick<SettlementPlan, "entries" | "reissueOrigins"> | null | undefined,
+	current: readonly SettlementHandBack[] | undefined,
+	origins: readonly SettlementReissueOrigin[] | undefined,
+	added: readonly SettlementHandBack[]
+): Readonly<{ handBacks: readonly SettlementHandBack[]; reissueOrigins: readonly SettlementReissueOrigin[] | undefined }> | undefined {
+	const source = added[0]?.sourceSequence;
+	if (source === undefined || added.some((record) => record.sourceSequence !== source)) return undefined;
+	const origin = settlementMoveOrigin(plan, source);
+	const handBacks = settlementHandBacksWith(
+		current,
+		origin.originSequence === source ? added : added.map((record) => ({ ...record, originSequence: origin.originSequence }))
+	);
+	if (handBacks === undefined) return undefined;
+	const remaining = origin.reissue === undefined ? origins
+		: origins?.filter((entry) => entry.reissueSequence !== origin.reissue?.reissueSequence);
+	return { handBacks, reissueOrigins: remaining === undefined || remaining.length === 0 ? undefined : remaining };
+}
+
+/**
+ * The window's hand-back records for one plan merge: each expiring own row (in sequence order) gives
+ * its operations back as unconsumed records carrying the move's origin, and the reissue-origin entry
+ * that origin was read from is dropped in the same write. Consumed records are dropped (they hold no
+ * record slot; the reissue's entry keeps the move's origin). A row whose records do not fit the record
+ * bound is not expired now (deferred: it stays live and is given back by a later merge) and drops
+ * nothing: every reissue-origin entry stays.
+ * @param plan - The durable plan before the merge.
+ * @param expiring - The rows the window expires, each with its operations' exact canonical bytes.
+ * @returns The merged records and origins, the rows expired, and the deferred moves.
+ */
+export function settlementWindowHandBacks(
+	plan: SettlementPlan | null,
+	expiring: readonly Readonly<{
+		sourceSequence: number;
+		sourceDigest: Uint8Array;
+		sourceEpoch: number;
+		operations: readonly Uint8Array[];
+	}>[]
+): Readonly<{
+	handBacks: readonly SettlementHandBack[] | undefined;
+	reissueOrigins: readonly SettlementReissueOrigin[] | undefined;
+	expired: ReadonlySet<number>;
+	deferredMoves: number;
+}> {
+	let handBacks: readonly SettlementHandBack[] | undefined = plan?.handBacks?.filter((record) => record.reissueSequence === null);
+	let reissueOrigins = plan?.reissueOrigins;
+	const expired = new Set<number>();
+	let deferredMoves = 0;
+	for (const row of [...expiring].sort((left, right) => left.sourceSequence - right.sourceSequence)) {
+		const recorded = settlementHandBacksAtOrigin(
+			plan,
+			handBacks,
+			reissueOrigins,
+			row.operations.map((operation, intent) => ({
+				exactCanonicalOperationBytes: operation,
+				intent,
+				reissueSequence: null,
+				sourceDigest: row.sourceDigest,
+				sourceEpoch: row.sourceEpoch,
+				sourceSequence: row.sourceSequence,
+			}))
+		);
+		if (recorded === undefined) {
+			deferredMoves += row.operations.length;
+			continue;
+		}
+		handBacks = recorded.handBacks;
+		reissueOrigins = recorded.reissueOrigins;
+		expired.add(row.sourceSequence);
+	}
+	return {
+		handBacks: handBacks === undefined || handBacks.length === 0 ? undefined : handBacks,
+		reissueOrigins,
+		expired,
+		deferredMoves,
+	};
+}
+
+/**
+ * The newest row carrying a reissued move: the plan's replacement links are followed forward from the
+ * reissued row (a replacement, or the newest chunk of one, replaces its source).
+ * @param plan - The durable plan.
+ * @param reissueSequence - The reissued row.
+ * @returns The chain's last carrier.
+ */
+export function settlementReissueLastCarrier(plan: Pick<SettlementPlan, "entries">, reissueSequence: number): number {
+	let current = reissueSequence;
+	for (let depth = 0; depth <= plan.entries.length; depth++) {
+		const entry = plan.entries.find((candidate) => candidate.sourceObjectId === undefined && candidate.sourceSequence === current);
+		const next = entry === undefined ? undefined
+			: (entry.replacementSequence ?? entry.replacementProgress?.chunks.at(-1)?.replacementSequence);
+		if (next === undefined || next <= current) break;
+		current = next;
+	}
+	return current;
+}
+
+/**
+ * The reissue origins a plan write keeps: an entry is dropped once the creator's signed frontier in the
+ * installed settlement capability admitted its chain's last carrier (`admittedThrough` >= that row),
+ * never on local acceptance or relay evidence, and never because the reissued row was replaced.
+ * @param plan - The durable plan before the write (for the replacement links).
+ * @param origins - The entries so far in this write.
+ * @param admittedThrough - The signed frontier's admitted author sequence, or null without one.
+ * @returns The entries kept (undefined when none).
+ */
+export function settlementReissueOriginsUnsettled(
+	plan: Pick<SettlementPlan, "entries">,
+	origins: readonly SettlementReissueOrigin[] | undefined,
+	admittedThrough: number | null
+): readonly SettlementReissueOrigin[] | undefined {
+	if (origins === undefined || admittedThrough === null) return origins;
+	const kept = origins.filter((entry) => settlementReissueLastCarrier(plan, entry.reissueSequence) > admittedThrough);
+	return kept.length === 0 ? undefined : kept.length === origins.length ? origins : kept;
 }
 
 function settlementHandBacksEqual(left: SettlementHandBack, right: SettlementHandBack): boolean {
@@ -691,6 +907,7 @@ function settlementHandBacksEqual(left: SettlementHandBack, right: SettlementHan
 		left.sourceSequence === right.sourceSequence &&
 		left.sourceEpoch === right.sourceEpoch &&
 		left.intent === right.intent &&
+		left.originSequence === right.originSequence &&
 		left.reissueSequence === right.reissueSequence &&
 		durableIssuanceBytesEqual(left.sourceDigest, right.sourceDigest) &&
 		durableIssuanceBytesEqual(left.exactCanonicalOperationBytes, right.exactCanonicalOperationBytes)
@@ -702,11 +919,13 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
+	const hasReissueOrigins = typeof value === "object" && value !== null && Object.hasOwn(value, "reissueOrigins");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])]) ||
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+			...(hasReissueOrigins ? ["reissueOrigins"] : [])]) ||
 		(hasCompletedSourceCustody && value.completedSourceCustody !== true) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
@@ -724,6 +943,8 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	if (hasHandBacks && handBacks === undefined) return undefined;
 	const memberFrontier = hasMemberFrontier ? copySettlementMemberFrontier(value.memberFrontier) : undefined;
 	if (hasMemberFrontier && memberFrontier === undefined) return undefined;
+	const reissueOrigins = hasReissueOrigins ? copySettlementReissueOrigins(value.reissueOrigins) : undefined;
+	if (hasReissueOrigins && reissueOrigins === undefined) return undefined;
 	const entries: SettlementPlanEntry[] = [];
 	let prior = -1;
 	for (const rawEntry of value.entries) {
@@ -767,6 +988,7 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		...(handBacks === undefined ? {} : { handBacks }),
 		...(memberFrontier === undefined ? {} : { memberFrontier }),
 		...(hasCompletedSourceCustody ? { completedSourceCustody: true as const } : {}),
+		...(reissueOrigins === undefined ? {} : { reissueOrigins }),
 		revision: value.revision,
 		scope: copyDurableIssueScope(scope),
 	};
@@ -852,6 +1074,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 					handBacks: plan.handBacks.map((record) => ({
 						exactCanonicalOperationBytes: new Uint8Array(record.exactCanonicalOperationBytes),
 						intent: record.intent,
+						...(record.originSequence === undefined ? {} : { originSequence: record.originSequence }),
 						reissueSequence: record.reissueSequence,
 						sourceDigest: new Uint8Array(record.sourceDigest),
 						sourceEpoch: record.sourceEpoch,
@@ -861,6 +1084,8 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 		...(plan.memberFrontier === undefined ? {} : {memberFrontier: {digest: new Uint8Array(plan.memberFrontier.digest),
 			exactCanonicalContextBytes: new Uint8Array(plan.memberFrontier.exactCanonicalContextBytes)}}),
 		...(plan.completedSourceCustody === true ? {completedSourceCustody: true as const} : {}),
+		...(plan.reissueOrigins === undefined ? {} : {reissueOrigins: plan.reissueOrigins.map((entry) => ({
+			originSequence: entry.originSequence, reissueSequence: entry.reissueSequence}))}),
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};
@@ -887,6 +1112,13 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			!next.handBacks?.some((value) => value.sourceSequence === prior.sourceSequence && value.intent === prior.intent)
 		)
 			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back changed");
+	}
+	// Reissue origins: only the hand-back effect (the reissued row's own issuance transaction) adds one;
+	// a plan write keeps an entry unchanged or drops it (the move settled: admitted or expired).
+	for (const entry of next.reissueOrigins ?? []) {
+		const prior = current?.reissueOrigins?.find((value) => value.reissueSequence === entry.reissueSequence);
+		if (prior?.originSequence !== entry.originSequence)
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement reissue origin changed");
 	}
 	if (current === null) return;
 	// The last-member frontier is written once and never changed or cleared.
@@ -1054,7 +1286,19 @@ export function applySettlementPlanEffect(
 			(record) => record.sourceSequence === effect.sourceSequence && record.intent === effect.intent
 		) ?? -1;
 		const record = plan.handBacks?.[index];
-		if (record === undefined || record.reissueSequence !== null || authorSequence <= record.sourceSequence) {
+		const originSequence = record === undefined ? undefined : (record.originSequence ?? record.sourceSequence);
+		const origins = plan.reissueOrigins ?? [];
+		if (
+			record === undefined ||
+			originSequence === undefined ||
+			record.reissueSequence !== null ||
+			authorSequence <= record.sourceSequence ||
+			(effect.originSequence !== undefined && effect.originSequence !== originSequence) ||
+			// The entry bound (the backlog term; an entry never takes a record slot): a full set refuses the
+			// reissue, which leaves the record unconsumed and listed.
+			origins.length >= SETTLEMENT_HAND_BACK_LIMITS.maxRecords ||
+			origins.some((entry) => entry.reissueSequence >= authorSequence)
+		) {
 			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back precondition changed");
 		}
 		const detached = cloneSettlementPlan(plan);
@@ -1063,6 +1307,8 @@ export function applySettlementPlanEffect(
 			handBacks: detached.handBacks!.map((value, valueIndex) =>
 				valueIndex === index ? { ...value, reissueSequence: authorSequence } : value
 			),
+			// Atomic with the consumption: the reissued row maps back to its move's origin.
+			reissueOrigins: [...(detached.reissueOrigins ?? []), { originSequence, reissueSequence: authorSequence }],
 			revision: plan.revision + 1,
 		};
 	}
@@ -1150,15 +1396,24 @@ export function settlementPlanHasExactEffectLink(
 	authorSequence: number
 ): boolean {
 	if (effect.kind === "fence") return plan?.fenceSequence === authorSequence;
-	if (effect.kind === "hand-back")
-		return (
-			plan?.handBacks?.some(
-				(record) =>
-					record.sourceSequence === effect.sourceSequence &&
-					record.intent === effect.intent &&
-					record.reissueSequence === authorSequence
-			) === true
+	if (effect.kind === "hand-back") {
+		const record = plan?.handBacks?.find(
+			(candidate) =>
+				candidate.sourceSequence === effect.sourceSequence &&
+				candidate.intent === effect.intent &&
+				candidate.reissueSequence === authorSequence
 		);
+		// The same transaction wrote the reissue's origin entry (a plan written before the field has none).
+		return (
+			record !== undefined &&
+			(plan?.reissueOrigins === undefined ||
+				plan.reissueOrigins.some(
+					(entry) =>
+						entry.reissueSequence === authorSequence &&
+						entry.originSequence === (record.originSequence ?? record.sourceSequence)
+				))
+		);
+	}
 	const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
 	if (!("fromIntent" in effect)) return entry?.replacementSequence === authorSequence;
 	const progress = entry?.replacementProgress;
