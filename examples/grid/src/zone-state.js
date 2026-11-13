@@ -8,6 +8,7 @@ import {
 	canonicalRecordResourceForSizing,
 } from "@ts-drp/canonical/resource";
 import {decodeCanonical, encodeCanonical} from "@ts-drp/canonical";
+import {createCanonicalWalker} from "@ts-drp/canonical/exact";
 
 import { blueprint } from "./zone-state-artifact.mjs";
 import { blueprint as predecessorBlueprint } from "./zone-state-predecessor-artifact.mjs";
@@ -282,54 +283,57 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 			output: freezeOutput(decodeCanonical(encodeCanonical(result.output))),
 		});
 	}
+	// SAME genuine BlueprintStateMachine depth/item envelope. No new fixture-sized
+	// byte ceiling or relaxation of canonical admission.
+	const PLACEMENT_BASE_LIMITS = Object.freeze({maxDepth: 16, maxItems: 16_384});
+	/** The closed material record: its base vector and operation groups, or undefined. */
+	function placementGrowthMaterial(material) {
+		if (!exactKeys(material, ["exactCanonicalBaseStateBytes", "currentOperations", "protectedOperations",
+			"recoveryOperations"])) return undefined;
+		const bases = denseDataArray(material.exactCanonicalBaseStateBytes);
+		const groups = [material.currentOperations, material.protectedOperations, material.recoveryOperations]
+			.map(denseDataArray);
+		if (bases === undefined || bases.length === 0 || groups.some(group => group === undefined)) return undefined;
+		if (bases.some(bytes => !(bytes instanceof Uint8Array))) return undefined;
+		return {bases, groups};
+	}
 	/** Resource data only. The native source owner must establish the exact
 	 * recognized artifact and completeness of every base/operation vector.
 	 * Placement order still determines the actual state; this upper bound covers
 	 * any subset/order, original roster declarations and causalJoin no-ops without
-	 * running reducers or constructing a future state. */
-	function placementGrowthProjection(material, bounded) {
-		try {
-			if (!exactKeys(material, ["exactCanonicalBaseStateBytes", "currentOperations", "protectedOperations",
-				"recoveryOperations"])) return undefined;
-			const bases = denseDataArray(material.exactCanonicalBaseStateBytes);
-			const groups = [material.currentOperations, material.protectedOperations, material.recoveryOperations]
-				.map(denseDataArray);
-			if (bases === undefined || bases.length === 0 || groups.some(group => group === undefined)) return undefined;
-			const rows = new Map();
-			const headers = [];
-			let rosterResource = {byteLength: 1, items: 1, maxDepth: 0};
-			const includeRoster = roster => {
-				const resource = canonicalArrayResourcesForSizing(roster.map(member => canonicalRecordResourceForSizing(member)));
-				rosterResource = {byteLength: Math.max(rosterResource.byteLength, resource.byteLength),
-					items: Math.max(rosterResource.items, resource.items), maxDepth: Math.max(rosterResource.maxDepth, resource.maxDepth)};
-				return resource;
-			};
-			let rowBytes = 0;
-			const includeBlock = block => {
-				const resource = canonicalRecordResourceForSizing(block);
-				const prior = rows.get(block.id);
-				// The captured block schema always has four primitive fields. Its
-				// item/depth shape is identical; keep the widest actual version per id.
-				if (prior === undefined || resource.byteLength > prior.byteLength) {
-					rows.set(block.id, resource); rowBytes += resource.byteLength - (prior?.byteLength ?? 0);
-				}
-			};
-			for (const bytes of bases) {
-				if (!(bytes instanceof Uint8Array)) return undefined;
-				// SAME genuine BlueprintStateMachine depth/item envelope. No new
-				// fixture-sized byte ceiling or relaxation of canonical admission.
-				const state = captureState(decodeCanonical(bytes, {maxDepth: 16, maxItems: 16_384}));
-				const exact = encodeCanonical(state);
-				if (exact.byteLength !== bytes.byteLength || !exact.every((byte, index) => byte === bytes[index])) return undefined;
-				state.blocks.forEach(includeBlock);
-				headers.push({
-					version: state.version,
-					creatorAuthor: state.creatorAuthor,
-					creatorPeerId: state.creatorPeerId,
-					outcomes: canonicalArrayResourcesForSizing(state.outcomes.map(outcomeResource)),
-					roster: includeRoster(state.roster),
-				});
+	 * running reducers or constructing a future state. One owner for the sync and
+	 * the resumable seed: each captured base contributes its blocks and its header,
+	 * then complete() adds the operation groups and returns the projection. */
+	function placementGrowthAccumulator(groups, bounded) {
+		const rows = new Map();
+		const headers = [];
+		let rosterResource = {byteLength: 1, items: 1, maxDepth: 0};
+		const includeRoster = roster => {
+			const resource = canonicalArrayResourcesForSizing(roster.map(member => canonicalRecordResourceForSizing(member)));
+			rosterResource = {byteLength: Math.max(rosterResource.byteLength, resource.byteLength),
+				items: Math.max(rosterResource.items, resource.items), maxDepth: Math.max(rosterResource.maxDepth, resource.maxDepth)};
+			return resource;
+		};
+		let rowBytes = 0;
+		const includeBlock = block => {
+			const resource = canonicalRecordResourceForSizing(block);
+			const prior = rows.get(block.id);
+			// The captured block schema always has four primitive fields. Its
+			// item/depth shape is identical; keep the widest actual version per id.
+			if (prior === undefined || resource.byteLength > prior.byteLength) {
+				rows.set(block.id, resource); rowBytes += resource.byteLength - (prior?.byteLength ?? 0);
 			}
+		};
+		const includeHeader = state => {
+			headers.push({
+				version: state.version,
+				creatorAuthor: state.creatorAuthor,
+				creatorPeerId: state.creatorPeerId,
+				outcomes: canonicalArrayResourcesForSizing(state.outcomes.map(outcomeResource)),
+				roster: includeRoster(state.roster),
+			});
+		};
+		const complete = () => {
 			const includeOperation = (value, includeBlock, includeRoster) => {
 				// Detach/validate actual supplied operation material, like apply().
 				const operation = decodeCanonical(encodeCanonical(value));
@@ -456,10 +460,129 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 					} catch {return undefined;}
 				},
 			});
+		};
+		return {includeBlock, includeHeader, complete};
+	}
+	function placementGrowthProjection(material, bounded) {
+		try {
+			const captured = placementGrowthMaterial(material);
+			if (captured === undefined) return undefined;
+			const growth = placementGrowthAccumulator(captured.groups, bounded);
+			for (const bytes of captured.bases) {
+				const state = captureState(decodeCanonical(bytes, PLACEMENT_BASE_LIMITS));
+				const exact = encodeCanonical(state);
+				if (exact.byteLength !== bytes.byteLength || !exact.every((byte, index) => byte === bytes[index])) return undefined;
+				state.blocks.forEach(growth.includeBlock);
+				growth.includeHeader(state);
+			}
+			return growth.complete();
 		} catch {
 			// Missing/unsupported pure material is not invalidity or admission.
 			return undefined;
 		}
+	}
+	const STATE_FIELDS = Object.freeze(["version", "creatorAuthor", "creatorPeerId", "blocks", "outcomes", "roster"]);
+	/** The resumable form of createPlacementGrowthProjection over the SAME material and the SAME result:
+	 * each base is walked in bounded byte steps (createCanonicalWalker accepts exactly the exact canonical
+	 * bytes, so the sync form's re-encode comparison holds without a re-encode), every block, outcome and
+	 * roster entry passes the same captureState checks, and the order captureState normalizes (approval
+	 * signers, roster orders) must already hold, as the sync form's byte comparison requires. Then the
+	 * same completion. A refused base throws from step; the seed grants nothing. */
+	function beginPlacementGrowthProjection(material) {
+		let captured;
+		try {
+			captured = placementGrowthMaterial(material);
+		} catch {
+			return undefined;
+		}
+		if (captured === undefined) return undefined;
+		const growth = placementGrowthAccumulator(captured.groups, true);
+		const invalid = () => {
+			throw new TypeError("v3 zone authenticated projection state is invalid");
+		};
+		let index = 0;
+		let walker;
+		let base;
+		let state = "walking";
+		const visit = event => {
+			if (event.depth === 0) {
+				if (event.type === "value" || event.kind !== "object") invalid();
+				return;
+			}
+			if (event.depth === 1) {
+				const field = event.key;
+				if (event.type === "leave") {
+					base.field = undefined;
+					return;
+				}
+				if (!STATE_FIELDS.includes(field)) invalid();
+				base.fields.add(field);
+				if (event.type === "enter") {
+					if (event.kind !== "array" || (field !== "blocks" && field !== "outcomes" && field !== "roster")) invalid();
+					base.field = field;
+					return;
+				}
+				if (field === "version" ? event.value !== 2 : field === "creatorAuthor" ? event.value !== creatorAuthor :
+					field === "creatorPeerId" ? event.value !== creatorPeerId : true) invalid();
+				return;
+			}
+			if (event.type !== "value" || event.depth !== 2) invalid();
+			if (base.field === "blocks") {
+				const block = blockValue(event.value, false);
+				if (block === undefined || (base.lastBlockId !== undefined && compareText(base.lastBlockId, block.id) >= 0)) invalid();
+				base.lastBlockId = block.id;
+				base.blockCount++;
+				growth.includeBlock(block);
+			} else if (base.field === "outcomes") {
+				const outcome = outcomeValue(event.value);
+				if (outcome === undefined || base.outcomeIds.has(outcome.proof.clientOperationId) ||
+					event.value.proof.approvals[0].signer !== outcome.proof.approvals[0].signer) invalid();
+				base.outcomeIds.add(outcome.proof.clientOperationId);
+				base.outcomes.push(outcome);
+			} else if (base.field === "roster") {
+				base.roster.push(event.value);
+			} else invalid();
+		};
+		const closeBase = () => {
+			if (base.fields.size !== STATE_FIELDS.length) invalid();
+			let roster = Object.freeze([]);
+			if (base.roster.length !== 0 || base.blockCount !== 0 || base.outcomes.length !== 0) {
+				roster = rosterValue(base.roster);
+				if (roster === undefined || roster.some((entry, at) => entry.order !== base.roster[at].order)) invalid();
+			}
+			growth.includeHeader({version: 2, creatorAuthor, creatorPeerId, outcomes: base.outcomes, roster});
+		};
+		return Object.freeze({
+			step(byteBudget) {
+				if (state === "failed") throw new TypeError("v3 zone placement seed failed");
+				if (state === "walked") return true;
+				try {
+					if (walker === undefined) {
+						walker = createCanonicalWalker(captured.bases[index], {splitDepth: 2, limits: PLACEMENT_BASE_LIMITS});
+						base = {fields: new Set(), field: undefined, lastBlockId: undefined, blockCount: 0, outcomes: [],
+							outcomeIds: new Set(), roster: []};
+					}
+					if (!walker.step(byteBudget, visit)) return false;
+					closeBase();
+					walker = undefined;
+					index++;
+					if (index < captured.bases.length) return false;
+					state = "walked";
+					return true;
+				} catch (error) {
+					state = "failed";
+					throw error;
+				}
+			},
+			finish() {
+				if (state !== "walked") return undefined;
+				try {
+					return growth.complete();
+				} catch {
+					return undefined;
+				}
+			},
+		});
 	}
 	function createPlacementGrowthProjection(material) {
 		return placementGrowthProjection(material, true);
@@ -478,6 +601,7 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 		blockForOperation: (operation) => blockValue(operation, true),
 		readPlacementGrowthBound,
 		createPlacementGrowthProjection,
+		beginPlacementGrowthProjection,
 		reducers: Object.freeze({
 			"applicationBatch": reduce,
 			"causalJoin": reduce,

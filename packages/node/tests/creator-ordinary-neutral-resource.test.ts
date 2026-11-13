@@ -260,7 +260,7 @@ describe("explicit unchanged-APP numerical query (no operation authority)", () =
 		const zoneTree = ts.createSourceFile("v3-zone.ts", zoneSource, ts.ScriptTarget.Latest, true);
 		const owner = zoneTree.statements.find((value): value is ts.FunctionDeclaration => ts.isFunctionDeclaration(value) && value.name?.text === "createV3ZoneApplication");
 		if (owner === undefined || owner.body === undefined) throw new Error("missing original Grid resource wrapper");
-		const names = ["kernel", "resolved", "expectedResourceCatalog", "captureResourceMaterial", "resourceFootprint", "resourceBoundReader"];
+		const names = ["kernel", "resolved", "expectedResourceCatalog", "captureResourceMaterial", "resourceFootprint", "projectionFacade", "resourceBoundReader"];
 		const statements = owner.body.statements.filter(value => ts.isVariableStatement(value) && value.declarationList.declarations.some(declaration =>
 			ts.isIdentifier(declaration.name) && names.includes(declaration.name.text)));
 		expect(statements).toHaveLength(names.length);

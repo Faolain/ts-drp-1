@@ -1345,6 +1345,186 @@ export function decodeCanonicalExactness(input: Uint8Array, limits: Partial<Cano
 	return Object.freeze({ value, exact });
 }
 
+/** A collection kind the walker enters. */
+export type CanonicalWalkKind = "array" | "object" | "map" | "set";
+
+/**
+ * One walker event. `depth` is the node's nesting depth (the root is 0) and `key` its place in its
+ * parent: the object key, the map key value, or the array/set index (undefined for the root).
+ * - "enter"/"leave" bracket a collection shallower than the split depth;
+ * - "value" carries one complete node: any node at the split depth, any non-collection above it, and
+ *   every set element and map/object key (decoded whole, so their order is checked at once).
+ */
+export type CanonicalWalkEvent =
+	| Readonly<{ type: "enter"; depth: number; key: unknown; kind: CanonicalWalkKind; length: number }>
+	| Readonly<{ type: "value"; depth: number; key: unknown; value: unknown }>
+	| Readonly<{ type: "leave"; depth: number; key: unknown; kind: CanonicalWalkKind }>;
+
+/** Options of {@link createCanonicalWalker}. */
+export interface CanonicalWalkerOptions {
+	/** Collections shallower than this depth are entered; nodes at it are decoded whole. Default 1. */
+	readonly splitDepth?: number;
+	/** Resource-limit overrides, as for {@link decodeCanonical}. */
+	readonly limits?: Partial<CanonicalLimits>;
+}
+
+/** Resumable walker over one canonical value: see {@link createCanonicalWalker}. */
+export interface CanonicalWalker {
+	/**
+	 * Walks on: at least one event, then stops at the first event boundary at or after `byteBudget`
+	 * more input bytes (a node at the split depth is never split). Events describe bytes validated so
+	 * far only: the walk accepts the value only when a step returns true.
+	 * @returns True once the whole value is walked and accepted as exact canonical bytes.
+	 * @throws CanonicalDecodingError on any malformed or non-exact input; every later step rethrows it.
+	 */
+	step(byteBudget: number, visit: (event: CanonicalWalkEvent) => void): boolean;
+	readonly done: boolean;
+	/** Input bytes consumed so far. */
+	readonly offset: number;
+	readonly byteLength: number;
+}
+
+const WALK_KINDS: Readonly<Record<number, CanonicalWalkKind>> = Object.freeze({
+	[TAG.ARRAY]: "array",
+	[TAG.OBJECT]: "object",
+	[TAG.MAP]: "map",
+	[TAG.SET]: "set",
+});
+
+interface WalkFrame {
+	readonly kind: CanonicalWalkKind;
+	readonly depth: number;
+	readonly key: unknown;
+	readonly length: number;
+	index: number;
+	/** Byte range of the previous key (object/map) or element (set), for the strict order check. */
+	previousStart: number;
+	previousEnd: number;
+}
+
+/**
+ * Creates a resumable walker over one canonical value: the input is consumed in bounded steps with
+ * an explicit stack, never decoded whole. It accepts exactly the inputs {@link decodeCanonicalExactness}
+ * decodes AND reports exact: the same limits and the same structural rules (minimal varuints, strict
+ * byte order of keys and set elements, no duplicates, string object keys, strict UTF-8, the float and
+ * typed-array domains, no trailing bytes), plus the exact-form rules (no leading BOM, no integral float
+ * beyond the safe range, within the default limits). So `encodeCanonical` of the value the events
+ * describe reproduces the input byte for byte, without a re-encode.
+ * @param input - Candidate canonical bytes (copied).
+ * @param options - Split depth and limits.
+ * @returns The walker.
+ */
+export function createCanonicalWalker(input: Uint8Array, options: CanonicalWalkerOptions = {}): CanonicalWalker {
+	const splitDepth = options.splitDepth ?? 1;
+	if (!Number.isSafeInteger(splitDepth) || splitDepth < 0) throw new TypeError("canonical walker split depth is invalid");
+	const bytes = new Uint8Array(input);
+	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...options.limits };
+	if (bytes.byteLength > configured.maxBytes) throw new CanonicalDecodingError("canonical value exceeds byte limit", "bytes");
+	const stats = { maxDepth: 0 };
+	const reader = new Reader(bytes, configured, stats);
+	const stack: WalkFrame[] = [];
+	let started = false;
+	let done = false;
+	let failure: unknown;
+
+	const exactForm = (): void => {
+		if (!reader.exact) throw new CanonicalDecodingError("canonical value is not in exact canonical form");
+	};
+	/** One node at `depth`: entered when it is a collection above the split depth, else decoded whole. */
+	const node = (depth: number, key: unknown, visit: (event: CanonicalWalkEvent) => void): void => {
+		const kind = reader.offset < bytes.byteLength ? WALK_KINDS[bytes[reader.offset]!] : undefined;
+		if (kind === undefined || depth >= splitDepth) {
+			const value = decodeInternal(reader, depth);
+			exactForm();
+			visit(Object.freeze({ type: "value" as const, depth, key, value }));
+			return;
+		}
+		// The same order of checks as decodeInternal/decodeCollection.
+		if (depth > configured.maxDepth)
+			throw new CanonicalDecodingError("canonical value exceeds maximum nesting depth", "depth");
+		if (depth > stats.maxDepth) stats.maxDepth = depth;
+		reader.countItems();
+		reader.byte();
+		const length = Number(reader.varUint());
+		reader.countItems(kind === "object" || kind === "map" ? length * 2 : length);
+		stack.push({ kind, depth, key, length, index: 0, previousStart: -1, previousEnd: -1 });
+		visit(Object.freeze({ type: "enter" as const, depth, key, kind, length }));
+	};
+	/** One unit of progress: the root, the next child of the innermost collection, or its end. */
+	const advance = (visit: (event: CanonicalWalkEvent) => void): void => {
+		if (!started) {
+			started = true;
+			node(0, undefined, visit);
+			return;
+		}
+		const frame = stack[stack.length - 1]!;
+		if (frame.index === frame.length) {
+			stack.pop();
+			visit(Object.freeze({ type: "leave" as const, depth: frame.depth, key: frame.key, kind: frame.kind }));
+			return;
+		}
+		const index = frame.index++;
+		if (frame.kind === "array") return node(frame.depth + 1, index, visit);
+		if (frame.kind === "set") {
+			const start = reader.offset;
+			const value = decodeInternal(reader, frame.depth + 1);
+			if (frame.previousStart >= 0 && compareRanges(bytes, frame.previousStart, frame.previousEnd, start, reader.offset) >= 0)
+				throw new CanonicalDecodingError("set values are not in canonical order or are duplicated");
+			frame.previousStart = start;
+			frame.previousEnd = reader.offset;
+			exactForm();
+			visit(Object.freeze({ type: "value" as const, depth: frame.depth + 1, key: index, value }));
+			return;
+		}
+		const start = reader.offset;
+		const key = decodeInternal(reader, frame.depth + 1);
+		if (frame.previousStart >= 0 && compareRanges(bytes, frame.previousStart, frame.previousEnd, start, reader.offset) >= 0)
+			throw new CanonicalDecodingError("map/object keys are not in canonical order or are duplicated");
+		frame.previousStart = start;
+		frame.previousEnd = reader.offset;
+		if (frame.kind === "object" && typeof key !== "string") throw new CanonicalDecodingError("object key must be a string");
+		exactForm();
+		node(frame.depth + 1, key, visit);
+	};
+	const finish = (): void => {
+		if (reader.offset !== bytes.byteLength) throw new CanonicalDecodingError("trailing bytes after canonical value");
+		// As decodeCanonicalExactness: within the defaults, the encoder accepts what the decoder bounded.
+		if (!(reader.exact && bytes.byteLength <= DEFAULT_LIMITS.maxBytes && reader.items <= DEFAULT_LIMITS.maxItems &&
+			stats.maxDepth <= DEFAULT_LIMITS.maxDepth))
+			throw new CanonicalDecodingError("canonical value is not in exact canonical form");
+		done = true;
+	};
+	return Object.freeze({
+		step(byteBudget: number, visit: (event: CanonicalWalkEvent) => void): boolean {
+			if (failure !== undefined) throw failure;
+			if (done) return true;
+			if (!Number.isSafeInteger(byteBudget) || byteBudget < 1) throw new TypeError("canonical walker byte budget is invalid");
+			if (typeof visit !== "function") throw new TypeError("canonical walker visitor is invalid");
+			const from = reader.offset;
+			try {
+				do {
+					advance(visit);
+					if (stack.length === 0) {
+						finish();
+						return true;
+					}
+				} while (reader.offset - from < byteBudget);
+				return false;
+			} catch (error) {
+				failure = error;
+				throw error;
+			}
+		},
+		get done() {
+			return done;
+		},
+		get offset() {
+			return reader.offset;
+		},
+		byteLength: bytes.byteLength,
+	});
+}
+
 /** Actual current carrier only. The ORIGINAL decoder validates the supplied
  * schema-depth bound and counts every original node/edge. Exact depth is an
  * opt-in statistic of that SAME single traversal, not another tree walker,

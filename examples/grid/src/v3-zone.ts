@@ -37,7 +37,7 @@ import { GRID_GENESIS_PROFILE } from "./profile.js";
 import { GRID_ROLLOVER_BUDGET } from "./rollover.js";
 import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
 import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
-import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
+import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZonePlacementGrowthProjection, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
 const PARAMETERS = Object.freeze({
 	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
@@ -1501,6 +1501,12 @@ export function createV3ZoneApplication(
 	};
 	const resourceFootprint = (bound: CanonicalResourceFootprint | undefined): CanonicalResourceFootprint | undefined =>
 		bound === undefined ? undefined : Object.freeze({byteLength: bound.byteLength, items: bound.items, maxDepth: bound.maxDepth});
+	const projectionFacade = (projection: ZonePlacementGrowthProjection | undefined) => projection === undefined ? undefined : Object.freeze({
+		advance: (operations: readonly unknown[]) => projection.advance(operations),
+		quote: (candidateOperation: unknown) => resourceFootprint(projection.quote(candidateOperation)),
+		quoteWithoutApplicationCandidate: () => resourceFootprint(projection.quoteWithoutApplicationCandidate()),
+		quoteWindow: (declaration: Parameters<typeof projection.quoteWindow>[0]) => resourceFootprint(projection.quoteWindow(declaration)),
+	});
 	/** Local numerical policy only. The original source owner authenticates the
 	 * exact catalog/material and retains one source-bound projection. Neither
 	 * complete nor delta planning grants admission, authority or proof credit. */
@@ -1513,12 +1519,17 @@ export function createV3ZoneApplication(
 		createIncrementalProjection: (input: ResourceInput<Omit<ZonePlacementGrowthMaterial, "candidateOperation">>) => {
 			try {
 				const captured = captureResourceMaterial(input);
-				const projection = captured === undefined ? undefined : kernel.createPlacementGrowthProjection(captured);
-				return projection === undefined ? undefined : Object.freeze({
-					advance: (operations: readonly unknown[]) => projection.advance(operations),
-					quote: (candidateOperation: unknown) => resourceFootprint(projection.quote(candidateOperation)),
-					quoteWithoutApplicationCandidate: () => resourceFootprint(projection.quoteWithoutApplicationCandidate()),
-					quoteWindow: (declaration: Parameters<typeof projection.quoteWindow>[0]) => resourceFootprint(projection.quoteWindow(declaration)),
+				return projectionFacade(captured === undefined ? undefined : kernel.createPlacementGrowthProjection(captured));
+			} catch {return undefined;}
+		},
+		// The same projection, seeded in bounded steps over the base bytes (the room drives it in short turns).
+		beginIncrementalProjection: (input: ResourceInput<Omit<ZonePlacementGrowthMaterial, "candidateOperation">>) => {
+			try {
+				const captured = captureResourceMaterial(input);
+				const seed = captured === undefined ? undefined : kernel.beginPlacementGrowthProjection(captured);
+				return seed === undefined ? undefined : Object.freeze({
+					step: (byteBudget: number) => seed.step(byteBudget),
+					finish: () => projectionFacade(seed.finish()),
 				});
 			} catch {return undefined;}
 		},
