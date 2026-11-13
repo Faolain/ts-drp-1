@@ -34,13 +34,18 @@ const blockIdentity = (operation: Readonly<Record<string, unknown>>) =>
 function memberRoom() {
 	let epoch = 3;
 	const accepted: { operation: Readonly<Record<string, unknown>>; handBack: unknown }[] = [];
-	let listed: { handBack: { sourceSequence: number; intent: number }; operation: Readonly<Record<string, unknown>> } | undefined;
+	let listed:
+		| { handBack: { sourceSequence: number; intent: number }; operation: Readonly<Record<string, unknown>> }
+		| undefined;
 	const room = {
 		authority: () =>
 			({ epoch }) as unknown as ReturnType<
 				NonNullable<Parameters<rollover.V3RoomRolloverPolicy["bind"]>[0]>["authority"]
 			>,
-		issue: (operation: Readonly<Record<string, unknown>>, options?: { handBack?: { sourceSequence: number; intent: number } }) => {
+		issue: (
+			operation: Readonly<Record<string, unknown>>,
+			options?: { handBack?: { sourceSequence: number; intent: number } }
+		) => {
 			accepted.push({ operation, handBack: options?.handBack });
 			if (
 				listed !== undefined &&
@@ -58,7 +63,14 @@ function memberRoom() {
 			undelivered:
 				listed === undefined
 					? []
-					: [{ vertexDigest: "00".repeat(32), epoch: epoch - 4, handBack: listed.handBack, operations: [listed.operation] }],
+					: [
+							{
+								vertexDigest: "00".repeat(32),
+								epoch: epoch - 4,
+								handBack: listed.handBack,
+								operations: [listed.operation],
+							},
+						],
 			deferred: 0,
 			awaitingFence: false,
 		}),
@@ -69,7 +81,8 @@ function memberRoom() {
 	return {
 		room,
 		accepted,
-		giveBack: (operation: Readonly<Record<string, unknown>>) => (listed = { handBack: { sourceSequence: 7, intent: 0 }, operation }),
+		giveBack: (operation: Readonly<Record<string, unknown>>) =>
+			(listed = { handBack: { sourceSequence: 7, intent: 0 }, operation }),
 		listed: () => listed,
 		install: (next: number) => (epoch = next),
 	};
