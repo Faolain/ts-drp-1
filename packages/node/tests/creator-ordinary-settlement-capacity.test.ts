@@ -1,9 +1,9 @@
 import {readFileSync} from "node:fs";
-import {compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-drp/canonical";
+import {CanonicalEncodingError, compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import {canonicalArrayResourcesForSizing, canonicalBytesResourceForSizing, canonicalRecordResourceForSizing, canonicalValueResourceForSizing} from "@ts-drp/canonical/resource";
 import {issuanceOrdinaryFinishingCapacityWidths} from "../../issuance-store/src/retirement.js";
 import {captureJournalRetirementControl, encodeJournalRetirementNativeCarriers, journalRetirementNativeProgressFields, LIVE_JOURNAL_RETIREMENT_LIMITS} from "../../live-journal/src/retirement.js";
-import {boundPreparedFields, boundCompletedFields, boundCompletionPayload} from "@ts-drp/storage";
+import {AHE_BOUNDED_READ_LIMITS, boundPreparedFields, boundCompletedFields, boundCompletionPayload} from "@ts-drp/storage";
 import {createCreatorClosedRollbackProofAccounting, createCreatorNoneResourceProgramCompiler, evaluateCreatorNoneResourceProgramForSizing,
 	creatorOrdinaryPreimageResourceGeometryForSizing, readCreatorOrdinaryPreimageCapacityForSizing,
 	captureCreatorOrdinaryFinishingWindowLimitsForSizing} from "../src/internal/creator-closed-rollback-data.js";
@@ -11,6 +11,10 @@ import {creatorAuthenticatedEpochVertexFields} from "../src/internal/runtime-rec
 import {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE} from "../src/internal/creator-source-custody.js";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
+
+// The close's own per-carrier encode cap (CLOSED_RETIREMENT_BYTES.maxBytes = AHE maxUnionBytes).
+const CLOSED_OBSERVATION_CARRIER_CAP = AHE_BOUNDED_READ_LIMITS.maxUnionBytes;
 
 // Controlled numerical seams only. No fixture mints a proof, runtime hold,
 // native grant, signed source or paid accounting credit. The production runtime
@@ -232,12 +236,65 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 			expect(result?.get("test.close")).toBe(expected.closeEnvelope); expect(result?.get("test.current")).toBe(expected.currentEnvelope);
 		}
 		const builder = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
-		expect(builder).toContain("journalWrapper.byteLength > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes");
+		expect(builder).toContain("journalWrapper.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes");
 		expect(builder).toContain("creatorIssuanceMaintenanceObservationCarriers({"); // Full successor jobs unchanged.
-		expect(declaration("creatorIssuanceMaintenanceObservationCarriers")).toContain("drainSource: input.journal.drainSource");
+		// A mid-drain journal's reconstructed drainSource is not encoded beside its own control, image and rows.
+		expect(declaration("creatorIssuanceMaintenanceObservationCarriers")).not.toContain("drainSource: input.journal.drainSource");
 		expect(declaration("acquireCreatorIssuanceMaintenanceProof")).toContain("creatorIssuanceMaintenanceObservationCarriers({"); // Immediate ordinary I is unchanged.
 		expect(() => builderExpression("physical")).toThrow("missing actual builder expression:physical");
 		expect(() => builderExpression("physicalTerm")).toThrow("missing actual builder expression:physicalTerm");
+	});
+	it("bounds every maintenance observation carrier by the close's own per-carrier encode cap, in readiness sizing and at acquisition", () => {
+		// The close encodes each observation carrier with closedRetirementBytes (CLOSED_RETIREMENT_BYTES,
+		// AHE maxUnionBytes = 786,432). Readiness sizing bounded the journal wrapper by the journal's own
+		// image bound (2 MiB) instead, so admission let a five-Writer room's journal carrier grow past what
+		// the close (and the creator's settlement fence) could encode.
+		const builder = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
+		expect(builder).toContain("[journalWrapper, CLOSED_RETIREMENT_BYTES.maxBytes, 65_536, 128]");
+		expect(builder).not.toContain("[journalWrapper, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes");
+		expect(builder).toContain("compiler.limit(compiler.references(value).byteLength, CLOSED_RETIREMENT_BYTES.maxBytes, 1)");
+		expect(declaration("creatorOrdinarySuffixCapacityForSizing")).toContain("freshJournalObservation.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes");
+		// Acquisition: a wider carrier is the proof's typed budget refusal (a rollover), never an untyped codec failure.
+		expect(source).not.toMatch(/creatorIssuanceMaintenanceObservationCarriers\(\{[^;]*?\}\)\.map\(closedRetirementBytes\)/u);
+		const carrier = execute<(value: unknown) => Uint8Array | undefined>(["closedRetirementBytes", "closedObservationCarrierBytes"],
+			"closedObservationCarrierBytes", {encodeCanonical, CanonicalEncodingError,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128}});
+		const journal = (rowBytes: number) => ({control: null, image: {rowCount: 1}, canonicalRows: [new Uint8Array(rowBytes)]});
+		const overhead = encodeCanonical(journal(0)).byteLength + 4;
+		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP - overhead))?.byteLength).toBeLessThanOrEqual(CLOSED_OBSERVATION_CARRIER_CAP);
+		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP))).toBeUndefined();
+		expect(() => carrier({value: BigInt(1)})).toThrow(); // Any other codec failure is unchanged.
+	});
+	it("compares a retained journal's rows row by row: as strict as the whole array, without one encode under the carrier cap", () => {
+		// A member's successor install (received recovery turnover → installClosedRetirementSource)
+		// compared its whole journal rows array with closedRetirementEqual, one encode under the close's
+		// carrier cap (786,432). A member's retained journal is bounded by the journal's own image bound,
+		// not that cap, so a five-Writer room's members failed every install with "canonical value
+		// exceeds byte limit". Every journal rows equality compares row by row.
+		// The member's install (11484/11492 drain read, journalNative, verifyCompleted) and its lull's drain
+		// ACK readback compare the whole retained journal or its residual; the ordinary source recheck compares
+		// rows while a drain is active (no reconstructed drainSource comparison).
+		expect(source).not.toMatch(/closedRetirementEqual\([^()]*(?:canonicalRows|readExactCanonicalRows\(\))/u);
+		expect(source.match(/closedJournalRowsEqual\([^()]*(?:\(\))?[^()]*(?:canonicalRows|rows)\)/gu)?.length).toBe(6);
+		const cap = {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128};
+		const bindings = {encodeCanonical, compareBytes, CLOSED_RETIREMENT_BYTES: cap};
+		const rowsEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual", "closedJournalRowsEqual"],
+			"closedJournalRowsEqual", bindings);
+		const wholeEqual = execute<(left: unknown, right: unknown) => boolean>(["closedRetirementBytes", "closedRetirementEqual"], "closedRetirementEqual", bindings);
+		const rows = (count: number, bytes: number, mark = 0) => Array.from({length: count}, (_, index) => {
+			const row = encodeCanonical({author: index, payload: new Uint8Array(bytes).fill(index === count - 1 ? mark : 7)});
+			return row;
+		});
+		const big = rows(5, 200_000); // 1,000,000+ bytes: past the carrier cap, under the journal's image bound.
+		expect(() => wholeEqual(big, rows(5, 200_000))).toThrow("canonical value exceeds byte limit");
+		expect(rowsEqual(big, rows(5, 200_000))).toBe(true);
+		expect(rowsEqual(big, rows(5, 200_000, 1))).toBe(false); // One byte of the last row differs.
+		expect(rowsEqual(big, rows(4, 200_000))).toBe(false);
+		expect(rowsEqual(big, [...rows(5, 200_000)].reverse())).toBe(false);
+		// Under the cap the row-by-row answer is the whole-array answer.
+		for (const [left, right] of [[rows(3, 100), rows(3, 100)], [rows(3, 100), rows(3, 100, 1)], [rows(3, 100), rows(2, 100)], [[], []]] as const)
+			expect(rowsEqual(left, right)).toBe(wholeEqual(left, right));
+		expect(() => rowsEqual([BigInt(1)], [BigInt(1)])).toThrow(); // A non-canonical row still fails as before.
 	});
 	it("reserves one prospective row-plan plus independent header-only drain, retaining distinct OLD plans and all progress", () => {
 		// Actual original reservation bodies, native encoder and accounting union.
@@ -675,9 +732,12 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(parameters.get("ordinary.nativeUnknown")).toBe(35251);
 		expect(parameters.get("ordinary.runtimeUnknown")).toBe(99209);
 		expect(encodeCanonical(fixture.program)).toEqual(before);
-		expect(builderExpression("semanticJournalProgress")).toContain("plan: journalPlan");
+		// The semantic progress (the journal observation carrier's control) holds the owner's projection of this same plan
+		// (C1: prefixes by digest); journalPlan itself stays the separately charged native plan carrier.
+		expect(builderExpression("semanticJournalProgress")).toContain("plan: observedJournalPlan");
+		expect(builderExpression("observedJournalPlan")).toContain("closedJournalDrainPlanCarriers(");
 	});
-	it("retains the complete old resumable journal plan when the NEW plan projection is smaller", () => {
+	it("retains the old resumable journal drain (its plan by digest in the carrier, C1) when the NEW plan projection is smaller", () => {
 		const objectId="room",digest="a".repeat(64),author="b".repeat(64),scope={objectId,epoch:0,anchorDigest:digest};
 		const baseControl={kind:"v3-live-journal-retirement-control-2",objectId,incarnation:digest,revision:1,sequence:1,
 			active:null,completed:{throughEpoch:1,decisionDigest:digest,sourceProofDigest:digest,protectedScopes:[]},drain:null};
@@ -689,11 +749,14 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		const compiler=createCreatorNoneResourceProgramCompiler(),backend=compiler.backend(limits),
 			actual=(value:unknown)=>canonicalValueResourceForSizing(value,128,limits,"exact"),
 			fields=Object.fromEntries(Object.entries(old).map(([key,value])=>[key,actual(value)]));
+		const {closedJournalObservationControl}=compileClosedJournalObservationOwner();
 		const bindings={maximum:backend.maximum,record:backend.record,semanticJournalProgress:backend.bytes(512),
-			baseFields:[undefined,fields],integer:backend.primitive(Number.MAX_SAFE_INTEGER)};
+			baseFields:[undefined,fields],integer:backend.primitive(Number.MAX_SAFE_INTEGER),controls:[undefined,old],
+			fields:(value:object)=>Object.fromEntries(Object.entries(value).map(([key,field])=>[key,actual(field)])),closedJournalObservationControl};
 		const js=ts.transpileModule(`return ${builderExpression("journalControl")};`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
 		const width=new Function("bindings",`const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
-		const completeOld=actual({...old,revision:Number.MAX_SAFE_INTEGER,sequence:Number.MAX_SAFE_INTEGER});
+		// Every old field survives, the old drain's plan by digest; its exact bytes stay the native carriers charged apart.
+		const completeOld=actual({...closedJournalObservationControl(old) as object,revision:Number.MAX_SAFE_INTEGER,sequence:Number.MAX_SAFE_INTEGER});
 		expect(width).toEqual(completeOld);
 		expect(width.byteLength).toBeGreaterThan(bindings.semanticJournalProgress.byteLength);
 		expect(encodeCanonical(old)).toEqual(before);
@@ -709,9 +772,11 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 			parameters = (rows: any) => new Map([["journal.rows.bytes", rows.byteLength], ["journal.rows.items", rows.items], ["journal.rows.depth", rows.maxDepth]]),
 			bindings = {capture: {journal: {}}, nil: backend.primitive(null), completed: [undefined, backend.bytes(128)],
 				actual: (value: unknown) => canonicalValueResourceForSizing(value, 128, limits, "exact"), maximum: backend.maximum, record: backend.record,
-				journalImage: backend.bytes(64), journalControl: backend.bytes(790_000), journal: {canonicalRows: seed},
+				// The wrapper holds the rows once (no reconstructed drainSource term), so the control carries the
+				// width the second rows term did: the same seed/candidate/rectangle boundaries under 2 MiB.
+				journalImage: backend.bytes(64), journalControl: backend.bytes(1_443_000), journal: {canonicalRows: seed},
 				inputResource: (name: string, value: any) => compiler.inputResource(name, value)};
-		const js = ts.transpileModule(["journalDrainSource", "journalWrapper"].map(name => `const ${name}=${builderExpression(name)};`).join("\n"),
+		const js = ts.transpileModule(["journalWrapper"].map(name => `const ${name}=${builderExpression(name)};`).join("\n"),
 			{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText,
 			wrapper = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js};return journalWrapper;`)(bindings);
 		compiler.limit(compiler.references(wrapper).byteLength, 2_097_152, 1);
@@ -723,7 +788,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(evaluateCreatorNoneResourceProgramForSizing(program, parameters(obsoleteHistoricalRectangle))).toBeUndefined();
 		const largerCandidateOrFence = canonicalArrayResourcesForSizing([oldRows, canonicalBytesResourceForSizing(32_768, limits)], limits);
 		expect(evaluateCreatorNoneResourceProgramForSizing(program, parameters(largerCandidateOrFence))).toBeUndefined();
-		expect(source).toContain("[journalWrapper, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, 65_536, 128]");
+		expect(source).toContain("[journalWrapper, CLOSED_RETIREMENT_BYTES.maxBytes, 65_536, 128]"); // The close's per-carrier encode cap.
 	});
 	it("keeps one complete future leaf and independent byte/item/depth maxima, without merging separate native jobs; NONE adds zero", () => {
 		const future = execute<(facts: any, native: any, frame: number) => any>(
@@ -844,6 +909,7 @@ describe("candidate-free complete ordinary window certificate", () => {
 			acceptedCount: 0, localIssuedCount: 0, acceptedWitnessPayloadBytes: 0,
 			journalObservationFields: {control: {byteLength: 1, items: 1, maxDepth: 0}, image: {byteLength: 100, items: 20, maxDepth: 1},
 				canonicalRows: {byteLength: 100, items: 3, maxDepth: 1}},
+			journalContextControlWidth: 1,
 			journal: {projection: journalProjection, imageDigest: "journal", parametersBytes: encodeCanonical({}), canonicalRows: observation.journal.canonicalRows}};
 		const profile: any = {sourceIdentity: identity, preparedMaterial: true, preparedParameters: compiler.captureParameters(), program,
 			firstStageThroughNode: checkpoint, context: {objectId: scope.objectId, epoch: 3, anchorDigest: anchor,
@@ -879,7 +945,8 @@ describe("candidate-free complete ordinary window certificate", () => {
 					return evaluateCreatorNoneResourceProgramForSizing(program, values, checkpoint);
 				}, snapshotRetirementContract: {maxChunks: 100},
 				snapshotQuarantineContract: {recoveryContentBytes: (payload: number, manifest: number) => payload + manifest},
-				CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes});
+				CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: CLOSED_OBSERVATION_CARRIER_CAP, maxItems: 65_536, maxDepth: 128}});
 		const input: any = {source: sourceFacts, preparation, observation, profile, geometry,
 			application: {byteLength: 400, items: 40, maxDepth: 3}, limits: window,
 			knownResourceTotals: {knownBytes: 1000, protectedBytes: 800, unknownEncodedBytes: 74}};
@@ -1075,6 +1142,7 @@ describe("candidate-free complete ordinary window certificate", () => {
 		changed.input.observation.journal.control = oldControl;
 		changed.input.observation.journal.exactCanonicalControlCarriers = [encodeCanonical(oldControl)];
 		changed.input.geometry.journalObservationFields.control = resource;
+		changed.input.geometry.journalContextControlWidth = resource.byteLength;
 		const retained = changed.run(changed.input);
 		expect(retained.ordinaryProofEnvelopeByteLength).toBeGreaterThan(after.ordinaryProofEnvelopeByteLength + 8192);
 		for (const parameters of changed.calls.evaluated.slice(-2)) {
@@ -1103,6 +1171,28 @@ describe("candidate-free complete ordinary window certificate", () => {
 		const f = windowFixture(), first = f.run(f.input), saved = structuredClone(first);
 		f.input.limits.maxAdditionalPreimageBytes = 500; f.input.application.byteLength = 50;
 		expect(first).toEqual(saved); // No mutable declaration/profile/owner is retained.
+	});
+	it("window certificate declines a journal observation carrier wider than the close's per-carrier encode cap, though the ordinary book would fit it", () => {
+		// The close encodes each observation carrier (journal {control, image, canonicalRows}, ...) with
+		// closedRetirementBytes, capped at CLOSED_RETIREMENT_BYTES.maxBytes (AHE maxUnionBytes, 786,432).
+		// Five hot Writers grew the creator's journal carrier past it while the ordinary book (1,310,720)
+		// still fit: the creator's next proof acquisition (its settlement fence, or its close) failed with
+		// an untyped "canonical value exceeds byte limit" and the room stopped. Readiness sizing charges
+		// the same carrier under the same cap, so admission refuses (typed) before it grows past.
+		const widened = (extra: number) => {
+			const f = windowFixture(), projection = f.input.geometry.journal.projection;
+			const widen = (quote: (request: any) => any) => (request: any) => {
+				const value = quote(request);
+				return {...value, canonicalRows: {...value.canonicalRows, byteLength: value.canonicalRows.byteLength + extra}};
+			};
+			projection.quoteCurrent = widen(projection.quoteCurrent); projection.quote = widen(projection.quote);
+			return f;
+		};
+		const within = widened(700_000);
+		expect(within.run(within.input), JSON.stringify(within.calls.declines)).toBeDefined();
+		const wide = widened(CLOSED_OBSERVATION_CARRIER_CAP);
+		expect(wide.run(wide.input)).toBeUndefined();
+		expect(wide.calls.declines).toContainEqual(expect.objectContaining({reason: expect.stringContaining(":observation-carrier")}));
 	});
 	it("selects a fully certified effective window only at the boundary, retaining OLD/UNKNOWN and coherent enforced aggregate caps", () => {
 		const f = windowFixture(); f.input.limits.maxAdditionalOperationBytes = 1000;

@@ -58,7 +58,9 @@ import {
 	issuanceOrdinaryFinishingCapacityWidths,
 	issuanceRetirementAllows,
 	issuanceRetirementPlanRewriteResourceForSizing,
+	issuancePotentialSourceCustody,
 	settlementPlanPermitsAuthenticatedPruning,
+	issuanceRetirementFloor,
 } from "@ts-drp/issuance-store/maintenance";
 import {
 	type DurableLiveJournalStore,
@@ -190,6 +192,7 @@ import {
 	type CreatorRoomSettlementPreview,
 	type V3CreatorCloseRegistration,
 	inspectHead,
+	issuanceCapacityRefusalOf,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
@@ -3417,6 +3420,21 @@ interface VerifiedV3IngressEvidence {
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+/** Room-local observers of a creator's received-move capacity refusals, keyed by the plane's admitted sink. */
+const ingressCapacityRefusalListeners = new WeakMap<object, (reason: string) => void>();
+
+/**
+ * Observes the creator refusing a received move at a capacity a rollover clears (the typed
+ * ISSUANCE_CAPACITY_FORECAST_EXCEEDED reason: the issuance image forecast or the per-epoch
+ * maintenance proof book). Observation only: it grants nothing, and the move stays held as pending
+ * ingress and is offered again; a room's rollover policy may seal sooner so the Writer's move lands
+ * in the successor rather than waiting for the room's budget or idle trigger.
+ * @param sink - The admitted-vertex sink the room activates its planes with.
+ * @param listener - Called with the typed reason; its failures are ignored.
+ */
+export function bindV3IngressCapacityRefusalListener(sink: object, listener: (reason: string) => void): void {
+	ingressCapacityRefusalListeners.set(sink, listener);
+}
 interface V3EgressAdmissionOwner {
 	jobs: number;
 	bufferedBytes: number;
@@ -4209,7 +4227,9 @@ function resolveRecoveryCloseHold(
 			const acquire = native?.acquireRetirementControl?.bind(native);
 			if (acquire === undefined) throw new TypeError("native issuance retirement is unsupported");
 			const scope = ObjectFreeze({ objectId: facts.context.payload.trust.trust.objectId });
-			return ObjectFreeze({ signing: facts.captureSigning(), issuance: () => acquire(scope) });
+			const readPlanBefore = native?.readRetirementPlanBefore?.bind(native);
+			return ObjectFreeze({ signing: facts.captureSigning(), issuance: ObjectFreeze(Object.assign(() => acquire(scope),
+				readPlanBefore === undefined ? {} : { readPlanBefore: () => readPlanBefore(scope) })) });
 		},
 		captureIssuanceRetirementOwner: function (this: CreatorSnapshotRecoveryCloseLifetime) {
 			if (this !== lifetime || !available() || !facts.retirementAllowed)
@@ -4222,8 +4242,10 @@ function resolveRecoveryCloseHold(
 			// the eventual native view supplies CAS, not caller-selected authority.
 			// Slice 14a: a room retirement session acts only for the owner of this same
 			// maintenance capability (a filtered facade is re-bound to it, never minted).
+			const readPlanBefore = native?.readRetirementPlanBefore?.bind(native);
 			return ObjectFreeze(Object.assign(() => acquire(scope), {
 				acquireIn: (session: V3RoomRetirementSession) => session.acquireIssuance(scope, native),
+				...(readPlanBefore === undefined ? {} : { readPlanBefore: () => readPlanBefore(scope) }),
 			}));
 		},
 		captureSigningRetirementOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
@@ -8456,8 +8478,14 @@ async function handleV3IngressWithSource(
 			releaseOperationReservation(reservation);
 			retainPendingIngress(registration, evidence, V3Envelope.encode({
 				canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
-			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${
-				creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable")}`);
+			const reason = creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable");
+			// Typed as on the local issue path: the bare Refusal kind ("proof-budget-exceeded") is not.
+			const capacity = issuanceCapacityRefusalOf(error);
+			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${capacity ?? reason}`);
+			if (capacity !== undefined) {
+				try { ingressCapacityRefusalListeners.get(registration.onAdmittedVertex)?.(capacity); }
+				catch { /* Observation cannot alter admission. */ }
+			}
 			// This job already ended (its release ran above): retry the retained row once, after
 			// this turn, so a refusal that clears ends in an admission rather than a held row.
 			resumePendingIngress(registration);
@@ -16607,6 +16635,19 @@ async function issueOneVertex(
 	}
 
 	const admittedFrontier = localAdmittedFrontier(registration, scope);
+	// A settlement-profile Writer's own new move (or a handed-back move offered again, or a join
+	// before either) reserves one settlement replacement per own row of this epoch in its store's
+	// admission: the creator may close the epoch without any of them, and the Writer must replace
+	// them at its successor's install under the same bound. Fence and replacement work never
+	// reserve (they are the settlement); the creator closes its own epoch and needs none.
+	const settlementReplacementReserve =
+		input.settlementSource === undefined &&
+		(planEffect === undefined || planEffect.kind === "hand-back") &&
+		!registration.creatorMaintenanceBound &&
+		registration.payload.trust.trust.profileId === "creator-trusted-settlement-v1" &&
+		resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== scope.author
+			? ObjectFreeze({ maxDependencies: registration.payload.parameters.maxDependencies })
+			: undefined;
 	let commit: unknown;
 	let capacityRejected = false;
 	let cryptoEntered = false;
@@ -16707,7 +16748,10 @@ async function issueOneVertex(
 									return nativeSignAdmission(
 										bytes,
 										sourceSign,
-										replacementContext ?? (planEffect === undefined ? undefined : { planEffect })
+										replacementContext ??
+											(settlementReplacementReserve === undefined
+												? planEffect === undefined ? undefined : { planEffect }
+												: ObjectFreeze({ ...(planEffect === undefined ? {} : { planEffect }), settlementReplacementReserve }))
 									);
 								};
 					const builtCommit = await buildAndSign(authorSequence, admittedSign);
@@ -16838,7 +16882,9 @@ async function issueOneVertex(
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
 					: localIssueFailure(
 							"issuance-rejected",
-							`v3 local issue transaction failed: ${error instanceof Error ? error.message : String(error)}`
+							// A Writer's (or creator's) own store bound is the same typed capacity refusal.
+							`v3 local issue transaction failed: ${issuanceCapacityRefusalOf(error) ??
+								(error instanceof Error ? error.message : String(error))}`
 						);
 		}
 		const committedFailure = (
@@ -21416,9 +21462,14 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 		plan === candidatePlan && settlement?.planEffect !== undefined && !receivedAppend ?
 			applySettlementPlanEffect(plan, settlement.planEffect, candidate.sequence,
 				settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes)) : plan);
-	const custodySourceCount = nativeRows.issued.filter(row => sameScope(row, candidate.scope)).length + Number(!receivedAppend) + futureJobs.length;
+	// Rule B/HB (issuance-image-capacity.qnt): only rows that can still become sources, and the
+	// widest own source preimage bounds a hand-back record's operation.
+	const potentialSources = issuancePotentialSourceCustody({issued: nativeRows.issued, plans: nativeRows.plans}, candidate.scope, sourceCustody);
+	const custodySourceCount = potentialSources.count + Number(!receivedAppend) + futureJobs.length;
+	const handBackOperationBytes = Math.max(potentialSources.maxPreimageByteLength, candidate.bytes.byteLength,
+		...futureJobs.map(job => job.intent.canonicalPreimageBytes.byteLength));
 	const currentPlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(currentPlans, sourceCustody === undefined ? undefined :
-		{scope: candidate.scope, maxSourceCount: custodySourceCount, geometry: sourceCustody});
+		{scope: candidate.scope, maxSourceCount: custodySourceCount, geometry: sourceCustody, maxHandBackOperationByteLength: handBackOperationBytes});
 	const currentPublishedCensusSizing = ObjectFreeze({
 		runtimeCensusOverheadByteLength: currentRuntimeOverhead,
 		nativeRowsByteLength: currentNativeRowsByteLength,
@@ -21882,7 +21933,8 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			planIndex: planOrder.findIndex((row) => row.scope.author === author),
 		}));
 		const nativePlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(plans, sourceCustody === undefined ? undefined :
-			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody});
+			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody,
+				maxHandBackOperationByteLength: handBackOperationBytes});
 		const results: CreatorPostAdoptionCensusSizing[] = [];
 		// An original signed settlement frontier selects the raw successor
 		// store (installCreatorSuccessorLive); unlike the no-settlement branch
@@ -23935,7 +23987,8 @@ async function cleanupCreatorSettlementSuccessor(
 					observed.control.completed.sourceProofDigest !== control.completed.sourceProofDigest ||
 					control.completed.generationDrain?.phase === "pending") return;
 				coordinatedIssuance = observed.control.completed.protectedRecords;
-				coordinatedThroughEpoch = observed.control.completed.throughEpoch;
+				// Rule H: rows above the completed floor are kept by the floor, not listed as holes.
+				coordinatedThroughEpoch = issuanceRetirementFloor(observed.control.completed);
 			} finally {await observed.release();}
 		}
 	}
@@ -24166,6 +24219,14 @@ async function cleanupCreatorSettlementSuccessor(
 				const row = outboxRowSnapshot(raw, material.issuanceScope);
 				if (row === undefined) throw new TypeError("creator cleanup issuance row is invalid");
 				if (coordinatedIssuance?.some(hole => hole.author === row.scope.author && hole.authorSequence === row.authorSequence)) {
+					done = true;
+					break;
+				}
+				// Rule H: a row above the coordinated floor is protected without a listed hole.
+				const rowEpoch = coordinatedIssuance === undefined ? undefined :
+					(decodeCanonical(row.canonicalPreimageBytes) as {epoch?: unknown}).epoch;
+				if (coordinatedThroughEpoch !== undefined && (typeof rowEpoch !== "number" || rowEpoch > coordinatedThroughEpoch) &&
+					coordinatedIssuance !== undefined) {
 					done = true;
 					break;
 				}

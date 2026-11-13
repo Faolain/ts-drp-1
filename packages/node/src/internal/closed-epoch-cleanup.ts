@@ -1,5 +1,5 @@
 import { compareBytes, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
+import { ISSUANCE_RETIREMENT_LIMITS, issuanceRetirementControlKind } from "@ts-drp/issuance-store/maintenance";
 import { LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES } from "@ts-drp/live-journal";
 import {
 	AHE_RETIREMENT_CONTROL_LIMITS,
@@ -818,6 +818,21 @@ export interface ClosedEpochRetirementMetadataControl {
 	readonly completed: unknown;
 }
 
+const ISSUANCE_CONTROL_KINDS: ReadonlySet<string> = new Set(["v3-issuance-retirement-control-1",
+	"v3-issuance-retirement-control-2"]);
+/** Issuance control-2 is the same native owner as control-1 (lazy upgrade, issuance-image-capacity.qnt):
+ * the domain and incarnation name the owner's family, so a control-1 object that prepares its first
+ * floored retirement keeps its ownership (and legacy durable commitments keep their bytes). */
+function domainKind(kind: string): string {
+	return ISSUANCE_CONTROL_KINDS.has(kind) ? "v3-issuance-retirement-control-1" : kind;
+}
+/** An issuance control's kind follows its contents, so a derived old or completed control names
+ * the kind its native owner writes for it. */
+function derivedKind(control: ClosedEpochRetirementMetadataControl): ClosedEpochRetirementMetadataControl {
+	return ISSUANCE_CONTROL_KINDS.has(control.kind)
+		? { ...control, kind: issuanceRetirementControlKind(control.active, control.completed) } : control;
+}
+
 function metadataImage(control: ClosedEpochRetirementMetadataControl, imageDigest: string): Uint8Array {
 	if (!HEX_DIGEST.test(imageDigest)) retirementRefusal("malformed native data image");
 	return hashDomain("ts-drp/closed-epoch-native-metadata/v1", retirementBytes({ control, imageDigest }));
@@ -836,12 +851,13 @@ export function captureClosedEpochRetirementMetadataDomain(
 ): AheRetirementDomain {
 	if (control.active !== null || control.revision > Number.MAX_SAFE_INTEGER - 2 ||
 		control.sequence === Number.MAX_SAFE_INTEGER) retirementRefusal("native metadata is not preparable");
-	const completed = projectCompleted({ ...control, revision: control.revision + 2, sequence: control.sequence + 1,
-		active: null, completed: preparation });
+	const completed = derivedKind(projectCompleted({ ...control, revision: control.revision + 2, sequence: control.sequence + 1,
+		active: null, completed: preparation }));
+	const kind = domainKind(control.kind);
 	return Object.freeze([
 		roles,
-		hashDomain("ts-drp/closed-epoch-native-domain/v1", retirementBytes({ kind: control.kind, objectId: control.objectId })),
-		hashDomain("ts-drp/closed-epoch-native-incarnation/v1", retirementBytes({ kind: control.kind,
+		hashDomain("ts-drp/closed-epoch-native-domain/v1", retirementBytes({ kind, objectId: control.objectId })),
+		hashDomain("ts-drp/closed-epoch-native-incarnation/v1", retirementBytes({ kind,
 			objectId: control.objectId, incarnation: control.incarnation })),
 		control.revision, metadataImage(control, imageDigest), metadataImage(completed, completedImageDigest), control.sequence,
 	]);
@@ -859,10 +875,11 @@ export function validateClosedEpochRetirementMetadataDomain(
 	projectCompleted: (control: ClosedEpochRetirementMetadataControl) => ClosedEpochRetirementMetadataControl = control => control,
 	completedImageDigest: string = imageDigest
 ): ClosedEpochRetirementParticipantRead["phase"] {
+	const kind = domainKind(control.kind);
 	const domain = hashDomain("ts-drp/closed-epoch-native-domain/v1",
-		retirementBytes({ kind: control.kind, objectId: control.objectId }));
+		retirementBytes({ kind, objectId: control.objectId }));
 	const incarnation = hashDomain("ts-drp/closed-epoch-native-incarnation/v1",
-		retirementBytes({ kind: control.kind, objectId: control.objectId, incarnation: control.incarnation }));
+		retirementBytes({ kind, objectId: control.objectId, incarnation: control.incarnation }));
 	if (compareBytes(domain, commitment[1]) !== 0 || compareBytes(incarnation, commitment[2]) !== 0)
 		retirementRefusal("native metadata ownership changed");
 	if (control.active === null && control.revision === commitment[3] && control.sequence === commitment[6] &&
@@ -870,8 +887,9 @@ export function validateClosedEpochRetirementMetadataDomain(
 	if (control.revision === commitment[3] + 1 && control.sequence === commitment[6] + 1 &&
 		control.active !== null && control.active.sequence === control.sequence &&
 		retirementEqual(control.active.preparation, preparation)) {
-		const old = { ...control, revision: commitment[3], sequence: commitment[6], active: null };
-		const completed = projectCompleted({ ...control, revision: commitment[3] + 2, active: null, completed: preparation });
+		const old = derivedKind({ ...control, revision: commitment[3], sequence: commitment[6], active: null });
+		const completed = derivedKind(projectCompleted({ ...control, revision: commitment[3] + 2, active: null,
+			completed: preparation }));
 		if (compareBytes(metadataImage(old, imageDigest), commitment[4]) === 0 &&
 			compareBytes(metadataImage(completed, completedImageDigest), commitment[5]) === 0) return "prepared";
 	}

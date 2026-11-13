@@ -4,6 +4,7 @@ import {canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, ca
 	canonicalArrayResourceForSizing, canonicalArrayResourcesForSizing, canonicalValueResourceForSizing} from "@ts-drp/canonical/resource";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 // Actual scalar/program expressions against the UNCHANGED original composer
 // literal and codec. These controls prove numerical lifetime composition, not
@@ -38,7 +39,9 @@ if (!originalJob || !observationLimits || initializers.size !== 5) throw new Err
 const bindings = {CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720,
 	canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, canonicalRecordResourceForSizing,
 	canonicalArrayResourceForSizing, canonicalArrayResourcesForSizing, compareBytes,
-	closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0};
+	closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+	// The owner's journal observation projection (C1).
+	closedJournalObservationControl: compileClosedJournalObservationOwner().closedJournalObservationControl};
 const original = execute<{compiler(): any; evaluate(program: any, parameters: Map<string, number>): Map<string, number> | undefined;
 	book(): any; parts(input: any): number[]; observations(input: any): any[]; exact(input: any): number}>(`
 	${["maintenanceWidthSum", "maintenanceVarUintWidth", "creatorCanonicalCapacityForSizing", "createCreatorNoneResourceProgramCompiler",
@@ -112,7 +115,7 @@ const compiled = execute<(f: any, compiler: any) => {program: any; parameters: M
 	 const successorJobTerms=${initializers.get("successorJobTerms")};${observationLimits}
 	 const roots=${initializers.get("roots")};roots.forEach((root,i)=>compiler.outputNumber("envelope."+i,root));
 	 return {program:compiler.finish(),parameters};};`, {sum, AHE_BOUNDED_READ_LIMITS: {maxUnionBytes: 786432},
-	LIVE_JOURNAL_RETIREMENT_LIMITS: {maxImageBytes: 786432}});
+	LIVE_JOURNAL_RETIREMENT_LIMITS: {maxImageBytes: 786432}, CLOSED_RETIREMENT_BYTES: {maxBytes: 786432, maxItems: 65_536, maxDepth: 128}});
 
 describe("successor native jobs use distinct complete proof lifetimes", () => {
 	it("matches the unchanged original formula, retaining six observations and every repeated readback within each job", () => {
@@ -154,6 +157,9 @@ describe("successor native jobs use distinct complete proof lifetimes", () => {
 	it("preserves observation and program limits and leaves NONE without successor jobs", () => {
 		const f = fixture(), {program, parameters} = compiled(f, original.compiler());
 		parameters.set("observation.5.bytes", 786433); expect(original.evaluate(program, parameters)).toBeUndefined();
+		// The journal observation (index 0) is one carrier under the close's per-carrier encode cap too.
+		const journal = compiled(f, original.compiler());
+		journal.parameters.set("observation.0.bytes", 786433); expect(original.evaluate(journal.program, journal.parameters)).toBeUndefined();
 		const none = fixture(4, 512, 2, 0), result = scalar(none), compiledNone = compiled(none, original.compiler());
 		expect(result[0]).toBe(none.base + none.physical + none.currentTurnover + none.generationTransitions +
 			2 * none.floorImage.byteLength + 6 * none.aheControl.byteLength);

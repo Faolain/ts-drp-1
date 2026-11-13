@@ -97,6 +97,7 @@ import {
 	type V3SettlementSourceSelectionRequest,
 	type V3TerminalMigrationSource,
 	withV3TerminalMigrationTargetFloor,
+	bindV3IngressCapacityRefusalListener,
 } from "@ts-drp/node/v3-live";
 import {
 	type AdmittedReceivedVertexView,
@@ -671,6 +672,12 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 * Rejection fails the current session closed; failure, crash or cold reopen may replay notifications.
 	 */
 	onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;
+	/**
+	 * Creator: a received move was refused at a capacity a rollover clears, with the typed reason
+	 * (ISSUANCE_CAPACITY_FORECAST_EXCEEDED). Local observation only: the move stays held and its
+	 * Writer offers it again; a rollover policy may seal sooner (examples/v3-room rollover `refused`).
+	 */
+	onIngressCapacityRefusal?(reason: string): void;
 	onMigrationTarget?(session: V3RoomSession<Projection>, objectId: string): void;
 	/**
 	 * Observation only: typed diagnostics of paths the room is not expected to reach
@@ -5475,6 +5482,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			throw error;
 		}
 	};
+	const onIngressCapacityRefusal = input.onIngressCapacityRefusal;
+	if (onIngressCapacityRefusal !== undefined)
+		bindV3IngressCapacityRefusalListener(admittedSink, (reason) => {
+			if (!closed) onIngressCapacityRefusal(reason);
+		});
 	try {
 		// Creator restore currency: armed once the local head and lineage are known and before anything
 		// of this open can sign (the startup plane, its drains and the creator close binding follow).

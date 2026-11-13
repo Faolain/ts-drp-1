@@ -76,6 +76,36 @@ it("binds atomic row rewrites to exact prepared and completed native images", ()
 	}
 });
 
+it("keeps a legacy issuance control's ownership when its first floored preparation upgrades it to control-2", () => {
+	// Lazy upgrade (issuance-image-capacity.qnt): the native owner writes control-2 once a preparation
+	// carries floorEpoch. The domain names the owner's family, and derived phases follow the contents.
+	const legacyCompleted = {decisionDigest: "07".repeat(32), sourceProofDigest: "08".repeat(32), throughEpoch: 2, protectedRecords: []};
+	const control = {kind: "v3-issuance-retirement-control-1", objectId: "upgrade-room", incarnation: "01".repeat(32),
+		revision: 3, sequence: 2, active: null, completed: legacyCompleted};
+	const preparation = {decisionDigest: "02".repeat(32), sourceProofDigest: "03".repeat(32), throughEpoch: 4, floorEpoch: 2,
+		protectedRecords: []};
+	const before = "04".repeat(32), after = "05".repeat(32);
+	const domain = captureClosedEpochRetirementMetadataDomain(16, control, before, preparation, undefined, after);
+	const kind = "v3-issuance-retirement-control-2";
+	const prepared = {...control, kind, revision: 4, sequence: 3, active: {sequence: 3, preparation}};
+	const completed = {...control, kind, revision: 5, sequence: 3, completed: preparation};
+	expect(validateClosedEpochRetirementMetadataDomain(control, before, preparation, domain, undefined, after)).toBe("old");
+	expect(validateClosedEpochRetirementMetadataDomain(prepared, before, preparation, domain, undefined, after)).toBe("prepared");
+	expect(validateClosedEpochRetirementMetadataDomain(completed, after, preparation, domain, undefined, after)).toBe("completed");
+	// A completion that kept the legacy label is not the image the owner writes.
+	expect(() => validateClosedEpochRetirementMetadataDomain({...completed, kind: control.kind}, after, preparation, domain,
+		undefined, after)).toThrow();
+	// A legacy (unfloored) commitment keeps its exact domain bytes and phases.
+	const {floorEpoch: _floor, ...legacy} = preparation;
+	const legacyDomain = captureClosedEpochRetirementMetadataDomain(16, control, before, legacy, undefined, after);
+	expect(legacyDomain[1]).toEqual(domain[1]);
+	expect(validateClosedEpochRetirementMetadataDomain({...control, revision: 5, sequence: 3, completed: legacy}, after, legacy,
+		legacyDomain, undefined, after)).toBe("completed");
+	// Another owner's kind is still a different domain.
+	expect(() => validateClosedEpochRetirementMetadataDomain({...control, kind: "v3-live-journal-retirement-control-1"}, before,
+		preparation, domain, undefined, after)).toThrow("native metadata ownership changed");
+});
+
 /** This exercises the real sequencer and native codecs. The fixture supplies
  * already authenticated participant facts; it does not claim signature/storage
  * verification. The healthy native fixture covers those independent owners. */

@@ -30,7 +30,7 @@ import {
 	type LiveJournalRetirementControl,
 } from "@ts-drp/live-journal";
 import { describe, expect, it } from "vitest";
-import { ISSUANCE_RETIREMENT_LIMITS, closeIssuanceRetirementProtectedRecords } from "../../issuance-store/src/retirement.js";
+import { ISSUANCE_RETIREMENT_LIMITS, closeIssuanceRetirementProtectedRecords, issuanceRetirementFloor } from "../../issuance-store/src/retirement.js";
 
 import {
 	createCreatorClosedRollbackProofAccounting,
@@ -46,6 +46,7 @@ import {capturePromotionRecord, capturePromotionArray, capturePromotionBytes} fr
 import {LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES} from "@ts-drp/live-journal";
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership } from "../src/internal/creator-close-membership.js";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 describe("private issuance hole selection", () => {
 	it("classifies exact terminal coverage only after publication and outside open settlement work", () => {
@@ -81,8 +82,10 @@ describe("private issuance hole selection", () => {
 		expect(run({authenticatedSettlementSourceRow: () => ({digest: "altered"})}).covered).toBe(false);
 	});
 	it("requires covered published work, physical absence and complete replay exclusion; preserves SAME-intent and permanent holes", () => {
-		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nclosedIssuanceProtectedRecordsForRetirement;`, {
-			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");},
+		// fix/maintenance-image-capacity: the selection returns {floorEpoch?, protectedRecords} and
+		// selects only rows at or below the retirement floor (closedIssuanceRetirementFloor).
+		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\n(input) => closedIssuanceProtectedRecordsForRetirement(input).protectedRecords;`, {
+			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");}, issuanceRetirementFloor,
 			closeIssuanceRetirementProtectedRecords: (input: {protectedRecords: readonly unknown[]}) => input.protectedRecords,
 		});
 		const digest = new Uint8Array(32).fill(3), scope = {objectId: "room", author: "author"};
@@ -911,13 +914,16 @@ describe("single immutable journal plan native proof charges", () => {
 			native[0]!.controlBytes.byteLength, native[0]!.planBytes!.byteLength]);
 	});
 
-	it("preserves the complete original semantic PRE wrapper without embedding the newly exposed carrier array", () => {
+	it("preserves the semantic PRE wrapper (its drain plan by digest, C1) without embedding the newly exposed carrier array", () => {
 		const original = {control: controls[0], image: plan.sourceImage, canonicalRows: [Uint8Array.of(1, 2)]};
 		const value = {...original, exactCanonicalControlCarriers: [native[0]!.controlBytes, native[0]!.planBytes!]};
 		const wrappers = execute<readonly unknown[]>(`${declaration("creatorIssuanceMaintenanceObservationCarriers")}
 			creatorIssuanceMaintenanceObservationCarriers({journal: value, snapshot: null, ahe: null,
 				floor: null, floorImage: null, snapshotInventory: null});`, {value});
-		expect(encodeCanonical(wrappers[0])).toEqual(encodeCanonical(original));
+		// The wrapper holds the plan by digest; the exact plan is the separately charged native carrier above.
+		expect(encodeCanonical(wrappers[0])).toEqual(encodeCanonical({...original, control: closedJournalObservationControl(controls[0])}));
+		expect(Object.keys(wrappers[0] as object)).toEqual(["control", "image", "canonicalRows"]);
+		expect(encodeCanonical(wrappers[0]).byteLength).toBeLessThan(encodeCanonical(original).byteLength);
 	});
 });
 
@@ -2349,11 +2355,13 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		expect(same(value, decodeCanonical(encodeCanonical(value, {maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes})))).toBe(true);
 		const altered = rows.map(r => r.slice()); altered[17]![5] ^= 1;
 		expect(same(value, {...value, canonicalRows: altered})).toBe(false);
-		expect(same(value, {...value, drainSource: {...value.drainSource, canonicalRows: altered}})).toBe(false);
+		// drainSource is the adapter's reconstruction from this same (control, image, rows): those compare.
+		expect(same(value, {...value, drainSource: {...value.drainSource, canonicalRows: altered}})).toBe(true);
 		expect(same(value, {...value, control: {...control, revision: 1}})).toBe(false);
 		expect(same(value, {...value, exactCanonicalControlCarriers: [Uint8Array.of(0)]})).toBe(false);
 		expect(same(value, {...value, extra: true})).toBe(false);
-		expect(same(value, {...value, drainSource: undefined})).toBe(false);
+		// The reconstruction's presence follows control.drain, compared above; it is not compared itself.
+		expect(same(value, {...value, drainSource: undefined})).toBe(true);
 		const reordered = [...rows]; [reordered[0], reordered[1]] = [reordered[1]!, reordered[0]!];
 		expect(same(value, {...value, canonicalRows: reordered})).toBe(false);
 		let invoked = false;
@@ -2795,6 +2803,11 @@ const consume = unique((node): node is ts.VariableDeclaration => ts.isVariableDe
 const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpoch", "closedSigningSummaryResidualRows"].map(declaration).join("\n");
 // Transpiling is a pure function of the program text; each call still evaluates a fresh program.
 const transpiled = new Map<string, string>();
+// The owner's own capture-journal detach (its in-memory drainSource never reaches the encoder).
+const detachClosedCaptureJournal = Function("decodeCanonical", "closedRetirementBytes", `"use strict"; ${ts.transpile(
+	declaration("detachClosedCaptureJournal"), { target: ts.ScriptTarget.ES2022 })}; return detachClosedCaptureJournal;`)(decodeCanonical, encodeCanonical);
+// The owner's journal observation projection (C1): a drain control's plan rides in the carrier by digest.
+const { closedJournalObservationControl } = compileClosedJournalObservationOwner();
 function execute<T>(code: string, context: Record<string, unknown>): T {
 	let js = transpiled.get(code);
 	if (js === undefined) {
@@ -2802,6 +2815,7 @@ function execute<T>(code: string, context: Record<string, unknown>): T {
 		transpiled.set(code, js);
 	}
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
+		closedObservationCarrierBytes: encodeCanonical, detachClosedCaptureJournal, closedJournalObservationControl,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
 	// Execute in the codec's realm. A separate VM realm would produce foreign
@@ -3414,6 +3428,10 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 				immediateJournalAppend: f.args[1], unsignedJournalSuccessor: f.args[2], successorJournalAppend: f.args[3],
 				currentContinuationAppends: f.args[4], preclose, closedMembershipByteLength: f.args[5]?.closedMembershipByteLength,
 				received: f.args[5]?.localIssuerBasis === undefined ? undefined : {localIssuerBasis: f.args[5].localIssuerBasis},
+				// The fence horizon's successor membership width has its own owner (creator-fence-horizon-membership.test.ts).
+				creatorFenceHorizonMembershipWidthForSizing: () => HORIZON_MEMBERSHIP, successorNativeJobPhases: undefined,
+				capacityDimensions: undefined, input: {exactCanonicalCurrentLatchedAclBytes: new Uint8Array(1),
+					exactCanonicalSuccessorLatchedAclBytes: new Uint8Array(1), exactCanonicalUnsignedVertexBytes: new Uint8Array(1)},
 				journalFutureAppendPostimageWidths: (...args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
 					calls++; return journalFutureAppendPostimageWidths(...args);
 				},
@@ -3421,13 +3439,21 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 	}
 	const outcome = (run: () => unknown) => {try {return {value: run()};} catch (error) {
 		return {error: (error as Error).message, cause: (error as Error & {cause?: Error}).cause?.message};}};
+	const HORIZON_MEMBERSHIP = 2_048;
+	// An ordinary (non-preclose) quote also asks for the successor fence's horizon (j22, fix/maintenance-image-capacity)
+	// and the membership row that successor's own close writes (sdiag d4/d5).
+	const ordinary = (args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
+		const withHorizon = [...args] as Parameters<typeof journalFutureAppendPostimageWidths>;
+		withHorizon[5] = {...args[5], fenceHorizon: true, successorClosedMembershipByteLength: HORIZON_MEMBERSHIP};
+		return journalFutureAppendPostimageWidths(...withHorizon);
+	};
 	it("validates complete CURRENT separately and freshly computes every FUTURE recipe across cardinality/backend shapes", () => {
 		for (const sql of [false, true]) for (const count of [0, 127]) {
 			const f = fixture(sql, count), o = owner();
 			const currentArgs = [...f.args] as Parameters<typeof journalFutureAppendPostimageWidths>;
 			currentArgs[5] = {control: null};
 			expect(o.run({...f, args: currentArgs}, true)).toEqual(journalFutureAppendPostimageWidths(...currentArgs));
-			const expected = journalFutureAppendPostimageWidths(...f.args), first = o.run(f);
+			const expected = ordinary(f.args), first = o.run(f);
 			expect(first).toEqual(expected);
 			for (let schedule = 0; schedule < 8; schedule++) {const fresh = o.run(f); expect(fresh).toEqual(first); expect(fresh).not.toBe(first);}
 			expect(o.calls()).toBe(10); // Full PRE freshly validated by each original producer invocation.
@@ -3448,7 +3474,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 		];
 		for (const change of mutations) {
 			const f = fixture(), o = owner(); o.run(f); change(f);
-			expect(outcome(() => o.run(f))).toEqual(outcome(() => journalFutureAppendPostimageWidths(...f.args)));
+			expect(outcome(() => o.run(f))).toEqual(outcome(() => ordinary(f.args)));
 			expect(o.calls()).toBe(2);
 		}
 		const f = fixture(), a = owner(), b = owner();
@@ -3483,7 +3509,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 			node.expression.getText(parsed).includes("forward.wholeFloor === undefined") && !node.expression.getText(parsed).includes("currentFacts"));
 		const inspect = () => execute<any>(`(() => {${guard.getText(parsed)} return effect();})();`,
 			{frame, capture, forward, facts: {}, input: {proof: {accounting}}, ledgers, effect: () => o.run(f)});
-		expect(inspect()).toEqual(journalFutureAppendPostimageWidths(...f.args));
+		expect(inspect()).toEqual(ordinary(f.args));
 		frame.alive = false;
 		expect(inspect()).toEqual({ok: false, reason: "MAINTENANCE_SOURCE_UNAVAILABLE"});
 		frame.alive = true; capture.currentTrust = {};
@@ -3562,6 +3588,7 @@ describe("CURRENT job phases reuse only identical same-schedule journal widths",
 				const ${map}; currentJobProofEnvelopeByteLengths;`, {
 				currentContinuation: inputPhases === undefined ? undefined : {nativeJobPhases: inputPhases},
 				currentContinuationAppends, nativeObservations, AHE_BOUNDED_READ_LIMITS, LIVE_JOURNAL_RETIREMENT_LIMITS,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 				capture: {journal: {canonicalRows: Uint8Array.of(seed), control: {revision: seed}}, snapshot: {}, ahe: {},
 					floorImage: {}, snapshotInventory: {scopes: [], owner: "owner"}, signingRows: [new Uint8Array(17), new Uint8Array(29)]},
 				immediateJournalAppend: {immediate: seed}, unsignedJournalSuccessor: {successor: seed},
@@ -3989,13 +4016,14 @@ describe("issuance journal postimages stay native-point bounds, not current proo
 			maintenanceEncodedWidth: (width: number) => new Uint8Array(width),
 			maintenanceCanonicalWidth: (value: unknown) => encodeCanonical(value).byteLength,
 			LIVE_JOURNAL_RETIREMENT_LIMITS,
+			CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 		});
 		expect(immediate).toEqual([101]);
 		expect(nativeObservations).toEqual([4,5,6].map((rowCount, index) => ({width: encodeCanonical({
 			control: { revision: 10 + index },
 			image: { imageDigest: "d".repeat(64), scopeCount: 3, rowCount, byteCharge: 900 + rowCount },
 			canonicalRows: new Uint8Array(300 + rowCount),
-		}).byteLength, maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes})));
+		}).byteLength, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}))); // The journal carrier's encode cap.
 		// This executes the original routing/constructor, not native lifetime or
 		// complete forecast conformance. The affected persistent-worker test owns that evidence.
 	});
@@ -4660,16 +4688,20 @@ const sizingProtectedRecords = unique(
 		node.name.text === "protectedRecords" &&
 		node.getText(parsed).includes("vertexDigest")
 );
+// fix/maintenance-image-capacity: the native statement destructures {floorEpoch, protectedRecords}.
 const nativeProtectedRecords = unique(
 	(node): node is ts.VariableDeclaration =>
 		ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) &&
-		node.name.text === "protectedRecords" &&
+		(ts.isIdentifier(node.name)
+			? node.name.text === "protectedRecords"
+			: ts.isObjectBindingPattern(node.name) &&
+				node.name.elements.some((element) => element.name.getText(parsed) === "protectedRecords")) &&
 		node.getText(parsed).includes("closedIssuanceProtectedRecordsForRetirement")
 );
 function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 	forecast: unknown;
 	native: unknown;
+	floored: unknown;
 	before: Uint8Array;
 	after: Uint8Array;
 } {
@@ -4704,7 +4736,8 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 		digest: vertexDigest,
 		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE: 2,
 	});
-	const native = execute(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
+	const native = execute(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
+		issuanceRetirementFloor,
 		// 8f21d1fd/07252cc7: retirement reads the (possibly restored) issuanceRows
 		// and the exact retirement intent labels, not nativeIssuance.rows.
 		issuanceRows: {
@@ -4724,23 +4757,29 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 			if (!condition) throw Error("native-control-input");
 		},
 	});
-	return { forecast, native, before, after: encodeCanonical(issued) };
+	// fix/maintenance-image-capacity: retirement selects protected records only at or below its floor
+	// (no completed control: two epochs behind the Cut); rows above it stay physically retained, so the
+	// sizing forecast, which protects every row through the source epoch, over-reserves them.
+	const epochOf = new Map([[1, 4], [2, 5], [3, 6], [unsigned.authorSequence, unsigned.epoch]]);
+	const floor = Math.max(0, sourceEpoch - 2);
+	const floored = (forecast as { authorSequence: number }[]).filter((entry) => (epochOf.get(entry.authorSequence) ?? Infinity) <= floor);
+	return { forecast, native, floored, before, after: encodeCanonical(issued) };
 }
 describe("R8 source-floor issuance metadata chronology affected controls", () => {
 	it("CURRENT uses original Cut4 protection while retaining every physical issued input", () => {
 		const result = issuanceProtectedRecordsForSource(4);
-		expect(result.forecast).toEqual(result.native);
+		expect(result.native).toEqual(result.floored);
 		expect((result.forecast as unknown[]).length).toBe(1);
 		expect(result.after).toEqual(result.before);
 	});
 	it("FUTURE Cut5 includes the original new epoch5 candidate exactly once", () => {
 		const result = issuanceProtectedRecordsForSource(5);
-		expect(result.forecast).toEqual(result.native);
+		expect(result.native).toEqual(result.floored);
 		expect((result.forecast as unknown[]).length).toBe(3);
 		expect(result.after).toEqual(result.before);
 	});
 	it("the selected protection feeds complete PRE and completed controls without changing the prior descriptor", () => {
-		const { forecast, native } = issuanceProtectedRecordsForSource(4);
+		const { floored: forecast, native } = issuanceProtectedRecordsForSource(4);
 		const old = { revision: 7, sequence: 3, active: null, completed: { fullPriorDescriptor: ["all", "PRE"] } };
 		const controls = (protectedRecords: unknown): unknown[] => {
 			const preparation = {
@@ -5128,6 +5167,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 			turnoverControl: null,
 			closedRetirementEqual: (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b),
 			AHE_BOUNDED_READ_LIMITS: { maxUnionBytes: 262144 },
+			CLOSED_RETIREMENT_BYTES: { maxBytes: 262144, maxItems: 65_536, maxDepth: 128 },
 		});
 		expect(result.selection).toBeDefined();
 		expect(result.projected.revision).toBe(8);
@@ -5241,6 +5281,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 				finalJournalCapacity: undefined,
 				AHE_BOUNDED_READ_LIMITS,
 				LIVE_JOURNAL_RETIREMENT_LIMITS,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 				objectId: "room",
 				futureSnapshotTurnover: { retiringScopes: [snapshotScope75(3)] },
 				futureSnapshotPriorWrapperWidth: beforeWidth,

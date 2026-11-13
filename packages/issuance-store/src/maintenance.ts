@@ -56,6 +56,13 @@ export interface DurableIssuancePruningMaintenance {
 		sign: () => Promise<Uint8Array>
 	): Promise<Uint8Array>;
 	acquireRetirementControl?(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead>;
+	/**
+	 * Rule A: the store's one plan-before side row for this object (the BEFORE plan images of its
+	 * completed control-2 preparation), or null. Read only to reconstruct the committed source; it
+	 * carries no authority and is opened against the completed preparation by
+	 * openIssuanceRetirementPlanBefore.
+	 */
+	readRetirementPlanBefore?(input: { readonly objectId: string }): Promise<Uint8Array | null>;
 	inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
 	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
 	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;

@@ -822,6 +822,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 				createRoomNetwork(author, roomChannelName(openedObjectId), knownPeerIds, automatic),
 			// The policy ends at a migration redirect, so it counts the source room only.
 			onAcceptedVertex: (vertex) => policy?.observe(vertex),
+			onIngressCapacityRefusal: (reason) => policy?.refused(reason),
 			onMigrationTarget: (target, targetObjectId): void => {
 				redirectedRoom = target;
 				currentObjectId = targetObjectId;
