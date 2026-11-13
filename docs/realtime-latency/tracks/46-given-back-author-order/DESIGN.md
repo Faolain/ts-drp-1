@@ -201,6 +201,9 @@ the one owner, `issuanceSourceCustodyPlanResourceForSizing` in packages/issuance
 
 - Store conformance: order by origin; entries added atomically with consumption; bound 64; old-plan
   reads; refusal by older readers.
+- Store test at the record bound: 64 unconsumed records plus entries present, and a new expiry finds no
+  free slot. The move is deferred (`windowDeferredMoves`) and no entry is dropped. (Requested by the
+  slow-member review.)
 - Native: `tests/app-rollover-handback-crash-native.test.ts` gets edges for re-hand-back of a reissued
   move (origin kept across the crash).
 - Make the RED green: `tests/app-rollover-given-back-origin-order.test.ts`. The Grid reload case needs
