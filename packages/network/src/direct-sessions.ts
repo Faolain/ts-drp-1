@@ -505,10 +505,7 @@ class LegacySender {
 			pending.onWriteStart?.();
 			await uint8ArrayToStream(stream, pending.bytes);
 			// A legacy receiver closes its end only after it admitted the frame: that close is the receipt.
-			if (
-				pending.acknowledged &&
-				(!(await waitClosed(stream, LEGACY_CLOSE_DEADLINE_MS)) || stream.status !== "closed")
-			)
+			if (pending.acknowledged && (!(await waitClosed(stream, LEGACY_CLOSE_DEADLINE_MS)) || stream.status !== "closed"))
 				throw new Error("The legacy receiver did not close the stream after the frame");
 			settle(pending);
 		} catch (cause) {

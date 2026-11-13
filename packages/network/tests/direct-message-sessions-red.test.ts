@@ -461,20 +461,24 @@ describe("direct message acknowledged sends", () => {
 		expect(await state(acknowledged)).toEqual({ name: "DirectMessageSendError", code: "DIRECT_SESSION_RESET" });
 	});
 
-	it("rejects with the abort reason when the caller gives up while waiting for the receipt", { timeout: 30_000 }, async () => {
-		const f = await pair();
-		await f.sender.sendMessage(f.receiver.peerId, message("warm"));
-		expect(await until(() => f.arrivals.includes("warm"))).toBe(true);
-		holdAdmission(f.receiver);
-		const controller = new AbortController();
-		const acknowledged = f.sender.sendMessage(f.receiver.peerId, message("acked"), {
-			acknowledged: true,
-			signal: controller.signal,
-		});
-		expect(await state(acknowledged)).toBe("pending");
-		controller.abort(new Error("caller gave up"));
-		await expect(acknowledged).rejects.toThrow("caller gave up");
-	});
+	it(
+		"rejects with the abort reason when the caller gives up while waiting for the receipt",
+		{ timeout: 30_000 },
+		async () => {
+			const f = await pair();
+			await f.sender.sendMessage(f.receiver.peerId, message("warm"));
+			expect(await until(() => f.arrivals.includes("warm"))).toBe(true);
+			holdAdmission(f.receiver);
+			const controller = new AbortController();
+			const acknowledged = f.sender.sendMessage(f.receiver.peerId, message("acked"), {
+				acknowledged: true,
+				signal: controller.signal,
+			});
+			expect(await state(acknowledged)).toBe("pending");
+			controller.abort(new Error("caller gave up"));
+			await expect(acknowledged).rejects.toThrow("caller gave up");
+		}
+	);
 
 	it(
 		"over the legacy protocol, resolves only once the receiver closed the stream after admitting",
