@@ -83,6 +83,15 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 				after: [5, 6, 7, 8],
 				lineageAfter: { exhausted: false, next: 9 },
 			});
+		if (native)
+			expect(report.sizing).toMatchObject({
+				overOk: false,
+				overSigned: 0,
+				unchanged: true,
+				fitsOk: true,
+				after: [9, 10, 11, 12, 13, 14, 15, null],
+				chargedCoversWritten: true,
+			});
 	}, 120_000);
 });
 

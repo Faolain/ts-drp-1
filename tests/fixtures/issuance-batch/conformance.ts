@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Conformance helpers retain inferred report types. */
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	durableIssuancePruningMaintenanceForStore,
+	ISSUANCE_RETIREMENT_LIMITS,
+	issuanceUnsignedBatchPostimageCharge,
+} from "@ts-drp/issuance-store/maintenance";
 import type {
 	DurableIssuanceStore,
 	DurableIssueCommit,
@@ -22,6 +27,9 @@ import type {
 // - precondition:  an entry already replaced refuses the batch before any signature, nothing written;
 // - progress:      a source split in two replacement chunks across two batches leaves the plan in the
 //                  same partial and final progress states as the same singles;
+// - sizing (native stores only): a batch of 8 whose last rows cross the store's byte bound is refused
+//                  whole before its marker (no signature, nothing written); the 7 that fit commit, and
+//                  the batch charge sized before the marker is at least the bytes the commit wrote;
 // - resume (native stores only): a batch that fails after its entered marker reports
 //                  ISSUANCE_OUTCOME_UNKNOWN, writes no row, and the same whole batch then commits.
 
@@ -327,6 +335,54 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 			resumedOk: resumed.ok,
 			after: after.issued,
 			lineageAfter: after.lineage,
+		};
+	}
+	if (native) {
+		// Sizing at the bound: each replacement is ~100 KB, so 8 cross the 786,432-byte image bound and 7 fit.
+		const pad = "p".repeat(100_000);
+		const big = (sourceSequence: number): Row => ({
+			effect: { kind: "replacement", sourceSequence },
+			bytes: (sequence) => preimage(sequence, 1, { action: "place", id: `m-${sourceSequence}`, pad }),
+		});
+		const { store, sources } = await settledStore(factory, "sizing", 8);
+		const census = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+		if (census === undefined) throw new Error("native store has no recovery census");
+		const read = () =>
+			census({
+				objectId: SCOPE.objectId,
+				limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+			});
+		const before = await snapshot(store, 9, 16);
+		const over = await issueBatch(store, sources.map((source) => big(source.authorSequence)));
+		const between = await snapshot(store, 9, 16);
+		const fitting = sources.slice(0, 7).map((source) => big(source.authorSequence));
+		const rowsBefore = (await read()).rows;
+		const plan = await store.readSettlementPlan(SCOPE);
+		const intents = fitting.map((row, index) => {
+			const bytes = row.bytes(9 + index);
+			return { authorSequence: 9 + index, canonicalPreimageBytes: bytes, digest: digestOf(bytes), planEffect: row.effect! };
+		});
+		const charged = issuanceUnsignedBatchPostimageCharge(rowsBefore, SCOPE, {
+			...intents[0]!,
+			exactCanonicalPlanBytes: encodeCanonical(plan),
+			followingIntents: intents.slice(1),
+		}).logicalBytes;
+		const fits = await issueBatch(store, fitting);
+		const after = await snapshot(store, 9, 16);
+		const written = encodeCanonical((await read()).rows).byteLength;
+		report.sizing = {
+			overOk: over.ok,
+			overCode: over.ok ? null : over.code,
+			overSigned: over.signed.length,
+			unchanged:
+				between.issued.every((value) => value === null) &&
+				JSON.stringify(between.lineage) === JSON.stringify(before.lineage) &&
+				sameBytes(between.planBytes, before.planBytes),
+			fitsOk: fits.ok,
+			after: after.issued,
+			chargedCoversWritten: charged >= written,
+			charged,
+			written,
 		};
 	}
 	return report;
