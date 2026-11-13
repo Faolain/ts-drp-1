@@ -240,6 +240,66 @@ it("a member's move issued during its recipient lull waits for at most one turno
 	}
 }, 900_000);
 
+// A (a): the recipient lull runs as bounded steps outside any single lifecycle transition, so a second
+// request while one runs (an explicit lull, a deferred lull's retry, a scheduled one) must join it, not
+// start a second run whose steps interleave with the first: two runs complete two turnovers in one
+// epoch, and each later lull entry ends the boundary the previous one recorded for the install.
+it("a lull requested while the member's lull runs joins it: one turnover per epoch", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-lull-join-"));
+	directories.push(directory);
+	const settles: { epoch: number }[] = [];
+	const previous = Reflect.get(globalThis, "__warmProofEvent");
+	Reflect.set(globalThis, "__warmProofEvent", (event: { kind?: string; epoch?: number }) => {
+		if (event.kind === "recipient-lull-turnover-settle" && typeof event.epoch === "number") settles.push({ epoch: event.epoch });
+	});
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let n = 0;
+		try {
+			let epoch = await warmUp(creator, writer, wire, rows, ordinal, async () => {
+				await writer.issue((await writer.authorityEpoch()) ?? 0, n++);
+			});
+			const sampled: { epoch: number; turnovers: number }[] = [];
+			lull.delayMs = 1_000;
+			for (let roll = 0; roll < 40 && sampled.length < 3; roll++) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch, 300_000);
+				const deadline = performance.now() + 3_000;
+				while (lull.active === 0 && performance.now() < deadline) await sleep(10);
+				if (lull.active === 0) {
+					await rows.toCreator();
+					continue;
+				}
+				// While the scheduled lull's pass runs: an explicit request, as a page or a retry makes.
+				await writer.lull();
+				const quiet = performance.now() + 30_000;
+				let idleSince = performance.now();
+				while (performance.now() < quiet) {
+					if (lull.active > 0) idleSince = performance.now();
+					else if (performance.now() - idleSince > 2_500) break;
+					await sleep(50);
+				}
+				const member = (await writer.authorityEpoch()) ?? 0;
+				sampled.push({ epoch: member, turnovers: settles.filter((settle) => settle.epoch === member).length });
+				await rows.toCreator();
+			}
+			lull.delayMs = 0;
+			process.stdout.write(`LULL_JOIN ${JSON.stringify({ sampled })}\n`);
+			expect(sampled.length, "scheduled lulls ran turnover passes").toBeGreaterThan(0);
+			for (const sample of sampled) expect(sample.turnovers, `epoch ${sample.epoch}: completed lull turnovers`).toBeLessThanOrEqual(1);
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		Reflect.set(globalThis, "__warmProofEvent", previous);
+		restore();
+	}
+}, 900_000);
+
 // The livelock: a member BEHIND (its rows never reached the creator for `epochs` creator epochs) is
 // connected again while the creator keeps rolling every CREATOR_MOVES_PER_EPOCH moves, one move every
 // CREATOR_MOVE_MS. The member's host costs are injected at the measured values: each turnover pass
