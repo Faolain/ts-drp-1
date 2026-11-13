@@ -6484,8 +6484,9 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 	function cellInputs() {
 		const native = {rows: {issued: [{preimage: Uint8Array.of(7), signature: new Uint8Array(64)}], lineages: [], plans: [], outbox: []}, image: {digest: "actual"}, control: null};
 		const pages: unknown[] = [], state = {identity: {}, key: {format: "raw", bytes: new Uint8Array(32).fill(4)}};
-		const store = Object.freeze({readOutboxPage: async () => pages, acquireNativeReadReservation: async () => undefined});
-		const maintenance = Object.freeze({readBoundedRecoveryCensus: async () => native});
+		const reads = {native: 0, pages: 0};
+		const store = Object.freeze({readOutboxPage: async () => {reads.pages++; return pages;}, acquireNativeReadReservation: async () => undefined});
+		const maintenance = Object.freeze({readBoundedRecoveryCensus: async () => {reads.native++; return native;}});
 		const floors = new WeakMap(), trust = {objectId: "room", currentEpoch: 3}, counted = new Set([1]);
 		const registration: any = {issuanceStore: store, liveJournalStore: Object.freeze({readiness: () => {}, readPage: () => {}}),
 			closeVertices: new Map([["vertex", {kind: "drp-vertex", hash: "vertex", operation: {bytes: Uint8Array.of(3)}}]]),
@@ -6506,8 +6507,96 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 				return () => {try {return Buffer.compare(encodeCanonical(value), bytes) === 0;} catch {return false;}};
 			}, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0};
 		return {sealed: encodeCanonical({nativeIssuance: native}), registration, trust, runtime: {currentTrust: trust, sourceBound: true,
-			nativeBranchSource: undefined, migrationSource: undefined}, pages, state, floors, counted, bindings};
+			nativeBranchSource: undefined, migrationSource: undefined}, pages, state, floors, counted, bindings, native, reads};
 	}
+	// A close hold runs several issuance leases, and checks between them with no lease. Each lease used
+	// to start with a complete census (the full outbox walk, every row's signature and classification),
+	// and each unheld check was one too: about 4 complete censuses per hold and 19-20 per retiring seal
+	// (.logs/realtime-resume-2026-11-10/lull/trace1). The census is a pure function of its inputs: the
+	// complete native census, the outbox pages, the replay rows and the bound registration context. A
+	// later check that reads all of them again, byte for byte equal, needs no new classification.
+	function holdLeases() {
+		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
+		const state = {captures: 0, probes: 0, probeCurrent: true, replays: 0, replayCurrent: true};
+		const probe = Object.freeze({checkCurrent: async () => {state.probes++; return state.probeCurrent;}});
+		const original: Reservation = {check: async () => {}, release: async () => {}};
+		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
+			prepareCreatorUnchangedHeldCensusRead;`, {...cell.bindings,
+			ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor});
+		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes;
+			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
+			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
+			recoveryCloseHolds.set(capability, facts);
+			${s.fn("fullRecoveryCloseHoldFacts").getText(s.file)}
+			({facts});`, {
+			ObjectFreeze: Object.freeze, registration: cell.registration, currentTrust: cell.trust, capability, recoveryCloseHolds: registry, sealed,
+			live: () => true, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			sourceDependencies: undefined, activeSource: undefined, runtime: cell.runtime, readJournalCurrent: undefined,
+			replay: {verify: async () => {state.replays++; return state.replayCurrent;}},
+			prepareCreatorUnchangedHeldCensusRead: prepare,
+			// The complete walk, as readCreatorRecoveryDependencyCensus does it: it fills the captured input
+			// view (the pages it read; the storage probe only under a lease) and returns the sealed bytes.
+			captureCensus: async (held: unknown, captured?: {pages: unknown[]; retainedBytes: number; nativeCurrent?: unknown}) => {
+				state.captures++;
+				if (captured !== undefined) {
+					captured.pages.push({afterKey: null, bytes: encodeCanonical(cell.pages)}); captured.retainedBytes = 1;
+					if (held !== undefined) captured.nativeCurrent = probe;
+				}
+				return state.replayCurrent && Buffer.compare(encodeCanonical({nativeIssuance: cell.native}), sealed) === 0 ? sealed : encodeCanonical({changed: true});
+			},
+		});
+		return {facts: owner.facts, state, cell, lease: () => owner.facts.ownIssuanceReservation(original)};
+	}
+	it("a later lease and an unheld check of the same hold reuse the classification after reading every input again, byte for byte", async () => {
+		const hold = holdLeases(), {state, cell} = hold;
+		let lease = hold.lease();
+		await hold.facts.check(); for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.captures, "first lease: one complete census, then storage currency").toBe(1); expect(state.probes).toBe(3);
+		await lease.release();
+		const native = cell.reads.native, pages = cell.reads.pages, replays = state.replays;
+		await hold.facts.check();
+		expect(state.captures, "unheld check: no new classification").toBe(1);
+		expect(cell.reads.native - native, "unheld check: an actual complete native census read").toBe(1);
+		expect(cell.reads.pages - pages, "unheld check: every outbox page read again").toBe(1);
+		expect(state.replays - replays, "unheld check: the original replay verification").toBe(1);
+		lease = hold.lease();
+		await hold.facts.check();
+		expect(state.captures, "second lease: no new classification").toBe(1);
+		expect(cell.reads.native - native, "second lease: an actual complete native census read").toBe(2);
+		const probes = state.probes;
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.captures).toBe(1); expect(state.probes - probes, "second lease: storage currency after its first check").toBe(3);
+		await lease.release();
+	});
+	it("a changed input between leases, or without a lease, makes the next check the complete census", async () => {
+		const changes: Record<string, (hold: ReturnType<typeof holdLeases>) => void> = {
+			"native census bytes": hold => {(hold.cell.native.rows.issued[0]!.preimage as Uint8Array)[0] ^= 1;},
+			"outbox page bytes": hold => {hold.cell.pages.push({foreign: 1});},
+			"replay rows": hold => {hold.state.replayCurrent = false;},
+			"authorization": hold => {hold.cell.registration.authorization.value.writers.push("foreign");},
+			"pending ingress": hold => {hold.cell.registration.pendingIngress.set("foreign", {});},
+			"source identity": hold => {hold.cell.state.identity = {};},
+			"carrier artifact bytes": hold => {hold.cell.registration.payload.catalog.exactArtifactBytes[0] ^= 1;},
+		};
+		for (const [change, apply] of Object.entries(changes)) for (const leased of [false, true]) {
+			const hold = holdLeases(), lease = hold.lease(), label = `${change} (${leased ? "new lease" : "unheld"})`;
+			await hold.facts.check(); await lease.release();
+			expect(hold.state.captures, `${label}: before`).toBe(1);
+			apply(hold);
+			const next = leased ? hold.lease() : undefined;
+			if (change === "native census bytes" || change === "replay rows") {
+				// A changed native census or replay row is stale: the hold is refused, as the complete census would refuse it.
+				await expect(hold.facts.check(), label).rejects.toThrow("stale or unclassified");
+			} else {
+				// Any other changed binding is decided by the complete census again.
+				await hold.facts.check();
+				expect(hold.state.captures, `${label}: the next check is complete`).toBe(2);
+			}
+			await next?.release();
+		}
+	}, 120_000);
 	it("a turn's checks after enrollment use the unchanged-held census; a bound input changed between checks forces the complete census", async () => {
 		// Positive control: first check after enrollment is complete (prepares the cell), later checks are not.
 		const control = turnHold();
