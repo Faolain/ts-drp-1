@@ -885,20 +885,33 @@ export function settlementReissueLastCarrier(plan: Pick<SettlementPlan, "entries
 
 /**
  * The reissue origins a plan write keeps: an entry is dropped once the creator's signed frontier in the
- * installed settlement capability admitted its chain's last carrier (`admittedThrough` >= that row),
- * never on local acceptance or relay evidence, and never because the reissued row was replaced.
- * @param plan - The durable plan before the write (for the replacement links).
+ * installed settlement capability ADMITTED its chain's last carrier, never on local acceptance or relay
+ * evidence, and never because the reissued row was replaced. Being at or below the frontier
+ * (`admittedThrough`, terminalThrough) is not enough: the frontier can pass a displaced row (a later own
+ * fence admitted), and such a row is still given back later (its window expiry or its frontier
+ * resolution), which needs the entry for the move's origin. So an entry is kept while its last carrier
+ * is displaced in this write (`displaced`) or has an own plan entry other than "committed" (displaced,
+ * retained, expired or replaced). Model settlement-window.qnt settlementAuthorOrder, variant terminalDrop.
+ * @param plan - The durable plan before the write (for the replacement links and dispositions).
  * @param origins - The entries so far in this write.
- * @param admittedThrough - The signed frontier's admitted author sequence, or null without one.
+ * @param admittedThrough - The signed frontier's terminal author sequence, or null without one.
+ * @param displaced - The own rows this write knows displaced (its displaced sources).
  * @returns The entries kept (undefined when none).
  */
 export function settlementReissueOriginsUnsettled(
 	plan: Pick<SettlementPlan, "entries">,
 	origins: readonly SettlementReissueOrigin[] | undefined,
-	admittedThrough: number | null
+	admittedThrough: number | null,
+	displaced: ReadonlySet<number> = new Set()
 ): readonly SettlementReissueOrigin[] | undefined {
 	if (origins === undefined || admittedThrough === null) return origins;
-	const kept = origins.filter((entry) => settlementReissueLastCarrier(plan, entry.reissueSequence) > admittedThrough);
+	const admitted = (sequence: number): boolean =>
+		sequence <= admittedThrough &&
+		!displaced.has(sequence) &&
+		!plan.entries.some(
+			(entry) => entry.sourceObjectId === undefined && entry.sourceSequence === sequence && entry.disposition !== "committed"
+		);
+	const kept = origins.filter((entry) => !admitted(settlementReissueLastCarrier(plan, entry.reissueSequence)));
 	return kept.length === 0 ? undefined : kept.length === origins.length ? origins : kept;
 }
 

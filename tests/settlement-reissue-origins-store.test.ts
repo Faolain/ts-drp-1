@@ -279,6 +279,43 @@ describe("settlement reissue origins: codec", () => {
 		expect(snapshot(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 20))).toEqual(snapshot([origin(20, 3)]));
 		expect(settlementReissueOriginsUnsettled(before, before.reissueOrigins, null)).toBe(before.reissueOrigins);
 		expect(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 24)).toBeUndefined();
+		// At or below the frontier is not admitted: a last carrier displaced in this write, or with an own
+		// plan entry still settling (the frontier passed it through a later fence), keeps the entry for its
+		// later give-back (model settlement-window.qnt settlementAuthorOrder, terminalDrop).
+		expect(snapshot(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 30, new Set([24])))).toEqual(
+			snapshot([origin(20, 3)])
+		);
+		for (const disposition of ["rebase", "transform", "expire", "manual-review"] as const) {
+			const settling = copied(
+				plan(5, {
+					entries: [
+						...before.entries,
+						{ disposition, replacementSequence: null, sourceDigest: new Uint8Array(32).fill(0xd4), sourceSequence: 24 },
+					],
+					reissueOrigins: [origin(20, 3)],
+				})
+			);
+			expect(snapshot(settlementReissueOriginsUnsettled(settling, settling.reissueOrigins, 30)), disposition).toEqual(
+				snapshot([origin(20, 3)])
+			);
+		}
+		const committed = copied(
+			plan(5, {
+				entries: [
+					...before.entries,
+					{
+						disposition: "committed",
+						replacementSequence: null,
+						sourceContextDigest: new Uint8Array(32).fill(0xd5),
+						sourceDigest: new Uint8Array(32).fill(0xd4),
+						sourceResolutionDigest: new Uint8Array(32).fill(0xd6),
+						sourceSequence: 24,
+					},
+				],
+				reissueOrigins: [origin(20, 3)],
+			})
+		);
+		expect(settlementReissueOriginsUnsettled(committed, committed.reissueOrigins, 30)).toBeUndefined();
 		// The expiry of the last carrier writes the record at the origin and drops the entry in the same write.
 		const merged = settlementWindowHandBacks(before, [
 			{ sourceSequence: 24, sourceDigest: new Uint8Array(32).fill(0xd3), sourceEpoch: 9, operations: [OPERATION] },

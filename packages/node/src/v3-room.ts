@@ -7471,10 +7471,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		for (const sequence of windowRecords.expired) expired.add(sequence);
 		// A reissued move settled once the creator's signed frontier in the installed settlement capability
 		// admits its chain's last carrier: its entry is dropped (never on local acceptance or relay evidence,
-		// and never because the reissued row was replaced).
+		// and never because the reissued row was replaced). A last carrier displaced in this write or still
+		// settling in the plan is not admitted, even at or below the frontier.
 		const admittedThrough = activeHandle === undefined ? undefined : v3InstalledSettlementAdmittedThrough(activeHandle);
 		const reissueOrigins =
-			current === null ? undefined : settlementReissueOriginsUnsettled(current, windowRecords.reissueOrigins, admittedThrough ?? null);
+			current === null
+				? undefined
+				: settlementReissueOriginsUnsettled(
+						current,
+						windowRecords.reissueOrigins,
+						admittedThrough ?? null,
+						new Set(sources.map((source) => source.authorSequence))
+					);
 		const completePlan = mergedSettlementPlan(
 			sources,
 			current,
