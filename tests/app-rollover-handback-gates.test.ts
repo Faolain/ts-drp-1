@@ -137,18 +137,22 @@ it("given-back moves are offered while the member's settlement lag holds its new
 	policy.bind(room);
 	// A new move refused at epoch 3 is kept with the given-back moves.
 	await expect(policy.issue({ action: "move", id: "new-0" })).rejects.toBeInstanceOf(rollover.V3RoomNotReachingHost);
-	await sleep(1_500);
+	// The given-back moves go out in the epoch they are listed in, past the refusal's gate.
+	await until(() => offers.filter((offer) => offer.handBack).length >= 2, 5_000);
+	expect(
+		offers.filter((offer) => offer.epoch === 3).map((offer) => offer.id),
+		"epoch 3 offers: the refused new move, then the given-back moves"
+	).toEqual(["new-0", "given-0", "given-1"]);
 	// Epoch 4, the backlog has room again, but the member lags its window (2 >= 4 - margin 2).
 	state.epoch = 4;
 	state.full = false;
 	state.unsettledEpochs = 2;
-	await until(() => offers.filter((offer) => offer.handBack).length >= 2, 5_000);
-	await sleep(1_500);
+	await sleep(2_500);
 	expect(policy.status().state).toBe("not-reaching-host");
 	expect(
 		offers.filter((offer) => offer.epoch === 4).map((offer) => offer.id),
-		"epoch 4 offers: the given-back moves only"
-	).toEqual(["given-0", "given-1"]);
+		"epoch 4 offers: none while the lag holds the new move"
+	).toEqual([]);
 	// The lag clears: the new move is offered.
 	state.unsettledEpochs = 0;
 	await until(() => offers.some((offer) => offer.id === "new-0" && offer.epoch === 4), 5_000);
@@ -168,15 +172,22 @@ it("a batch offers given-back moves first and stops its new moves at the first b
 			handBack: { sourceSequence: 10 + k, intent: 0 },
 			operations: [{ action: "move", id: `given-${k}` }],
 		});
-	await sleep(1_500);
 	const before = offers.length;
-	state.epoch = 4;
-	await until(() => offers.length >= before + 3, 5_000);
+	// The given-back moves go out in the epoch they are listed in; the new moves wait to be past it.
+	await until(() => offers.length >= before + 2, 5_000);
 	await sleep(1_500);
 	expect(
-		offers.slice(before).map((offer) => `${offer.id}:${offer.outcome}`),
-		"epoch 4: given-back first, then new moves up to the first refusal"
-	).toEqual(["given-0:accepted", "given-1:accepted", "new-0:refused"]);
+		offers.slice(before).map((offer) => `${offer.epoch}:${offer.id}:${offer.outcome}`),
+		"epoch 3: the given-back moves only"
+	).toEqual(["3:given-0:accepted", "3:given-1:accepted"]);
+	const atFour = offers.length;
+	state.epoch = 4;
+	await until(() => offers.length >= atFour + 1, 5_000);
+	await sleep(1_500);
+	expect(
+		offers.slice(atFour).map((offer) => `${offer.id}:${offer.outcome}`),
+		"epoch 4: new moves up to the first refusal"
+	).toEqual(["new-0:refused"]);
 	// Epoch 5 with room in the backlog: the new moves land in their order.
 	const atFive = offers.length;
 	state.epoch = 5;
