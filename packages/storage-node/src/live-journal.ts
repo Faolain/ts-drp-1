@@ -80,6 +80,7 @@ import {
 	journalRetirementImageMemo,
 } from "./internal/journal-image-memo.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
+export { journalResidualImageCounts, type JournalResidualImageCounts } from "./internal/journal-residual-image.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import type { NodeNativeReadPort } from "./index.js";
 import { configuredStatement, iterationStatement } from "./internal/sqlite-statement-cache.js";
