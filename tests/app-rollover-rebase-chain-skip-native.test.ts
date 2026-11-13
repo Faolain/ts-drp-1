@@ -407,6 +407,10 @@ async function retainedResolutionCost(count: number) {
 			const cpuBefore = process.cpuUsage();
 			wire.resume();
 			await wire.caughtUp(epoch, 1_200_000);
+			// The given-back moves as the install leaves them (an in-memory snapshot, no store read).
+			// Since 727b32f2 an idle member re-offers given-back moves in their listing epoch, so a
+			// later read can find some already re-offered.
+			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
 			// The window ends when both roles' once-per-epoch recovery-pool lull for this epoch has
 			// settled, so it always contains them. The creator's lull is requested by its last
 			// adoption, just before the window. It runs several readiness-maintenance holds, each with
@@ -446,7 +450,6 @@ async function retainedResolutionCost(count: number) {
 				retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
 				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
 			};
-			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
 			// The next one-epoch install, with the resolved rows still unretired: what each of its census
 			// reads costs in own-fence outbox scans.
 			const nextBefore = readV3SettlementWorkCounts();
