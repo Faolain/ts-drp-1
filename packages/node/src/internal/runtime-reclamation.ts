@@ -331,7 +331,8 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	readClosedJournalAuthority?(input: ReceivedClosedJournalAuthorityRead): ReceivedClosedJournalAuthority | undefined;
 	/** This hold's own registration reads a terminally covered, locally settled source.
 	 * Its exact policy, digest-matched plan and completed replacement chunks are rechecked. */
-	readSettledLocalSource?(source: CreatorSettledLocalSource): Promise<CreatorSettledLocalSourceRead | undefined>;
+	/** `walk`: one classification's token; its reads share one own-fence scan (see v3-live). */
+	readSettledLocalSource?(source: CreatorSettledLocalSource, walk?: object): Promise<CreatorSettledLocalSourceRead | undefined>;
 	/** Private owner geometry only: this lifetime retains no replacement or
 	 * displaced-source physical custody. It is not currency or authorization. */
 	canDetachNativePreparation?: true;

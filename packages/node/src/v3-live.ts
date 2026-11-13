@@ -4215,12 +4215,14 @@ function resolveRecoveryCloseHold(
 			: {
 					readSettledLocalSource: function (
 						this: CreatorSnapshotRecoveryCloseLifetime,
-						source: CreatorSettledLocalSource
+						source: CreatorSettledLocalSource,
+						walk?: object
 					): Promise<CreatorSettledLocalSourceRead | undefined> {
 						const registration = facts.registration;
 						if (this !== lifetime || !available() || registration === undefined)
 							return Promise.reject(new TypeError("creator recovery close hold is unavailable"));
-						return admit(() => settledLocalSourceFacts(registration, source));
+						return admit(() => settledLocalSourceFacts(registration, source,
+							walk === undefined ? undefined : settledSourceWalkFences(walk)));
 					},
 				}),
 		captureRoomRetentionLedger: function (this: CreatorSnapshotRecoveryCloseLifetime, create: boolean) {
@@ -14253,6 +14255,15 @@ async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueSc
 /** ownEpochFences for one read walk: the same (store, scope) is scanned once and every row of the walk
  * reads that scan, as the walk's own windowFences. Lives only as long as the walk that created it. */
 type OwnEpochFenceReader = (store: DurableIssuanceStore, scope: DurableIssueScope) => Promise<ReadonlyMap<number, number>>;
+/** One classification's settled-source reads (its `walk` token) share one own-fence scan per
+ * (store, scope), as a census read walk's rows do: without it every settled local source the
+ * classification reads rescans the author's whole outbox. */
+const settledSourceWalkReaders = new WeakMap<object, OwnEpochFenceReader>();
+function settledSourceWalkFences(walk: object): OwnEpochFenceReader {
+	let reader = settledSourceWalkReaders.get(walk);
+	if (reader === undefined) settledSourceWalkReaders.set(walk, reader = createOwnEpochFenceReader());
+	return reader;
+}
 function createOwnEpochFenceReader(): OwnEpochFenceReader {
 	const scans = new Map<DurableIssuanceStore, Map<string, Promise<ReadonlyMap<number, number>>>>();
 	return (store, scope) => {
@@ -17966,7 +17977,8 @@ function settlementSourceOperations(
  * authenticates these original bytes against the scope's own closed ACL. */
 async function settledLocalSourceFacts(
 	registration: V3PlaneRegistration,
-	source: CreatorSettledLocalSource
+	source: CreatorSettledLocalSource,
+	fences: OwnEpochFenceReader = ownEpochFences
 ): Promise<CreatorSettledLocalSourceRead | undefined> {
 	try {
 		const scope = registration.issuanceScope;
@@ -17984,7 +17996,7 @@ async function settledLocalSourceFacts(
 			source.authorSequence, frontier.admissionEpoch, frontier.terminalThrough);
 		const expired = terminal === "displaced" &&
 			settlementOwnRowWindowExpired(selected.authenticated.admitted.epoch, frontier.currentEpoch) &&
-			settlementOwnRowFenceGuarded(await ownEpochFences(store, scope), selected.authenticated.admitted.epoch,
+			settlementOwnRowFenceGuarded(await fences(store, scope), selected.authenticated.admitted.epoch,
 				source.authorSequence, frontier.terminalThrough);
 		const pinnedBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
 		// This author's own pinned bootstrap (its sequence 0 at the genesis anchor) is no application
