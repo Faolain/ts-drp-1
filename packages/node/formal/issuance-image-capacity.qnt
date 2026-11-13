@@ -28,6 +28,10 @@
  *     rows of unresolved entries at or below the floor), not one record per row.
  * HB  Frontier resolution may add a hand-back record (at most HBMAX in a plan);
  *     every unresolved entry and potential source reserves one while slots remain.
+ * R   Replaced source: a close may add a completed replacement entry ("replaced"), which may
+ *     later gain its replaced-source resolution and one receipt (EXPIRY), exactly once. Each such
+ *     entry reserves that receipt (replacedSourceResolvable in the sizing). A potential source that
+ *     ends replaced stays within PER_SOURCE.
  *
  * Invariants (allProperties):
  *   imageWithinForecast, maintenanceAdmits (F <= CAP everywhere: what admission
@@ -40,9 +44,10 @@
  *   committedLaterExpires                                      (D)
  *   holesForWindow, floorSkipsPending                          (H)
  *   noHandBackReserve                                          (HB)
+ *   replacedReceiptUncharged                                   (R)
  *   admissionOmitsHoles                    (admission/maintenance disagreement)
  * Witnesses (must be reachable): noCustodySeen, noCompactionSeen,
- *   noReconstructSeen, noAdmissionRefusalSeen, noHandBackSeen, noPruneSeen.
+ *   noReconstructSeen, noAdmissionRefusalSeen, noHandBackSeen, noPruneSeen, noReplacedSourceSeen.
  */
 module issuanceImageCapacity {
   // NOTE: write `x' = (a or b)`; unparenthesized, `x' = a or b` parses as `(x' = a) or b`.
@@ -61,18 +66,21 @@ module issuanceImageCapacity {
   pure val NONE = -1
 
   type Row = { id: int, ep: int, pub: bool }
-  // res: "manual" (unresolved), "committed", "expire", "both" (mutant only)
+  // res: "manual" (unresolved), "committed", "expire", "replaced" (completed replacement, source
+  // unresolved), "replacedResolved" (with its replaced-source receipt), "both" (mutant only)
   type Entry = { id: int, res: str }
 
   type Mut = {
     beforeInControl: bool, compactAlways: bool, skipTargetCheck: bool,
     excludeClosing: bool, historicalSource: bool, committedLaterExpires: bool,
     holesForWindow: bool, floorSkipsPending: bool, noHandBackReserve: bool, admissionOmitsHoles: bool,
+    replacedReceiptUncharged: bool,
   }
   pure val SOUND: Mut = {
     beforeInControl: false, compactAlways: false, skipTargetCheck: false,
     excludeClosing: false, historicalSource: false, committedLaterExpires: false,
     holesForWindow: false, floorSkipsPending: false, noHandBackReserve: false, admissionOmitsHoles: false,
+    replacedReceiptUncharged: false,
   }
 
   var epoch: int
@@ -107,6 +115,7 @@ module issuanceImageCapacity {
   var pendingLost: bool
   var handBackSeen: bool
   var pruneSeen: bool
+  var replacedSourceSeen: bool
 
   pure def rowIds(rs: Set[Row]): Set[int] = rs.map(r => r.id)
   pure def entryIds(es: Set[Entry]): Set[int] = es.map(e => e.id)
@@ -115,13 +124,14 @@ module issuanceImageCapacity {
   pure def max2(a: int, b: int): int = if (a > b) a else b
 
   pure def cost(e: Entry): int =
-    ENTRY + (if (e.res == "committed") MEMBER else if (e.res == "expire") EXPIRY
+    ENTRY + (if (e.res == "committed") MEMBER else if (e.res == "expire" or e.res == "replacedResolved") EXPIRY
       else if (e.res == "both") MEMBER + EXPIRY else 0)
   pure def planBytes(es: Set[Entry], hb: int): int =
     (if (es.size() == 0) 0 else FIXED + sum(es, cost)) + HB * hb
 
-  pure def entryReserve(e: Entry): int =
-    ENTRY + (if (e.res == "committed") MEMBER else if (e.res == "both") MEMBER + EXPIRY else EXPIRY)
+  pure def entryReserve(e: Entry, m: Mut): int =
+    ENTRY + (if (e.res == "committed") MEMBER else if (e.res == "both") MEMBER + EXPIRY
+      else if (e.res == "replaced" and m.replacedReceiptUncharged) 0 else EXPIRY)
   pure val PER_SOURCE = ENTRY + max2(MEMBER, EXPIRY)
 
   pure def manualIds(es: Set[Entry]): Set[int] = es.filter(e => e.res == "manual").map(e => e.id)
@@ -132,7 +142,7 @@ module issuanceImageCapacity {
   pure def planReserve(rs: Set[Row], es: Set[Entry], hb: int, appliedEpoch: int, m: Mut): int = {
     val p = potential(rs, es, appliedEpoch, m).size()
     val slots = if (m.noHandBackReserve) 0 else min2(HBMAX - hb, manualIds(es).size() + p)
-    FIXED + sum(es, entryReserve) + PER_SOURCE * p + HB * (hb + slots)
+    FIXED + sum(es, e => entryReserve(e, m)) + PER_SOURCE * p + HB * (hb + slots)
   }
 
   // Rows that can still need an explicit protection record (H).
@@ -170,6 +180,7 @@ module issuanceImageCapacity {
     targetRows' = Set(), trueSourceRows' = Set(), trueSourcePlan' = Set(),
     forecastGrew' = false, stuck' = false, wrongSource' = false, compacted' = false, reconstructed' = false,
     admissionRefused' = false, pendingLost' = false, handBackSeen' = false, pruneSeen' = false,
+    replacedSourceSeen' = false,
   }
 
   action keepAhe = all { aheActive' = aheActive, aheCompleted' = aheCompleted }
@@ -184,6 +195,7 @@ module issuanceImageCapacity {
   action keepFlags = all {
     stuck' = stuck, wrongSource' = wrongSource, compacted' = compacted, reconstructed' = reconstructed,
     admissionRefused' = admissionRefused, pendingLost' = pendingLost, handBackSeen' = handBackSeen, pruneSeen' = pruneSeen,
+    replacedSourceSeen' = replacedSourceSeen,
   }
   action keepData = all {
     epoch' = epoch, applied' = applied, rows' = rows, entries' = entries, handBacks' = handBacks, nextId' = nextId,
@@ -212,7 +224,7 @@ module issuanceImageCapacity {
       epoch' = epoch, applied' = applied, entries' = entries, handBacks' = handBacks, forecastGrew' = forecastGrew,
       keepAhe, keepCtl,
       stuck' = stuck, wrongSource' = wrongSource, compacted' = compacted, reconstructed' = reconstructed,
-      pendingLost' = pendingLost, handBackSeen' = handBackSeen, pruneSeen' = pruneSeen,
+      pendingLost' = pendingLost, handBackSeen' = handBackSeen, pruneSeen' = pruneSeen, replacedSourceSeen' = replacedSourceSeen,
     }
   }
 
@@ -236,7 +248,7 @@ module issuanceImageCapacity {
     all {
       e < epoch, ctlActive == NONE,
       nondet added = candidates.powerset().oneOf()
-      nondet res = Set("manual", "committed", "expire").oneOf()
+      nondet res = Set("manual", "committed", "expire", "replaced").oneOf()
       dataStep(m, rows, entries.union(added.map(r => { id: r.id, res: res })), handBacks, e, completedHoles, activeHoles),
       keepAhe, keepCtl, keepFlags,
     }
@@ -257,7 +269,23 @@ module issuanceImageCapacity {
     },
     keepAhe, keepCtl,
     stuck' = stuck, wrongSource' = wrongSource, compacted' = compacted, reconstructed' = reconstructed,
-    admissionRefused' = admissionRefused, pendingLost' = pendingLost, pruneSeen' = pruneSeen,
+    admissionRefused' = admissionRefused, pendingLost' = pendingLost, pruneSeen' = pruneSeen, replacedSourceSeen' = replacedSourceSeen,
+  }
+
+  // Replaced-source resolution (R): a completed replacement's source is released once, with one
+  // signed receipt. Its reserve was taken when the entry was added, so this never raises the forecast.
+  action replacedSourceResolve(m: Mut): bool = all {
+    ctlActive == NONE,
+    nondet e = entries.filter(x => x.res == "replaced").oneOf()
+    all {
+      entries.exists(x => x.res == "replaced"),
+      dataStep(m, rows, entries.exclude(Set(e)).union(Set({ id: e.id, res: "replacedResolved" })), handBacks, applied,
+        completedHoles, activeHoles),
+    },
+    replacedSourceSeen' = true,
+    keepAhe, keepCtl,
+    stuck' = stuck, wrongSource' = wrongSource, compacted' = compacted, reconstructed' = reconstructed,
+    admissionRefused' = admissionRefused, pendingLost' = pendingLost, handBackSeen' = handBackSeen, pruneSeen' = pruneSeen,
   }
 
   // The application takes a hand-back record back.
@@ -309,7 +337,7 @@ module issuanceImageCapacity {
       completedAfter' = completedAfter, targetRows' = targetRows,
       trueSourceRows' = trueSourceRows, trueSourcePlan' = trueSourcePlan,
       stuck' = stuck, wrongSource' = wrongSource, reconstructed' = reconstructed,
-      admissionRefused' = admissionRefused, pendingLost' = pendingLost, handBackSeen' = handBackSeen, pruneSeen' = pruneSeen,
+      admissionRefused' = admissionRefused, pendingLost' = pendingLost, handBackSeen' = handBackSeen, pruneSeen' = pruneSeen, replacedSourceSeen' = replacedSourceSeen,
     }
   }
 
@@ -350,7 +378,7 @@ module issuanceImageCapacity {
       pruneSeen' = true,
       keepAhe, keepCtl,
       stuck' = stuck, wrongSource' = wrongSource, compacted' = compacted, reconstructed' = reconstructed,
-      admissionRefused' = admissionRefused, handBackSeen' = handBackSeen,
+      admissionRefused' = admissionRefused, handBackSeen' = handBackSeen, replacedSourceSeen' = replacedSourceSeen,
     }
   }
 
@@ -364,12 +392,12 @@ module issuanceImageCapacity {
       (rowIds(rows) != trueSourceRows or sideCompleted != trueSourcePlan))),
     reconstructed' = true,
     compacted' = compacted, admissionRefused' = admissionRefused, pendingLost' = pendingLost,
-    handBackSeen' = handBackSeen, pruneSeen' = pruneSeen,
+    handBackSeen' = handBackSeen, pruneSeen' = pruneSeen, replacedSourceSeen' = replacedSourceSeen,
     keepAhe, keepCtl, keepData,
   }
 
   action stepWith(m: Mut): bool = any {
-    issue(m), advance, publish(m), closeApply(m), frontierResolve(m), consumeHandBack(m),
+    issue(m), advance, publish(m), closeApply(m), frontierResolve(m), replacedSourceResolve(m), consumeHandBack(m),
     aheBegin, aheAbort, aheComplete,
     issPrepare(m), issAbort, issCommit(m), prune(m), reconstruct(m),
   }
@@ -385,6 +413,7 @@ module issuanceImageCapacity {
   action stepFloorSkipsPending = stepWith(SOUND.with("floorSkipsPending", true))
   action stepNoHandBackReserve = stepWith(SOUND.with("noHandBackReserve", true))
   action stepAdmissionOmitsHoles = stepWith(SOUND.with("admissionOmitsHoles", true))
+  action stepReplacedReceiptUncharged = stepWith(SOUND.with("replacedReceiptUncharged", true))
 
   def soundForecast: int = forecast(rows, entries, handBacks, applied, completedHoles, if (ctlActive != NONE) activeHoles else Set(), SOUND)
   val imageWithinForecast = actualImage <= soundForecast
@@ -403,4 +432,5 @@ module issuanceImageCapacity {
   val noAdmissionRefusalSeen = not(admissionRefused)
   val noHandBackSeen = not(handBackSeen)
   val noPruneSeen = not(pruneSeen)
+  val noReplacedSourceSeen = not(replacedSourceSeen)
 }
