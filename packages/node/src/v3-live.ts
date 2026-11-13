@@ -26390,8 +26390,11 @@ export function resumeV3PendingIssuanceIntent(
 				)
 					throw new TypeError("v3 pending batch intent is not this author's");
 			}
+			// The marker binds the exact plan it was entered against (exactCanonicalPlanBytes); the store
+			// requires those bytes again, so the revision passed is the plan's own as the census read it.
+			const plan = census.rows.plans.find((candidate) => sameScope(candidate.scope, scope));
 			await transactIssueBatch(
-				{ scope, count: intents.length, expectedPlanRevision: null },
+				{ scope, count: intents.length, expectedPlanRevision: plan === undefined ? null : plan.revision },
 				async (firstSequence, nativeSignAdmission) => {
 					if (firstSequence !== pending.authorSequence) throw new TypeError("v3 pending intent ordinal changed");
 					if (nativeSignAdmission === undefined) throw new TypeError("v3 pending intent resume requires its native job");
