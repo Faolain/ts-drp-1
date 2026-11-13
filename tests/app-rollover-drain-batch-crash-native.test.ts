@@ -37,16 +37,17 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // Every commit of the Writer's issuance store is watched: a chunk is never partly replaced (no commit
 // leaves 0 < replaced-in-chunk < chunk). The fallback (a store without transactIssueBatch: one
 // replacement per transaction, as before) has its own edge (DRAIN_BATCH_CRASH_SINGLES=1, SINGLES_EDGES):
-//   between-issues: the commit of the drain's second single replacement (some rows replaced).
+//   between-issues: the commit of the drain's second single replacement (some rows replaced);
+//   single-marker:  the commit of the first single replacement's entered marker (the singles' chunk-marker).
 // (The drain's one transform-refusal plan CAS needs an application whose displaced moves transform;
 // Grid and Chat rebase.)
 // The test reopens the same directory, reconnects, and requires every move to be admitted by the
 // creator exactly once: no loss, no double apply. No native write, signature or transaction is mocked.
 const INNER = process.env.RUN_DRAIN_BATCH_CRASH === "1";
-type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-journal" | "between-issues";
+type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-journal" | "between-issues" | "single-marker";
 /** The fallback edge: run with DRAIN_BATCH_CRASH_SINGLES=1 against a build whose issuance store has no
  * transactIssueBatch (the drain then issues one replacement per transaction, as before batching). */
-const SINGLES_EDGES: readonly Edge[] = ["between-issues"];
+const SINGLES_EDGES: readonly Edge[] = ["between-issues", "single-marker"];
 const EDGES: readonly Edge[] =
 	process.env.DRAIN_BATCH_CRASH_SINGLES === "1" ? SINGLES_EDGES : ["fence", "chunk-marker", "between-chunks", "between-journal"];
 const MOVES = 10;
@@ -102,6 +103,20 @@ function writerTimes(file: string, author: string) {
 		return fence < 0
 			? { fenceTime: null, times: [] as number[] }
 			: { fenceTime: rows[fence]!.logicalTime, times: rows.slice(fence + 1).map((row) => row.logicalTime) };
+	} finally {
+		db.close();
+	}
+}
+/** The plan effect kind of the Writer's entered marker, if any (a single's or a batch's). */
+function writerMarkerEffect(file: string, author: string): string | null {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const row = db.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(author) as
+			| { pending_unsigned: Uint8Array | null }
+			| undefined;
+		if (row?.pending_unsigned == null) return null;
+		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as { planEffect?: { kind?: string } };
+		return pending.planEffect?.kind ?? "none";
 	} finally {
 		db.close();
 	}
@@ -260,6 +275,8 @@ it.runIf(INNER)(
 					if (edge === "between-chunks" && replaced.length === CHUNK)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 					if (edge === "between-journal" && replaced.length === CHUNK) watch.journalCommits ??= 0;
+					if (edge === "single-marker" && replaced.length === 0 && writerMarkerEffect(file, watch.author) === "replacement")
+						die({ marker: 1, rebase: rebase.length });
 					if (edge === "between-issues" && replaced.length === 2)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 				} finally {
@@ -337,7 +354,7 @@ it.skipIf(INNER).each(EDGES)(
 		if (edge === "between-journal") expect(death).toMatchObject({ journalCommits: 3 });
 		// Replacement logical times are the singles' own: fence + 2, + 4, ... (no gap, no reuse).
 		const times = death.times as number[];
-		if (edge !== "fence" && edge !== "chunk-marker") {
+		if (edge !== "fence" && edge !== "chunk-marker" && edge !== "single-marker") {
 			expect(times.length).toBeGreaterThan(0);
 			expect(times).toEqual(times.map((_, index) => (death.fenceTime as number) + 2 * (index + 1)));
 		}
