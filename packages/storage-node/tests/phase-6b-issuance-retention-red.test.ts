@@ -653,8 +653,8 @@ describe("D.109b Node issuance-retention RED", () => {
 		expect(fs.statSync(filename).ino).toBe(inode);
 		const after = new DatabaseSync(filename, { readOnly: true });
 		try {
-			// v1 now migrates to the current schema (ea4eb158: SCHEMA_VERSION 5).
-			expect(scalar(after, "PRAGMA user_version")).toBe(5);
+			// v1 now migrates to the current schema (SCHEMA_VERSION 6: retirement_plan_before side row).
+			expect(scalar(after, "PRAGMA user_version")).toBe(6);
 			expect(catalog(after).find(({ name }) => name === "lineages")?.sql).toBe(CURRENT_LINEAGES_DDL);
 			expect(catalog(after).find(({ name }) => name === "settlement_plans")?.sql).toBe(
 				PHASE_2L_C_V3_DDL.settlement_plans
@@ -711,7 +711,7 @@ describe("D.109b Node issuance-retention RED", () => {
 			);
 			const raced = new DatabaseSync(derived(racingPrimary), { readOnly: true });
 			try {
-				expect(scalar(raced, "PRAGMA user_version")).toBe(5);
+				expect(scalar(raced, "PRAGMA user_version")).toBe(6);
 				expect(catalog(raced).find(({ name }) => name === "lineages")?.sql).toBe(CURRENT_LINEAGES_DDL);
 				expect(catalog(raced).find(({ name }) => name === "settlement_plans")?.sql).toBe(
 					PHASE_2L_C_V3_DDL.settlement_plans

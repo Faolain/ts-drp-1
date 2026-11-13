@@ -802,7 +802,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				store = new InMemoryPeerCacheStore();
 				break;
 			case "browser-local":
-				store = new LocalStoragePeerCacheStore({ key: config.key });
+				store = new LocalStoragePeerCacheStore({
+					key: config.key,
+					...(config.storage === undefined ? {} : { storage: config.storage }),
+				});
 				break;
 			case "node-fs": {
 				const modulePath = "./rendezvous-cache.node.js";

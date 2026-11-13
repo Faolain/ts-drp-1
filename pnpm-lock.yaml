@@ -301,6 +301,9 @@ importers:
       "@ts-drp/rendezvous":
         specifier: 0.11.0
         version: link:../../packages/rendezvous
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/routing-browser":
         specifier: 0.11.0
         version: link:../../packages/routing-browser
@@ -413,6 +416,9 @@ importers:
       "@ts-drp/ephemeral":
         specifier: workspace:*
         version: link:../../packages/ephemeral
+      "@ts-drp/errors":
+        specifier: workspace:*
+        version: link:../../packages/errors
       "@ts-drp/issuance-store":
         specifier: workspace:*
         version: link:../../packages/issuance-store
@@ -425,6 +431,9 @@ importers:
       "@ts-drp/protocol-v3":
         specifier: workspace:*
         version: link:../../packages/protocol-v3
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/storage":
         specifier: workspace:*
         version: link:../../packages/storage
@@ -1156,6 +1165,12 @@ importers:
       vitest:
         specifier: ^3.0.5
         version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
+  packages/room-worker:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.8.2
 
   packages/routing-browser:
     dependencies:

@@ -27,6 +27,7 @@ DatabaseSync.prototype.prepare = function (sql) {
 			const result = Reflect.apply(value, target, args);
 			if (/^UPDATE settlement_plans\b/u.test(sql)) checkpoint("after-plan-write");
 			if (/^UPDATE retirement_controls\b/u.test(sql)) checkpoint("after-control-write");
+			if (/^INSERT INTO retirement_plan_before\b/u.test(sql)) checkpoint("after-plan-before-write");
 			return result;
 		};
 	}});

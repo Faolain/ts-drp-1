@@ -182,6 +182,13 @@ export interface ControlPlaneNodeRoutingConfig {
 	readonly public_network_acknowledgement?: string;
 }
 
+/** The Web Storage subset the browser-local peer cache uses. */
+export interface ControlPlanePeerCacheStorage {
+	getItem(key: string): string | null;
+	removeItem(key: string): void;
+	setItem(key: string, value: string): void;
+}
+
 interface ControlPlanePeerCacheBaseConfig {
 	readonly enabled: boolean;
 	readonly max: number;
@@ -194,6 +201,11 @@ export type ControlPlanePeerCacheConfig =
 	| (ControlPlanePeerCacheBaseConfig & {
 			readonly key: string;
 			readonly persistence: "browser-local";
+			/**
+			 * Where the browser-local cache persists (default globalThis.localStorage). A room hosted in a
+			 * dedicated worker has no localStorage; its page passes a storage mirrored into its own.
+			 */
+			readonly storage?: ControlPlanePeerCacheStorage;
 	  })
 	| (ControlPlanePeerCacheBaseConfig & {
 			readonly path: string;

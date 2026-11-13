@@ -3005,6 +3005,41 @@ function creatorNextEpochAdmissionForecast(
 	return chargedBytes + sink.delta + snapshotEvidence + signing + CREATOR_NEXT_EPOCH_FIXED_CUSTODY_BYTES;
 }
 
+/** Typed admission refusal (model issuance-image-capacity.qnt, maintenanceAdmits): ordinary admission
+ * sizes the same maintenance forecast the creator's maintenance later charges, so a move whose
+ * forecast exceeds a bound is refused here, before signing, and never admitted for maintenance to
+ * refuse later. */
+export const ISSUANCE_CAPACITY_FORECAST_EXCEEDED = "ISSUANCE_CAPACITY_FORECAST_EXCEEDED";
+const CREATOR_ISSUANCE_CAPACITY_REFUSAL = new RegExp("MAINTENANCE_NATIVE_IMAGE_EXHAUSTED:|MAINTENANCE_FUTURE_PROOF_ENVELOPE_EXHAUSTED:|" +
+	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds (byte|row) bound|" +
+	// The creator's per-epoch maintenance proof book: this epoch's, or the room the next epoch's
+	// first cold admission needs after this one closes. Both clear with a rollover.
+	"creator (issuance maintenance|next-epoch admission) proof reserve is exhausted|" +
+	// This epoch's maintenance carrier is wider than its bound, or the creator's per-epoch closed
+	// rollback proof budget is spent: both clear with a rollover (several hot Writers reach them).
+	"creator maintenance encoded width exceeds its bound|creator closed rollback refusal: proof-budget-exceeded");
+/**
+ * The one typed capacity reason for a local issue (creator or Writer) refused before signing because
+ * the issuance image forecast would exceed its bound. A rollover clears it (retry after rollover).
+ * @param reason - The refusal's diagnostic text.
+ * @returns The typed text, or undefined when the reason is not an issuance capacity bound.
+ */
+export function issuanceCapacityRefusal(reason: string): string | undefined {
+	if (reason.includes(ISSUANCE_CAPACITY_FORECAST_EXCEEDED)) return reason;
+	return CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(reason)
+		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: issuance forecast exceeds its bound: ${reason}` : undefined;
+}
+/**
+ * The typed capacity reason of a thrown maintenance refusal, local or received. An Error is read by its
+ * message; a closed-rollback Refusal is typed data, not an Error, and names itself through its string
+ * form ("creator closed rollback refusal: proof-budget-exceeded"), never by its bare kind.
+ * @param error - The thrown value.
+ * @returns The typed text, or undefined when it is not an issuance capacity bound.
+ */
+export function issuanceCapacityRefusalOf(error: unknown): string | undefined {
+	return issuanceCapacityRefusal(error instanceof Error ? error.message : String(error));
+}
+
 async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,
 	unsignedBytes: Uint8Array,
@@ -3013,6 +3048,7 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	deferFirstCompile = false
 ): Promise<boolean> {
 	const {proof} = quote, accounting = proof.accounting;
+	const baselineBytes = accounting.chargedBytes;
 	const {knownBasis, receivedSignature, unknownBasis, fields} = creatorIssuanceMaintenanceQuoteSizing(quote, unsignedBytes, planEffect);
 	const nextEpochAdmissionForecast: CreatorNextEpochAdmissionForecastSink = {};
 	const prefixInput = {...fields, proof, nextEpochAdmissionForecast};
@@ -3023,7 +3059,9 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	// fallback retains original exact sizing, without the extra diagnostic pass.
 	const { ordinaryFinishingCapacityDimensions: _diagnosticDimensions, ...exactPrefixInput } = prefixInput;
 	const prefixes = captured?.prefixes ?? await readProspectiveCreatorMaintenancePrefixesForSizing(exactPrefixInput);
-	if (!prefixes.ok) throw new TypeError(`creator issuance maintenance prefix sizing is unavailable: ${prefixes.reason}`);
+	if (!prefixes.ok) throw new TypeError(CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(prefixes.reason)
+		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: creator issuance maintenance forecast exceeds its bound: ${prefixes.reason}`
+		: `creator issuance maintenance prefix sizing is unavailable: ${prefixes.reason}`);
 	// Known original encodings receive only the existing byte-exact dedup law.
 	// Unknown signature/control leaves never receive identity or refund credit.
 	const known = [
@@ -3031,8 +3069,25 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...(prefixes.knownCarriers ?? []),
 		...receivedSignature,
 	];
+	// Measurement only: the book's standing material before this quote and this quote's terms.
+	const report = (outcome: string, nextEpochForecastBytes?: number): void => {
+		try {
+			const event = {kind: "creator-issuance-maintenance-book", outcome,
+				baselineBytes, chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes,
+				known: known.map(bytes => bytes.byteLength), unknown: [...unknownBasis, ...prefixes.unknownEncodedLengths]};
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer(event);
+			// A refusal is rare and ends the epoch's admission: say what filled the book.
+			if (outcome !== "charged") console.warn("::v3-issuance-book", JSON.stringify(event));
+		} catch { /* Diagnostics cannot alter admission. */ }
+	};
+	const exhausted = (need: number): TypeError => {
+		report("exhausted");
+		return new TypeError(
+			`creator issuance maintenance proof reserve is exhausted:${accounting.chargedBytes}+${need}/${accounting.maxBytes}`);
+	};
 	for (const bytes of known)
-		if (!accounting.charge(bytes)) throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+		if (!accounting.charge(bytes)) throw exhausted(bytes.byteLength);
 	// The private source owner has reserved complete future close/adopt and
 	// maintenance lifetimes against their fixed maintenance entitlement. They are not retained
 	// by this current issuance job; charge only its complete immediate phases.
@@ -3041,19 +3096,14 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...prefixes.unknownEncodedLengths,
 	];
 	for (const length of unknown)
-		if (!accounting.chargeUnknownEncodedLength(length))
-			throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+		if (!accounting.chargeUnknownEncodedLength(length)) throw exhausted(length);
 	// Admission must leave the next epoch's first cold admission room in the
 	// same ordinary book after this epoch closes and adopts; otherwise retained
 	// material strands admission with no protocol drain.
 	const forecast = creatorNextEpochAdmissionForecast(quote, accounting.chargedBytes, nextEpochAdmissionForecast, planEffect);
-	try {
-		const observer = Reflect.get(globalThis, "__warmProofEvent");
-		if (typeof observer === "function") observer({kind: "creator-issuance-maintenance-book",
-			chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes: forecast});
-	} catch { /* Diagnostics cannot alter admission. */ }
+	report(forecast !== undefined && forecast > accounting.maxBytes ? "next-epoch-exhausted" : "charged", forecast);
 	if (forecast !== undefined && forecast > accounting.maxBytes)
-		throw new TypeError("creator next-epoch admission proof reserve is exhausted");
+		throw new TypeError(`creator next-epoch admission proof reserve is exhausted:${forecast}/${accounting.maxBytes}`);
 	return captured?.captured ?? false;
 }
 

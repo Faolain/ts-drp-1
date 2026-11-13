@@ -19,13 +19,21 @@ function gridElements(grid: HTMLDivElement): GridElements {
 	return state;
 }
 
-/** One UI owner: full projections render in order; only transient visual frames
+/**
+ * One UI owner: full projections render in order; only transient visual frames
  * may collapse to their latest positions. A full projection/reset cancels the
- * old pending frame, including close/reopen of the same room identifier. */
+ * old pending frame, including close/reopen of the same room identifier.
+ * @param requestFrame
+ * @param cancelFrame
+ */
 export function createZonePresentation(
 	requestFrame: (callback: FrameRequestCallback) => number = (callback) => requestAnimationFrame(callback),
 	cancelFrame: (handle: number) => void = (handle) => cancelAnimationFrame(handle)
-): Readonly<{ projection(snapshot: ZoneSnapshot): void; transient(snapshot: ZoneTransientSnapshot): void; close(): void }> {
+): Readonly<{
+	projection(snapshot: ZoneSnapshot): void;
+	transient(snapshot: ZoneTransientSnapshot): void;
+	close(): void;
+}> {
 	let pending: ZoneTransientSnapshot | undefined;
 	let frame: number | undefined;
 	let revision = 0;
@@ -58,7 +66,11 @@ export function createZonePresentation(
 				if (latest !== undefined) renderTransientZone(latest);
 			});
 		},
-		close(): void { closed = true; current = undefined; cancel(); },
+		close(): void {
+			closed = true;
+			current = undefined;
+			cancel();
+		},
 	});
 }
 
@@ -77,9 +89,37 @@ export function enableUIControls(): void {
  * @param node Active network node.
  */
 export function renderNetwork(node: DRPNode): void {
-	setText("peerId", node.networkNode.peerId);
-	setText("peers", JSON.stringify(node.networkNode.getAllPeers().sort()));
-	setText("discoveryPeers", JSON.stringify(node.networkNode.getSubscribedTopics().sort()));
+	renderNetworkInfo(networkInfo(node));
+}
+
+/** The page's network panel: this node's peer id, its peers and its subscribed topics. */
+export interface NetworkInfo {
+	readonly peerId: string;
+	readonly peers: readonly string[];
+	readonly topics: readonly string[];
+}
+
+/**
+ * Read the network panel's data from a node.
+ * @param node Started node.
+ * @returns Its peer id, sorted peers and sorted topics.
+ */
+export function networkInfo(node: DRPNode): NetworkInfo {
+	return {
+		peerId: node.networkNode.peerId,
+		peers: node.networkNode.getAllPeers().sort(),
+		topics: node.networkNode.getSubscribedTopics().sort(),
+	};
+}
+
+/**
+ * Render the network panel (the room worker page receives its data as a stream).
+ * @param info Network panel data.
+ */
+export function renderNetworkInfo(info: NetworkInfo): void {
+	setText("peerId", info.peerId);
+	setText("peers", JSON.stringify(info.peers));
+	setText("discoveryPeers", JSON.stringify(info.topics));
 }
 
 /**
@@ -116,26 +156,41 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 			retained = { element, kind: block.kind, x: block.x, y: block.y };
 			state.blocks.set(block.id, retained);
 		}
-		if (retained.element.textContent === "" || retained.kind !== block.kind || retained.x !== block.x || retained.y !== block.y) {
+		if (
+			retained.element.textContent === "" ||
+			retained.kind !== block.kind ||
+			retained.x !== block.x ||
+			retained.y !== block.y
+		) {
 			retained.element.textContent = `${block.kind} (${block.x}, ${block.y})`;
 			retained.element.style.left = `calc(50% + ${block.x * 24}px)`;
 			retained.element.style.top = `calc(50% - ${block.y * 24}px)`;
-			retained.kind = block.kind; retained.x = block.x; retained.y = block.y;
+			retained.kind = block.kind;
+			retained.x = block.x;
+			retained.y = block.y;
 		}
 		grid.appendChild(retained.element);
 	}
-	for (const [id, retained] of state.blocks) if (!present.has(id)) { retained.element.remove(); state.blocks.delete(id); }
+	for (const [id, retained] of state.blocks)
+		if (!present.has(id)) {
+			retained.element.remove();
+			state.blocks.delete(id);
+		}
 	renderTransientZone(snapshot);
 	// Full projections preserve the original block-before-overlay draw order.
 	for (const element of state.positions.values()) grid.appendChild(element);
 }
 
-/** Update only the already-authorized visual overlay; no durable diagnostics,
- * block reconstruction, trade verification or protocol operation occurs here. */
+/**
+ * Update only the already-authorized visual overlay; no durable diagnostics,
+ * block reconstruction, trade verification or protocol operation occurs here.
+ * @param snapshot
+ */
 export function renderTransientZone(snapshot: ZoneTransientSnapshot): void {
 	const grid = document.getElementById("grid");
 	if (!(grid instanceof HTMLDivElement)) return;
-	const state = gridElements(grid), present = new Set<string>();
+	const state = gridElements(grid),
+		present = new Set<string>();
 	for (const [peerId, position] of Object.entries(snapshot.transientPositions)) {
 		present.add(peerId);
 		let element = state.positions.get(peerId);
@@ -154,7 +209,11 @@ export function renderTransientZone(snapshot: ZoneTransientSnapshot): void {
 		element.style.left = `calc(50% + ${position.x * 24}px)`;
 		element.style.top = `calc(50% - ${position.y * 24}px)`;
 	}
-	for (const [peerId, element] of state.positions) if (!present.has(peerId)) { element.remove(); state.positions.delete(peerId); }
+	for (const [peerId, element] of state.positions)
+		if (!present.has(peerId)) {
+			element.remove();
+			state.positions.delete(peerId);
+		}
 }
 
 function renderTradeIntent(snapshot: ZoneSnapshot): void {

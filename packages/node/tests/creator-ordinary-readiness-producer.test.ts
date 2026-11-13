@@ -687,6 +687,8 @@ function terminalJournalAcknowledgement() {
 		requireLaw: (value: unknown, reason: string) => {if (!value) throw Error(reason);},
 		closedRetirementBytes: encodeCanonical,
 		closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+		// Row-by-row journal equality (as strict as one whole-array encode; the harness compares the arrays).
+		closedJournalRowsEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
 		journalRetirementDrainItemCount: () => 1,
 		advanceJournalRetirementMutationControl: (control: any) => ({...control, revision: control.revision + 1, drain: null}),
 		closedJournalNativeControlCarriers: (read: any) => [encodeCanonical(read.control)],
@@ -786,6 +788,7 @@ function terminalVerificationCustody() {
 		bindMethod: (owner: any, key: string) => owner[key].bind(owner),
 		requireLaw: (value: unknown, kind: string) => {if (!value) throw Error(kind);},
 		closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+		closedJournalRowsEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
 		closedRetirementBytes: encodeCanonical, encodeAheRetirementControl: encodeCanonical,
 		closedJournalNativeControlCarriers: () => [encodeCanonical(null)],
 		checkSourceImage: (actual: string, expected: string) => {expect(actual).toBe(expected);},

@@ -320,7 +320,12 @@ describe("native retirement plan law", () => {
 		const rows = pruneThrough(fixture(), 0), p = prepare(rows, [1]);
 		expect(p.protectedRecords.map(value => value.authorSequence)).toEqual([1, 2, 3]);
 		expect(p.planRewrite?.plans).toHaveLength(1);
-		expect(encodeCanonical(p.planRewrite).byteLength).toBeLessThanOrEqual(
+		// This legacy byte form is only resumed, never newly prepared; the forecast sizes the digest form
+		// a new (floored) preparation writes.
+		const floored = issuanceRetirementPreparationWithPlanRewrite(control,
+			{...labels, floorEpoch: labels.throughEpoch, protectedRecords: p.protectedRecords}, rows);
+		expect(floored.planRewrite?.kind).toBe("v3-issuance-retirement-plan-rewrite-2");
+		expect(encodeCanonical(floored.planRewrite).byteLength).toBeLessThanOrEqual(
 			issuanceRetirementPlanRewriteResourceForSizing(rows.plans)!.byteLength);
 		assertIssuanceRetirementPreparationRows(control, p, rows);
 		const target = issuanceRetirementCommitRows(control, p, rows);

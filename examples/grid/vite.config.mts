@@ -21,6 +21,8 @@ export default defineConfig({
 		target: "esnext",
 	},
 	plugins: [nodePolyfills()],
+	// The opt-in room worker (src/zone-worker.ts) is a module worker.
+	worker: { format: "es", plugins: () => [nodePolyfills()] },
 	optimizeDeps: {
 		esbuildOptions: {
 			target: "esnext",

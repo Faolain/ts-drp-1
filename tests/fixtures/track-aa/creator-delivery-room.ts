@@ -160,6 +160,11 @@ export interface RoomOptions {
 	readonly separateStorage?: boolean;
 	/** Measurement seam: called for every author-key vertex signature a peer makes. */
 	onSign?(index: number): void;
+	/**
+	 * The creator's observation-only received-move capacity refusal (the session's
+	 * onIngressCapacityRefusal), as the pages wire it to their rollover policy.
+	 */
+	onIngressCapacityRefusal?(reason: string): void;
 	/** Extra session options for every opened peer (measurement harnesses, e.g. the scheduled lull). */
 	readonly sessionOptions?: Readonly<{ recoveryPoolScheduledLull?: boolean }>;
 }
@@ -260,6 +265,9 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			author: identity.author,
 			...(index === 0
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
+				: {}),
+			...(index === 0 && options.onIngressCapacityRefusal !== undefined
+				? { onIngressCapacityRefusal: (reason: string) => options.onIngressCapacityRefusal?.(reason) }
 				: {}),
 			creatorInvite: invite,
 			databaseName: name,

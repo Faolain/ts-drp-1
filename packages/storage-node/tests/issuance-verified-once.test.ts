@@ -67,8 +67,11 @@ async function retiredStore(): Promise<{ store: DurableIssuanceStore; primaryFil
 			throughEpoch: 1, protectedRecords: [] });
 		const p = issuanceRetirementPreparationWithPlanRewrite(read.control, { throughEpoch: 1,
 			decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords }, native.rows);
-		expect(p.planRewrite?.plans[0]?.before.byteLength).toBeGreaterThan(40_000);
-		expect(p.planRewrite?.plans[0]?.after.byteLength).toBeGreaterThan(40_000);
+		// No floorEpoch: the legacy byte rewrite (rewrite-1), whose plans carry the whole BEFORE/AFTER bytes.
+		const rewritten = p.planRewrite?.plans[0];
+		if (rewritten === undefined || !("before" in rewritten)) throw new Error("expected a byte plan rewrite");
+		expect(rewritten.before.byteLength).toBeGreaterThan(40_000);
+		expect(rewritten.after.byteLength).toBeGreaterThan(40_000);
 		await read.prepareFence(p);
 	} finally {
 		await read.release();
