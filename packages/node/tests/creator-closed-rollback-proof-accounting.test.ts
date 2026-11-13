@@ -6461,6 +6461,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
 			prepareCreatorUnchangedHeldCensusRead;`, cell.bindings);
 		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			${s.fn("censusReuseDebug").getText(s.file)}
 			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
 			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
@@ -6522,8 +6523,14 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 	// later check that reads all of them again, byte for byte equal, needs no new classification.
 	function holdLeases() {
 		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
-		const state = {captures: 0, probes: 0, probeCurrent: true, replays: 0, replayCurrent: true};
-		const probe = Object.freeze({checkCurrent: async () => {state.probes++; return state.probeCurrent;}});
+		const state = {captures: 0, probes: 0, probeCurrent: true, replays: 0, replayCurrent: true, diverge: false,
+			byProbe: new Map<object, number>()};
+		// Each storage read enrolls a fresh probe object; byProbe counts each one's currency checks.
+		const newProbe = () => {
+			const value: object = Object.freeze({checkCurrent: async () => {state.probes++; state.byProbe.set(value, (state.byProbe.get(value) ?? 0) + 1); return state.probeCurrent;}});
+			return value;
+		};
+		const probe = newProbe();
 		cell.reads.probe = probe;
 		const original: Reservation = {check: async () => {}, release: async () => {}};
 		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
@@ -6531,6 +6538,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			prepareCreatorUnchangedHeldCensusRead;`, {...cell.bindings,
 			ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor});
 		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			${s.fn("censusReuseDebug").getText(s.file)}
 			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
 			const censusBytesEligible = true, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
@@ -6551,10 +6559,11 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 					captured.pages.push({afterKey: null, bytes: encodeCanonical(cell.pages)}); captured.retainedBytes = 1;
 					if (held !== undefined) captured.nativeCurrent = probe;
 				}
-				return state.replayCurrent && Buffer.compare(encodeCanonical({nativeIssuance: cell.native}), sealed) === 0 ? sealed : encodeCanonical({changed: true});
+				return !state.diverge && state.replayCurrent && Buffer.compare(encodeCanonical({nativeIssuance: cell.native}), sealed) === 0
+					? sealed : encodeCanonical({changed: true});
 			},
 		});
-		return {facts: owner.facts, state, cell, lease: () => owner.facts.ownIssuanceReservation(original)};
+		return {facts: owner.facts, state, cell, newProbe, lease: () => owner.facts.ownIssuanceReservation(original)};
 	}
 	it("a later lease and an unheld check of the same hold reuse the classification after reading every input again, byte for byte", async () => {
 		const hold = holdLeases(), {state, cell} = hold;
@@ -6586,6 +6595,10 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			"pending ingress": hold => {hold.cell.registration.pendingIngress.set("foreign", {});},
 			"source identity": hold => {hold.cell.state.identity = {};},
 			"carrier artifact bytes": hold => {hold.cell.registration.payload.catalog.exactArtifactBytes[0] ^= 1;},
+			"rebase snapshot": hold => {hold.cell.registration.rebaseSnapshot = [{}];},
+			"rebase cursor": hold => {hold.cell.registration.rebaseCursor = 0;},
+			"retained source custody": hold => {hold.cell.registration.historicalIssuance.retainedSources = new Map();},
+			"history counters": hold => {hold.cell.counted.add(2);},
 		};
 		for (const [change, apply] of Object.entries(changes)) for (const leased of [false, true]) {
 			const hold = holdLeases(), lease = hold.lease(), label = `${change} (${leased ? "new lease" : "unheld"})`;
@@ -6604,6 +6617,63 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			await next?.release();
 		}
 	}, 120_000);
+	it("a lease's storage probe never serves another lease; each lease enrolls its own on an actual complete read", async () => {
+		const hold = holdLeases(), {state, cell} = hold;
+		const first = cell.reads.probe as object;
+		let lease = hold.lease();
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.byProbe.get(first), "first lease uses its own probe").toBe(2);
+		await lease.release();
+		const second = hold.newProbe(); cell.reads.probe = second;
+		lease = hold.lease();
+		const native = cell.reads.native;
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.byProbe.get(first), "the first lease's probe is never consulted again").toBe(2);
+		expect(state.byProbe.get(second), "the second lease's own probe, after its first complete read").toBe(2);
+		expect(cell.reads.native - native, "one actual complete native read starts the second lease").toBe(1);
+		expect(state.captures).toBe(1);
+		await lease.release();
+	});
+	it("debug mode classifies every reuse afresh and refuses a divergence", async () => {
+		const prior = process.env.TS_DRP_DEBUG_CENSUS_REUSE;
+		process.env.TS_DRP_DEBUG_CENSUS_REUSE = "1";
+		try {
+			const hold = holdLeases(), {state} = hold;
+			let lease = hold.lease();
+			await hold.facts.check(); await hold.facts.check();
+			expect(state.captures, "the lease reuse was also classified").toBe(2);
+			await lease.release();
+			await hold.facts.check();
+			expect(state.captures, "the unheld reuse was also classified").toBe(3);
+			state.diverge = true;
+			await expect(hold.facts.check()).rejects.toThrow("diverged from a complete census");
+			lease = hold.lease();
+			await expect(hold.facts.check()).rejects.toThrow("diverged from a complete census");
+			await lease.release();
+		} finally {
+			if (prior === undefined) delete process.env.TS_DRP_DEBUG_CENSUS_REUSE; else process.env.TS_DRP_DEBUG_CENSUS_REUSE = prior;
+		}
+	});
+	it("the census reads no input outside the compared set (purity inventory)", () => {
+		// Every external read of readCreatorRecoveryDependencyCensus. Each is either compared byte for byte by the
+		// hold's cell (native census, outbox pages, replay), bound by identity or exact bytes in its context
+		// (prepareCreatorUnchangedHeldCensusRead owners()/context()/carriers()), required absent (pending ingress,
+		// rebase state, migration floor, source dependencies, active source), or a projection of the native census
+		// through a bound facade (plans, issued rows, lineages, own fences). A new read must join one of these.
+		const s = seam(), text = s.census.getText(s.file);
+		const calls = [...new Set([...text.matchAll(/await ([A-Za-z_.]+)\(/gu)].map(match => match[1]))].sort();
+		expect(calls).toEqual(["authenticatedOutboxRow", "checkpoint", "maintenance.readBoundedRecoveryCensus", "ownSourceSettlementIsComplete",
+			"readPlan", "registration.issuanceStore.readIssued", "registration.issuanceStore.readLineage",
+			"registration.issuanceStore.readOutboxPage", "registration.issuanceStore.readSettlementPlan", "replacementChainLive", "replay.verify",
+			"selectedStore.readIssued", "settledFences"].sort());
+		const fields = [...new Set([...text.matchAll(/registration\.([A-Za-z]+)/gu)].map(match => match[1]))].sort();
+		expect(fields).toEqual(["authorization", "displacedSource", "exactCanonicalPinnedGenesisBootstrapOperationBytes", "historicalIssuance",
+			"index", "issuanceScope", "issuanceStore", "payload"].sort());
+		// The prepared migration floor (preparedTargetFloor?.read()) is required absent by the cell.
+		expect(text).toContain("await preparedTargetFloor?.read()");
+		// No clock, randomness or counters.
+		for (const ambient of ["Date.", "performance.", "Math.random", "getRandomValues"]) expect(text).not.toContain(ambient);
+	});
 	it("a turn's checks after enrollment use the unchanged-held census; a bound input changed between checks forces the complete census", async () => {
 		// Positive control: first check after enrollment is complete (prepares the cell), later checks are not.
 		const control = turnHold();
