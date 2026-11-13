@@ -9485,9 +9485,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	});
 	// The recipient lull's own pass: the SAME original turnover passes, one per step.
 	let recipientLullResult: CreatorRecoveryPoolResult = Object.freeze({ kind: "not-needed" });
+	let recipientLullRun: Promise<CreatorRecoveryPoolResult> | undefined;
 	const recipientLullStep = async (): Promise<"done" | "more" | "deferred"> => {
 		const busy = Object.freeze({ kind: "deferred" as const, reason: "busy" as const });
-		if (terminalFailure !== undefined || creatorRecipientRecoveryRequired) {
+		// An install is queued or running: it runs the SAME turnover inline (the backstop) unless a
+		// lull settled at its exact boundary, which a lull cut short by it never does. A pass now only
+		// delays the install; the install schedules the next epoch's lull.
+		if (terminalFailure !== undefined || creatorRecipientRecoveryRequired || creatorSuccessorAdoptionTask !== undefined) {
 			recipientLullResult = busy;
 			return "deferred";
 		}
@@ -9522,7 +9526,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// Arrivals queued behind the boundary; any refused at the bounded input
 		// pool are repaired through the same authenticated retained path a reconnect uses.
 		// Not after close: close revoked the transport and the next open asks again.
-		if (stepped.step !== "deferred" && stepped.result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
+		if (stepped.step === "done" && stepped.result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
 			roomTransport.requestRetainedHistory();
 		return stepped.step;
 	};
@@ -10589,15 +10593,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					return routed;
 				}
 				const epoch = session.authority()?.epoch;
-				const lull = async (): Promise<CreatorRecoveryPoolResult> => {
-					lullPasses.requestLullPass("recipient-turnover", recipientLullStep);
-					const answer = await lullPasses.runLull();
-					if (answer === "deferred") {
-						retryLullLater(epoch);
-						return Object.freeze({ kind: "deferred", reason: "busy" });
-					}
-					return recipientLullResult;
-				};
+				// One recipient lull at a time: a request while one runs joins it (its steps are admitted
+				// one by one outside any single transition, so two runs would interleave their passes).
+				const lull = (): Promise<CreatorRecoveryPoolResult> =>
+					(recipientLullRun ??= (async (): Promise<CreatorRecoveryPoolResult> => {
+						lullPasses.requestLullPass("recipient-turnover", recipientLullStep);
+						const answer = await lullPasses.runLull();
+						if (answer === "deferred") {
+							retryLullLater(epoch);
+							return Object.freeze({ kind: "deferred", reason: "busy" });
+						}
+						return recipientLullResult;
+					})().finally(() => {
+						recipientLullRun = undefined;
+					}));
 				// One lull per epoch when scheduled: a settled epoch answers with its result.
 				return scheduledLulls === undefined ? lull() : scheduledLulls.run(scheduled, lull);
 			})();
