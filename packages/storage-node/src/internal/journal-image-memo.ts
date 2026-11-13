@@ -44,7 +44,8 @@ type NativeValue = string | number | null | Uint8Array;
 /** One captured row: table, then alternating column names and private value copies. */
 export type JournalImageRowKey = readonly unknown[];
 
-interface JournalImageEntry {
+/** One remembered verified capture. Its identity is private to this module's callers in this package. */
+export interface JournalImageEntry {
 	readonly rows: readonly JournalImageRowKey[];
 	readonly image: LiveJournalRetirementImage;
 	readonly frames: readonly Uint8Array[] | undefined;
@@ -130,7 +131,7 @@ export class JournalRetirementImageMemo {
 		image: LiveJournalRetirementImage,
 		frames: readonly Uint8Array[] | undefined,
 		currency?: JournalImageCurrency
-	): void {
+	): Readonly<JournalImageEntry> | undefined {
 		const prior = this.#entries.get(objectId);
 		this.#currencies.delete(objectId);
 		if (prior !== undefined) {
@@ -144,17 +145,38 @@ export class JournalRetirementImageMemo {
 		}
 		const copies = frames?.map((frame) => frame.slice());
 		for (const frame of copies ?? []) bytes += VALUE_OVERHEAD + frame.byteLength;
-		if (bytes > this.#maxBytes) return;
-		this.#entries.set(objectId, Object.freeze({ rows: Object.freeze([...rows]), image,
-			frames: copies === undefined ? undefined : Object.freeze(copies), bytes }));
+		if (bytes > this.#maxBytes) return undefined;
+		const entry: JournalImageEntry = Object.freeze({ rows: Object.freeze([...rows]), image,
+			frames: copies === undefined ? undefined : Object.freeze(copies), bytes });
+		this.#entries.set(objectId, entry);
 		this.#bytes += bytes;
 		if (currency !== undefined) this.#currencies.set(objectId, currency);
 		while (this.#entries.size > this.#maxObjects || this.#bytes > this.#maxBytes) {
-			const [oldest, entry] = this.#entries.entries().next().value!;
+			const [oldest, evicted] = this.#entries.entries().next().value!;
 			this.#entries.delete(oldest);
 			this.#currencies.delete(oldest);
-			this.#bytes -= entry.bytes;
+			this.#bytes -= evicted.bytes;
 		}
+		return this.#entries.get(objectId) === entry ? entry : undefined;
+	}
+
+	/**
+	 * @param objectId - Remembered object.
+	 * @returns Its remembered entry (the one the last capture, match or unchanged answer of it verified), if any.
+	 */
+	public current(objectId: string): Readonly<JournalImageEntry> | undefined {
+		return this.#entries.get(objectId);
+	}
+
+	/**
+	 * Records the currency of committed rows that a still-current entry equals, after the caller proved
+	 * the committed database is exactly the rows that entry captured (see the drain CAS in live-journal.ts).
+	 * @param objectId - Remembered object.
+	 * @param entry - The entry the caller proved; nothing is recorded when it is no longer current.
+	 * @param currency - The connection's currency of those committed rows.
+	 */
+	public adopt(objectId: string, entry: Readonly<JournalImageEntry>, currency: JournalImageCurrency): void {
+		if (this.#entries.get(objectId) === entry) this.#currencies.set(objectId, currency);
 	}
 
 	/** @returns Remembered object and byte counts, for bound tests. */
@@ -175,6 +197,14 @@ function sameCurrency(left: JournalImageCurrency, right: JournalImageCurrency): 
 // moment it was outside every transaction, so every own change before it is
 // committed or rolled back. Retained per connection object, unreachable with it.
 const outsideTransaction = new WeakMap<DatabaseSync, JournalImageCurrency>();
+
+/**
+ * @param database - The connection.
+ * @returns Its currency now (inside or outside a transaction), whether or not its rows are committed.
+ */
+export function journalConnectionCurrency(database: DatabaseSync): JournalImageCurrency {
+	return readCurrency(database);
+}
 
 function readCurrency(database: DatabaseSync): JournalImageCurrency {
 	const row = configuredStatement(
