@@ -215,3 +215,46 @@ it("a superseded kept or given-back move is accounted for (V3RoomKeptMoveSuperse
 			`the author's final state for ${id} lands last`
 		).toEqual(newest);
 }, 30_000);
+
+it("the newer move offered again after a superseded given-back move takes what the epoch's budget leaves", async () => {
+	const { room, accepted, giveBack, install } = memberRoom();
+	let epoch = 3;
+	const acceptedIn = new Map<Readonly<Record<string, unknown>>, number[]>();
+	const issue = room.issue;
+	room.issue = (operation, options) => {
+		acceptedIn.set(operation, [...(acceptedIn.get(operation) ?? []), epoch]);
+		return issue(operation, options);
+	};
+	const reported: unknown[] = [];
+	const policy = (
+		rollover.createV3RoomRolloverPolicy as (input: Record<string, unknown>) => rollover.V3RoomRolloverPolicy
+	)({
+		role: "member",
+		// One kept re-offer per epoch: the given-back move spends it, so the newer move waits a later epoch.
+		budget: { movesPerAuthor: 1, idleMs: 10_000 },
+		identity: blockIdentity,
+		hooks: { onError: (error: unknown) => reported.push(error) },
+	});
+	policies.add(policy);
+	policy.bind(room);
+	const older = Object.freeze({ action: "placeBlock", id: "b-5", kind: "stone", x: 1, y: 0 });
+	const newer = Object.freeze({ action: "placeBlock", id: "b-5", kind: "wood", x: 2, y: 0 });
+	await policy.issue(older);
+	await policy.issue(newer);
+	giveBack(older);
+	await sleep(1_500);
+	for (let next = 4; next <= 6; next++) {
+		epoch = next;
+		install(next);
+		await sleep(1_500);
+	}
+	const reoffers = accepted.slice(2).map((move) => move.operation);
+	expect(reoffers, "the given-back move, then the newer move once, after it").toEqual([older, newer]);
+	expect(acceptedIn.get(older), "the given-back move: issued at 3, offered again in 4").toEqual([3, 4]);
+	expect(acceptedIn.get(newer), "the newer move offered again in the next epoch's budget").toEqual([3, 5]);
+	expect(
+		reported.filter((error) => error instanceof rollover.V3RoomKeptMoveSuperseded),
+		"the superseded given-back move is reported once"
+	).toHaveLength(1);
+	expect(policy.status().kept, "nothing is left kept").toEqual([]);
+}, 30_000);
