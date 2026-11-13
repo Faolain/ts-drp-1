@@ -27,6 +27,24 @@ const MEASURE_EPOCHS = Number(process.env.STATE_BOUND_MEASURE_EPOCHS ?? 6);
 const TARGETS = [8192, 16_384, 32_768 - 2 * (ID_BYTES + 64)];
 /** A pause after each install before the next move (a game's frame pacing); 0 issues at once. */
 const FIRST_MOVE_DELAY_MS = Number(process.env.STATE_BOUND_FIRST_MOVE_DELAY_MS ?? 0);
+/**
+ * Without the application's incremental projection (no bound): every move is judged by the exact fold, the
+ * path a sorts-last move takes while its plane's bound seed is pending (running fold plus one apply), so
+ * its cost is sampled on every move instead of only the few that land before a seed finishes.
+ */
+const EXACT_ONLY = process.env.STATE_BOUND_EXACT_ONLY === "1";
+
+/** The zone application with its resource bound reader lacking the incremental projection (seed and bound). */
+function withoutIncrementalProjection<Zone extends { readOrdinaryApplicationResourceBound?: unknown }>(zone: Zone): Zone {
+	const reader = zone.readOrdinaryApplicationResourceBound as ((...args: unknown[]) => unknown) | undefined;
+	if (typeof reader !== "function") return zone;
+	const stripped = (...args: unknown[]): unknown => Reflect.apply(reader, undefined, args);
+	const descriptors = Object.getOwnPropertyDescriptors(reader) as Record<string, PropertyDescriptor>;
+	for (const name of ["createIncrementalProjection", "beginIncrementalProjection", "length", "name", "prototype"])
+		Reflect.deleteProperty(descriptors, name);
+	Object.defineProperties(stripped, descriptors);
+	return { ...zone, readOrdinaryApplicationResourceBound: stripped };
+}
 
 type BoundEvent = {
 	mode?: "bound" | "exact";
@@ -56,6 +74,7 @@ function percentile(values: readonly number[], fraction: number): number {
 it("the state bound's per-move cost and refold rate, per admission path and state size", async () => {
 	const fixture = await readinessHoldRoom({
 		writers: 1,
+		...(EXACT_ONLY ? { wrapApplication: withoutIncrementalProjection } : {}),
 		createOperationAdmissionPolicy: ((context: Record<string, unknown>) =>
 			createOutcomeCommitAdmissionPolicy({
 				aclDigest: context.aclDigest as string,
@@ -214,6 +233,17 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	const firstMoves = moves.filter((sample) => sample.firstAfterInstall);
 	const firstWalker = firstMoves.map((sample) => sample.walkerUs);
 	const whilePending = moves.filter((sample) => sample.seedPending === true).map((sample) => sample.durationUs);
+	// The exact path's sorts-last cost (one apply on the running fold; the first move of an epoch rebuilds it),
+	// per measured state size: with EXACT_ONLY, every sorts-last move.
+	const exactSortsLast = Object.fromEntries(
+		[...new Set(moves.filter((sample) => sample.phase !== "grow").map((sample) => sample.phase))].map((name) => {
+			const rows = moves.filter((sample) => sample.phase === name && sample.mode === "exact" && sample.sortsLast);
+			const all = rows.map((sample) => sample.durationUs);
+			const first = rows.filter((sample) => sample.firstAfterInstall).map((sample) => sample.durationUs);
+			return [name, { count: all.length, p50Us: percentile(all, 0.5), p99Us: percentile(all, 0.99), maxUs: Math.max(0, ...all),
+				firstMoveCount: first.length, firstMoveP99Us: percentile(first, 0.99), firstMoveMaxUs: Math.max(0, ...first) }];
+		})
+	);
 	const perThousand = (count: number): number => Math.round((count * 1000 * 10) / Math.max(1, firstMoves.length)) / 10;
 	const walker = {
 		// Every move admission after an install, the population a pending seed can reach.
@@ -266,6 +296,8 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 				),
 			},
 			walker,
+			exactOnly: EXACT_ONLY,
+			exactSortsLast,
 			rounds: ROUNDS,
 			epochs: epoch,
 			refusal,

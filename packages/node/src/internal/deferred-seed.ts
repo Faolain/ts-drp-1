@@ -3,8 +3,10 @@
 // install turn nor any later turn pays the whole seed: each turn steps until it has run `turnMs`,
 // then yields to the host. A newer seed for the same owner (the next install) abandons the older one,
 // and a seed whose owner is no longer current when its turn runs is discarded: a result is only ever
-// delivered for the seed that is still the owner's latest and still current. Nothing here grants
-// admission; the caller owns what a result means and keeps its own fallback when none is delivered.
+// delivered for the seed that is still the owner's latest and still current. A caller that cannot wait
+// for the turns (it needs the result now) finishes the pending seed in its own turn with finishNow and
+// pays only the residual. Nothing here grants admission; the caller owns what a result means and keeps
+// its own fallback when none is delivered.
 
 /** The resumable seed the runner drives. step throws on refusal; the runner then delivers undefined. */
 export type DeferredSeedStepper<Result> = Readonly<{
@@ -13,8 +15,11 @@ export type DeferredSeedStepper<Result> = Readonly<{
 }>;
 
 /** One seed's cost: host turns taken, busy time across them, its longest turn, install-to-result wall time,
- * the time its creation took (inside the first turn) and each turn's duration in order. */
+ * the time its creation took (inside the first turn), each turn's duration in order, whether a finishNow
+ * caller finished it and the residual that caller paid in its own turn (0 when its own turns finished it). */
 export type DeferredSeedStats = Readonly<{
+	forced: boolean;
+	forcedUs: number;
 	turns: number;
 	busyUs: number;
 	maxTurnUs: number;
@@ -51,6 +56,12 @@ export interface DeferredSeedRunner<Owner extends object, Result> {
 	/** Abandons the owner's unfinished seed; true when there was one. */
 	cancel(owner: Owner): boolean;
 	pending(owner: Owner): boolean;
+	/**
+	 * Finishes the owner's pending seed in the caller's turn and delivers it (done) before returning.
+	 * @returns The delivered seed's stats (forcedUs: the residual paid here), or undefined when nothing was
+	 * pending or the seed was no longer current (then discarded).
+	 */
+	finishNow(owner: Owner): DeferredSeedStats | undefined;
 }
 
 type Entry<Result> = {
@@ -62,6 +73,8 @@ type Entry<Result> = {
 	maxTurnMs: number;
 	startMs: number;
 	turnMs: number[];
+	forced: boolean;
+	forcedMs: number;
 };
 
 /**
@@ -82,6 +95,8 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 			wallUs: Math.round((now() - entry.begunAt) * 1000),
 			startUs: Math.round(entry.startMs * 1000),
 			turnUs: Object.freeze(entry.turnMs.map((ms) => Math.round(ms * 1000))),
+			forced: entry.forced,
+			forcedUs: Math.round(entry.forcedMs * 1000),
 		});
 	const abandon = (entry: Entry<Result>): void => {
 		try {
@@ -90,8 +105,9 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 			/* A listener cannot alter the runner. */
 		}
 	};
-	const turn = (owner: Owner, entry: Entry<Result>): void => {
-		if (entries.get(owner) !== entry) return;
+	/** Whether the owner's live seed is this entry and still current; a seed no longer current is discarded. */
+	const live = (owner: Owner, entry: Entry<Result>): boolean => {
+		if (entries.get(owner) !== entry) return false;
 		let current = false;
 		try {
 			current = entry.request.current();
@@ -101,8 +117,21 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 		if (!current) {
 			entries.delete(owner);
 			abandon(entry);
-			return;
 		}
+		return current;
+	};
+	const deliver = (owner: Owner, entry: Entry<Result>, result: Result | undefined): DeferredSeedStats => {
+		entries.delete(owner);
+		const delivered = stats(entry);
+		try {
+			entry.request.done(result, delivered);
+		} catch {
+			/* The caller owns its result. */
+		}
+		return delivered;
+	};
+	const turn = (owner: Owner, entry: Entry<Result>): void => {
+		if (!live(owner, entry)) return;
 		const started = now();
 		let finished = false;
 		let result: Result | undefined;
@@ -133,18 +162,14 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 			schedule(() => turn(owner, entry));
 			return;
 		}
-		entries.delete(owner);
-		try {
-			entry.request.done(result, stats(entry));
-		} catch {
-			/* The caller owns its result. */
-		}
+		deliver(owner, entry, result);
 	};
 	return Object.freeze({
 		begin(owner: Owner, request: DeferredSeedRequest<Result>): void {
 			const prior = entries.get(owner);
 			if (prior !== undefined) abandon(prior);
-			const entry: Entry<Result> = { request, begunAt: now(), turns: 0, busyMs: 0, maxTurnMs: 0, startMs: 0, turnMs: [] };
+			const entry: Entry<Result> = { request, begunAt: now(), turns: 0, busyMs: 0, maxTurnMs: 0, startMs: 0, turnMs: [],
+				forced: false, forcedMs: 0 };
 			entries.set(owner, entry);
 			schedule(() => turn(owner, entry));
 		},
@@ -157,6 +182,25 @@ export function createDeferredSeedRunner<Owner extends object, Result>(
 		},
 		pending(owner: Owner): boolean {
 			return entries.has(owner);
+		},
+		finishNow(owner: Owner): DeferredSeedStats | undefined {
+			const entry = entries.get(owner);
+			if (entry === undefined || !live(owner, entry)) return undefined;
+			// The queued turn finds the entry gone and does nothing.
+			const started = now();
+			let result: Result | undefined;
+			try {
+				entry.seed ??= entry.request.start();
+				if (entry.seed !== undefined) {
+					while (entry.seed.step(Number.MAX_SAFE_INTEGER) !== true);
+					result = entry.seed.finish();
+				}
+			} catch {
+				result = undefined;
+			}
+			entry.forced = true;
+			entry.forcedMs = now() - started;
+			return deliver(owner, entry, result);
 		},
 	});
 }

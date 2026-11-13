@@ -143,6 +143,7 @@ describe("deferred seed runner", () => {
 		const [result, stats] = results[0]!;
 		expect(result).toBe("base-1");
 		expect(forced).toEqual(stats);
+		expect(stats.forced).toBe(true);
 		expect(stats.forcedUs, "only the residual: the bytes the deferred turn had not walked").toBe(Math.round((clock.now() - before) * 1000));
 		expect(stats.forcedUs).toBeLessThan(Math.round(32_768 * 0.0001 * 1000));
 		expect(log.at(-1)).toBe("base-1:32768");
@@ -189,6 +190,7 @@ describe("deferred seed runner", () => {
 			done: (_result, delivered) => void stats.push(delivered),
 		});
 		clock.drain();
+		expect(stats[0]?.forced).toBe(false);
 		expect(stats[0]?.forcedUs).toBe(0);
 	});
 

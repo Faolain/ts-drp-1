@@ -22275,15 +22275,42 @@ type ApplicationStateBoundCache = {
 };
 const applicationStateBounds = new WeakMap<V3PlaneRegistration, ApplicationStateBoundCache>();
 
-/** A deferred seed turn stops stepping after this long, so each turn stays well under 1 ms. */
-const APPLICATION_STATE_SEED_TURN_MS = 0.5;
+/** A deferred seed turn stops stepping after this long (plus at most one step), so each turn stays under 1 ms. */
+const APPLICATION_STATE_SEED_TURN_MS = 0.8;
 /** Base bytes per seed step (a few dozen Grid blocks): one step is a small fraction of a turn. */
 const APPLICATION_STATE_SEED_STEP_BYTES = 512;
-/** Seeds each plane's bound after its machine install, in short host turns (one live seed per plane). */
+const HostSetImmediate: unknown = Reflect.get(globalThis, "setImmediate");
+const HostMessageChannel: unknown = Reflect.get(globalThis, "MessageChannel");
+let seedTurnChannel: Readonly<{ queue: (() => void)[]; post(): void }> | undefined;
+/**
+ * Runs a seed turn in the next host task, back to back with the previous one but never inside it: the
+ * host's own work (I/O, timers, a browser's frames) runs between turns. Node's setImmediate, else a
+ * MessageChannel task (unclamped, unlike a nested setTimeout), else setTimeout.
+ */
+function scheduleSeedTurn(turn: () => void): void {
+	if (typeof HostSetImmediate === "function") {
+		ReflectApply(HostSetImmediate, globalThis, [turn]);
+		return;
+	}
+	if (typeof HostMessageChannel === "function") {
+		if (seedTurnChannel === undefined) {
+			const channel = new (HostMessageChannel as typeof MessageChannel)();
+			const queue: (() => void)[] = [];
+			channel.port1.onmessage = () => queue.shift()?.();
+			seedTurnChannel = ObjectFreeze({ queue, post: () => channel.port2.postMessage(undefined) });
+		}
+		seedTurnChannel.queue.push(turn);
+		seedTurnChannel.post();
+		return;
+	}
+	setTimeout(turn, 0);
+}
+/**
+ * Seeds each plane's bound after its machine install, in host turns of under 1 ms run back to back (one
+ * live seed per plane), so the seed has usually finished before the first move after the install.
+ */
 const applicationStateBoundSeeds = createDeferredSeedRunner<V3PlaneRegistration, V3ApplicationStateBound>({
-	schedule: (turn) => {
-		setTimeout(turn, 0);
-	},
+	schedule: scheduleSeedTurn,
 	now: () => (typeof performance === "undefined" ? Date.now() : performance.now()),
 	turnMs: APPLICATION_STATE_SEED_TURN_MS,
 	stepBytes: APPLICATION_STATE_SEED_STEP_BYTES,
@@ -22405,7 +22432,9 @@ function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): 
 				// A check that self-seeded this same base meanwhile keeps its cache (and what it advanced).
 				const existing = applicationStateBounds.get(registration);
 				if (existing !== undefined && existing.base === base && existing.index === index && existing.payload === payload) return;
-				installApplicationStateBound(registration, base, bound, { mode: "deferred", durationUs: stats.busyUs, ...stats });
+				// A forced seed was finished inside an admission check: durationUs is the residual that check paid.
+				installApplicationStateBound(registration, base, bound, { ...stats, mode: stats.forced ? "forced" : "deferred",
+					durationUs: stats.forced ? stats.forcedUs : stats.busyUs });
 			},
 			discarded: (stats) => emitApplicationStateBoundSeed(registration, stats, "application-state-bound-seed-discarded"),
 		});
@@ -22418,23 +22447,39 @@ function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): 
  * The exact state is at most the bound (the application's theorem, property-tested per shipped app), so
  * a vertex admitted here never makes the seal's fold refuse; the seal names the bound if it ever does.
  * Conservative near the limit: the usable state there is bounded by the application's bound.
- * @returns The verdict and the quoted bound, or undefined when the plane has no bound covering this material.
+ *
+ * While the plane's deferred seed has not finished, a candidate that sorts last is judged by the exact
+ * fold instead (its running fold plus one apply), so no move pays the seed; the bound catches up over
+ * the epoch graph once it is seeded (the exact fold never admits past the limit, and the bound covers
+ * every admitted vertex). Any other candidate would refold the epoch: it finishes the pending seed in
+ * this turn, paying only the walk the seed's own turns had not done yet.
+ * @returns The verdict and the quoted bound; "seed-pending" when the exact fold judges this candidate while
+ * the seed finishes; undefined when the plane has no bound covering this material.
  */
 function applicationStateBoundAdmits(
 	registration: V3PlaneRegistration,
 	base: BlueprintStateMachine,
-	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>
-): Readonly<{ admitted: boolean; quoted: number; rebuilt: boolean }> | undefined {
+	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>,
+	sortsLast: boolean
+): Readonly<{ admitted: boolean; quoted: number; rebuilt: boolean }> | "seed-pending" | undefined {
+	const stale = (cache: ApplicationStateBoundCache | undefined): boolean =>
+		cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload;
 	let cache = applicationStateBounds.get(registration);
 	let rebuilt = false;
-	if (cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload) {
-		// No finished seed over this base (the deferred seed has not finished, or the plane was reset
-		// since): self-seed now, in this turn, and abandon the unfinished one.
-		applicationStateBoundSeeds.cancel(registration);
-		cache = seedApplicationStateBound(registration, base, "self");
-		if (cache === undefined) return undefined;
+	if (stale(cache) && applicationStateBoundSeeds.pending(registration)) {
+		if (sortsLast) return "seed-pending";
+		applicationStateBoundSeeds.finishNow(registration);
+		cache = applicationStateBounds.get(registration);
 		rebuilt = true;
 	}
+	if (stale(cache)) {
+		// No seed over this base, finished or pending (the plane was reset since its install): self-seed
+		// now, in this turn.
+		applicationStateBoundSeeds.cancel(registration);
+		cache = seedApplicationStateBound(registration, base, "self");
+		rebuilt = true;
+	}
+	if (cache === undefined) return undefined;
 	const disable = (): undefined => {
 		cache.bound = undefined;
 		return undefined;
@@ -22546,10 +22591,13 @@ function applicationStateAdmits(
 					durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000), ...event });
 		} catch { /* Diagnostics cannot alter admission. */ }
 	};
+	const tips = registration.index.tips();
+	const sortsLast = tips.every((tip) => candidate.dependencies.includes(tip));
 	// The application's own state bound, when it covers this material: O(operation), no fold.
-	const bounded = applicationStateBoundAdmits(registration, base, candidate);
-	if (bounded !== undefined) {
-		emit({ mode: "bound", refolded: bounded.rebuilt, admitted: bounded.admitted, sortsLast: true, stateBytes: bounded.quoted });
+	const bounded = applicationStateBoundAdmits(registration, base, candidate, sortsLast);
+	const seedPending = bounded === "seed-pending";
+	if (bounded !== undefined && bounded !== "seed-pending") {
+		emit({ mode: "bound", refolded: bounded.rebuilt, admitted: bounded.admitted, sortsLast, stateBytes: bounded.quoted });
 		return bounded.admitted;
 	}
 	const limitRefusal = (error: unknown): boolean =>
@@ -22590,8 +22638,6 @@ function applicationStateAdmits(
 	let running = cache.running !== undefined && cache.running.base === base && cache.running.graphVersion === graphVersion &&
 		cache.running.index === registration.index && cache.running.payload === registration.payload
 		? cache.running : undefined;
-	const tips = registration.index.tips();
-	const sortsLast = tips.every((tip) => candidate.dependencies.includes(tip));
 	let refolded = false;
 	let admitted = true;
 	try {
@@ -22644,7 +22690,8 @@ function applicationStateAdmits(
 		if (limitRefusal(error)) admitted = false;
 	}
 	const staged = cache.pending?.digest === candidate.digest ? cache.pending.machine : undefined;
-	emit({ mode: "exact", refolded, admitted, sortsLast, ...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
+	emit({ mode: "exact", refolded, admitted, sortsLast, ...(seedPending ? { seedPending } : {}),
+		...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
 	return admitted;
 }
 
