@@ -73,6 +73,13 @@ byte-identical to the classified inputs. A new issuance lease no longer starts w
 holds. Its storage probe is still captured on an actual complete read in that lease, never carried from another.
 Latency never relaxes this (G26): any changed input runs the complete census or is refused as stale.
 
+Residual-image reuse within one journal drain is an implementation choice too (decision row 91). The residual
+the drain CAS derives is the exact native residual: the rows the same transaction verified, minus exactly its
+own deletions of the plan's items, with no other row change (the connection's change count) and no DDL. A later
+read reuses it only while the committed database is provably unchanged (no other connection's commit, no own
+write, no DDL); anything else scans, captures and validates in full (G26). Every refusal of the full path stays:
+an outside change to a residual row, header or count is still stale.
+
 ## What the checklist has already ruled out
 
 These verdicts come from Tracks R and R2. The reasoning is in
