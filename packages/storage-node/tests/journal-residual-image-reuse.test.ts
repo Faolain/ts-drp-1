@@ -7,7 +7,7 @@ import { expect, test, vi } from "vitest";
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { decodeCanonical } from "../../canonical/dist/src/index.js";
 // The adapter's own module instance (the package entry).
-import { createJournalRetirementImageCapture, journalRetirementFrameDigest } from "@ts-drp/live-journal";
+import { createJournalRetirementImageCapture, journalRetirementFrameDigest, journalRetirementImageOfCapturedFrames } from "@ts-drp/live-journal";
 import { createNodeDurableLiveJournalStore, journalResidualImageCounts } from "../src/live-journal.js";
 
 // A drain removes at most LIVE_JOURNAL_RETIREMENT_BATCH_ROWS items per batch, and every batch's control
@@ -235,4 +235,44 @@ test("debug mode cross-checks every derived residual against a full native captu
 		if (prior === undefined) delete process.env.TS_DRP_DEBUG_RESIDUAL_IMAGE; else process.env.TS_DRP_DEBUG_RESIDUAL_IMAGE = prior;
 		raw.close(); await store.close(); await rm(fixture.directory, { recursive: true, force: true });
 	}
+});
+
+test("the residual image assembled from a capture's frames equals a full capture of the same rows, for every subset", () => {
+	// Scopes with, without and with a NULL closed membership, received rows with native blobs, local rows, multibyte text.
+	const scopes = Array.from({ length: 5 }, (_, epoch) => ({ object_id: "room-\u00e9", epoch, anchor_digest: `${epoch}`.repeat(64),
+		next_journal_sequence: epoch * 3, exact_anchor_preimage: new Uint8Array(40 + epoch).fill(epoch), detached_anchor_signature: new Uint8Array(64).fill(9),
+		parameters_digest: "p".repeat(64), exact_parameters_carrier: new Uint8Array(300).fill(epoch + 1),
+		...(epoch % 2 === 0 ? { closed_membership_bytes: new Uint8Array(17).fill(3) } : epoch === 3 ? { closed_membership_bytes: null } : {}) }));
+	const rows = Array.from({ length: 300 }, (_, sequence) => sequence % 3 === 0
+		? { object_id: "room-\u00e9", epoch: 1, anchor_digest: "1".repeat(64), journal_sequence: sequence, source_kind: "received",
+			vertex_digest: sequence.toString(16).padStart(64, "0"), received_preimage: new Uint8Array(200 + sequence).fill(sequence & 0xff),
+			received_signature: new Uint8Array(64).fill(1), local_author: null, local_author_sequence: null }
+		: { object_id: "room-\u00e9", epoch: 1, anchor_digest: "1".repeat(64), journal_sequence: sequence, source_kind: "local-issued",
+			vertex_digest: sequence.toString(16).padStart(64, "0"), received_preimage: null, received_signature: null,
+			local_author: "creator-\u4e16", local_author_sequence: sequence });
+	const capture = (keep: (table: string, index: number) => boolean) => {
+		const owner = createJournalRetirementImageCapture(), frames: { table: string; key: unknown[]; bytes: Uint8Array }[] = [];
+		scopes.forEach((row, index) => { if (keep("scopes", index)) { const key = [row.object_id, row.epoch, row.anchor_digest];
+			frames.push({ table: "scopes", key, bytes: owner.append("scopes", { ...row }, key)! }); } });
+		rows.forEach((row, index) => { if (keep("accepted_entries", index)) { const key = [row.object_id, row.epoch, row.anchor_digest, row.journal_sequence];
+			frames.push({ table: "accepted_entries", key, bytes: owner.append("accepted_entries", { ...row }, key)! }); } });
+		return { image: owner.finish(), frames };
+	};
+	const all = capture(() => true);
+	expect(journalRetirementImageOfCapturedFrames(all.frames)).toEqual(all.image);
+	let seed = 7;
+	const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+	for (let trial = 0; trial < 40; trial++) {
+		const keepScopes = scopes.map(() => random() < 0.7), keepRows = rows.map(() => random() < (trial % 4) / 4 + 0.1);
+		const keep = (table: string, index: number) => (table === "scopes" ? keepScopes : keepRows)[index]!;
+		const subset = all.frames.filter((frame, index) => keep(frame.table, frame.table === "scopes" ? index : index - scopes.length));
+		expect(journalRetirementImageOfCapturedFrames(subset), `trial ${trial}`).toEqual(capture(keep).image);
+	}
+	expect(journalRetirementImageOfCapturedFrames([])).toEqual(capture(() => false).image);
+	// A frame that is not exactly the capture's [table, key, row] shape is not assembled (the caller captures).
+	const first = all.frames[0]!;
+	expect(journalRetirementImageOfCapturedFrames([{ ...first, key: [...first.key.slice(0, 2), "x".repeat(64)] }])).toBeUndefined();
+	expect(journalRetirementImageOfCapturedFrames([{ ...first, table: "accepted_entries" }])).toBeUndefined();
+	const truncated = first.bytes.slice(); truncated[1] = 0x02;
+	expect(journalRetirementImageOfCapturedFrames([{ ...first, bytes: truncated }])).toBeUndefined();
 });
