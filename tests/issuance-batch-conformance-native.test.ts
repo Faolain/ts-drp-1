@@ -1,3 +1,4 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +7,7 @@ import { createEphemeralDurableIssuanceStore } from "@ts-drp/issuance-store/conf
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runBatchConformance } from "./fixtures/issuance-batch/conformance.js";
+import { createTransactionalVertexIssuer, type IssueCommit } from "../packages/protocol-v3/src/index.js";
 import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/issuance.js";
 
 // transactIssueBatch conformance on the ephemeral control and the SQLite store (the IndexedDB store
@@ -83,3 +85,59 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 			});
 	}, 120_000);
 });
+
+// The vertices a batch signs are the vertices the same singles sign: byte-identical preimages
+// (dependencies chained, row i on row i-1's digest, as a frontier the previous single left; the same
+// logical times), digests and (deterministic Ed25519) signatures.
+it("issueBatch signs exactly the vertices the same sequential singles sign", async () => {
+	const seed = new Uint8Array(32).fill(7);
+	const publicKey = ed25519.getPublicKey(seed);
+	const author = Buffer.from(publicKey).toString("hex");
+	const objectId = "issuance-batch-equivalence";
+	const anchor = "a".repeat(64);
+	const root = "b".repeat(64);
+	const operations = Array.from({ length: 8 }, (_, index) => ({ action: "place", id: `m-${index}`, x: index, y: 2 }));
+	const singlesStore = await factories.sqlite("equivalence-singles");
+	const batchStore = await factories.sqlite("equivalence-batch");
+	const issuerOf = (store: DurableIssuanceStore) =>
+		createTransactionalVertexIssuer({
+			author,
+			privateKeySeed: seed,
+			publicKey: { bytes: publicKey, format: "raw" },
+			transactIssue: (scope, build) => store.transactIssue(scope, build),
+		});
+	const singles: IssueCommit[] = [];
+	for (const [index, operation] of operations.entries())
+		singles.push(
+			await issuerOf(singlesStore).issue({
+				anchor,
+				dependencies: index === 0 ? [root] : [Buffer.from(singles[index - 1]!.envelope.digest).toString("hex")],
+				epoch: 1,
+				logicalTime: 1 + 2 * index,
+				objectId,
+				operation,
+			})
+		);
+	const batched = await issuerOf(batchStore).issueBatch(
+		{ anchor, dependencies: [root], epoch: 1, objectId, entries: operations.map((operation, index) => ({ logicalTime: 1 + 2 * index, operation })) },
+		(scope, count, build) =>
+			batchStore.transactIssueBatch!({ scope, count, expectedPlanRevision: null }, (first, admission) =>
+				build(
+					first,
+					admission === undefined
+						? undefined
+						: (preimages, sign) => admission(preimages.map((bytes) => ({ exactCanonicalUnsignedVertexBytes: bytes })), sign)
+				)
+			)
+	);
+	const view = (commits: readonly IssueCommit[]) =>
+		commits.map((commit) => ({
+			authorSequence: commit.authorSequence,
+			preimage: Buffer.from(commit.envelope.canonicalPreimageBytes).toString("hex"),
+			digest: Buffer.from(commit.envelope.digest).toString("hex"),
+			signature: Buffer.from(commit.envelope.signature).toString("hex"),
+		}));
+	expect(batched).toHaveLength(8);
+	expect(view(batched)).toEqual(view(singles));
+	expect(await batchStore.readLineage({ objectId, author })).toEqual(await singlesStore.readLineage({ objectId, author }));
+}, 60_000);

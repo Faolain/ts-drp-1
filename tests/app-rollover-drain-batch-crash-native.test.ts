@@ -29,7 +29,11 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 //   fence:          the commit that issues the drain's author fence (every row prepared, none replaced);
 //   chunk-marker:   the commit of the first chunk's entered marker (signed nothing, replaced nothing);
 //                   the reopened Writer resumes the marker whole before any plan write;
-//   between-chunks: the commit of the first chunk (8 rows replaced, the other 2 not).
+//   between-chunks: the commit of the first chunk (8 rows replaced, the other 2 not);
+//   between-journal: after the first chunk's commit, the journal commit of its third row (rows 4..8
+//                   committed to issuance but not yet journaled); reopen admits each exactly once.
+// At death the Writer's replacement rows carry the logical times singles give them (fence + 2, + 4, ...):
+// a batch attempt that fell back or retried left no gap and reused no time.
 // Every commit of the Writer's issuance store is watched: a chunk is never partly replaced (no commit
 // leaves 0 < replaced-in-chunk < chunk). The fallback (a store without transactIssueBatch: one
 // replacement per transaction, as before) has its own edge (DRAIN_BATCH_CRASH_SINGLES=1, SINGLES_EDGES):
@@ -39,12 +43,12 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // The test reopens the same directory, reconnects, and requires every move to be admitted by the
 // creator exactly once: no loss, no double apply. No native write, signature or transaction is mocked.
 const INNER = process.env.RUN_DRAIN_BATCH_CRASH === "1";
-type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-issues";
+type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-journal" | "between-issues";
 /** The fallback edge: run with DRAIN_BATCH_CRASH_SINGLES=1 against a build whose issuance store has no
  * transactIssueBatch (the drain then issues one replacement per transaction, as before batching). */
 const SINGLES_EDGES: readonly Edge[] = ["between-issues"];
 const EDGES: readonly Edge[] =
-	process.env.DRAIN_BATCH_CRASH_SINGLES === "1" ? SINGLES_EDGES : ["fence", "chunk-marker", "between-chunks"];
+	process.env.DRAIN_BATCH_CRASH_SINGLES === "1" ? SINGLES_EDGES : ["fence", "chunk-marker", "between-chunks", "between-journal"];
 const MOVES = 10;
 const CHUNK = 8;
 
@@ -70,6 +74,13 @@ const idOf = (operation: string): string | undefined => {
 	const value = JSON.parse(operation) as Record<string, unknown> | null;
 	return typeof value?.id === "string" ? value.id : undefined;
 };
+const journalFile = (directory: string, name: string) =>
+	join(
+		directory,
+		`${createHash("sha256")
+			.update(JSON.stringify(["journal", name]))
+			.digest("hex")}.sqlite.drp-live-journal-v1.sqlite`
+	);
 const issuanceFile = (directory: string, name: string) =>
 	join(
 		directory,
@@ -79,6 +90,22 @@ const issuanceFile = (directory: string, name: string) =>
 	);
 
 type PlanEntry = { disposition: string; sourceSequence: number; replacementSequence: number | null };
+/** The logical times of the Writer's rows after its latest author fence, and the fence's own. */
+function writerTimes(file: string, author: string) {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const rows = db
+			.prepare("SELECT canonical_preimage FROM issued_records WHERE author=? ORDER BY author_sequence")
+			.all(author)
+			.map((row) => decodeCanonical(new Uint8Array(row.canonical_preimage as Uint8Array)) as RowValue & { logicalTime: number });
+		const fence = rows.findLastIndex((row) => row.operation.action === "$drp.author-fence.v1");
+		return fence < 0
+			? { fenceTime: null, times: [] as number[] }
+			: { fenceTime: rows[fence]!.logicalTime, times: rows.slice(fence + 1).map((row) => row.logicalTime) };
+	} finally {
+		db.close();
+	}
+}
 /** The size of the entered batch marker in the Writer's lineage (null: none, or a single's marker). */
 function writerBatchMarker(file: string, author: string): number | null {
 	const db = new DatabaseSync(file, { readOnly: true });
@@ -193,15 +220,24 @@ it.runIf(INNER)(
 			partialFile = join(directory, "partial-chunk.json");
 		const singles = process.env.DRAIN_BATCH_CRASH_SINGLES === "1";
 		const file = issuanceFile(directory, "recipient");
+		const journal = journalFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
-		const watch = { author: "", armed: false, inside: false };
+		const watch = { author: "", armed: false, inside: false, journalCommits: null as number | null };
 		const die = (detail: Record<string, unknown>) => {
-			writeFileSync(deathFile, JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...detail }));
+			const times = writerTimes(file, watch.author);
+			writeFileSync(deathFile, JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...times, ...detail }));
 			process.kill(process.pid, "SIGKILL");
 			throw Error("SIGKILL_DID_NOT_TERMINATE");
 		};
 		DatabaseSync.prototype.exec = function (sql: string) {
 			const result = exec.call(this, sql);
+			if (
+				watch.journalCommits !== null &&
+				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
+				this.location()?.endsWith(`/${basename(journal)}`) === true &&
+				++watch.journalCommits === 3
+			)
+				die({ journalCommits: watch.journalCommits, replaced: CHUNK });
 			if (
 				watch.armed &&
 				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
@@ -223,6 +259,7 @@ it.runIf(INNER)(
 						die({ marker, rebase: rebase.length });
 					if (edge === "between-chunks" && replaced.length === CHUNK)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
+					if (edge === "between-journal" && replaced.length === CHUNK) watch.journalCommits ??= 0;
 					if (edge === "between-issues" && replaced.length === 2)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 				} finally {
@@ -294,9 +331,16 @@ it.skipIf(INNER).each(EDGES)(
 		const setup = JSON.parse(readFileSync(join(directory, "setup.json"), "utf8")) as Setup;
 		process.stdout.write(`DRAIN_BATCH_CRASH_DEATH ${JSON.stringify({ death, setup })}\n`);
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
-	expect(existsSync(join(directory, "partial-chunk.json")), "a chunk was partly replaced").toBe(false);
-	if (edge === "chunk-marker") expect(death).toMatchObject({ marker: CHUNK, rebase: MOVES });
-	if (edge === "between-chunks") expect((death.replaced as number[]).length).toBe(CHUNK);
+		expect(existsSync(join(directory, "partial-chunk.json")), "a chunk was partly replaced").toBe(false);
+		if (edge === "chunk-marker") expect(death).toMatchObject({ marker: CHUNK, rebase: MOVES });
+		if (edge === "between-chunks") expect((death.replaced as number[]).length).toBe(CHUNK);
+		if (edge === "between-journal") expect(death).toMatchObject({ journalCommits: 3 });
+		// Replacement logical times are the singles' own: fence + 2, + 4, ... (no gap, no reuse).
+		const times = death.times as number[];
+		if (edge !== "fence" && edge !== "chunk-marker") {
+			expect(times.length).toBeGreaterThan(0);
+			expect(times).toEqual(times.map((_, index) => (death.fenceTime as number) + 2 * (index + 1)));
+		}
 
 		const restore = await installEnvironment("node", () => undefined);
 		try {
