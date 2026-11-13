@@ -30,6 +30,7 @@ import {
 	type DurableIssueScope,
 	type DurableIssueSignContext,
 	type DurableOutboxPageInput,
+	MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS,
 	type DurableOutboxPublicationTransitionInput,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
@@ -84,6 +85,7 @@ import {
 	type PreparedBlueprintAdmission,
 	type PreparedBlueprintRuntime,
 	type SignRegisteredVertexDigest,
+	type TransactIssueBatch,
 } from "@ts-drp/protocol-v3";
 import {
 	type CurrentEpochAuthorAuthorization,
@@ -846,7 +848,30 @@ export type V3EgressResult =
 export const V3_SETTLEMENT_DRAIN_TURN_ROWS = 8;
 // The genuine rebase sources this module minted, with their runtime and held source: a batched
 // preparation accepts only these, never a look-alike.
-const rebaseSourceOwners = new WeakMap<object, Readonly<{ registration: V3PlaneRegistration; source: ClassifiedRebaseRow }>>();
+const rebaseSourceOwners = new WeakMap<object, RebaseSourceOwner>();
+type RebaseSourceOwner = Readonly<{
+	registration: V3PlaneRegistration;
+	source: ClassifiedRebaseRow;
+	/** The source's whole-floor checkpoint when it may issue in a batch (no creator selection held). */
+	batchFloor(): Uint8Array | undefined;
+}>;
+
+/**
+ * One drain chunk's replacements issued in one batched issuance (V3RebaseSource.issueReplacements).
+ * `batch-unavailable`: nothing was reserved, entered or signed; the drain issues the chunk's rows
+ * singly (a portable or creator-selected source, a store without transactIssueBatch, a row that
+ * needs a split or a join, a batch the store's sizing refuses). `batch-retry`: the plan moved past
+ * the revision the drain re-checked; nothing was written and the drain re-checks the chunk.
+ * Any other failure is the singles' failure of the row it stopped at.
+ */
+export type V3ReplacementBatchResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "accepted";
+			readonly rows: readonly Readonly<{ readonly authorSequence: number; readonly digest: string }>[];
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: "batch-unavailable" | "batch-retry"; readonly detail: string }>
+	| Extract<V3LocalIssueResult, { readonly ok: false }>;
 
 type V3RebaseSource = Readonly<{
 	readonly author: string;
@@ -866,6 +891,15 @@ type V3RebaseSource = Readonly<{
 	/** Several sources of the same runtime prepared in one dependency turn (at most
 	 * V3_SETTLEMENT_DRAIN_TURN_ROWS); same decisions as prepareReplacement on each, in order. */
 	prepareReplacements(peers: readonly V3RebaseSource[]): Promise<readonly NativeReplacementPreparation[]>;
+	/** Several sources' legacy replacements (one input per peer, in order; at most
+	 * V3_SETTLEMENT_DRAIN_TURN_ROWS) issued in ONE batched issuance transaction against
+	 * `expectedPlanRevision`, under one native custody and one census; each row is checked as its
+	 * single issueReplacement checks it. See V3ReplacementBatchResult. */
+	issueReplacements(
+		peers: readonly V3RebaseSource[],
+		inputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
+		expectedPlanRevision: number
+	): Promise<V3ReplacementBatchResult>;
 	/** Explicit creator selection; this never grants authority merely from the local source capability. */
 	authorizeReplacement(
 		sign: (request: Readonly<{ exactCanonicalSelectionBytes: Uint8Array; digest: Uint8Array }>) => Promise<Uint8Array>
@@ -17018,194 +17052,509 @@ async function issueOneVertex(
 								(error instanceof Error ? error.message : String(error))}`
 						);
 		}
-		const committedFailure = (
-			kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
-			detail: string
-		): InternalLocalIssueResult => {
-			registration.operationAdmissionHalted = true;
-			return requireTerminalAuthorization
-				? internalLocalIssueFailure(kind, detail, "outcome-unknown")
-				: localIssueFailure(kind, detail);
-		};
-		const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
-		if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
-
-		let authenticated: AuthenticatedRecoveryVertex | undefined;
-		const retained: RetainedCloseSignedAdmissionCapture = {};
-		try {
-			authenticated = authenticateRecoveryVertex(
-				registration.payload,
-				registration.authorization,
-				row.canonicalPreimageBytes,
-				row.signature, undefined, retained
-			);
-		} catch {
-			return committedFailure("admission-rejected", "v3 local issue authentication failed");
-		}
-		if (
-			authenticated === undefined ||
-			authenticated.digest !== lowerHexDigest(row.digest) ||
-			authenticated.author !== scope.author ||
-			authenticated.authorSequence !== row.authorSequence ||
-			registration.index.has(authenticated.digest)
-		) {
-			return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
-		}
-		if (!hasBoundedDependencies(registration.payload, authenticated)) {
-			return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
-		}
-		if (requireTerminalAuthorization) {
-			let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
-			try {
-				classification =
-					registration.classifyTerminalVertex?.(
-						ObjectFreeze({
-							author: authenticated.author,
-							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
-							signature: new Uint8ArrayConstructor(row.signature),
-							vertex: authenticated.admitted,
-						})
-					) ?? "reject";
-			} catch {
-				classification = "reject";
-			}
-			if (classification !== "terminal-authorized") {
-				return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
-			}
-		}
-		const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-		if (
-			!controlOperation &&
-			!validateLatchedOperation(
-				registration.authorization,
-				registration.latchedOperations,
-				acceptedAcl,
-				authenticated.author,
-				registration.payload.trust.trust.profileId,
-				requireTerminalAuthorization,
-				input.settlementSource !== undefined && input.settlementAuthorization !== undefined
-			)
-		) {
-			return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
-		}
-		if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
-			return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-		}
-
-		let appended;
-		try {
-			const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
-			if (custodyImage !== undefined && maintenanceImage !== undefined &&
-				(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
-					!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
-				throw new TypeError("local journal contexts disagree");
-			const expectedNativeImage = custodyImage ?? maintenanceImage;
-			appended = await registration.liveJournalStore.appendAccepted({
-				author: scope.author,
-				authorSequence: row.authorSequence,
-				scope: liveJournalScope(registration.payload),
-				sourceKind: "local-issued",
-				vertexDigest: authenticated.digest,
-				...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
-			});
-			if (input.settlementCustody !== undefined) {
-				if (!appended.ok || appended.nativeImage === undefined)
-					throw new TypeError("replacement journal source-bound readback is unavailable");
-				await input.settlementCustody.resumeJournalReads(appended.nativeImage);
-			}
-			if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
-				throw new TypeError("ordinary local journal postimage is unavailable");
-		} catch {
-			return committedFailure("journal-rejected", "v3 local issue journal append failed");
-		}
-		if (
-			!appended.ok ||
-			appended.idempotent ||
-			appended.sourceKind !== "local-issued" ||
-			appended.vertexDigest !== authenticated.digest ||
-			!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
-		) {
-			return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
-		}
-
-		const updatedEpochBytes = nextEpochBytes(
-			registration.epochBytes,
-			authenticated.byteCharge,
-			registration.payload.parameters.maxEpochBytes
+		return await admitCommittedLocalVertex(
+			registration,
+			input,
+			scope,
+			commit,
+			controlOperation,
+			reservation,
+			requireTerminalAuthorization,
+			maintenanceAdmission
 		);
-		if (updatedEpochBytes === undefined) {
-			return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-		}
-		try {
-			const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
-			if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-			registration.epochBytes = updatedEpochBytes;
-		} catch {
-			return committedFailure("graph-rejected", "v3 local issue graph append failed");
-		}
-		retainCloseVertex(
-			registration.closeVertices,
-			registration.closeAuthors,
-			registration.authorVertexCounts,
-			authenticated,
-			registration.closeCharges,
-			input.settlementSource !== undefined && input.settlementAuthorization !== undefined,
-			retained.value,
-			registration.vertexFacts
-		);
-		if (controlOperation) registration.controlVertices.add(authenticated.digest);
-		registration.graphVersion += 1;
-		if (acceptedAcl !== null && acceptedAcl !== undefined) {
-			registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
-		}
-		if (!commitOperationReservation(reservation)) {
-			registration.operationAdmissionHalted = true;
-			return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
-		}
-		const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
-		advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
-			appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
-			acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
-				byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
-				detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
-			{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
-				canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
-		maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
-			detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
-			...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
-		let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
-		try {
-			await input.settlementCustody?.check();
-		} catch {
-			return committedFailure("admission-rejected", "replacement currency changed before delivery");
-		}
-		if (currentRegistration(registration) && !controlOperation) {
-			try {
-				const disposition = await registration.onAdmittedVertex(
-					ObjectFreeze({
-						vertex: authenticated.admitted,
-						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
-						signature: new Uint8ArrayConstructor(row.signature),
-						transportSender: registration.networkNode.peerId,
-					})
-				);
-				terminalDisposition = disposition?.kind;
-			} catch {
-				ingressFailureLog("sink-rejected");
-			}
-		}
-		try {
-			await input.settlementCustody?.check();
-		} catch {
-			return committedFailure("admission-rejected", "replacement currency changed at delivery");
-		}
-		return ObjectFreeze({
-			...localIssueSuccess(row.authorSequence, authenticated.digest),
-			...(terminalDisposition === undefined ? {} : { terminalDisposition }),
-		});
 	} finally {
 		await maintenanceAdmission?.release();
 	}
+}
+
+/**
+ * Everything after a local vertex's issuance commit, in order: authentication of the committed row,
+ * its journal append (under the replacement custody's journal join when one is held), graph index,
+ * close retention, reservation commit and delivery. One vertex per call; a batched issuance admits
+ * its committed rows through this one at a time, in sequence order, exactly as singles do.
+ * @param registration - The live plane that issued the row.
+ * @param input - The captured issue input (settlement source/custody when a replacement).
+ * @param scope - The issuance scope the commit belongs to.
+ * @param commit - The committed issuance (unchecked; authenticated here).
+ * @param controlOperation - Whether the row's operation is a control operation.
+ * @param reservation - The row's fresh operation reservation, committed on success.
+ * @param requireTerminalAuthorization - Whether the row must classify terminal-authorized.
+ * @param maintenanceAdmission - The creator maintenance admission the issue held, if any.
+ * @returns The local issue result of this row.
+ */
+async function admitCommittedLocalVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	scope: DurableIssueScope,
+	commit: unknown,
+	controlOperation: boolean,
+	reservation: FreshOperationAdmissionReservation | undefined,
+	requireTerminalAuthorization: boolean,
+	maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined
+): Promise<InternalLocalIssueResult> {
+	const committedFailure = (
+		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+		detail: string
+	): InternalLocalIssueResult => {
+		registration.operationAdmissionHalted = true;
+		return requireTerminalAuthorization
+			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+			: localIssueFailure(kind, detail);
+	};
+	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+
+	let authenticated: AuthenticatedRecoveryVertex | undefined;
+	const retained: RetainedCloseSignedAdmissionCapture = {};
+	try {
+		authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			row.canonicalPreimageBytes,
+			row.signature, undefined, retained
+		);
+	} catch {
+		return committedFailure("admission-rejected", "v3 local issue authentication failed");
+	}
+	if (
+		authenticated === undefined ||
+		authenticated.digest !== lowerHexDigest(row.digest) ||
+		authenticated.author !== scope.author ||
+		authenticated.authorSequence !== row.authorSequence ||
+		registration.index.has(authenticated.digest)
+	) {
+		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
+	}
+	if (!hasBoundedDependencies(registration.payload, authenticated)) {
+		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	if (requireTerminalAuthorization) {
+		let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+		try {
+			classification =
+				registration.classifyTerminalVertex?.(
+					ObjectFreeze({
+						author: authenticated.author,
+						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+						signature: new Uint8ArrayConstructor(row.signature),
+						vertex: authenticated.admitted,
+					})
+				) ?? "reject";
+		} catch {
+			classification = "reject";
+		}
+		if (classification !== "terminal-authorized") {
+			return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
+		}
+	}
+	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+	if (
+		!controlOperation &&
+		!validateLatchedOperation(
+			registration.authorization,
+			registration.latchedOperations,
+			acceptedAcl,
+			authenticated.author,
+			registration.payload.trust.trust.profileId,
+			requireTerminalAuthorization,
+			input.settlementSource !== undefined && input.settlementAuthorization !== undefined
+		)
+	) {
+		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+
+	let appended;
+	try {
+		const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
+		if (custodyImage !== undefined && maintenanceImage !== undefined &&
+			(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
+				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
+			throw new TypeError("local journal contexts disagree");
+		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		appended = await registration.liveJournalStore.appendAccepted({
+			author: scope.author,
+			authorSequence: row.authorSequence,
+			scope: liveJournalScope(registration.payload),
+			sourceKind: "local-issued",
+			vertexDigest: authenticated.digest,
+			...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
+		});
+		if (input.settlementCustody !== undefined) {
+			if (!appended.ok || appended.nativeImage === undefined)
+				throw new TypeError("replacement journal source-bound readback is unavailable");
+			await input.settlementCustody.resumeJournalReads(appended.nativeImage);
+		}
+		if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
+			throw new TypeError("ordinary local journal postimage is unavailable");
+	} catch {
+		return committedFailure("journal-rejected", "v3 local issue journal append failed");
+	}
+	if (
+		!appended.ok ||
+		appended.idempotent ||
+		appended.sourceKind !== "local-issued" ||
+		appended.vertexDigest !== authenticated.digest ||
+		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
+	) {
+		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
+	}
+
+	const updatedEpochBytes = nextEpochBytes(
+		registration.epochBytes,
+		authenticated.byteCharge,
+		registration.payload.parameters.maxEpochBytes
+	);
+	if (updatedEpochBytes === undefined) {
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	try {
+		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+		if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+		registration.epochBytes = updatedEpochBytes;
+	} catch {
+		return committedFailure("graph-rejected", "v3 local issue graph append failed");
+	}
+	retainCloseVertex(
+		registration.closeVertices,
+		registration.closeAuthors,
+		registration.authorVertexCounts,
+		authenticated,
+		registration.closeCharges,
+		input.settlementSource !== undefined && input.settlementAuthorization !== undefined,
+		retained.value,
+		registration.vertexFacts
+	);
+	if (controlOperation) registration.controlVertices.add(authenticated.digest);
+	registration.graphVersion += 1;
+	if (acceptedAcl !== null && acceptedAcl !== undefined) {
+		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
+	}
+	if (!commitOperationReservation(reservation)) {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
+	}
+	const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
+	advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
+		appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
+		acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
+			byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
+		{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
+			canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
+	maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
+		detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
+		...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
+	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
+	try {
+		await input.settlementCustody?.check();
+	} catch {
+		return committedFailure("admission-rejected", "replacement currency changed before delivery");
+	}
+	if (currentRegistration(registration) && !controlOperation) {
+		try {
+			const disposition = await registration.onAdmittedVertex(
+				ObjectFreeze({
+					vertex: authenticated.admitted,
+					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(row.signature),
+					transportSender: registration.networkNode.peerId,
+				})
+			);
+			terminalDisposition = disposition?.kind;
+		} catch {
+			ingressFailureLog("sink-rejected");
+		}
+	}
+	try {
+		await input.settlementCustody?.check();
+	} catch {
+		return committedFailure("admission-rejected", "replacement currency changed at delivery");
+	}
+	return ObjectFreeze({
+		...localIssueSuccess(row.authorSequence, authenticated.digest),
+		...(terminalDisposition === undefined ? {} : { terminalDisposition }),
+	});
+}
+
+/**
+ * One drain chunk's legacy nonportable replacements in ONE batched issuance (transactIssueBatch):
+ * one entered marker and one commit for every row, instead of one marker and one commit per row.
+ * Every row passes the checks issueLocal and issueOneVertex make of it alone (source derivation,
+ * ACL, reservation, native source/plan currency against the chunk's one census, the exact owned
+ * bytes before its signature); the first row depends on the current frontier and each later row on
+ * its predecessor alone (the frontier the same singles see without foreign ingress). The committed
+ * rows are then admitted in sequence order exactly as singles are (admitCommittedLocalVertex).
+ * Anything a single would split, join or refuse is `batch-unavailable` before anything is reserved,
+ * so the drain issues those rows singly and gets the single's own outcome.
+ * @param registration - The live plane issuing the chunk.
+ * @param inputs - The chunk's captured replacement inputs (shared custody, no portable authorization).
+ * @param custody - The one native replacement custody held for the chunk.
+ * @param expectedPlanRevision - The settlement plan revision the drain re-checked the chunk against.
+ * @returns The chunk's outcome (see V3ReplacementBatchResult).
+ */
+async function issueReplacementBatch(
+	registration: V3PlaneRegistration,
+	inputs: readonly CapturedLocalIssueInput[],
+	custody: LocalReplacementCustody,
+	expectedPlanRevision: number
+): Promise<V3ReplacementBatchResult> {
+	const unavailable = (detail: string): V3ReplacementBatchResult =>
+		ObjectFreeze({ ok: false as const, kind: "batch-unavailable" as const, detail });
+	const transactIssueBatch = registration.issuanceStore.transactIssueBatch;
+	if (transactIssueBatch === undefined) return unavailable("the issuance store has no batched transaction");
+	if (inputs.length === 0 || inputs.length > MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS)
+		return unavailable("replacement batch size is outside the store bound");
+	if (registration.receiveOnly) return localIssueFailure("authorization-rejected", "v3 plane is receive-only");
+	if (currentRegistration(registration) && creatorInterruptedClosePending(registration))
+		return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold
+	)
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	if (registration.operationAdmissionHalted)
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	const readinessFailure = await localSnapshotAdmissionFailure(registration);
+	if (readinessFailure !== undefined) return readinessFailure;
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold ||
+		creatorInterruptedClosePending(registration)
+	)
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	// The creator's maintenance admission sizes one issuance at a time.
+	if (registration.creatorMaintenanceBound) return unavailable("creator maintenance issues singly");
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId)
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	const profileId = registration.payload.trust.trust.profileId;
+	const tips = registration.index.tips();
+	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies)
+		return unavailable("the frontier needs a causal join first");
+	if (!hasGraphCapacity(registration, scope.author, undefined, inputs.length))
+		return unavailable("the graph has no room for the whole batch");
+	const rows: Readonly<{
+		input: CapturedLocalIssueInput;
+		operation: Readonly<Record<string, unknown>>;
+		logicalTime: number;
+		planEffect: NonNullable<DurableIssueCommit["planEffect"]>;
+	}>[] = [];
+	for (const input of inputs) {
+		const effect = input.planEffect;
+		const first = input.operations[0];
+		const source = input.settlementSource;
+		if (
+			effect?.kind !== "replacement" ||
+			"fromIntent" in effect ||
+			first === undefined ||
+			source === undefined ||
+			input.settlementAuthorization !== undefined ||
+			input.settlementCustody !== custody ||
+			source.row.scope.objectId !== scope.objectId
+		)
+			return unavailable("only own-object legacy nonportable replacements batch");
+		try {
+			deriveOwnedReplacement(registration, source, input);
+		} catch {
+			return localIssueFailure("authorization-rejected", "v3 settlement replacement is not source authorized");
+		}
+		if (isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+			return unavailable("a reserved action issues singly");
+		let operation = first.operation;
+		if (input.operations.length > 1) {
+			if (
+				typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function" ||
+				input.operations.length > APPLICATION_BATCH_MAX_ENTRIES
+			)
+				return unavailable("an application batch row issues singly");
+			operation = applicationBatchOperation(input.operations);
+			if (!applicationBatchFits(operation)) return unavailable("a row needs a split");
+		}
+		if (
+			isControlOperation(operation, profileId) ||
+			!validateLatchedOperation(
+				registration.authorization,
+				registration.latchedOperations,
+				aclOperation(scope.author, "0".repeat(64), operation),
+				scope.author,
+				profileId,
+				false,
+				false
+			)
+		)
+			return unavailable("a row's operation issues singly");
+		rows.push(ObjectFreeze({ input, operation, logicalTime: first.logicalTime, planEffect: effect }));
+	}
+	const reservations: (FreshOperationAdmissionReservation | undefined)[] = [];
+	const releaseReservations = (): void => {
+		for (const reservation of reservations) releaseOperationReservation(reservation);
+	};
+	for (const row of rows) {
+		const reservation = reserveOperation(registration.operationAdmissionPolicy, row.operation, scope.author);
+		if (reservation === null) {
+			releaseReservations();
+			return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+		}
+		reservations.push(reservation);
+	}
+	const admittedFrontier = localAdmittedFrontier(registration, scope);
+	let commits: readonly DurableIssueCommit[];
+	let cryptoEntered = false;
+	let signerResolved = false;
+	let capacityRejected = false;
+	let signingRow: (typeof rows)[number] | undefined;
+	try {
+		const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
+		if (maintenance?.readBoundedRecoveryCensus === undefined)
+			throw new TypeError("replacement source is outside its native issuance custody");
+		// One census for the chunk; every row is checked against it as against its own read.
+		const census = await maintenance.readBoundedRecoveryCensus({
+			objectId: scope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		});
+		let context: Readonly<{ expectedIssuanceImageDigest?: string; expectedIssuanceControlBytes?: Uint8Array | null }> | undefined;
+		for (const row of rows) {
+			const quoted = await ownedReplacementSignContext(registration, row.input, census);
+			context ??= ObjectFreeze({
+				expectedIssuanceImageDigest: quoted.expectedIssuanceImageDigest,
+				expectedIssuanceControlBytes: quoted.expectedIssuanceControlBytes,
+			});
+		}
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
+			author: scope.author,
+			preparedBlueprintAdmission: registration.payload.admission,
+			publicKey: authorized,
+			signRegisteredVertexDigest: async (digest, request) => {
+				const row = signingRow;
+				if (row === undefined) throw new TypeError("replacement batch signer has no owned row");
+				cryptoEntered = true;
+				const signature = await row.input.signRegisteredVertexDigest(digest, request);
+				signerResolved = true;
+				return signature;
+			},
+			transactIssue: () => Promise.reject(new TypeError("a replacement batch issues only through its batched transaction")),
+		});
+		const transact: TransactIssueBatch = (selectedScope, count, buildAndSign) =>
+			transactIssueBatch({ scope: selectedScope, count, expectedPlanRevision }, async (firstSequence, nativeSignAdmission) => {
+				// Every local signature passes here with the store's CAS-selected sequences first.
+				if (admittedFrontier !== null && firstSequence <= admittedFrontier)
+					throw new V3LocalLineageBehindFrontier(selectedScope.author, firstSequence, admittedFrontier);
+				if (nativeSignAdmission === undefined) throw new TypeError("source-bound replacement requires its original native job");
+				const built = await buildAndSign(firstSequence, async (preimages, sign) => {
+					let byteCharge = 0;
+					for (const bytes of preimages) byteCharge += bytes.byteLength;
+					if (!hasGraphCapacity(registration, selectedScope.author, byteCharge, preimages.length)) {
+						capacityRejected = true;
+						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					return nativeSignAdmission(
+						preimages.map((bytes, index) =>
+							ObjectFreeze({ exactCanonicalUnsignedVertexBytes: bytes, planEffect: rows[index]!.planEffect })
+						),
+						async (index) => {
+							const row = rows[index];
+							const bytes = preimages[index];
+							if (row === undefined || bytes === undefined) throw new TypeError("replacement batch index is invalid");
+							deriveOwnedReplacement(registration, row.input.settlementSource!, row.input);
+							await custody.check();
+							const decoded = decodeCanonical(bytes);
+							if (
+								!isObject(decoded) ||
+								!sameBytes(encodeCanonical(Reflect.get(decoded, "operation")), encodeCanonical(row.operation)) ||
+								Reflect.get(decoded, "settlementSource") !== undefined
+							)
+								throw new TypeError("native replacement bytes differ from owned candidate");
+							signingRow = row;
+							try {
+								return await sign(index);
+							} finally {
+								signingRow = undefined;
+							}
+						},
+						context
+					);
+				});
+				return built.map((commit, index) => ObjectFreeze({ ...commit, planEffect: rows[index]!.planEffect }));
+			});
+		commits = await issuer.issueBatch(
+			{
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies: tips,
+				epoch: registration.payload.provenance.epoch,
+				objectId: scope.objectId,
+				entries: rows.map((row) => ({ logicalTime: row.logicalTime, operation: row.operation })),
+			},
+			transact
+		);
+	} catch (error) {
+		const code = isObject(error) ? Reflect.get(error, "code") : undefined;
+		if (code === "ISSUANCE_OUTCOME_UNKNOWN" || cryptoEntered) {
+			// Durable entered debt (the whole batch's marker) is resumed whole, never re-issued singly.
+			registration.operationAdmissionHalted = true;
+		} else {
+			releaseReservations();
+			if (code === "ISSUANCE_RETRY_REQUIRED")
+				return ObjectFreeze({
+					ok: false as const,
+					kind: "batch-retry" as const,
+					detail: error instanceof Error ? error.message : "settlement plan revision changed",
+				});
+			// The store's sizing refused the whole batch before anything was written: singles size each row.
+			const refusal = issuanceCapacityRefusalOf(error);
+			if (refusal !== undefined && !capacityRejected) return unavailable(`batch sizing refused: ${refusal}`);
+		}
+		return capacityRejected
+			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+			: signerResolved
+				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+				: localIssueFailure(
+						"issuance-rejected",
+						`v3 local issue transaction failed: ${issuanceCapacityRefusalOf(error) ??
+							(error instanceof Error ? error.message : String(error))}`
+					);
+	}
+	if (commits.length !== rows.length) {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("issuance-rejected", "v3 replacement batch commit is incomplete");
+	}
+	const accepted: Readonly<{ authorSequence: number; digest: string }>[] = [];
+	for (let index = 0; index < commits.length; index += 1) {
+		const committed = commits[index]!;
+		const admitted = await admitCommittedLocalVertex(
+			registration,
+			rows[index]!.input,
+			scope,
+			ObjectFreeze({
+				authorSequence: committed.authorSequence,
+				envelope: committed.envelope,
+				issuedRecord: committed.issuedRecord,
+				outboxEntry: committed.outboxEntry,
+			}),
+			false,
+			reservations[index],
+			false,
+			undefined
+		);
+		if (!admitted.ok) {
+			// The rest are durably committed: recovery admits them from the outbox, never re-issues them.
+			registration.operationAdmissionHalted = true;
+			return admitted.kind === "split-required"
+				? localIssueFailure("issuance-rejected", "v3 replacement batch admission is invalid")
+				: admitted;
+		}
+		accepted.push(ObjectFreeze({ authorSequence: admitted.authorSequence, digest: admitted.digest }));
+	}
+	await drainPendingIngress(registration);
+	return ObjectFreeze({ ok: true as const, kind: "accepted" as const, rows: ObjectFreeze(accepted) });
 }
 
 async function issueAuthorFence(
@@ -18420,7 +18769,10 @@ function deriveOwnedReplacement(
 /** Captures mechanical source/plan currency for the existing native reservation. */
 async function ownedReplacementSignContext(
 	registration: V3PlaneRegistration,
-	input: CapturedLocalIssueInput
+	input: CapturedLocalIssueInput,
+	// One census a batched chunk read once for all its rows (own-object sources only); every row is
+	// still checked against it exactly as against its own read.
+	sharedCensus?: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensus
 ): Promise<DurableIssueSignContext> {
 	const selected = input.settlementSource;
 	if (selected === undefined) throw new TypeError("replacement owning source is unavailable");
@@ -18440,10 +18792,13 @@ async function ownedReplacementSignContext(
 			: sourceMaintenance !== maintenance)
 	)
 		throw new TypeError("replacement source is outside its native issuance custody");
-	const census = await maintenance.readBoundedRecoveryCensus({
-		objectId: registration.issuanceScope.objectId,
-		limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
-	});
+	if (sharedCensus !== undefined && externalSource) throw new TypeError("a shared replacement census is own-object only");
+	const census =
+		sharedCensus ??
+		(await maintenance.readBoundedRecoveryCensus({
+			objectId: registration.issuanceScope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		}));
 	if (!currentRegistration(registration)) throw new TypeError("replacement source owner was revoked");
 	await input.settlementCustody?.check();
 	let sourceCensus = census;
@@ -18933,6 +19288,108 @@ async function readRebaseOutbox(
 			}
 		);
 	}
+	function issueReplacements(
+		this: V3RebaseSource,
+		peers: readonly V3RebaseSource[],
+		rawInputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
+		expectedPlanRevision: number
+	): Promise<V3ReplacementBatchResult> {
+		if (this !== resultSource)
+			return Promise.resolve(localIssueFailure("authorization-rejected", "active replacement source is foreign"));
+		if (!currentRegistration(registration))
+			return Promise.resolve(localIssueFailure("not-active", "active replacement source is revoked"));
+		if (
+			!ArrayIsArray(peers) ||
+			!ArrayIsArray(rawInputs) ||
+			peers.length === 0 ||
+			peers.length !== rawInputs.length ||
+			peers.length > V3_SETTLEMENT_DRAIN_TURN_ROWS ||
+			!NumberIsSafeInteger(expectedPlanRevision) ||
+			expectedPlanRevision < 0
+		)
+			return Promise.resolve(localIssueFailure("malformed-input", "replacement batch is malformed"));
+		const owners: RebaseSourceOwner[] = [];
+		const seen = new Set<object>();
+		for (const peer of peers) {
+			const owner = rebaseSourceOwners.get(peer);
+			if (owner === undefined || owner.registration !== registration || seen.has(peer))
+				return Promise.resolve(localIssueFailure("authorization-rejected", "replacement batch source is foreign or repeated"));
+			seen.add(peer);
+			owners.push(owner);
+		}
+		const unavailable = (detail: string): V3ReplacementBatchResult =>
+			ObjectFreeze({ ok: false as const, kind: "batch-unavailable" as const, detail });
+		return enqueueRegistrationTask<V3ReplacementBatchResult>(
+			registration,
+			(captureCustody) => {
+				const captured: CapturedLocalIssueInput[] = [];
+				for (let index = 0; index < rawInputs.length; index += 1) {
+					const input = capturedLocalIssueInput(registration.payload, rawInputs[index]!, captureCustody);
+					if ("ok" in input) return () => Promise.resolve(input);
+					captured.push(ObjectFreeze({ ...input, settlementSource: owners[index]!.source }));
+				}
+				return async () => {
+					// Only what issueReplacement issues nonportable batches: no creator selection held,
+					// a non-creator Writer the target still authorizes, own-object native custody.
+					const floors = owners.map((owner) => owner.batchFloor());
+					const floor = floors[0];
+					if (floor === undefined || floors.some((value) => value === undefined || !sameBytes(value, floor)))
+						return unavailable("a replacement source holds a creator selection or no common floor checkpoint");
+					if (
+						resolveCreatorSettlementAuthor(registration.payload.trust.trust) === registration.issuanceScope.author ||
+						!isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
+					)
+						return unavailable("portable replacements issue singly");
+					if (
+						registration.displacedSource !== undefined &&
+						registration.displacedSource.prepared.provenance.objectId !== registration.payload.provenance.objectId
+					)
+						return unavailable("external-source replacements issue singly");
+					if (registration.issuanceStore.transactIssueBatch === undefined)
+						return unavailable("the issuance store has no batched transaction");
+					let custody: LocalReplacementCustody | undefined;
+					let outcome: V3ReplacementBatchResult;
+					let releaseFailed = false;
+					try {
+						for (const input of captured) deriveOwnedReplacement(registration, input.settlementSource!, input);
+						custody = await acquireLocalReplacementCustody(registration, floor);
+						if (registration.currentReplacementCustody !== undefined)
+							throw new TypeError("replacement native custody is already entered");
+						registration.currentReplacementCustody = custody;
+						const held = custody;
+						outcome = await issueReplacementBatch(
+							registration,
+							captured.map((input) => ObjectFreeze({ ...input, settlementCustody: held, settlementAuthorization: undefined })),
+							held,
+							expectedPlanRevision
+						);
+					} catch (error) {
+						outcome = localIssueFailure(
+							"authorization-rejected",
+							`active replacement source custody refused: ${error instanceof Error ? error.message : "unknown"}`
+						);
+					} finally {
+						if (registration.currentReplacementCustody === custody) registration.currentReplacementCustody = undefined;
+						try {
+							await custody?.release();
+						} catch {
+							// As issueReplacement: joined custody failure halts further issues.
+							registration.operationAdmissionHalted = true;
+							releaseFailed = true;
+						}
+					}
+					return releaseFailed
+						? localIssueFailure("admission-rejected", "replacement native custody joined release failed")
+						: outcome;
+				};
+			},
+			{
+				pool: "settlement",
+				refuse: () => unavailable("v3 input task capacity exhausted"),
+				refuseCapture: (capacity) => unavailable(`v3 input ${capacity} capacity exhausted`),
+			}
+		);
+	}
 	function withDependencies(
 		this: V3RebaseSource,
 		consume: (read: CreatorSnapshotRecoveryCloseDependencyRead, proofByteCharge: number) => Promise<void>
@@ -19101,6 +19558,7 @@ async function readRebaseOutbox(
 							resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== commonSource.author),
 					withDependencies,
 					issueReplacement,
+					issueReplacements,
 					prepareReplacement,
 					prepareReplacements,
 					authorizeReplacement,
@@ -19114,11 +19572,19 @@ async function readRebaseOutbox(
 					publishState: selected.row.publishState,
 					withDependencies,
 					issueReplacement,
+					issueReplacements,
 					prepareReplacement,
 					prepareReplacements,
 					authorizeReplacement,
 				});
-	rebaseSourceOwners.set(resultSource, ObjectFreeze({ registration, source: heldSource }));
+	rebaseSourceOwners.set(
+		resultSource,
+		ObjectFreeze({
+			registration,
+			source: heldSource,
+			batchFloor: () => (creatorSelection === undefined ? expectedFloorBytes : undefined),
+		})
+	);
 	return ObjectFreeze({ kind: "displaced" as const, ok: true as const, source: resultSource });
 }
 
@@ -25902,6 +26368,72 @@ export function resumeV3PendingIssuanceIntent(
 				authorSequence: pending.authorSequence,
 				detail: "a pending intent is signed only once this session is current",
 			});
+		const following = pending.followingIntents ?? [];
+		if (following.length !== 0) {
+			// A batched marker (one drain chunk) is resumed whole, through the batched transaction
+			// that entered it: never a row at a time, never re-derived.
+			const transactIssueBatch = registration.issuanceStore.transactIssueBatch;
+			if (transactIssueBatch === undefined) throw new TypeError("v3 pending batch intent requires its batched store");
+			const intents = [pending, ...following];
+			for (const [index, intent] of intents.entries()) {
+				const decoded = decodeCanonical(intent.canonicalPreimageBytes);
+				if (
+					!isObject(decoded) ||
+					intent.authorSequence !== pending.authorSequence + index ||
+					Reflect.get(decoded, "author") !== scope.author ||
+					Reflect.get(decoded, "objectId") !== scope.objectId ||
+					Reflect.get(decoded, "authorSequence") !== intent.authorSequence ||
+					Reflect.get(decoded, "epoch") !== epoch
+				)
+					throw new TypeError("v3 pending batch intent is not this author's");
+			}
+			await transactIssueBatch(
+				{ scope, count: intents.length, expectedPlanRevision: null },
+				async (firstSequence, nativeSignAdmission) => {
+					if (firstSequence !== pending.authorSequence) throw new TypeError("v3 pending intent ordinal changed");
+					if (nativeSignAdmission === undefined) throw new TypeError("v3 pending intent resume requires its native job");
+					const preimages = intents.map((intent) => new Uint8ArrayConstructor(intent.canonicalPreimageBytes));
+					const digests = preimages.map((bytes, index) => {
+						const digest = hashDomain(V3_VERTEX_DOMAIN, bytes);
+						if (!sameBytes(digest, intents[index]!.digest)) throw new TypeError("v3 pending intent digest differs");
+						return digest;
+					});
+					const signed = await nativeSignAdmission(
+						intents.map((intent, index) =>
+							ObjectFreeze({
+								exactCanonicalUnsignedVertexBytes: new Uint8ArrayConstructor(preimages[index]!),
+								...(intent.planEffect === undefined ? {} : { planEffect: intent.planEffect }),
+							})
+						),
+						(index) =>
+							withAuthoredOperationSigningRequest(preimages[index]!, (request) =>
+								sign(new Uint8ArrayConstructor(digests[index]!), request)
+							)
+					);
+					if (signed.length !== intents.length) throw new TypeError("v3 pending batch signatures are incomplete");
+					return signed.map((value, index) => {
+						const signature = copyDetachedBytes(value);
+						if (signature === undefined || signature.byteLength !== 64)
+							throw new TypeError("v3 pending intent signature is invalid");
+						const authorSequence = intents[index]!.authorSequence;
+						const envelope = ObjectFreeze({ canonicalPreimageBytes: preimages[index]!, digest: digests[index]!, signature });
+						const commit = ObjectFreeze({
+							authorSequence,
+							envelope,
+							issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+							outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+						});
+						const planEffect = intents[index]!.planEffect;
+						return planEffect === undefined ? commit : ObjectFreeze({ ...commit, planEffect });
+					});
+				}
+			);
+			return ObjectFreeze({
+				ok: true as const,
+				kind: "resumed" as const,
+				currentEpoch: epoch === registration.payload.provenance.epoch,
+			});
+		}
 		await registration.issuanceStore.transactIssue(scope, async (authorSequence, nativeSignAdmission) => {
 			if (authorSequence !== pending.authorSequence) throw new TypeError("v3 pending intent ordinal changed");
 			if (nativeSignAdmission === undefined) throw new TypeError("v3 pending intent resume requires its native job");

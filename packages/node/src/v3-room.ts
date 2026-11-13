@@ -6777,6 +6777,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
 			{ ok: true; kind: "displaced" }
 		>["source"]["prepareReplacements"];
+		issueReplacements?: Extract<
+			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
+			{ ok: true; kind: "displaced" }
+		>["source"]["issueReplacements"];
 	}>;
 	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
 	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
@@ -7903,6 +7907,81 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				Object.freeze({ kind: "fence" })
 			);
 			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
+		}
+		// Batched replacements: each chunk of at most V3_SETTLEMENT_DRAIN_TURN_ROWS legacy rows (no
+		// replacement progress) is re-checked against the plan as it now is and issued in ONE batched
+		// issuance transaction against that re-check's revision (issueReplacements): one entered marker
+		// and one commit for the chunk, not one of each per row, and one publication per chunk. A plan
+		// another writer moved meanwhile refuses the chunk with nothing written and the chunk is
+		// re-checked; a chunk the batch cannot carry (see V3ReplacementBatchResult) and every row the
+		// batches leave are issued singly by the loop below, which skips each row already replaced.
+		for (let retries = 0, recoveries = 0; ; ) {
+			await checkpoint();
+			assertSessionOpen();
+			const current = await issuanceStore.readSettlementPlan(settlementScope);
+			if (current === null) throw new TypeError("v3 room settlement plan is unavailable");
+			const chunk: Readonly<{ entry: RoomSettlementPlanEntry; source: DisplacedSource; ordered: readonly Readonly<Record<string, unknown>>[] }>[] = [];
+			for (const now of current.entries) {
+				if (!eligible(now) || now.replacementProgress !== undefined) continue;
+				const prepared = plan.entries.find((row) => row.sourceSequence === now.sourceSequence);
+				const ordered = orderedBySequence.get(now.sourceSequence);
+				if (prepared === undefined || !eligible(prepared) || !sameBytes(prepared.sourceDigest, now.sourceDigest) || ordered === undefined)
+					continue;
+				await refreshSourceOwner();
+				const source = sourceBySequence.get(now.sourceSequence);
+				if (source === undefined) throw new TypeError("v3 room replacement source is unavailable");
+				chunk.push(Object.freeze({ entry: now, source, ordered }));
+				if (chunk.length === V3_SETTLEMENT_DRAIN_TURN_ROWS) break;
+			}
+			const head = chunk[0]?.source;
+			if (head === undefined || typeof head.issueReplacements !== "function") break;
+			const firstLogicalTime = logicalTime;
+			let signed = false;
+			const signRegisteredVertexDigest = async (value: Uint8Array, request: Parameters<SignRegisteredVertexDigest>[1]) => {
+				const signature = await input.signRegisteredVertexDigest(value, request);
+				signed = true;
+				return signature;
+			};
+			const inputs = chunk.map(({ entry, ordered }) =>
+				Object.freeze({
+					operations: Object.freeze(
+						ordered.map((operation) => {
+							const selected = Object.freeze({ logicalTime, operation });
+							logicalTime += 2;
+							return selected;
+						})
+					),
+					planEffect: Object.freeze({ kind: "replacement" as const, sourceSequence: entry.sourceSequence }),
+					signRegisteredVertexDigest,
+				})
+			);
+			const issued = await head.issueReplacements(
+				chunk.map((row) => row.source),
+				inputs,
+				current.revision
+			);
+			if (issued.ok) {
+				if (settlementDrainPublication === "immediate") await publishAccepted();
+				continue;
+			}
+			if (issued.kind === "batch-unavailable") {
+				logicalTime = firstLogicalTime;
+				break;
+			}
+			if (issued.kind === "batch-retry") {
+				logicalTime = firstLogicalTime;
+				if (++retries >= V3_SETTLEMENT_REFUSAL_CAS_ATTEMPTS) break;
+				continue;
+			}
+			if (!signed)
+				throw new TypeError(`v3 room settlement batch issue failed: ${issued.kind}: ${issued.detail}`, { cause: issued });
+			// The chunk's marker was entered: it is resumed whole (never re-issued a row at a time) once
+			// the plane is recovered, and the next chunk re-checks the plan as that leaves it.
+			if (++recoveries > V3_SETTLEMENT_REFUSAL_CAS_ATTEMPTS)
+				throw new TypeError(`v3 room settlement batch did not recover: ${issued.kind}: ${issued.detail}`, { cause: issued });
+			await recoverSettlementOwner();
+			if (!(await resumePendingIssuanceIntent())) return;
+			if (settlementDrainPublication === "immediate") await publishAccepted();
 		}
 		for (const entry of plan.entries) {
 			await checkpoint();
