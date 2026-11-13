@@ -26484,6 +26484,23 @@ export interface V3RetainedWorkFrontier {
  * @param plane - Original live handle.
  * @returns Every retained application row with its frontier proof.
  */
+/**
+ * The creator-signed settlement frontier in this plane's installed settlement capability: the highest
+ * own author sequence it admitted (terminalThrough; null when none), or undefined without a valid one.
+ * Signed evidence only, never local acceptance or relay evidence: the room drops a reissue-origin entry
+ * (SettlementPlan.reissueOrigins) once this reaches its chain's last carrier.
+ * @param plane - The live plane.
+ * @returns The admitted author sequence, null, or undefined.
+ */
+export function v3InstalledSettlementAdmittedThrough(plane: V3PlaneHandle): number | null | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration)) return undefined;
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	return frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)
+		? undefined
+		: frontier.terminalThrough;
+}
+
 export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promise<readonly V3RetainedWorkFrontier[]> {
 	const registration = v3HandleRegistrations.get(plane);
 	if (registration === undefined || !currentRegistration(registration)) throw new TypeError("creator source custody owner is unavailable");
