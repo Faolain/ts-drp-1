@@ -6261,7 +6261,8 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			let issuanceRead: CreatorHeldIssuanceCensusRead | undefined;
 			// ea4eb158: check/ownIssuanceReservation also own the unchanged-held fast
 			// cell and the optional current-journal enrollment (closure state).
-			let unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent;
+			let unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
@@ -6460,7 +6461,8 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
 			prepareCreatorUnchangedHeldCensusRead;`, cell.bindings);
 		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
-			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent;
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
@@ -6484,9 +6486,12 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 	function cellInputs() {
 		const native = {rows: {issued: [{preimage: Uint8Array.of(7), signature: new Uint8Array(64)}], lineages: [], plans: [], outbox: []}, image: {digest: "actual"}, control: null};
 		const pages: unknown[] = [], state = {identity: {}, key: {format: "raw", bytes: new Uint8Array(32).fill(4)}};
-		const reads = {native: 0, pages: 0};
+		const reads = {native: 0, pages: 0, probe: undefined as unknown};
 		const store = Object.freeze({readOutboxPage: async () => {reads.pages++; return pages;}, acquireNativeReadReservation: async () => undefined});
-		const maintenance = Object.freeze({readBoundedRecoveryCensus: async () => {reads.native++; return native;}});
+		// The storage owner's read enrolls a currency probe on its own observation (captureCurrentProbe).
+		const readBoundedRecoveryCensus = Object.freeze(Object.assign(async () => {reads.native++; return native;},
+			{captureCurrentProbe: () => reads.probe}));
+		const maintenance = Object.freeze({readBoundedRecoveryCensus});
 		const floors = new WeakMap(), trust = {objectId: "room", currentEpoch: 3}, counted = new Set([1]);
 		const registration: any = {issuanceStore: store, liveJournalStore: Object.freeze({readiness: () => {}, readPage: () => {}}),
 			closeVertices: new Map([["vertex", {kind: "drp-vertex", hash: "vertex", operation: {bytes: Uint8Array.of(3)}}]]),
@@ -6519,13 +6524,15 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
 		const state = {captures: 0, probes: 0, probeCurrent: true, replays: 0, replayCurrent: true};
 		const probe = Object.freeze({checkCurrent: async () => {state.probes++; return state.probeCurrent;}});
+		cell.reads.probe = probe;
 		const original: Reservation = {check: async () => {}, release: async () => {}};
 		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
 			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
 			prepareCreatorUnchangedHeldCensusRead;`, {...cell.bindings,
 			ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor});
 		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
-			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes;
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = true, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
