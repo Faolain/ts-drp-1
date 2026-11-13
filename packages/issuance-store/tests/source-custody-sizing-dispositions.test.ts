@@ -204,7 +204,8 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		// consumed records, new records take their slots and are reissued in turn. The plan sized while the
 		// consumed records were still present covers the 64 entries those reissues write.
 		const consumed = consumeAll(withRecords(SETTLEMENT_HAND_BACK_LIMITS.maxRecords, 0), 2_000_000);
-		const prior = copySettlementPlan({...consumed, reissueOrigins: undefined}, scope)!;
+		const {reissueOrigins: _settled, ...withoutEntries} = consumed;
+		const prior = copySettlementPlan(withoutEntries, scope)!;
 		expect(prior.reissueOrigins).toBeUndefined();
 		expect(prior.handBacks!.every(record => record.reissueSequence !== null)).toBe(true);
 		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 0, geometry, OPERATION);

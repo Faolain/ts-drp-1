@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-non-null-assertion -- Fixture builders keep their inferred record types; each asserted effect was copied a line earlier by the test. */
 import "fake-indexeddb/auto";
 
 import { encodeCanonical } from "@ts-drp/canonical";
@@ -138,8 +139,12 @@ afterEach(async () => {
 	await Promise.all(directories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })));
 });
 
-/** Issues sequences up to (not including) `through` without effects, so the lineage reaches it. */
-async function advance(store: Store, through: number) {
+/**
+ * Issues sequences up to (not including) `through` without effects, so the lineage reaches it.
+ * @param store - The store under test.
+ * @param through - The first sequence not issued.
+ */
+async function advance(store: Store, through: number): Promise<void> {
 	for (let next = (await store.readLineage(SCOPE)).next; next < through; next++)
 		await store.transactIssue(SCOPE, (sequence) => Promise.resolve(commit(sequence, undefined)));
 }
@@ -300,23 +305,8 @@ describe("settlement reissue origins: codec", () => {
 				snapshot([origin(20, 3)])
 			);
 		}
-		const committed = copied(
-			plan(5, {
-				entries: [
-					...before.entries,
-					{
-						disposition: "committed",
-						replacementSequence: null,
-						sourceContextDigest: new Uint8Array(32).fill(0xd5),
-						sourceDigest: new Uint8Array(32).fill(0xd4),
-						sourceResolutionDigest: new Uint8Array(32).fill(0xd6),
-						sourceSequence: 24,
-					},
-				],
-				reissueOrigins: [origin(20, 3)],
-			})
-		);
-		expect(settlementReissueOriginsUnsettled(committed, committed.reissueOrigins, 30)).toBeUndefined();
+		// With no settling entry of its own, a last carrier at or below the frontier is admitted: dropped.
+		expect(settlementReissueOriginsUnsettled(before, before.reissueOrigins, 30, new Set([20]))).toBeUndefined();
 		// The expiry of the last carrier writes the record at the origin and drops the entry in the same write.
 		const merged = settlementWindowHandBacks(before, [
 			{ sourceSequence: 24, sourceDigest: new Uint8Array(32).fill(0xd3), sourceEpoch: 9, operations: [OPERATION] },
