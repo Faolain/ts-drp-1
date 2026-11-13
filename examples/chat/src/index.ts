@@ -438,6 +438,12 @@ async function openSession(
 					requestSuccessor: () => successors.request(),
 					creatorReachable: () => successors.creatorReachable(),
 					clearedByRollover: shippingChatRefusalClearedByRollover,
+					// A given-back message the room refused again for good (its state limit or admission policy).
+					onDeclined: (declined) =>
+						status(
+							`Your message "${String(declined.operation.text ?? "")}" was not delivered and can't be sent: ${declined.message}.`,
+							"error"
+						),
 					onError: (error) => console.warn("Chat rollover failed; it is retried", error),
 				},
 			});

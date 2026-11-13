@@ -758,6 +758,9 @@ export function createV3ZoneApi(
 						if (status.state === "read-only")
 							console.warn("v3 zone: the host is unreachable; read-only until it is back; kept placements", status.kept);
 					},
+					// A given-back placement the room refused again for good (its state limit or admission policy).
+					onDeclined: (declined) =>
+						console.warn(`v3 zone: a placement that did not reach the host was dropped: ${declined.message}`, declined.operation),
 					onError: (error) => console.warn("v3 zone rollover failed; it is retried", error),
 				},
 			});
@@ -783,6 +786,9 @@ export function createV3ZoneApi(
 						epoch: context.epoch,
 						objectId: context.objectId,
 						maxEntries: PARAMETERS.maxEpochVertices,
+						...(context.maxApplicationStateBytes === undefined
+							? {}
+							: { maxApplicationStateBytes: context.maxApplicationStateBytes }),
 						...(context.authenticatedApplicationStateBytes === undefined
 							? {}
 							: { authenticatedApplicationStateBytes: context.authenticatedApplicationStateBytes }),

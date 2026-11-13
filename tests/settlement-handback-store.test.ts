@@ -22,7 +22,8 @@ import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/iss
 // the row that offers it again consumes it (plan effect `hand-back`, which links the record to that
 // row). The same contract path in the memory, Node (SQLite) and browser (IndexedDB) stores: exact
 // readback, one consumption per record, records immutable to plan writes (an unconsumed record is
-// never dropped or altered by a plan write; a consumed one may be dropped), and Node reopen.
+// never dropped or altered by a plan write, except by the application's own decline write, which
+// drops exactly that record and nothing else; a consumed one may be dropped), and Node reopen.
 
 const SCOPE = Object.freeze({ author: "author:handback-store", objectId: "room:handback-store" });
 const OPERATION = encodeCanonical({ action: "placeBlock", id: "block-1-1", kind: "stone", x: 1, y: 1 });
@@ -216,6 +217,55 @@ describe("settlement hand-back record contract", () => {
 				).toBe("ISSUANCE_RETRY_REQUIRED");
 				await store.transactWriteSettlementPlan({ expectedRevision: 1, plan: plan(2, undefined), scope: SCOPE });
 				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(snapshot(plan(2, undefined)));
+			} finally {
+				await store.close();
+			}
+		});
+	}
+
+	for (const kind of ["memory", "node", "browser"] as const) {
+		it(`${kind}: a decline drops exactly that unconsumed record and nothing else`, async () => {
+			const store = await openStore(kind);
+			const key = Object.freeze({ intent: 1, sourceSequence: 7 });
+			const decline = (expectedRevision: number, candidate: unknown, declineHandBack: unknown = key) =>
+				store.transactWriteSettlementPlan({ declineHandBack, expectedRevision, plan: candidate, scope: SCOPE });
+			try {
+				await advance(store, 8);
+				await store.transactWriteSettlementPlan({
+					expectedRevision: null,
+					plan: plan(0, [record(), record({ intent: 1 })]),
+					scope: SCOPE,
+				});
+				// A decline write that changes anything besides dropping that record is refused.
+				for (const candidate of [
+					plan(1, [record(), record({ intent: 1 })]),
+					plan(1, [record({ intent: 1 })]),
+					plan(1, undefined),
+					plan(1, [record()], 5),
+					{ ...plan(1, [record()]), entries: [] },
+				])
+					expect(
+						code(await failure(decline(0, candidate))),
+						JSON.stringify(snapshot(candidate)).slice(0, 120)
+					).toBe("ISSUANCE_RETRY_REQUIRED");
+				// A malformed key is refused before the store is touched.
+				for (const bad of [{ intent: 1 }, { intent: -1, sourceSequence: 7 }, { extra: 1, intent: 1, sourceSequence: 7 }])
+					expect(code(await failure(decline(0, plan(1, [record()]), bad)))).toBe("ISSUANCE_INVALID_ARGUMENT");
+				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(
+					snapshot(plan(0, [record(), record({ intent: 1 })]))
+				);
+				// The exact decline: one write, the record gone, the other one and the plan untouched.
+				await decline(0, plan(1, [record()]));
+				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(snapshot(plan(1, [record()])));
+				// Declining it again (absent), or a consumed record, is refused.
+				expect(code(await failure(decline(1, plan(2, [record()]))))).toBe("ISSUANCE_RETRY_REQUIRED");
+				await store.transactIssue(SCOPE, (sequence) => Promise.resolve(commit(sequence, effect())));
+				expect(
+					code(await failure(decline(2, plan(3, undefined), Object.freeze({ intent: 0, sourceSequence: 7 }))))
+				).toBe("ISSUANCE_RETRY_REQUIRED");
+				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(
+					snapshot(plan(2, [record({ reissueSequence: 8 })]))
+				);
 			} finally {
 				await store.close();
 			}
