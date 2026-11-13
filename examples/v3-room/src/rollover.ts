@@ -175,6 +175,37 @@ export class V3RoomKeptMoveRefused extends Error {
 }
 
 /**
+ * Reported through `onError` (never thrown to the caller): a kept or given-back move was superseded by
+ * a newer accepted move of the same author and identity (the policy's `identity`, as a later placement
+ * of the same block). Offered again as a new move, the older move would land after the newer one and
+ * replace it in every replica, so the newer move stands as the author's final state for that identity:
+ * a superseded kept move is not offered again; a superseded given-back move is offered again with its
+ * record (only its own row consumes the record) and `supersededBy` is offered again right after it, so
+ * it lands last. Either way the older move is accounted for here, never silently dropped.
+ */
+export class V3RoomKeptMoveSuperseded extends Error {
+	/**
+	 * @param operation - The older kept or given-back move.
+	 * @param supersededBy - The newer accepted move of the same identity that stands in its place.
+	 * @param epoch - The epoch the policy found it superseded in.
+	 * @param givenBack - Whether the older move was a given-back move (offered again with its record).
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly supersededBy: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly givenBack: boolean
+	) {
+		super(
+			givenBack
+				? "a given-back move was superseded by a newer accepted move of the same identity; the newer move is sent again after it"
+				: "a kept move was superseded by a newer accepted move of the same identity; the newer move stands in its place"
+		);
+		this.name = "V3RoomKeptMoveSuperseded";
+	}
+}
+
+/**
  * A member's new move refused because its undelivered moves fill the room's backlog
  * (V3RoomLocalBacklogFull): they are not reaching the host. The move was never accepted, so it is not
  * lost: the policy keeps it and offers it again once the member's moves reach the creator
@@ -330,7 +361,12 @@ const CLOSING_RETRY_MS = 250;
 const CLOSING_LIMIT_MS = 120_000;
 const RETRY_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
 
-/** The same move: equal plain-data operations, key order aside. */
+/**
+ * The same move: equal plain-data operations, key order aside.
+ * @param left - One operation (or a value inside one).
+ * @param right - The other.
+ * @returns Whether both hold the same data.
+ */
 function sameMove(left: unknown, right: unknown): boolean {
 	if (left === right) return true;
 	if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
@@ -390,7 +426,7 @@ export function createV3RoomRolloverPolicy(
 		 * supersedes. With it, a kept or given-back move never lands after a newer accepted move of the
 		 * same identity (author order); without it, kept moves are offered again as they are.
 		 */
-		identity?: (operation: Readonly<Record<string, unknown>>) => string | undefined;
+		identity?(operation: Readonly<Record<string, unknown>>): string | undefined;
 	}>
 ): V3RoomRolloverPolicy {
 	const { role, budget } = input;
@@ -702,7 +738,7 @@ export function createV3RoomRolloverPolicy(
 	// such a move supersedes is not offered again (the newer accepted move stands in its place). A
 	// superseded given-back move is still offered again with its record (only its own row may consume
 	// the record), and the newest accepted move of its identity is offered right after it, so the newer
-	// move lands last.
+	// move lands last. Either is reported (V3RoomKeptMoveSuperseded), never silently dropped.
 	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<"next" | "stop-new" | "stop-all"> => {
 		const identity = identityOf(operation);
 		const newest = identity === undefined ? undefined : latest.get(identity);
@@ -711,10 +747,14 @@ export function createV3RoomRolloverPolicy(
 			newest !== undefined &&
 			!sameMove(newest.operation, operation) &&
 			(givenBack || (requestOrder.get(operation) ?? 0) < newest.order);
-		if (superseded && !givenBack) return "next";
+		if (superseded && !givenBack) {
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), false));
+			return "next";
+		}
 		const answer = await offerOne(operation);
 		if (answer !== "issued") return answer;
 		if (superseded) {
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), true));
 			const again = await offerOne(newest.operation);
 			return again === "issued" ? "next" : again;
 		}

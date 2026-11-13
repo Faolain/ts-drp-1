@@ -150,3 +150,68 @@ it("a kept move never lands after a newer accepted move of the same block id", a
 	const ofBlock = accepted.filter((move) => move.operation.id === "b-2").map((move) => move.operation);
 	expect(ofBlock.at(-1), "the member's last accepted operation for b-2 is its newest placement").toEqual(newer);
 }, 30_000);
+
+it("a superseded kept or given-back move is accounted for (V3RoomKeptMoveSuperseded), never silently dropped", async () => {
+	const { room, accepted, giveBack, install } = memberRoom();
+	const issue = room.issue;
+	let refusedOnce = false;
+	room.issue = (operation, options) => {
+		if (operation.id === "b-4" && !refusedOnce) {
+			refusedOnce = true;
+			const refusal = new Error("v3 room local backlog is full: 64 of 64 own moves are not reaching the host");
+			refusal.name = "V3RoomLocalBacklogFull";
+			return Promise.reject(refusal);
+		}
+		return issue(operation, options);
+	};
+	const reported: unknown[] = [];
+	const policy = (
+		rollover.createV3RoomRolloverPolicy as (input: Record<string, unknown>) => rollover.V3RoomRolloverPolicy
+	)({
+		role: "member",
+		budget: { movesPerAuthor: 7, idleMs: 10_000 },
+		identity: blockIdentity,
+		hooks: { onError: (error: unknown) => reported.push(error) },
+	});
+	policies.add(policy);
+	policy.bind(room);
+	const givenOlder = Object.freeze({ action: "placeBlock", id: "b-3", kind: "stone", x: 1, y: 0 });
+	const givenNewer = Object.freeze({ action: "placeBlock", id: "b-3", kind: "wood", x: 2, y: 0 });
+	const keptOlder = Object.freeze({ action: "placeBlock", id: "b-4", kind: "stone", x: 3, y: 0 });
+	const keptNewer = Object.freeze({ action: "placeBlock", id: "b-4", kind: "wood", x: 4, y: 0 });
+	await policy.issue(givenOlder);
+	await policy.issue(givenNewer);
+	await expect(policy.issue(keptOlder)).rejects.toThrow(rollover.V3RoomNotReachingHost);
+	await policy.issue(keptNewer);
+	giveBack(givenOlder);
+	await sleep(1_500);
+	for (let next = 4; next <= 6; next++) {
+		install(next);
+		await sleep(1_500);
+	}
+	const superseded = reported.filter(
+		(error): error is rollover.V3RoomKeptMoveSuperseded => error instanceof rollover.V3RoomKeptMoveSuperseded
+	);
+	expect(
+		superseded.map((error) => ({ operation: error.operation, by: error.supersededBy, givenBack: error.givenBack })),
+		"each superseded move is reported with the newer move that stands in its place"
+	).toEqual(
+		expect.arrayContaining([
+			{ operation: givenOlder, by: givenNewer, givenBack: true },
+			{ operation: keptOlder, by: keptNewer, givenBack: false },
+		])
+	);
+	expect(superseded).toHaveLength(2);
+	expect(policy.status().kept, "nothing is left kept").toEqual([]);
+	for (const [id, newest] of [
+		["b-3", givenNewer],
+		["b-4", keptNewer],
+	] as const)
+		expect(
+			accepted
+				.filter((move) => move.operation.id === id)
+				.map((move) => move.operation)
+				.at(-1),
+			`the author's final state for ${id} lands last`
+		).toEqual(newest);
+}, 30_000);
