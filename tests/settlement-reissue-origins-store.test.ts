@@ -405,6 +405,31 @@ describe("settlement reissue origins: codec", () => {
 			expect(total(replaced, displaced)).toBe(1);
 			expect(settlementBacklogMoves(replaced, displaced).pending.map((move) => move.rows)).toEqual([[24]]);
 		}
+		// The next install displaces row 24 before the scan gives it an entry (alone, or with row 20 still
+		// listed): no entry counts it, so the reissueOrigins entry does, on 24, which no creator row reaches.
+		for (const displaced of [
+			new Map([[24, 1]]),
+			new Map([
+				[20, 1],
+				[24, 1],
+			]),
+		]) {
+			expect(total(replaced, displaced)).toBe(1);
+			expect(settlementBacklogMoves(replaced, displaced).pending.map((move) => move.rows)).toEqual([[24]]);
+		}
+		// Once the scan gives row 24 its own rebase entry, that entry counts the move instead.
+		const redisplaced = copied(
+			plan(3, {
+				entries: [
+					expired(),
+					{ ...rebase, replacementSequence: 24 },
+					{ ...rebase, sourceDigest: new Uint8Array(32).fill(0xd3), sourceSequence: 24, replacementSequence: null },
+				],
+				reissueOrigins: [origin(20, 7)],
+			})
+		);
+		expect(total(redisplaced, new Map([[24, 1]]))).toBe(1);
+		expect(settlementBacklogMoves(redisplaced, new Map([[24, 1]])).pending).toEqual([]);
 		// Row 24 displaced and expired: the record holds the origin, the entry is dropped, still one move.
 		const merged = settlementWindowHandBacks(replaced, [
 			{ sourceSequence: 24, sourceDigest: new Uint8Array(32).fill(0xd3), sourceEpoch: 9, operations: [OPERATION] },

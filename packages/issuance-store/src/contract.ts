@@ -885,8 +885,20 @@ export function settlementWindowHandBacks(
  * @returns The chain's last carrier.
  */
 export function settlementReissueLastCarrier(plan: Pick<SettlementPlan, "entries">, reissueSequence: number): number {
-	let current = reissueSequence;
-	for (let depth = 0; depth <= plan.entries.length; depth++) {
+	return settlementReissueChain(plan, reissueSequence).at(-1)!;
+}
+
+/**
+ * The rows carrying a reissued move, oldest first: the reissued row, then each replacement the plan links
+ * forward from it (settlementReissueLastCarrier is the last).
+ * @param plan - The durable plan, or null.
+ * @param reissueSequence - The reissued row.
+ * @returns The chain.
+ */
+function settlementReissueChain(plan: Pick<SettlementPlan, "entries"> | null, reissueSequence: number): readonly number[] {
+	const chain = [reissueSequence];
+	for (let depth = 0; plan !== null && depth <= plan.entries.length; depth++) {
+		const current = chain.at(-1)!;
 		const entry = plan.entries.find(
 			(candidate) => candidate.sourceObjectId === undefined && candidate.sourceSequence === current
 		);
@@ -895,9 +907,9 @@ export function settlementReissueLastCarrier(plan: Pick<SettlementPlan, "entries
 				? undefined
 				: (entry.replacementSequence ?? entry.replacementProgress?.chunks.at(-1)?.replacementSequence);
 		if (next === undefined || next <= current) break;
-		current = next;
+		chain.push(next);
 	}
-	return current;
+	return chain;
 }
 
 /**
@@ -941,8 +953,8 @@ export function settlementReissueOriginsUnsettled(
  * - each retained source's moves (manual-review);
  * - every unconsumed hand-back record;
  * - every reissued move (a reissueOrigins entry, kept until the plan write that sees the move settled),
- *   pending on its chain's last carrier. A chain whose reissued row or last carrier the rebase scan lists
- *   displaced is counted by its newest displaced row's entry instead (reissue, displace, replace and
+ *   pending on its chain's last carrier. A chain with a row whose own entry or record counts it above is
+ *   counted there instead; a displaced row without one counts here (reissue, displace, replace and
  *   expire keep the count: tests/settlement-reissue-origins-store.test.ts).
  * A reissue moves one unit from the record term to the entry term, so the total does not grow. A move
  * whose newest row is a replacement or a reissue is `pending`: it leaves the count once a creator row
@@ -962,10 +974,14 @@ export function settlementBacklogMoves(
 	const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
 	let fixed = 0;
 	const pending: Readonly<{ rows: readonly number[]; moves: number }>[] = [];
+	// The own rows whose plan entry or record counts their move above: a reissued chain through one of
+	// them is counted there, not again by its reissueOrigins entry.
+	const counted = new Set<number>();
 	for (const entry of plan?.entries ?? []) {
 		if (entry.sourceObjectId !== undefined) continue;
 		if (entry.disposition === "manual-review") {
 			fixed += moves(entry.sourceSequence);
+			counted.add(entry.sourceSequence);
 			continue;
 		}
 		if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
@@ -976,20 +992,26 @@ export function settlementBacklogMoves(
 			...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
 			...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
 		];
+		counted.add(entry.sourceSequence);
 		if (rows.length === 0) fixed += moves(entry.sourceSequence);
 		else pending.push(Object.freeze({ rows: Object.freeze([...new Set(rows)]), moves: moves(entry.sourceSequence) }));
 	}
 	const entries = new Set((plan?.reissueOrigins ?? []).map((entry) => entry.reissueSequence));
 	for (const record of plan?.handBacks ?? []) {
+		counted.add(record.sourceSequence);
 		if (record.reissueSequence === null) fixed += 1;
 		// A consumed record written before reissueOrigins existed has no entry: its reissue counts here.
 		else if (!entries.has(record.reissueSequence))
 			pending.push(Object.freeze({ rows: Object.freeze([record.reissueSequence]), moves: 1 }));
 	}
 	for (const reissued of entries) {
-		const last = plan === null ? reissued : settlementReissueLastCarrier(plan, reissued);
-		if (displaced.has(reissued) || displaced.has(last)) continue;
-		pending.push(Object.freeze({ rows: Object.freeze([last]), moves: 1 }));
+		// Skipped only when a row of its chain is counted above. A displaced row with no counting entry yet
+		// (a displaced last carrier the scan has not given an entry, or a chain whose every row is
+		// displaced) still counts here, on the last carrier, which no creator row reaches while it is
+		// displaced: counting it zero times let the Writer accept moves past the record bound.
+		const chain = settlementReissueChain(plan, reissued);
+		if (chain.some((sequence) => counted.has(sequence))) continue;
+		pending.push(Object.freeze({ rows: Object.freeze([chain.at(-1)!]), moves: 1 }));
 	}
 	return Object.freeze({ fixed, pending: Object.freeze(pending) });
 }
