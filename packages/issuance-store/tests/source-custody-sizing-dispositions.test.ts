@@ -1,6 +1,6 @@
 import {encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import {describe, expect, it} from "vitest";
-import {assertSettlementPlanProgressTransition, copySettlementPlan} from "../src/contract.js";
+import {applySettlementPlanEffect, assertSettlementPlanProgressTransition, copySettlementPlan} from "../src/contract.js";
 import {issuanceSourceCustodyPlanResourceForSizing} from "../src/retirement.js";
 import {SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, type SettlementPlan} from "../src/types.js";
 
@@ -18,7 +18,9 @@ import {SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, type 
 //   potential row (a replaced potential row stays a possible completion member).
 // - one displaced-source context when a completed replacement still lacks its context, plus the
 //   completed-source custody marker.
-// - the HB reserve, and the member frontier when the geometry gives one.
+// - the HB reserve, each record with its move's origin (track 46), the reissue-origin reserve (one entry
+//   per record that could still be consumed, within the entry bound of 64), and the member frontier when
+//   the geometry gives one.
 const scope = {objectId: "source-custody-sizing-dispositions", author: "writer"};
 const geometry = {maxContextByteLength: 74_107, maxCompletionByteLength: 70_432, maxCompletionMemberByteLength: 512,
 	maxExpiryByteLength: 1_024, maxNativeReadByteLength: 786_432, maxMemberFrontierByteLength: 4_096};
@@ -103,10 +105,12 @@ function writtenPlan(prior: SettlementPlan, potential: number, disposition: Disp
 	if (potential > 0) contexts.push(open);
 	const frontier = context(geometry.maxMemberFrontierByteLength);
 	// A frontier resolution may add hand-back records. While any changeable source remains, every free slot is
-	// reserved, so fill all of them, each with one operation byte (see OPERATION).
+	// reserved, so fill all of them, each with one operation byte (see OPERATION) and its move's origin at the
+	// widest integer (a resolved row that carried a reissued or replaced move).
 	const handBacks = changeable === 0 ? [] : Array.from({length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords}, (_, intent) => ({
 		sourceSequence: Number.MAX_SAFE_INTEGER - 1, sourceDigest: new Uint8Array(32).fill(5), sourceEpoch: Number.MAX_SAFE_INTEGER,
-		intent, exactCanonicalOperationBytes: new Uint8Array(OPERATION).fill(6), reissueSequence: null}));
+		intent, exactCanonicalOperationBytes: new Uint8Array(OPERATION).fill(6), reissueSequence: null,
+		originSequence: Number.MAX_SAFE_INTEGER - 2}));
 	const raw = {scope, revision: prior.revision + 1, fenceSequence: null, entries: [...entries, ...potentials],
 		sourceContexts: sorted(contexts), memberFrontier: frontier, ...(displaced ? {completedSourceCustody: true as const} : {}),
 		...(handBacks.length === 0 ? {} : {handBacks})};
@@ -139,5 +143,83 @@ describe("merged custody sizing covers every written disposition (G22)", () => {
 		const without = issuanceSourceCustodyPlanResourceForSizing(scope, priorPlan(4, 0).plan, 8, geometry);
 		const withReplaced = issuanceSourceCustodyPlanResourceForSizing(scope, priorPlan(4, 6).plan, 8, geometry);
 		expect(withReplaced.byteLength - without.byteLength).toBeGreaterThan(6 * geometry.maxExpiryByteLength + geometry.maxContextByteLength);
+	});
+});
+
+// Track 46 (reissueOrigins): every new written shape is sized. A record carries its move's origin; every
+// record that could still be consumed reserves one reissue-origin entry, a separate bound from the records
+// (64 unconsumed records plus 64 entries); the reissue's admission sizes the plan after its own effect
+// (consumption plus the entry), and later writes stay within the reserve.
+describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", () => {
+	const measured = (written: SettlementPlan, resource: ReturnType<typeof issuanceSourceCustodyPlanResourceForSizing>, label: string) => {
+		const canonical = encodeCanonical(written, {maxBytes: resource.byteLength, maxItems: resource.items, maxDepth: resource.maxDepth});
+		expect(canonical.byteLength, `${label}: canonical width`).toBeLessThanOrEqual(resource.byteLength);
+		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
+		expect(Buffer.byteLength(native), `${label}: native carrier`).toBeLessThanOrEqual(resource.nativeStorageByteLength);
+	};
+	/** A prior plan with `records` unconsumed hand-back records (each of one operation byte) and `origins` entries. */
+	const withRecords = (records: number, origins: number): SettlementPlan => {
+		const {plan} = priorPlan(2, 0);
+		const value = copySettlementPlan({...plan,
+			...(records === 0 ? {} : {handBacks: Array.from({length: records}, (_, index) => ({sourceSequence: 1_000 + index,
+				sourceDigest: new Uint8Array(32).fill(5), sourceEpoch: 1, intent: 0, exactCanonicalOperationBytes: new Uint8Array(OPERATION).fill(6),
+				reissueSequence: null, originSequence: index}))}),
+			...(origins === 0 ? {} : {reissueOrigins: Array.from({length: origins}, (_, index) => ({
+				originSequence: Number.MAX_SAFE_INTEGER - 1_000 - origins + index, reissueSequence: Number.MAX_SAFE_INTEGER - 999 - origins + index}))})}, scope);
+		if (value === undefined) throw new Error("prior plan fixture invalid");
+		return value;
+	};
+	/** Every unconsumed record consumed by its own reissue (each effect adds its entry), in record order. */
+	const consumeAll = (prior: SettlementPlan, from: number): SettlementPlan => {
+		let plan = prior;
+		for (const [index, record] of (prior.handBacks ?? []).entries())
+			plan = applySettlementPlanEffect(plan, {kind: "hand-back", sourceSequence: record.sourceSequence, intent: record.intent,
+				originSequence: record.originSequence ?? record.sourceSequence}, from + index);
+		return plan;
+	};
+
+	it("plan with 64 entries: 64 records consumed after the sizing are within it", () => {
+		const prior = withRecords(SETTLEMENT_HAND_BACK_LIMITS.maxRecords, 0);
+		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 4, geometry, OPERATION);
+		const written = consumeAll(prior, 2_000_000);
+		expect(written.reissueOrigins).toHaveLength(64);
+		measured(written, resource, "64 consumed with 64 entries");
+	});
+
+	it("consumption at the entry bound: 63 entries plus one more reissue", () => {
+		const prior = withRecords(1, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - 1);
+		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 0, geometry, OPERATION);
+		const written = consumeAll(prior, Number.MAX_SAFE_INTEGER - 10);
+		expect(written.reissueOrigins).toHaveLength(64);
+		measured(written, resource, "entry bound");
+		// The bound itself refuses the next reissue (a separate record, unconsumed).
+		const full = copySettlementPlan({...written, handBacks: [...written.handBacks!, {...written.handBacks![0]!, sourceSequence: 5_000,
+			reissueSequence: null, originSequence: 4_000}]}, scope)!;
+		expect(() => applySettlementPlanEffect(full, {kind: "hand-back", sourceSequence: 5_000, intent: 0}, Number.MAX_SAFE_INTEGER - 1)).toThrow();
+	});
+
+	it("records with origin and 64 entries in one plan: 64 unconsumed records plus 64 entries", () => {
+		// The record and entry bounds are separate: the prior's 64 entries take no record slot, so a frontier
+		// resolution may still fill every free record slot (each with its origin).
+		const prior = withRecords(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords);
+		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 4, geometry, OPERATION);
+		const written = writtenPlan(prior, 4, "expire-frontier");
+		const withEntries = copySettlementPlan({...written, reissueOrigins: prior.reissueOrigins}, scope)!;
+		expect(withEntries.handBacks).toHaveLength(64);
+		expect(withEntries.handBacks!.every(record => record.originSequence !== undefined)).toBe(true);
+		expect(withEntries.reissueOrigins).toHaveLength(64);
+		expect(() => assertSettlementPlanProgressTransition(prior, withEntries)).not.toThrow();
+		measured(withEntries, resource, "64 records with origin plus 64 entries");
+	});
+
+	it("measured widths: an origin adds 25 bytes per record, an entry is 53 bytes, 64 entries add 3,410", () => {
+		const max = Number.MAX_SAFE_INTEGER;
+		const recordFields = {sourceSequence: max, sourceDigest: new Uint8Array(32), sourceEpoch: max, intent: max,
+			exactCanonicalOperationBytes: new Uint8Array(OPERATION), reissueSequence: max};
+		expect(encodeCanonical({...recordFields, originSequence: max}).byteLength - encodeCanonical(recordFields).byteLength).toBe(25);
+		const entry = {originSequence: max, reissueSequence: max};
+		expect(encodeCanonical(entry).byteLength).toBe(53);
+		const entries = Array.from({length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords}, () => entry);
+		expect(encodeCanonical({reissueOrigins: entries}).byteLength - encodeCanonical({}).byteLength).toBe(3_410);
 	});
 });

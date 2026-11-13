@@ -343,7 +343,9 @@ export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): n
  *   for each potential row.
  * - one displaced-source context and the completed-source custody marker when a completed replacement
  *   still lacks its context.
- * - the hand-back reserve (HB), and the last-member frontier when the geometry gives one.
+ * - the hand-back reserve (HB), each record with its origin, and the reissue-origin reserve (one entry per
+ *   record that could still be consumed, within the entry bound), and the last-member frontier when the
+ *   geometry gives one.
  * Pinned by tests/source-custody-sizing-dispositions.test.ts. */
 export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
 	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry,
@@ -463,19 +465,40 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const freeHandBacks = either === 0 ? 0 : Math.min(operationBudget,
 		Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingHandBacks.length));
 	const recordOperation = Math.min(operationBudget, maxHandBackOperationByteLength);
+	// Every record is charged as if it carries its move's origin (originSequence, written when the move
+	// began before the record's row; track 46).
 	const handBackFields = {sourceSequence: integer, sourceDigest: digest, sourceEpoch: integer, intent: integer,
-		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer};
+		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer, originSequence: integer};
 	const handBackOverhead = unsignedRecordWidth({}, handBackFields) - recordOperation;
 	const reservedOperation = Math.min(operationBudget, freeHandBacks * recordOperation);
 	const handBackShape = unsignedRecordShape({}, Object.fromEntries(Object.keys(handBackFields).map(key => [key, leaf])));
-	const widestHandBacks = existingHandBacks.map(record =>
-		record.reissueSequence === null ? {...record, reissueSequence: Number.MAX_SAFE_INTEGER} : record);
+	// The widest each existing record can be written: an unconsumed record at its consumed width (a maximum
+	// reissueSequence, bb6455fe), and a record without an origin with a maximum originSequence (track 46).
+	// Both apply to the same record when it is unconsumed and has no origin.
+	const widestHandBacks = existingHandBacks.map(record => ({...record,
+		...(record.reissueSequence === null ? {reissueSequence: Number.MAX_SAFE_INTEGER} : {}),
+		...(record.originSequence === undefined ? {originSequence: Number.MAX_SAFE_INTEGER} : {})}));
 	const handBacks = existingHandBacks.length + freeHandBacks === 0 ? undefined : {
 		width: unsignedArrayWidth([...widestHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
 			...Array.from({length: freeHandBacks}, (_, index) => handBackOverhead +
 				Math.floor(reservedOperation / freeHandBacks) + Number(index < reservedOperation % freeHandBacks))]),
 		shape: unsignedArrayShape([...widestHandBacks.map(unsignedCanonicalShape),
 			...Array.from({length: freeHandBacks}, () => handBackShape)]),
+	};
+	// Reissue origins (a separate bound from the records): existing entries exactly, and one more entry for
+	// every record that could still be consumed (each unconsumed or reserved free record), up to the entry
+	// bound. A reissue writes its entry in its own issuance transaction; its admission sizes the plan after
+	// that effect, so the reserve here is what covers it.
+	const existingOrigins = captured?.reissueOrigins ?? [];
+	const unconsumedHandBacks = existingHandBacks.filter(record => record.reissueSequence === null).length;
+	const freeOrigins = Math.min(Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingOrigins.length),
+		unconsumedHandBacks + freeHandBacks);
+	const originWidth = unsignedRecordWidth({}, {originSequence: integer, reissueSequence: integer});
+	const originShape = unsignedRecordShape({}, {originSequence: leaf, reissueSequence: leaf});
+	const reissueOrigins = existingOrigins.length + freeOrigins === 0 ? undefined : {
+		width: unsignedArrayWidth([...existingOrigins.map(entry => encodeCanonical(entry, unsignedEncodingLimits).byteLength),
+			...Array.from({length: freeOrigins}, () => originWidth)]),
+		shape: unsignedArrayShape([...existingOrigins.map(unsignedCanonicalShape), ...Array.from({length: freeOrigins}, () => originShape)]),
 	};
 	// The last-member frontier: the stored record exactly, or the one a removing close may persist.
 	const memberFrontierLength = captured?.memberFrontier?.exactCanonicalContextBytes.byteLength ??
@@ -489,12 +512,14 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		entries: unsignedArrayWidth(entryWidths), sourceContexts: sourceContextsWidth,
 		...(handBacks === undefined ? {} : {handBacks: handBacks.width}),
 		...(memberFrontier === undefined ? {} : {memberFrontier}),
-		...(completedSourceCustody === undefined ? {} : {completedSourceCustody})});
+		...(completedSourceCustody === undefined ? {} : {completedSourceCustody}),
+		...(reissueOrigins === undefined ? {} : {reissueOrigins: reissueOrigins.width})});
 	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
 		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes),
 		...(handBacks === undefined ? {} : {handBacks: handBacks.shape}),
 		...(memberFrontier === undefined ? {} : {memberFrontier: contextShape}),
-		...(completedSourceCustody === undefined ? {} : {completedSourceCustody: leaf})});
+		...(completedSourceCustody === undefined ? {} : {completedSourceCustody: leaf}),
+		...(reissueOrigins === undefined ? {} : {reissueOrigins: reissueOrigins.shape})});
 	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
 	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
 		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
