@@ -257,8 +257,18 @@ function render(): void {
 	}
 	const chat = document.getElementById("chat") as HTMLElement;
 	chat.replaceChildren();
-	// The shared window plus the messages only this device still keeps (each once).
-	const messages = projection === undefined ? [] : shippingChatHistory(projection.messages, archive?.records() ?? []);
+	// The shared window plus the messages only this device still keeps (each once), each author's messages
+	// in their signed display-time order, authors interleaved by admitted order (shippingChatDisplayOrder).
+	// The window and shares formats keep admitted order (they carry the projection epoch); the lifetime
+	// format sorts its messages by identity.
+	const messages =
+		projection === undefined
+			? []
+			: shippingChatHistory(
+					projection.messages,
+					archive?.records() ?? [],
+					projection.epoch === undefined ? "identity" : "admitted"
+				);
 	if (messages.length === 0) {
 		const empty = document.createElement("div");
 		empty.className = "no-messages";
