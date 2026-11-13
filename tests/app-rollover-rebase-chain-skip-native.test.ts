@@ -407,6 +407,15 @@ async function retainedResolutionCost(count: number) {
 			const cpuBefore = process.cpuUsage();
 			wire.resume();
 			await wire.caughtUp(epoch, 1_200_000);
+			// The window ends when both roles' once-per-epoch recovery-pool lull for this epoch has
+			// settled, so it always contains them. The creator's lull is requested by its last
+			// adoption, just before the window. It runs several readiness-maintenance holds, each with
+			// complete census reads, alongside the member's install. Ending at caughtUp alone counted
+			// however many of those holds had started by then: 0 to 5 full census reads, timing
+			// dependent. An explicit lull call queues behind the scheduled one and answers with its
+			// settled result; it does no second lull.
+			await creator.lull();
+			await writer.lull();
 			const ms = performance.now() - started;
 			const cpu = process.cpuUsage(cpuBefore);
 			const cpuMs = Math.round((cpu.user + cpu.system) / 1000);
