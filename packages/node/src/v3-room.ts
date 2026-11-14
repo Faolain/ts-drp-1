@@ -207,6 +207,16 @@ const noteV3RoomStage = (stage: string, started: number): void => {
 		row.count += 1;
 	}
 };
+// Diagnostics (measurement only): moves a member's install carried to the next install, and carries
+// that went out because no install started within V3_ROOM_ADOPTION_CARRY_START_MS.
+const v3RoomCarryCounts = { carried: 0, expired: 0 };
+/**
+ * Reads the carry diagnostics (since the process started).
+ * @returns A snapshot.
+ */
+export function readV3RoomCarryCounts(): Readonly<{ carried: number; expired: number }> {
+	return Object.freeze({ ...v3RoomCarryCounts });
+}
 // Diagnostics (measurement only): how this process's settlement drains issued their replacement rows, summed
 // over its rooms. `batches`/`rowsBatched`: chunks issued as one batched issuance and their rows;
 // `journalBatches`: of those chunks, the ones journaled in one native write (appendAcceptedLocalBatch); `rowsSingly`:
@@ -1843,12 +1853,14 @@ export type V3RoomCreatorSuccessorInstallRequest = Readonly<{
 		| Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
 		| undefined;
 	/**
-	 * Asked by the install's settlement drain before each replacement batch (each row when issued singly),
-	 * without consuming anything: whether the caller already holds a newer offer it will install next. The
-	 * creator has then sealed the epoch this install reaches, and ingress admits only the current anchor, so
-	 * a replacement signed into it could never be admitted: the drain still merges the plan, expires the
-	 * window, resolves retained work and signs the author fence, and leaves the remaining rows eligible for
-	 * the next install's drain (rule R, packages/node/formal/slow-member-follow.qnt).
+	 * Asked without consuming anything: whether the caller already holds a newer offer it will install next.
+	 * The creator has then sealed the epoch this install reaches, and ingress admits only the current anchor.
+	 * Asked by the install's settlement drain before each replacement batch (each row when issued singly): a
+	 * replacement signed into that epoch could never be admitted, so the drain still merges the plan, expires
+	 * the window, resolves retained work and signs the author fence, and leaves the remaining rows eligible for
+	 * the next install's drain (rule R). Asked once more when the install has succeeded: the moves held for it
+	 * would only be displaced there, so they wait for that next install instead, once
+	 * (V3_ROOM_ADOPTION_CARRY_START_MS; rule C). Model: packages/node/formal/slow-member-follow.qnt.
 	 */
 	queued?: () => boolean;
 }>;
@@ -1887,6 +1899,13 @@ function selectNewestCreatorSuccessorOffer(
  * up to ~60 s in a loaded browser.
  */
 export const V3_ROOM_ADOPTION_ISSUE_HOLD_MS = 120_000;
+/**
+ * Moves held for a member's install whose epoch the creator has already closed (a newer offer is
+ * queued: `queued`) wait for the next install, once; they go out as before if no install starts
+ * within this bound. Each move is carried at most once and stays under its
+ * V3_ROOM_ADOPTION_ISSUE_HOLD_MS bound.
+ */
+export const V3_ROOM_ADOPTION_CARRY_START_MS = 1_000;
 
 /**
  * How many closed epochs' departed-scope carriers a creator keeps in memory (fix/skip-scope-carrier).
@@ -6257,20 +6276,37 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// it (installPreDrain), so back-to-back installs never starve them. Held at most
 	// V3_ROOM_ADOPTION_ISSUE_HOLD_MS. A creator's own adoption still refuses (its moves are its own
 	// policy's, issued between its short adoptions).
+	//
+	// Carry: an install that succeeded while its caller already queued a newer offer reached an epoch
+	// the creator has closed, so its held moves would be displaced there and replaced by the next
+	// install. They wait for that next install instead (carryHolds), at most once per move
+	// (carriedIssues); moves made in between wait behind them (author order). They go out when the
+	// next install settles, or as before if none starts within V3_ROOM_ADOPTION_CARRY_START_MS; the
+	// hold bound is not reset.
 	let heldIssues: PendingIssue[] = [];
 	const heldIssueTimers = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
+	const carriedIssues = new Set<PendingIssue>();
+	let carryHolds = false;
+	let carryTimer: ReturnType<typeof setTimeout> | undefined;
 	let installPreDrain = false;
 	let recipientInstallTask: Promise<void> | undefined;
 	const adoptionHoldsIssues = (): boolean =>
 		settlementProfile === "v1" &&
 		creatorSuccessorAdoptionTask !== undefined &&
 		creatorSuccessorAdoptionTask === recipientInstallTask;
+	const issuesHeld = (): boolean => adoptionHoldsIssues() || carryHolds;
+	const endCarry = (): void => {
+		carryHolds = false;
+		if (carryTimer !== undefined) clearTimeout(carryTimer);
+		carryTimer = undefined;
+	};
 	const holdIssue = (request: PendingIssue): void => {
 		heldIssues.push(request);
 		heldIssueTimers.set(
 			request,
 			setTimeout(() => {
 				heldIssueTimers.delete(request);
+				carriedIssues.delete(request);
 				const index = heldIssues.indexOf(request);
 				if (index < 0) return;
 				heldIssues.splice(index, 1);
@@ -6280,15 +6316,38 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		);
 	};
 	const releaseHeldIssues = (): void => {
+		endCarry();
 		if (heldIssues.length === 0) return;
 		const released = heldIssues.sort((left, right) => left.logicalTime - right.logicalTime);
 		heldIssues = [];
 		for (const request of released) {
 			clearTimeout(heldIssueTimers.get(request));
 			heldIssueTimers.delete(request);
+			carriedIssues.delete(request);
 		}
 		pendingIssues = [...released, ...pendingIssues];
 		scheduleDrain();
+	};
+	// The moves already carried once go out now (they are the oldest: held an install earlier); the
+	// others wait for the next install.
+	const carryHeldIssues = (): void => {
+		const carried = heldIssues.filter((request) => !carriedIssues.has(request));
+		heldIssues = heldIssues.filter((request) => carriedIssues.has(request));
+		releaseHeldIssues();
+		if (carried.length === 0) return;
+		heldIssues = carried;
+		for (const request of carried) carriedIssues.add(request);
+		carryHolds = true;
+		v3RoomCarryCounts.carried += carried.length;
+		carryTimer = setTimeout(() => {
+			carryTimer = undefined;
+			// A closed session issues nothing more (its close released a carry for its drain).
+			if (closed) return;
+			if (carryHolds && recipientInstallTask === undefined) {
+				v3RoomCarryCounts.expired += 1;
+				releaseHeldIssues();
+			}
+		}, V3_ROOM_ADOPTION_CARRY_START_MS);
 	};
 	let drainScheduled = false;
 	let draining = false;
@@ -6564,7 +6623,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
 		if (owned.length === 0) return;
-		if (activeHandle !== undefined && adoptionHoldsIssues() && !installPreDrain && owned.every(({ source }) => source === "public-new")) {
+		if (activeHandle !== undefined && issuesHeld() && !installPreDrain && owned.every(({ source }) => source === "public-new")) {
 			for (const request of owned) holdIssue(request);
 			return;
 		}
@@ -9878,14 +9937,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (creatorSuccessorAdoptionTask !== undefined)
 			return Promise.reject(new TypeError("creator recipient installation is already owned"));
 		let installFromEpoch: number | undefined;
+		// Moves carried from the install before wait for this one (it holds them from here on).
+		const carriedIn = carryHolds;
+		endCarry();
 		const attempt = enqueueLifetimeTransition(async () => {
 			assertSessionOpen();
 			// The moves held by the adoption before this one (and any issue in flight) go out first, on
 			// the plane that adoption left, so back-to-back installs never starve them. Moves made from
-			// here on are held for this install.
+			// here on are held for this install. Moves carried to this install (that plane is closed)
+			// stay held for it.
 			installPreDrain = true;
 			try {
-				releaseHeldIssues();
+				if (!carriedIn) releaseHeldIssues();
 				await drainPendingIssues();
 			} finally {
 				installPreDrain = false;
@@ -10072,8 +10135,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 			if (recipientInstallTask === shared) recipientInstallTask = undefined;
 			// Moves held for this install were made while current; moves held until current are older
-			// still, so they are released last and go out first.
-			releaseHeldIssues();
+			// still, so they are released last and go out first. An install that advanced while its
+			// caller already queued a newer offer reached a closed epoch: its moves wait for that one.
+			const advanced = installFromEpoch !== undefined && currentEpoch() > installFromEpoch;
+			let newerQueued = false;
+			if (advanced && queued !== undefined && !closed) {
+				try {
+					newerQueued = queued() === true;
+				} catch {
+					newerQueued = false;
+				}
+			}
+			if (newerQueued) carryHeldIssues();
+			else releaseHeldIssues();
 			// Sync before sending: the adopted plane holds this author's closed frontier, and the
 			// statement checked before adoption (checkInstallCurrency) its live frontier.
 			if (installFromEpoch !== undefined && currentEpoch() > installFromEpoch) becomeLocalIssueCurrent();
@@ -10131,6 +10205,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (sessionCloseTask !== undefined) return sessionCloseTask;
 		closed = true;
 		endSessionWaits();
+		// Moves carried to an install that will not come now go out with the close's drain.
+		if (carryHolds) releaseHeldIssues();
 		autoPoolMaintenance?.stop();
 		scheduledLulls?.cancel();
 		if (lullRetry !== undefined) clearTimeout(lullRetry);
@@ -10550,7 +10626,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 					// An adoption owns the plane: the move waits for it and is authorized against the plane
 					// it leaves when its drain issues it (issueOwned), never refused for the adoption.
-					const held = adoptionHoldsIssues();
+					const held = issuesHeld();
 					if (!held) {
 						const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
 						if (!authorized.ok) {

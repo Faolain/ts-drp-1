@@ -31,6 +31,12 @@
 //   K2 the creator keeps serving the adopted successor it replaced (CREATOR_SUCCESSOR_SERVINGS_RETAINED);
 //   H  a move issued while the transition runs is held and released when it ends; the transition
 //      begins by draining the moves released before it (installPreDrain).
+//   C  (fix/member-carry-held-moves) an install that succeeds while a newer offer is known (lag > 0
+//      after it: by A2 the member knows the creator's current offer) reached an epoch the creator
+//      has closed: its held move is carried to the next install instead of being released into
+//      the closed epoch (where it would be displaced and replaced). A carried move survives the next
+//      transition's pre-drain and is released when that install ends (whatever the outcome), never
+//      carried twice; if no install begins, it is released (V3_ROOM_ADOPTION_CARRY_START_MS).
 //   D  (row 72, the owner's decision) an install whose material the creator holds (its serving of
 //      that successor not ready: an adoption still running, a restart before its startup readiness,
 //      a creator that never adopts) ends at the install deadline (V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS)
@@ -47,7 +53,7 @@
 //      is handed back (V3RoomHandBack) instead of replaced, with or without R.
 // Broken controls: "enqueue" (no F1), "single" (no K2), "refuse" (no H), "giveup" (D's expiry
 // ends following instead of re-targeting), "noretarget" (no R, cb43680c: the drain replaces into the
-// closed epoch).
+// closed epoch). "nocarry" is H without C (6874482a): a held move is released into the closed epoch.
 //
 // Environment assumptions (the residual requirements the fix leaves):
 //   A1 a member's fetch window (selection to the last chunk) never spans a whole open period of
@@ -70,7 +76,7 @@ module slowMemberFollow {
   var inst: str                // member install: idle | queued | material | chunks | apply
   var behindTarget: int        // creator epoch - install target, saturated at 2
   var windowAdopted: bool      // the creator adopted (published) an epoch inside the current fetch window
-  var move: str                // none | held | pending | retrying | journaled
+  var move: str                // none | held | carried | pending | retrying | journaled
   var last: str                // the last action (for the liveness properties)
   var held: bool               // the creator holds the material of the member's target (not ready)
   var gaveUp: bool             // the member stopped following ("giveup" control only)
@@ -85,6 +91,7 @@ module slowMemberFollow {
   def hold: bool = mode != "refuse"
   def giveUpOnExpiry: bool = mode == "giveup"
   def retarget: bool = mode != "noretarget"
+  def carry: bool = mode != "nocarry"
   def sat(n: int, m: int): int = if (n > m) m else n
   def windowed(i: str): bool = i == "material" or i == "chunks"
   def transition(i: str): bool = windowed(i) or i == "apply"
@@ -104,6 +111,7 @@ module slowMemberFollow {
   action initRefuse = initWith("refuse")
   action initGiveUp = initWith("giveup")
   action initNoRetarget = initWith("noretarget")
+  action initNoCarry = initWith("nocarry")
 
   // The creator (no fairness: it may roll forever or stop).
   action creatorSeal = all {
@@ -153,8 +161,8 @@ module slowMemberFollow {
   }
   action enqueue = enqueueAs(true)
   action enqueueForged = enqueueAs(false)
-  // The transition begins: the pre-drain journals the moves released before it (H), then the
-  // install selects its offer (F1: the newest it knows).
+  // The transition begins: the pre-drain journals the moves released before it (H; a carried move
+  // stays held for this install: C), then the install selects its offer (F1: the newest it knows).
   action beginFetch = all {
     rowKept,
     inst == "queued",
@@ -163,8 +171,13 @@ module slowMemberFollow {
     move' = if (hold and move == "pending") "journaled" else move, last' = if (auth) "beginFetch" else "forged",
     phase' = phase, stopped' = stopped, lag' = lag, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
-  // A fetch that ends the transition releases the held moves (shared.finally releaseHeldIssues).
-  def released(m: str): str = if (m == "held") "pending" else m
+  // A fetch that ends the transition releases the held moves (shared.finally releaseHeldIssues),
+  // and a carried move (it was carried once).
+  def released(m: str): str = if (m == "held" or m == "carried") "pending" else m
+  // C: a successful install that leaves the member behind the creator's known offer carries a move
+  // held for it (not one carried already) to the next install.
+  def releasedAfterInstall(m: str, behind: int): str =
+    if (carry and m == "held" and behind > 0) "carried" else released(m)
   action fetchMaterial = all {
     rowKept,
     inst == "material",
@@ -206,7 +219,7 @@ module slowMemberFollow {
   }
   action applyDone = all {
     inst == "apply", settleDrain,
-    inst' = "idle", lag' = behindTarget, move' = released(move), last' = "installed",
+    inst' = "idle", lag' = behindTarget, move' = releasedAfterInstall(move, behindTarget), last' = "installed",
     phase' = phase, stopped' = stopped, behindTarget' = behindTarget, windowAdopted' = windowAdopted, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
 
@@ -224,6 +237,14 @@ module slowMemberFollow {
     phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
     windowAdopted' = windowAdopted, move' = move, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
+  // C: no install begins within the bound (the member stays idle): the carried move is released.
+  action carryLapse = all {
+    rowKept,
+    move == "carried", inst == "idle",
+    move' = "pending", last' = "carryLapse",
+    phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
+    windowAdopted' = windowAdopted, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
+  }
   // The drain (H) or the policy's retry (refuse) lands the move only while no transition runs.
   action drain = all {
     rowKept,
@@ -237,13 +258,17 @@ module slowMemberFollow {
 
   action step = any {
     creatorSeal, creatorAdopt, creatorStop, creatorHold, creatorRelease, enqueue, enqueueForged, beginFetch, fetchMaterial, expire,
-    fetchChunks, applyDone, issue, drain, displace,
+    fetchChunks, applyDone, issue, drain, displace, carryLapse,
   }
 
   // Safety: under A1 and A2 a fixed member's request is never refused as stale.
   val neverStale = last != "stale"
-  // No move is lost: once issued, it is held, released, retried or journaled.
-  val moveKept = move == "none" or move == "held" or move == "pending" or move == "retrying" or move == "journaled"
+  // No move is lost: once issued, it is held, carried, released, retried or journaled.
+  val moveKept =
+    move == "none" or move == "held" or move == "carried" or move == "pending" or move == "retrying" or move == "journaled"
+  // C: a carried move waits only for an install (queued or running) or the lapse; it is never
+  // journaled while carried, and a move is carried only by the fixed member.
+  val carriedOnlyWithCarry = move == "carried" implies carry
   // No install proceeds from a forged offer: the fetch and the local adoption run only for an
   // authenticated one (and, by neverStale, only from a successor the creator still serves).
   val noUnauthenticatedInstall = (inst == "material" or inst == "chunks" or inst == "apply" or last == "installed") implies auth
@@ -257,13 +282,13 @@ module slowMemberFollow {
   val rowSafety = rowAccounted and deferralBounded and noWastedReplacement
   // Holds only with R: the control "noretarget" violates it (the chain).
   val noReplacementWasted = wasted == 0
-  val safety = neverStale and moveKept and noUnauthenticatedInstall and rowAccounted and deferralBounded and noWastedReplacement
+  val safety = neverStale and moveKept and noUnauthenticatedInstall and carriedOnlyWithCarry and rowAccounted and deferralBounded and noWastedReplacement
 
   val vars = (mode, phase, stopped, lag, inst, behindTarget, windowAdopted, move, last, held, gaveUp, auth, row, rowAge, rowWaits, wasted)
   // The deadline is a timer: an install held long enough expires (weak fairness of expire).
   temporal memberFair =
     weakFair(enqueue, vars) and weakFair(beginFetch, vars) and weakFair(fetchMaterial, vars) and weakFair(fetchChunks, vars)
-      and weakFair(applyDone, vars) and weakFair(drain, vars) and weakFair(expire, vars)
+      and weakFair(applyDone, vars) and weakFair(drain, vars) and weakFair(expire, vars) and weakFair(carryLapse, vars)
   // The creator makes progress: whatever it held, it eventually serves for good.
   temporal creatorProgresses = eventually(always(not(held)))
   // Forged offers are finitely many: from some point on, every offer the member installs authenticates.
@@ -301,6 +326,21 @@ module slowMemberFollow {
   run fixedHoldTest = init.then(rollOnce).then(enqueue).then(beginFetch).then(issue).then(all { assert(move == "held"), fetchMaterial })
     .then(fetchChunks).then(applyDone).then(all { assert(move == "pending"), rollOnce }).then(enqueue).then(beginFetch)
     .then(all { assert(move == "journaled"), fetchMaterial })
+  // C: the creator rolls during the install (a newer offer is known when it ends): the held move is
+  // carried, survives the next transition's pre-drain, and is released when that install ends,
+  // though the creator rolled again during it (never carried twice); the drain then journals it.
+  run fixedCarryTest = init.then(rollOnce).then(enqueue).then(beginFetch).then(issue).then(fetchMaterial)
+    .then(rollOnce).then(fetchChunks).then(applyDone).then(all { assert(move == "carried" and lag == 1), enqueue })
+    .then(beginFetch).then(all { assert(move == "carried"), fetchMaterial }).then(rollOnce).then(fetchChunks).then(applyDone)
+    .then(all { assert(move == "pending" and lag == 1), drain }).then(all { assert(move == "journaled" and safety), creatorStop })
+  // C: no install begins after the carry: the move is released by the lapse and journaled.
+  run fixedCarryLapseTest = init.then(rollOnce).then(enqueue).then(beginFetch).then(issue).then(fetchMaterial)
+    .then(rollOnce).then(fetchChunks).then(applyDone).then(all { assert(move == "carried"), carryLapse })
+    .then(all { assert(move == "pending"), drain }).then(all { assert(move == "journaled"), creatorStop })
+  // The base (no C): the same schedule releases the held move into the epoch the creator closed.
+  run noCarryReleaseTest = initNoCarry.then(rollOnce).then(enqueue).then(beginFetch).then(issue).then(fetchMaterial)
+    .then(rollOnce).then(fetchChunks).then(applyDone).then(all { assert(move == "pending" and lag == 1), drain })
+    .then(all { assert(move == "journaled" and lag == 1), creatorStop })
   // D: the creator holds the target's material; the install expires, re-targets the same offer and
   // installs once the creator releases it.
   run fixedExpireRetargetTest = init.then(rollOnce).then(creatorHold).then(enqueue).then(all { assert(auth), beginFetch })
