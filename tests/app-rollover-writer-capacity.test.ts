@@ -74,11 +74,12 @@ function create(options: { writerCapacity?: boolean; profileId?: "creator-truste
 	return { policy, events, epoch: fixture.epoch };
 }
 
-/** One Writer move every GAP_MS; returns the epoch's own move count at each roll. */
+/** One Writer move every `gapMs` (GAP_MS by default); returns the epoch's own move count at each roll. */
 async function play(
 	subject: ReturnType<typeof create>,
 	moves: number,
-	from = 0
+	from = 0,
+	gapMs = GAP_MS
 ): Promise<Readonly<{ next: number; firedAt: number[] }>> {
 	const firedAt: number[] = [];
 	let inEpoch = 0;
@@ -88,7 +89,7 @@ async function play(
 		const epoch = subject.epoch();
 		subject.policy.observe(view(WRITER, epoch, sequence));
 		inEpoch++;
-		await vi.advanceTimersByTimeAsync(GAP_MS);
+		await vi.advanceTimersByTimeAsync(gapMs);
 		if (subject.events.length !== seen) {
 			seen = subject.events.length;
 			firedAt.push(inEpoch);
@@ -106,6 +107,22 @@ it("rolls in the genesis epoch before the Writer's own store refuses, under a bu
 	// with its margin for the rollover (about 40 moves at 10 moves a second), and not needlessly early.
 	expect(firedAt[0]).toBeGreaterThan(100);
 	expect(firedAt[0]).toBeLessThan(254);
+});
+
+// Where the trigger first rolls a genesis epoch, by the Writer's gap between admitted rows: its margin is the
+// Writer's rate x twice the rollover, 2 s before any rollover is measured, so a fast Writer rolls the room
+// early (about 239 forecast moves at its 7th: a Writer at 60 moves a second would spend them in about 4 s).
+// Pinned for tests whose premise is that no trigger fires (the chain-skip online-Writer case paces its
+// Writer at 50 ms for this).
+it("rolls a genesis epoch at the own move its Writer's rate decides, and not within 100 moves at 30 ms or more", async () => {
+	const firstRoll: Record<number, number | null> = {};
+	for (const gap of [10, 15, 17, 20, 25, 30, 40, 50, 100]) {
+		const subject = create();
+		const { firedAt } = await play(subject, 100, 0, gap);
+		firstRoll[gap] = firedAt[0] ?? null;
+		if (firedAt[0] !== undefined) expect(subject.events[0]?.trigger, `gap ${gap} ms`).toBe("capacity");
+	}
+	expect(firstRoll).toEqual({ 10: 7, 15: 7, 17: 18, 20: 54, 25: 94, 30: null, 40: null, 50: null, 100: null });
 });
 
 it("fires at most once per epoch, never before 7 own moves in it", async () => {

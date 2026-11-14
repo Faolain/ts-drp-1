@@ -1051,6 +1051,16 @@ it("an offline Writer's moves of one epoch are bounded by the hand-back records 
 // the epoch until the next install and refused this Writer at its 65th move. The control continues in
 // the same epoch with the creator silent: from the last creator row on, moves count again and the
 // Writer is refused at the bound.
+//
+// Rollover off must hold by construction. The budget override turns the budget and idle triggers off, but
+// decision row 92's capacity trigger stays active under an override and in the genesis epoch, and its
+// margin grows with the Writer's rate (twice a 2 s default rollover at that rate, before any rollover is
+// measured). tests/app-rollover-writer-capacity.test.ts pins where it first rolls a genesis epoch: Writer
+// rows 10 or 15 ms apart at own move 7, 17 ms at 18, 20 ms at 54, 25 ms at 94, 30 ms or more not within
+// 100 moves. Unpaced, this loop's rows reached the creator 16-18 ms apart in some runs and the creator
+// rolled on capacity mid-test (.logs/realtime-resume-2026-11-10/lull/auth/). The online moves are paced at
+// WRITER_PACE_MS, well clear of every firing gap; load only widens the gaps.
+const WRITER_PACE_MS = 50;
 async function admittedMovesLeaveTheBacklog(moves: number, creatorEvery: number) {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-admitted-"));
@@ -1066,6 +1076,7 @@ async function admittedMovesLeaveTheBacklog(moves: number, creatorEvery: number)
 		const refusals: string[] = [];
 		let unprovenAtEnd = 0;
 		for (let k = 0; k < moves; k++) {
+			const paced = performance.now();
 			if (k % creatorEvery === 0) {
 				await creator.issueRoom!(epoch, ordinal++);
 				await rows.toWriter();
@@ -1079,6 +1090,7 @@ async function admittedMovesLeaveTheBacklog(moves: number, creatorEvery: number)
 				refusals.push(String((error as Error).name ?? error));
 			}
 			await rows.toCreator();
+			await sleep(Math.max(0, WRITER_PACE_MS - (performance.now() - paced)));
 		}
 		const writerAuthor = (await writer.acceptedVertices!()).find((vertex) => vertex.epoch === epoch)?.author;
 		const admitted = (await creator.acceptedVertices!()).filter((vertex) => vertex.author === writerAuthor).length;
@@ -1094,8 +1106,11 @@ async function admittedMovesLeaveTheBacklog(moves: number, creatorEvery: number)
 			}
 		}
 		const epochAfter = (await writer.authorityEpoch()) ?? 0;
-		const summary = { moves, creatorEvery, accepted, refused: refusals.length, refusals: [...new Set(refusals)], admitted, unprovenAtEnd, silentAccepted, silentRefusal, epoch, epochAfter };
+		const rolls = (await creator.rollover!()).events.map((event) => event.trigger);
+		const summary = { moves, creatorEvery, accepted, refused: refusals.length, refusals: [...new Set(refusals)], admitted, unprovenAtEnd, silentAccepted, silentRefusal, epoch, epochAfter, rolls };
 		process.stdout.write(`BACKLOG_ADMITTED ${JSON.stringify(summary)}\n`);
+		// The guard on the premise: no app trigger rolled the room, row 92's capacity trigger included.
+		expect(rolls, "rollover off: the creator's policy rolled no epoch (capacity included)").toEqual([]);
 		expect(epochAfter, "rollover off: one epoch throughout").toBe(epoch);
 		expect(admitted, "the creator admitted the Writer's moves").toBeGreaterThanOrEqual(moves);
 		expect(summary.refused, "admitted moves refused as undelivered").toBe(0);
