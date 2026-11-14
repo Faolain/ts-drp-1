@@ -109,6 +109,13 @@ export interface RoleEnvironment {
 	 * wraps it to model a slow host, e.g. an install that starts late.
 	 */
 	deliveryRoom?(room: Awaited<ReturnType<typeof createV3RoomSession>>): Parameters<V3RoomSuccessorDelivery["bind"]>[0];
+	/**
+	 * Test hook around this role's signer (the room's `signRegisteredVertexDigest`, awaited once per
+	 * own row the room signs, inside that row's issuance). It must return what `sign` returns. A test
+	 * uses it to step a logical clock per signed row (a creator that rolls on a timer while a member's
+	 * settlement drain signs its rows).
+	 */
+	sign?(digest: Uint8Array, sign: () => Promise<Uint8Array>): Promise<Uint8Array>;
 }
 
 export interface LongRoomHost {
@@ -716,7 +723,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		objectId,
 		publicKeyBytes: ed25519.getPublicKey(identity.seed),
 		roomHeadAuthority: floor,
-		signRegisteredVertexDigest: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, identity.seed)),
+		signRegisteredVertexDigest: (digest: Uint8Array) =>
+			env.sign === undefined
+				? Promise.resolve(ed25519.sign(digest, identity.seed))
+				: env.sign(digest, () => Promise.resolve(ed25519.sign(digest, identity.seed))),
 		onProjection: observe,
 		onIngressCapacityRefusal: (reason: string) => policy?.refused(reason),
 		onAcceptedVertex: (
