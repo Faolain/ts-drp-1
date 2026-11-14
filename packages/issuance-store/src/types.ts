@@ -131,6 +131,8 @@ export interface SettlementSourceContext {
  * application move held for the application, so their number and bytes are capped. A move whose
  * records do not fit is not given back yet: the writer keeps it live (it is not expired) until records
  * are free, and refuses new local moves while its backlog fills the record bound (V3RoomLocalBacklogFull).
+ * `maxRecords` also bounds the plan's `reissueOrigins` entries (a separate bound: an entry never takes a
+ * record slot).
  */
 export const SETTLEMENT_HAND_BACK_LIMITS = Object.freeze({
 	maxRecords: 64,
@@ -152,6 +154,24 @@ export interface SettlementHandBack {
 	readonly intent: number;
 	readonly exactCanonicalOperationBytes: Uint8Array;
 	readonly reissueSequence: number | null;
+	/**
+	 * The move's origin: the author sequence of the row the author signed when it asked for the move
+	 * (replacements and reissues keep it). Present only when it differs from `sourceSequence` (always
+	 * smaller); absent means the origin is the source, exactly the record written before this field.
+	 * Records are ordered by (originSequence ?? sourceSequence, intent): the author's order. Older readers
+	 * refuse the field at open (closed record), before any write, like memberFrontier and
+	 * completedSourceCustody.
+	 */
+	readonly originSequence?: number;
+}
+
+/**
+ * One reissued row's move origin (SettlementPlan.reissueOrigins): the row `reissueSequence` offered a
+ * given-back move again, and `originSequence` (always smaller) is where the author asked for that move.
+ */
+export interface SettlementReissueOrigin {
+	readonly reissueSequence: number;
+	readonly originSequence: number;
 }
 
 export interface SettlementPlan {
@@ -160,8 +180,18 @@ export interface SettlementPlan {
 	readonly fenceSequence: number | null;
 	readonly entries: readonly SettlementPlanEntry[];
 	readonly sourceContexts?: readonly SettlementSourceContext[];
-	/** Sorted by (sourceSequence, intent); absent when empty. */
+	/** Sorted by (originSequence ?? sourceSequence, intent); absent when empty. */
 	readonly handBacks?: readonly SettlementHandBack[];
+	/**
+	 * The origin of each reissued row's move, sorted by reissueSequence without duplicates, at most
+	 * SETTLEMENT_HAND_BACK_LIMITS.maxRecords; absent when empty. Added only by the hand-back plan effect,
+	 * in the reissued row's own issuance transaction (atomic with the record's consumption); dropped only
+	 * by the plan write that sees the move settled (the chain's last carrier admitted on the creator's
+	 * signed frontier, or expired, whose new record takes this origin), never by a replacement; never
+	 * altered. Older readers refuse the field at open (closed record), before any write, like
+	 * memberFrontier and completedSourceCustody.
+	 */
+	readonly reissueOrigins?: readonly SettlementReissueOrigin[];
 	/**
 	 * The author's last-member frontier: the creator-signed settlement statement the author held at its
 	 * last install as a member (verbatim signed bytes; Node opens and re-verifies them on every open).
@@ -197,7 +227,17 @@ export interface DurableIssueCommit {
 				readonly sourceSequence: number;
 				readonly throughIntent: number;
 		  }>
-		| Readonly<{ readonly intent: number; readonly kind: "hand-back"; readonly sourceSequence: number }>;
+		| Readonly<{
+				readonly intent: number;
+				readonly kind: "hand-back";
+				readonly sourceSequence: number;
+				/**
+				 * The consumed record's move origin (its originSequence ?? sourceSequence); the effect adds the
+				 * reissueOrigins entry {this row, originSequence}. Absent in effects written before the field:
+				 * the origin is then the record's.
+				 */
+				readonly originSequence?: number;
+		  }>;
 }
 
 export interface DurableIssueSignContext {

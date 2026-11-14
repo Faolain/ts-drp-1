@@ -1,10 +1,19 @@
+import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { settlementHandBacksWith } from "@ts-drp/issuance-store";
 import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
-import { SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
+import {
+	SETTLEMENT_HAND_BACK_LIMITS,
+	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
+	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	settlementBacklogMoves,
+	settlementMoveOrigin,
+	settlementReissueOriginsUnsettled,
+	settlementSourceContextsForEntries,
+	settlementWindowHandBacks,
+} from "@ts-drp/issuance-store";
 import { nativeIssuanceSignAdmissionForStore } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { createSnapshotChunkProtocolPort, CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
@@ -69,6 +78,7 @@ import {
 	reofferV3CarriedPendingIngress,
 	releaseV3CarriedPendingIngress,
 	inspectV3RetainedWorkFrontier,
+	v3InstalledSettlementAdmittedThrough,
 	resolveV3RetainedWorkFromFrontier,
 	resolveV3ReplacedSources,
 	inspectV3UnresolvedAcceptedWork,
@@ -111,7 +121,6 @@ import {
 } from "@ts-drp/protocol-v3";
 import { digestReceivedVertexPreimage } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "@ts-drp/keychain/finality";
-import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
@@ -445,6 +454,19 @@ export type V3RoomSettlementStatus = Readonly<{
 		operations: readonly Readonly<Record<string, unknown>>[];
 		/** The record's key: pass it back with the operation to consume the record. */
 		handBack: V3RoomHandBack;
+		/**
+		 * The move's origin: the author sequence of the row the author signed when it asked for the move
+		 * (replacements and reissues keep it). The listing is sorted by it, the author's order.
+		 */
+		originSequence: number;
+		/**
+		 * For a move with a displacement identity (displacedOperationIdentity of a "rebase" action): the
+		 * author's newest own issued move of the same identity with a later origin, when one exists. Offered
+		 * again as a new move, this older move would land after it, so the policy offers that newer move again
+		 * right after this one. Durable: recomputed from the plan and the issued rows at each plan write (and
+		 * after own issues), so it survives a reload.
+		 */
+		supersededBy?: Readonly<{ authorSequence: number; operation: Readonly<Record<string, unknown>> }>;
 	}>[];
 	/**
 	 * Safety net (observation only), expected 0: moves the window or the creator's frontier would give
@@ -6634,6 +6656,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return;
 		}
 		if (owned.some((request) => request.handBack !== undefined)) await refreshHandBackListing().catch(() => undefined);
+		// A new own move may supersede a listed given-back move of its identity (author order): refresh the
+		// listing's supersession in the background, only while such a record is listed.
+		else if (handBackSupersession !== undefined && handBackSupersession.head !== -1)
+			void refreshHandBackListing().catch(() => undefined);
 		try {
 			await publishAccepted();
 			for (const request of owned) request.resolve(issued.digest);
@@ -6889,52 +6915,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The displaced sources of the last rebase scan (recordSettlementStatus), for a status recomputed
 	// after the same drain resolves retained rows.
 	let settlementSources: readonly DisplacedSource[] = [];
-	/**
-	 * The backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one per
-	 * intent): each live replaced move once (the entry of its newest displaced row, whose replacement is
-	 * not itself displaced, or which is not yet replaced), each retained source's moves (manual-review),
-	 * and every hand-back record, unconsumed or consumed (a consumed one keeps its reissued move's slot
-	 * until the next merge drops it and the reissued row is counted live, if displaced). A move whose
-	 * newest row is a replacement or a reissue is `pending`: it leaves the count once a creator row
-	 * reaches every such row (the creator admitted it; settlementBacklogNow), the evidence that removes
-	 * new moves (markCreatorReached). A row counts all its moves: Grid batches moves made together into
-	 * one row, and each of them needs its own record when the window gives it back, so counting the row
-	 * once let the Writer accept moves past the record bound.
-	 * @param plan - The durable plan.
-	 * @param displaced - The displaced own rows of the last rebase scan, with their moves.
-	 * @returns The moves counted until the next plan write, and the pending ones.
-	 */
-	const settlementBacklogOf = (
-		plan: RoomSettlementPlan | null,
-		displaced: ReadonlyMap<number, number>
-	): Readonly<{ fixed: number; pending: readonly Readonly<{ rows: readonly number[]; moves: number }>[] }> => {
-		// A row the scan no longer lists counts one move (it is retired or proven, never more than its record).
-		const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
-		let fixed = 0;
-		const pending: Readonly<{ rows: readonly number[]; moves: number }>[] = [];
-		for (const entry of plan?.entries ?? []) {
-			if (entry.sourceObjectId !== undefined) continue;
-			if (entry.disposition === "manual-review") {
-				fixed += moves(entry.sourceSequence);
-				continue;
-			}
-			if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
-			if (!displaced.has(entry.sourceSequence)) continue;
-			if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
-			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
-			const rows = [
-				...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
-				...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
-			];
-			if (rows.length === 0) fixed += moves(entry.sourceSequence);
-			else pending.push(Object.freeze({ rows: Object.freeze([...new Set(rows)]), moves: moves(entry.sourceSequence) }));
-		}
-		for (const record of plan?.handBacks ?? []) {
-			if (record.reissueSequence === null) fixed += 1;
-			else pending.push(Object.freeze({ rows: Object.freeze([record.reissueSequence]), moves: 1 }));
-		}
-		return Object.freeze({ fixed, pending: Object.freeze(pending) });
-	};
+	// The backlog V3RoomLocalBacklogFull bounds, in moves: settlementBacklogMoves (issuance-store).
+	const settlementBacklogOf = settlementBacklogMoves;
 	const recordSettlementBacklog = (plan: RoomSettlementPlan | null): void => {
 		const backlog = settlementBacklogOf(plan, settlementDisplaced);
 		settlementBacklog = backlog.fixed;
@@ -6947,27 +6929,162 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!move.rows.every((sequence) => creatorReachedOwnSequences.has(sequence))) undelivered += move.moves;
 		return undelivered;
 	};
+	// Durable author order per identity (track 46): for each unconsumed hand-back record of a move with a
+	// displacement identity, the newest own issued row of that identity with a later ORIGIN (a reissue of
+	// another given-back move has a high sequence but an older origin, so a row's origin is read through
+	// reissueOrigins and the replacement links). Computed before a plan write's listing is published and
+	// after own issues, memoized by plan revision and lineage head; the issued rows' identity keys are kept
+	// (rowIdentities) so a refresh reads only rows it has not seen. settlementStatus() is polled every
+	// second and never reads issued rows.
+	type HandBackSupersededBy = NonNullable<V3RoomSettlementStatus["undelivered"][number]["supersededBy"]>;
+	let handBackSupersession:
+		| Readonly<{ revision: number; head: number; superseded: ReadonlyMap<string, HandBackSupersededBy> }>
+		| undefined;
+	const rowIdentities = new Map<
+		number,
+		readonly Readonly<{ key: string; operation: Readonly<Record<string, unknown>> }>[]
+	>();
+	const handBackKeyOf = (record: Pick<RoomHandBack, "intent" | "sourceSequence">): string =>
+		`${record.sourceSequence}:${record.intent}`;
+	const displacementKeyOf = (operation: Readonly<Record<string, unknown>>): string | undefined => {
+		const action = Reflect.get(operation, "action");
+		if (typeof action !== "string" || input.application.displacementPolicies[action] !== "rebase") return undefined;
+		try {
+			const identity = input.application.displacedOperationIdentity(operation);
+			return typeof identity === "string" && identity.length !== 0 ? `${action}\u0000${identity}` : undefined;
+		} catch {
+			return undefined;
+		}
+	};
+	const ownRowIdentities = (
+		preimage: Uint8Array
+	): readonly Readonly<{ key: string; operation: Readonly<Record<string, unknown>> }>[] => {
+		let operation: unknown;
+		try {
+			operation = Reflect.get(decodeCanonical(preimage) as object, "operation");
+		} catch {
+			return [];
+		}
+		if (operation === null || typeof operation !== "object" || Array.isArray(operation)) return [];
+		const batch = Reflect.get(operation, "action") === "applicationBatch" ? Reflect.get(operation, "batch") : undefined;
+		const entries = batch !== null && typeof batch === "object" ? Reflect.get(batch, "entries") : undefined;
+		const operations = Array.isArray(entries)
+			? entries.map((entry: unknown) =>
+					entry !== null && typeof entry === "object" ? Reflect.get(entry, "operation") : undefined
+				)
+			: [operation];
+		return operations.flatMap((child: unknown) => {
+			if (child === null || typeof child !== "object" || Array.isArray(child)) return [];
+			const value = child as Readonly<Record<string, unknown>>;
+			const key = displacementKeyOf(value);
+			return key === undefined ? [] : [Object.freeze({ key, operation: Object.freeze(value) })];
+		});
+	};
+	/**
+	 * Recomputes which listed hand-back records a later own move of the same identity supersedes.
+	 * @param plan - The durable plan whose listing is about to be published.
+	 */
+	const refreshHandBackSupersession = async (plan: RoomSettlementPlan | null): Promise<void> => {
+		const revision = plan?.revision ?? -1;
+		const keyed = (plan?.handBacks ?? []).flatMap((record) => {
+			if (record.reissueSequence !== null) return [];
+			let operation: unknown;
+			try {
+				operation = decodeCanonical(record.exactCanonicalOperationBytes);
+			} catch {
+				return [];
+			}
+			const key =
+				operation !== null && typeof operation === "object" && !Array.isArray(operation)
+					? displacementKeyOf(operation as Readonly<Record<string, unknown>>)
+					: undefined;
+			return key === undefined ? [] : [{ record, key, origin: record.originSequence ?? record.sourceSequence }];
+		});
+		if (keyed.length === 0) {
+			rowIdentities.clear();
+			handBackSupersession = Object.freeze({ revision, head: -1, superseded: new Map() });
+			return;
+		}
+		const head = (await issuanceStore.readLineage(settlementScope)).next;
+		// Plan revisions and the lineage head only grow: a refresh never replaces a newer one.
+		if (
+			handBackSupersession !== undefined &&
+			(handBackSupersession.revision > revision ||
+				(handBackSupersession.revision === revision && handBackSupersession.head >= head))
+		)
+			return;
+		const from = Math.min(...keyed.map(({ origin }) => origin)) + 1;
+		for (const sequence of [...rowIdentities.keys()]) if (sequence < from) rowIdentities.delete(sequence);
+		for (let sequence = from; sequence < head; sequence++) {
+			if (rowIdentities.has(sequence)) continue;
+			const row = await issuanceStore.readIssued(settlementScope, sequence);
+			rowIdentities.set(sequence, row === null ? [] : ownRowIdentities(row.envelope.canonicalPreimageBytes));
+		}
+		const keys = new Set(keyed.map(({ key }) => key));
+		const newest = new Map<
+			string,
+			Readonly<{ origin: number; authorSequence: number; operation: Readonly<Record<string, unknown>> }>
+		>();
+		for (const [sequence, identities] of rowIdentities) {
+			if (sequence >= head) continue;
+			const origin = settlementMoveOrigin(plan, sequence).originSequence;
+			for (const { key, operation } of identities) {
+				if (!keys.has(key)) continue;
+				const prior = newest.get(key);
+				if (
+					prior === undefined ||
+					origin > prior.origin ||
+					(origin === prior.origin && sequence >= prior.authorSequence)
+				)
+					newest.set(key, Object.freeze({ origin, authorSequence: sequence, operation }));
+			}
+		}
+		const superseded = new Map<string, HandBackSupersededBy>();
+		for (const { record, key, origin } of keyed) {
+			const later = newest.get(key);
+			if (later !== undefined && later.origin > origin)
+				superseded.set(
+					handBackKeyOf(record),
+					Object.freeze({ authorSequence: later.authorSequence, operation: later.operation })
+				);
+		}
+		if (
+			handBackSupersession !== undefined &&
+			(handBackSupersession.revision > revision ||
+				(handBackSupersession.revision === revision && handBackSupersession.head >= head))
+		)
+			return;
+		handBackSupersession = Object.freeze({ revision, head, superseded });
+	};
 	/**
 	 * The given-back moves: the plan's unconsumed hand-back records (written with the window's expiry or
-	 * the frontier resolution, consumed by the reissued row's own issuance transaction).
+	 * the frontier resolution, consumed by the reissued row's own issuance transaction), in the author's
+	 * order (the plan keeps records sorted by origin), each with its origin and, from the last
+	 * supersession refresh of this plan revision, the newer move of its identity that supersedes it.
 	 * @param plan - The durable plan.
 	 * @returns The listing, oldest first.
 	 */
-	const handBackListing = (plan: RoomSettlementPlan | null): V3RoomSettlementStatus["undelivered"] =>
-		Object.freeze(
+	const handBackListing = (plan: RoomSettlementPlan | null): V3RoomSettlementStatus["undelivered"] => {
+		const superseded =
+			handBackSupersession?.revision === (plan?.revision ?? -1) ? handBackSupersession.superseded : undefined;
+		return Object.freeze(
 			(plan?.handBacks ?? [])
 				.filter((record) => record.reissueSequence === null)
-				.map((record) =>
-					Object.freeze({
+				.map((record) => {
+					const supersededBy = superseded?.get(handBackKeyOf(record));
+					return Object.freeze({
 						vertexDigest: hex(record.sourceDigest),
 						epoch: record.sourceEpoch,
 						operations: Object.freeze([
 							Object.freeze(decodeCanonical(record.exactCanonicalOperationBytes) as Record<string, unknown>),
 						]),
 						handBack: Object.freeze({ sourceSequence: record.sourceSequence, intent: record.intent }),
-					})
-				)
+						originSequence: record.originSequence ?? record.sourceSequence,
+						...(supersededBy === undefined ? {} : { supersededBy }),
+					});
+				})
 		);
+	};
 	// The window's moves of the last plan merge that no free hand-back record fitted (expected 0).
 	let windowDeferredMoves = 0;
 	/**
@@ -6988,8 +7105,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		return windowDeferredMoves + retained;
 	};
+	// The plan revision of the published listing: a slower refresh never publishes an older plan.
+	let listedRevision = -1;
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
+		await refreshHandBackSupersession(plan);
+		if ((plan?.revision ?? -1) < listedRevision) return;
+		listedRevision = plan?.revision ?? -1;
 		recordSettlementBacklog(plan);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({
@@ -7092,9 +7214,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
 		prunedSources: ReadonlySet<number> = new Set(),
 		windowExpired: ReadonlySet<number> = new Set(),
-		handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter((record) => record.reissueSequence === null)
+		handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter(
+			(record) => record.reissueSequence === null
+		),
+		reissueOrigins: RoomSettlementPlan["reissueOrigins"] = current?.reissueOrigins
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
 		const selectedHandBacks = handBacks === undefined || handBacks.length === 0 ? undefined : handBacks;
+		const selectedOrigins = reissueOrigins === undefined || reissueOrigins.length === 0 ? undefined : reissueOrigins;
 		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
 		const entries: RoomSettlementPlanEntry[] = [];
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
@@ -7164,6 +7290,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				current !== null &&
 				current.fenceSequence === fenceSequence &&
 				sameBytes(encodeCanonical(current.handBacks ?? null), encodeCanonical(selectedHandBacks ?? null)) &&
+				sameBytes(encodeCanonical(current.reissueOrigins ?? null), encodeCanonical(selectedOrigins ?? null)) &&
 				current.entries.length === entries.length &&
 				current.entries.every((entry, index) => {
 					const candidate = entries[index];
@@ -7181,6 +7308,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...(current?.memberFrontier === undefined ? {} : { memberFrontier: current.memberFrontier }),
 				// So is the completed-source custody marker.
 				...(current?.completedSourceCustody === true ? { completedSourceCustody: true as const } : {}),
+				// Reissue origins: kept until the move settles (writeMergedSettlementPlan drops them).
+				...(selectedOrigins === undefined ? {} : { reissueOrigins: Object.freeze([...selectedOrigins]) }),
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,
 			});
@@ -7257,6 +7386,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			let sequence = source.authorSequence;
 			let retired = false;
 			for (let depth = 0; depth <= 64 && !retired; depth++) {
+				// A reissued row (a reissueOrigins entry) starts the move's chain again: a reissue gets a fresh
+				// window; only order and identity use the move's origin (settlementMoveOrigin).
+				if (current?.reissueOrigins?.some((entry) => entry.reissueSequence === sequence) === true) break;
 				const link = current?.entries.find(
 					(entry) =>
 						entry.sourceObjectId === undefined &&
@@ -7280,49 +7412,55 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const windowExpired = await settlementWindowExpired(current, sources);
 		// Each move the window resolves as expired now is given back to the application in this same plan
 		// write: one durable hand-back record per operation, kept until its reissued row consumes it (it
-		// outlives the row's retirement). Consumed records are dropped. An accepted move is never expired
-		// unrecorded: one whose records do not fit the record bound (SETTLEMENT_HAND_BACK_LIMITS) is not
-		// expired now; it stays live (replaced again) and is given back by a later install once records
-		// are free. The backlog bound (V3RoomLocalBacklogFull) keeps that from happening except after a
-		// burst of moves within one epoch.
-		let handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter(
-			(record) => record.reissueSequence === null
-		);
+		// outlives the row's retirement), carrying the move's origin (a reissued move's origin comes from
+		// its reissueOrigins entry, which this write drops). Consumed records are dropped. An accepted move
+		// is never expired unrecorded: one whose records do not fit the record bound
+		// (SETTLEMENT_HAND_BACK_LIMITS, unconsumed records only) is not expired now and drops no entry; it
+		// stays live (replaced again) and is given back by a later install once records are free. The
+		// backlog bound (V3RoomLocalBacklogFull) keeps that from happening except after a burst of moves
+		// within one epoch.
 		const expired = new Set<number>();
-		windowDeferredMoves = 0;
+		const expiring: Parameters<typeof settlementWindowHandBacks>[1][number][] = [];
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
 			if (!windowExpired.has(source.authorSequence)) continue;
 			if (current?.entries.find((entry) => entry.sourceSequence === source.authorSequence)?.disposition === "expire") {
 				expired.add(source.authorSequence);
 				continue;
 			}
-			const recorded = settlementHandBacksWith(
-				handBacks,
-				source.intents.map((intent, index) =>
-					Object.freeze({
-						sourceSequence: source.authorSequence,
-						sourceDigest: bytes(source.vertexDigest),
-						sourceEpoch: source.epoch,
-						intent: index,
-						exactCanonicalOperationBytes: encodeCanonical(intent.operation),
-						reissueSequence: null,
-					})
-				)
+			expiring.push(
+				Object.freeze({
+					sourceSequence: source.authorSequence,
+					sourceDigest: bytes(source.vertexDigest),
+					sourceEpoch: source.epoch,
+					operations: Object.freeze(source.intents.map((intent) => encodeCanonical(intent.operation))),
+				})
 			);
-			if (recorded === undefined) {
-				windowDeferredMoves += source.intents.length;
-				continue;
-			}
-			handBacks = recorded;
-			expired.add(source.authorSequence);
 		}
+		const windowRecords = settlementWindowHandBacks(current, expiring);
+		windowDeferredMoves = windowRecords.deferredMoves;
+		for (const sequence of windowRecords.expired) expired.add(sequence);
+		// A reissued move settled once the creator's signed frontier in the installed settlement capability
+		// admits its chain's last carrier: its entry is dropped (never on local acceptance or relay evidence,
+		// and never because the reissued row was replaced). A last carrier displaced in this write or still
+		// settling in the plan is not admitted, even at or below the frontier.
+		const admittedThrough = activeHandle === undefined ? undefined : v3InstalledSettlementAdmittedThrough(activeHandle);
+		const reissueOrigins =
+			current === null
+				? undefined
+				: settlementReissueOriginsUnsettled(
+						current,
+						windowRecords.reissueOrigins,
+						admittedThrough ?? null,
+						new Set(sources.map((source) => source.authorSequence))
+					);
 		const completePlan = mergedSettlementPlan(
 			sources,
 			current,
 			await authenticatedSettlementInheritance(sources),
 			await completedSettlementSourcesPruned(current, sources),
 			expired,
-			handBacks
+			windowRecords.handBacks,
+			reissueOrigins
 		);
 		const priorFence =
 			current?.fenceSequence == null
@@ -7341,6 +7479,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						plan,
 						scope: settlementScope,
 					});
+		await refreshHandBackSupersession(written);
 		recordSettlementStatus(sources, written);
 		return written;
 	};
@@ -7373,6 +7512,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		settlementSources = sources;
 		settlementDisplaced = new Map(sources.map((source) => [source.authorSequence, source.intents.length] as const));
 		recordSettlementBacklog(plan);
+		listedRevision = Math.max(listedRevision, plan.revision);
 		// This plan write at `epoch` settled every own row of the epochs before it.
 		localMovesCountedFrom(epoch);
 		settlementStatusSnapshot = Object.freeze({
@@ -7448,6 +7588,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
+		await refreshHandBackSupersession(current);
 		recordSettlementBacklog(current);
 		// The status reflects this drain's resolutions (given-back moves no longer wait).
 		recordSettlementStatus(settlementSources, current);

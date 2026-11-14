@@ -25,6 +25,10 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 //   pruned:     the commit that retires the expired row of a move the application holds in memory
 //               (taken back, not yet offered again because its moves do not reach the creator).
 //   reissue:    after reconnecting, the commit that issues the application's new row for that move.
+//   rehandback: the commit that hands the move back a second time: its reissued row (or a replacement of
+//               it) never reaches the creator either, and the window expires it. That commit writes the
+//               new hand-back record, which must carry the move's origin (the row the author first made
+//               it in), the reissue's reissueOrigins entry being dropped in the same write (track 46).
 //
 // Before the fix (hand-backs derived in memory from retained rows, dff7d4ed): "pruned" loses the move
 // (nothing durable names it once its row is retired, and the application's copy died with the
@@ -36,11 +40,11 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // again. Writing the reissued row and consuming the record are one transaction: there is no separate
 // "reissued but not consumed" edge.
 const INNER = process.env.RUN_HANDBACK_CRASH === "1";
-const EDGES = ["resolution", "pruned", "reissue"] as const;
+const EDGES = ["resolution", "pruned", "reissue", "rehandback"] as const;
 type Edge = (typeof EDGES)[number];
 // Silent epochs before the death (or before reconnecting, for "reissue"): the window is 4, so move 1
 // is given back at epoch 5 and its expired row is retired a few epochs later.
-const SILENT: Readonly<Record<Edge, number>> = { resolution: 6, pruned: 12, reissue: 5 };
+const SILENT: Readonly<Record<Edge, number>> = { resolution: 6, pruned: 12, reissue: 5, rehandback: 5 };
 const TARGET = "block-1-1";
 
 const track = {
@@ -86,12 +90,21 @@ function moveIds(value: unknown, out = new Set<string>()): Set<string> {
 }
 
 type PlanEntry = { disposition: string; sourceSequence: number; sourceContextDigest?: unknown };
-type HandBack = { sourceSequence: number; intent: number; reissueSequence: number | null; exactCanonicalOperationBytes: Uint8Array };
+type HandBack = {
+	sourceSequence: number;
+	intent: number;
+	originSequence?: number;
+	reissueSequence: number | null;
+	exactCanonicalOperationBytes: Uint8Array;
+};
+type ReissueOrigin = { reissueSequence: number; originSequence: number };
 /**
- * The Writer's settlement plan entries, hand-back records and issued rows, read straight from its SQLite file.
+ * The Writer's settlement plan (entries, hand-back records, reissue origins) and issued rows, read
+ * straight from its SQLite file.
  * @param file - The Writer's issuance store.
  * @param author - The Writer's author.
- * @returns Its plan entries, its hand-back records with their move ids, and its issued rows' move ids by author sequence.
+ * @returns Its plan entries, its hand-back records with their move ids, its reissue origins, and its
+ * issued rows' move ids by author sequence.
  */
 function writerIssuance(file: string, author: string) {
 	const db = new DatabaseSync(file, { readOnly: true });
@@ -101,17 +114,23 @@ function writerIssuance(file: string, author: string) {
 			| undefined;
 		let entries: PlanEntry[] = [];
 		let handBacks: (HandBack & { ids: Set<string> })[] = [];
+		let reissueOrigins: ReissueOrigin[] = [];
 		if (planRow !== undefined) {
 			const decoded = JSON.parse(planRow.entries_json) as unknown;
 			if (Array.isArray(decoded)) entries = decoded as PlanEntry[];
 			else {
 				const bytes = Buffer.from((decoded as { bytes: string }).bytes, "base64");
-				const plan = decodeCanonical(new Uint8Array(bytes)) as { entries: PlanEntry[]; handBacks?: HandBack[] };
+				const plan = decodeCanonical(new Uint8Array(bytes)) as {
+					entries: PlanEntry[];
+					handBacks?: HandBack[];
+					reissueOrigins?: ReissueOrigin[];
+				};
 				entries = plan.entries;
 				handBacks = (plan.handBacks ?? []).map((record) => ({
 					...record,
 					ids: moveIds(decodeCanonical(record.exactCanonicalOperationBytes)),
 				}));
+				reissueOrigins = plan.reissueOrigins ?? [];
 			}
 		}
 		const issued = new Map<number, Set<string>>();
@@ -121,7 +140,7 @@ function writerIssuance(file: string, author: string) {
 			const preimage = decodeCanonical(new Uint8Array(row.canonical_preimage)) as { operation: unknown };
 			issued.set(Number(row.author_sequence), moveIds(preimage.operation));
 		}
-		return { entries, handBacks, issued };
+		return { entries, handBacks, reissueOrigins, issued };
 	} finally {
 		db.close();
 	}
@@ -159,8 +178,14 @@ async function openPair(directory: string, reopen: boolean) {
 	}
 }
 
-/** The scripted row wire: each side's rows reach the other only in the receiver's current epoch. */
-function rowWire(creator: RoleEndpoint, writer: RoleEndpoint) {
+/**
+ * The scripted row wire: each side's rows reach the other only in the receiver's current epoch.
+ * @param creator - The creator.
+ * @param writer - The Writer.
+ * @param lost - A Writer row the wire loses on its way to the creator (never delivered later).
+ * @returns The two carries.
+ */
+function rowWire(creator: RoleEndpoint, writer: RoleEndpoint, lost: (row: WireRow) => boolean = () => false) {
 	const cursor = { creator: null as number | null, writer: null as number | null };
 	const carry = async (from: RoleEndpoint, to: RoleEndpoint, key: "creator" | "writer") => {
 		const published = await from.published(cursor[key]);
@@ -169,7 +194,7 @@ function rowWire(creator: RoleEndpoint, writer: RoleEndpoint) {
 		const ahead = published.findIndex((row) => rowValue(row).epoch > current);
 		const rows = ahead < 0 ? published : published.slice(0, ahead);
 		if (rows.length === 0) return;
-		await to.inject(rows.filter((row) => rowValue(row).epoch === current));
+		await to.inject(rows.filter((row) => rowValue(row).epoch === current && !(key === "writer" && lost(row))));
 		cursor[key] = rows.at(-1)?.authorSequence ?? cursor[key];
 	};
 	return { toWriter: () => carry(creator, writer, "creator"), toCreator: () => carry(writer, creator, "writer") };
@@ -232,6 +257,8 @@ it.runIf(INNER)(
 			expired: new Map<number, Set<string>>(),
 			// The author sequences issued before reconnecting (a reissue is a later row).
 			before: -1,
+			// The row the author first made TARGET in (its origin).
+			first: -1,
 			inside: false,
 			// "pruned": the durable hand-back record of the target move that armed the edge.
 			arm: undefined as { sourceSequence: number; intent: number } | undefined,
@@ -251,7 +278,10 @@ it.runIf(INNER)(
 			) {
 				watch.inside = true;
 				try {
-					const { entries, handBacks, issued } = writerIssuance(file, watch.author);
+					const { entries, handBacks, reissueOrigins, issued } = writerIssuance(file, watch.author);
+					if (watch.first < 0)
+						for (const [sequence, ids] of issued)
+							if (ids.has(TARGET) && (watch.first < 0 || sequence < watch.first)) watch.first = sequence;
 					const windowExpired = entries.filter(
 						(entry) => entry.disposition === "expire" && entry.sourceContextDigest === undefined
 					);
@@ -285,6 +315,23 @@ it.runIf(INNER)(
 						if (edge === "reissue")
 							for (const [sequence, ids] of issued)
 								if (sequence > watch.before && ids.has(TARGET)) die({ reissued: sequence });
+						// A window expiry of a row of TARGET's reissue chain (issued after reconnecting).
+						if (edge === "rehandback")
+							for (const entry of windowExpired)
+								if (entry.sourceSequence > watch.before && issued.get(entry.sourceSequence)?.has(TARGET) === true)
+									die({
+										rehandedBack: entry.sourceSequence,
+										first: watch.first,
+										records: handBacks
+											.filter((record) => record.sourceSequence === entry.sourceSequence)
+											.map(({ sourceSequence, intent, originSequence, reissueSequence }) => ({
+												sourceSequence,
+												intent,
+												originSequence,
+												reissueSequence,
+											})),
+										reissueOrigins,
+									});
 					}
 				} finally {
 					watch.inside = false;
@@ -296,7 +343,17 @@ it.runIf(INNER)(
 		try {
 			const { creator, writer } = await openPair(directory, false);
 			const wire = successorWire(() => [creator, writer] as const);
-			const wireRows = rowWire(creator, writer);
+			// rehandback: the wire loses every row carrying TARGET after reconnecting (its reissue and any
+			// replacement of it), so the window gives the move back a second time.
+			const wireRows = rowWire(
+				creator,
+				writer,
+				(row) =>
+					edge === "rehandback" &&
+					watch.before >= 0 &&
+					row.authorSequence > watch.before &&
+					moveIds(rowValue(row).operation).has(TARGET)
+			);
 			const ordinal = { next: 0 };
 			const ids: string[] = [];
 			// The creator's admissions are observed in memory (acceptedVertices), so the reopened process
@@ -329,7 +386,7 @@ it.runIf(INNER)(
 				const status = (await writer.rolloverStatus?.()) as Status;
 				process.stdout.write(`HANDBACK_CRASH_EPOCH ${JSON.stringify({ epoch, state: status.state, kept: status.kept.map((op) => op.id) })}\n`);
 			}
-			if (edge === "reissue") {
+			if (edge === "reissue" || edge === "rehandback") {
 				await waitFor(
 					"the application takes the move back",
 					async () => ((await writer.rolloverStatus?.()) as Status).kept.map((operation) => operation.id),
@@ -340,7 +397,8 @@ it.runIf(INNER)(
 				save(true);
 				// Reconnect: the Writer's rows reach the creator, its settlement lands, the move is offered again.
 				await rows.toCreator();
-				for (let round = 0; round < 4; round++) {
+				// rehandback: the reissue, then the window (4) on it, and a margin.
+				for (let round = 0; round < (edge === "rehandback" ? 14 : 4); round++) {
 					epoch = await rollCreator(creator, rows.toWriter, ordinal);
 					save(true);
 					await follow(wire, writer, epoch);
@@ -391,6 +449,15 @@ it.skipIf(INNER).each(EDGES)(
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
 		// The pruned edge is reached only after its arm: the target move's durable hand-back record.
 		if (edge === "pruned") expect(death.armedBy, "the pruned edge was armed by the target's hand-back record").toBeDefined();
+		if (edge === "rehandback") {
+			// The second hand-back record keeps the move's origin: the row the author first made it in, not
+			// the reissued row the window expired.
+			const second = death as { rehandedBack: number; first: number; records: Pick<HandBack, "originSequence">[] };
+			expect(second.first).toBeGreaterThanOrEqual(0);
+			expect(second.rehandedBack).toBeGreaterThan(second.first);
+			expect(second.records.length).toBeGreaterThan(0);
+			for (const record of second.records) expect(record.originSequence).toBe(second.first);
+		}
 
 		const restore = await installEnvironment("node", () => undefined);
 		try {

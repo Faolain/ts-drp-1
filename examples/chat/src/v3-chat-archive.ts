@@ -349,34 +349,58 @@ export interface ShippingChatHistoryMessage extends ShippingChatMessage {
 }
 
 /**
- * This device's history: the window and the archive, each message once (the window's copy
- * first), ordered by display time, then author, then identity.
- * @param window - The projection's messages.
- * @param archive - The archive's records.
+ * The Chat display order (track 46, option C1): each author's messages in the order of the signed
+ * `displayTimeMs` they carry (ties keep admitted order), interleaved with the other authors' messages
+ * by admitted order. Admitted order alone puts a move the room gave back and the author offered again
+ * after that author's newer messages; the author's own signed display time puts it back in the
+ * author's order. Each author's messages only trade places among themselves (every message keeps an
+ * admitted slot of its own author), so a forged or skewed displayTimeMs may only reorder THAT author's
+ * own messages, never another author's.
+ * @param admitted - Messages in admitted order.
+ * @returns The same messages in display order.
+ */
+export function shippingChatDisplayOrder<Message extends Pick<ShippingChatMessage, "author" | "displayTimeMs">>(
+	admitted: readonly Message[]
+): Message[] {
+	const byAuthor = new Map<string, Message[]>();
+	for (const message of admitted) {
+		const own = byAuthor.get(message.author);
+		if (own === undefined) byAuthor.set(message.author, [message]);
+		else own.push(message);
+	}
+	// Array.prototype.sort is stable: equal display times keep admitted order.
+	for (const own of byAuthor.values()) own.sort((left, right) => left.displayTimeMs - right.displayTimeMs);
+	const taken = new Map<string, number>();
+	return admitted.map((message) => {
+		const index = taken.get(message.author) ?? 0;
+		taken.set(message.author, index + 1);
+		return (byAuthor.get(message.author) as Message[])[index] as Message;
+	});
+}
+
+/**
+ * This device's history: the window and the archive, each message once (the window's copy first), in
+ * the Chat display order (shippingChatDisplayOrder) of admitted order, which is the archive's messages
+ * the window no longer holds (older: they left it), in the archive's order, then the window's. The
+ * lifetime format (v3) keeps its messages sorted by identity, not admitted order: its history has no
+ * admitted order to interleave authors by, and stays ordered by display time, then author, then identity.
+ * @param window - The projection's messages, in admitted order (window and shares formats) or by identity.
+ * @param archive - The archive's records, in sequence order.
+ * @param windowOrder - "identity" for the lifetime format's identity-sorted messages.
  * @returns The merged history.
  */
 export function shippingChatHistory(
 	window: readonly ShippingChatMessage[],
-	archive: readonly ShippingChatArchiveRecord[]
+	archive: readonly ShippingChatArchiveRecord[],
+	windowOrder: "admitted" | "identity" = "admitted"
 ): readonly ShippingChatHistoryMessage[] {
+	const inWindow = new Set(window.map(contentOf));
 	const seen = new Set<string>();
-	const history: ShippingChatHistoryMessage[] = [];
-	for (const message of window) {
-		seen.add(contentOf(message));
-		history.push(
-			Object.freeze({
-				author: message.author,
-				clientOperationId: message.clientOperationId,
-				displayTimeMs: message.displayTimeMs,
-				text: message.text,
-				inWindow: true,
-			})
-		);
-	}
+	const admitted: ShippingChatHistoryMessage[] = [];
 	for (const record of archive) {
-		if (seen.has(contentOf(record))) continue;
+		if (inWindow.has(contentOf(record)) || seen.has(contentOf(record))) continue;
 		seen.add(contentOf(record));
-		history.push(
+		admitted.push(
 			Object.freeze({
 				author: record.author,
 				clientOperationId: record.clientOperationId,
@@ -386,8 +410,20 @@ export function shippingChatHistory(
 			})
 		);
 	}
+	for (const message of window) {
+		admitted.push(
+			Object.freeze({
+				author: message.author,
+				clientOperationId: message.clientOperationId,
+				displayTimeMs: message.displayTimeMs,
+				text: message.text,
+				inWindow: true,
+			})
+		);
+	}
+	if (windowOrder === "admitted") return shippingChatDisplayOrder(admitted);
 	const order = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
-	return history.sort(
+	return admitted.sort(
 		(left, right) =>
 			left.displayTimeMs - right.displayTimeMs ||
 			order(left.author, right.author) ||

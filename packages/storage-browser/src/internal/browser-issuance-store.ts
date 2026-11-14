@@ -245,6 +245,7 @@ interface NativeSettlementPlan extends DurableIssueScope {
 	readonly handBacks?: SettlementPlan["handBacks"];
 	readonly memberFrontier?: SettlementPlan["memberFrontier"];
 	readonly completedSourceCustody?: SettlementPlan["completedSourceCustody"];
+	readonly reissueOrigins?: SettlementPlan["reissueOrigins"];
 	readonly entries: readonly (SettlementPlanEntry & {
 		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
 	})[];
@@ -493,11 +494,14 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
+	const hasReissueOrigins = typeof value === "object" && value !== null && Object.hasOwn(value, "reissueOrigins");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])]) ||
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+			...(hasReissueOrigins ? ["reissueOrigins"] : []),
+		]) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId
 	) {
@@ -506,10 +510,11 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 	return copySettlementPlan(
 		{
 			entries: value.entries,
-			...(hasContexts ? {sourceContexts: value.sourceContexts} : {}),
-			...(hasHandBacks ? {handBacks: value.handBacks} : {}),
-			...(hasMemberFrontier ? {memberFrontier: value.memberFrontier} : {}),
-			...(hasCompletedSourceCustody ? {completedSourceCustody: value.completedSourceCustody} : {}),
+			...(hasContexts ? { sourceContexts: value.sourceContexts } : {}),
+			...(hasHandBacks ? { handBacks: value.handBacks } : {}),
+			...(hasMemberFrontier ? { memberFrontier: value.memberFrontier } : {}),
+			...(hasCompletedSourceCustody ? { completedSourceCustody: value.completedSourceCustody } : {}),
+			...(hasReissueOrigins ? { reissueOrigins: value.reissueOrigins } : {}),
 			fenceSequence: value.fenceSequence,
 			revision: value.revision,
 			scope,
@@ -523,10 +528,13 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 	return {
 		...copyDurableIssueScope(detached.scope),
 		entries: detached.entries,
-		...(detached.sourceContexts === undefined ? {} : {sourceContexts: detached.sourceContexts}),
-		...(detached.handBacks === undefined ? {} : {handBacks: detached.handBacks}),
-		...(detached.memberFrontier === undefined ? {} : {memberFrontier: detached.memberFrontier}),
-		...(detached.completedSourceCustody === undefined ? {} : {completedSourceCustody: detached.completedSourceCustody}),
+		...(detached.sourceContexts === undefined ? {} : { sourceContexts: detached.sourceContexts }),
+		...(detached.handBacks === undefined ? {} : { handBacks: detached.handBacks }),
+		...(detached.memberFrontier === undefined ? {} : { memberFrontier: detached.memberFrontier }),
+		...(detached.completedSourceCustody === undefined
+			? {}
+			: { completedSourceCustody: detached.completedSourceCustody }),
+		...(detached.reissueOrigins === undefined ? {} : { reissueOrigins: detached.reissueOrigins }),
 		fenceSequence: detached.fenceSequence,
 		revision: detached.revision,
 	};

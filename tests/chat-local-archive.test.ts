@@ -12,6 +12,7 @@ import {
 	SHIPPING_CHAT_ARCHIVE_DEFAULT_BOUND,
 	shippingChatArchiveDatabaseName,
 	type ShippingChatArchiveStore,
+	shippingChatDisplayOrder,
 	shippingChatHistory,
 } from "../examples/chat/src/v3-chat-archive.js";
 import { openNodeShippingChatArchiveStore } from "../examples/chat/src/v3-chat-archive-sqlite.js";
@@ -260,8 +261,43 @@ describe("Track W: Chat's device archive", () => {
 				{ ...two, key: "k2", seq: 2, epoch: 1, bytes: size(two) },
 			]
 		);
-		expect(history.map(identity)).toEqual([three, one, two].map(identity));
-		expect(history.map((row) => row.inWindow)).toEqual([true, false, true]);
+		// Admitted order is the archive's message the window no longer holds (one), then the window (two,
+		// three); A's messages take A's slots in A's display-time order (three, then one), B's stays put.
+		expect(history.map(identity)).toEqual([three, two, one].map(identity));
+		expect(history.map((row) => row.inWindow)).toEqual([true, true, false]);
+	});
+
+	it("orders each author's messages by their signed display time and interleaves authors by admitted order (C1)", () => {
+		// A given-back message offered again lands after its author's newer message: admitted order
+		// [newer, older], shown in the author's order.
+		const older = message(A, "older", "older", T);
+		const between = message(B, "between", "between", T + 5);
+		const newer = message(A, "newer", "newer", T + 10);
+		expect(shippingChatHistory([newer, between, older], []).map(identity)).toEqual(
+			[older, between, newer].map(identity)
+		);
+		expect(shippingChatDisplayOrder([newer, between, older]).map(identity)).toEqual(
+			[older, between, newer].map(identity)
+		);
+	});
+
+	it("a forged or skewed display time reorders only its own author's messages, never another author's", () => {
+		const b1 = message(B, "b1", "b1", T + 1);
+		const b2 = message(B, "b2", "b2", T + 2);
+		const b3 = message(B, "b3", "b3", T + 3);
+		// A claims a time before everything (and one far in the future): B's messages keep their slots.
+		const early = message(A, "early", "early", 0);
+		const late = message(A, "late", "late", Number.MAX_SAFE_INTEGER);
+		const admitted = [b1, late, b2, early, b3];
+		const shown = shippingChatHistory(admitted, []);
+		expect(shown.map(identity)).toEqual([b1, early, b2, late, b3].map(identity));
+		// Every slot keeps its admitted author, and B's messages stay in B's admitted order.
+		expect(shown.map((row) => row.author)).toEqual(admitted.map((row) => row.author));
+		expect(shown.filter((row) => row.author === B).map(identity)).toEqual([b1, b2, b3].map(identity));
+		// Equal display times keep admitted order.
+		const tie1 = message(A, "tie1", "tie1", T);
+		const tie2 = message(A, "tie2", "tie2", T);
+		expect(shippingChatDisplayOrder([tie2, tie1]).map(identity)).toEqual([tie2, tie1].map(identity));
 	});
 
 	it("lives in its own database, never a room database", () => {

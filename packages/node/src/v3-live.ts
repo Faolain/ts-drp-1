@@ -34,10 +34,10 @@ import {
 	type DurableOutboxPublicationTransitionInput,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	settlementHandBacksAtOrigin,
 	type SettlementPlan,
-	type SettlementSourceContext,
-	settlementHandBacksWith,
 	settlementReplacementLastLogicalTimeFromPreimage,
+	type SettlementSourceContext,
 } from "@ts-drp/issuance-store";
 import {
 	bindDurableIssuancePruningMaintenance,
@@ -10770,11 +10770,20 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		entries.sort((a, b) => a.sourceSequence - b.sourceSequence);
 		contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 		const persistedFrontier = memberFrontier ?? prior?.memberFrontier;
-		const plan = copySettlementPlan({scope, revision: prior === null ? 0 : prior.revision + 1,
-			fenceSequence: prior?.fenceSequence ?? null, entries, ...(contexts.length === 0 ? {} : {sourceContexts: contexts}),
-			...(prior?.handBacks === undefined ? {} : {handBacks: prior.handBacks}),
-			...(persistedFrontier === undefined ? {} : {memberFrontier: persistedFrontier}),
-			...(completedSourceCustody ? {completedSourceCustody: true} : {})}, scope);
+		const plan = copySettlementPlan(
+			{
+				scope,
+				revision: prior === null ? 0 : prior.revision + 1,
+				fenceSequence: prior?.fenceSequence ?? null,
+				entries,
+				...(contexts.length === 0 ? {} : { sourceContexts: contexts }),
+				...(prior?.handBacks === undefined ? {} : { handBacks: prior.handBacks }),
+				...(persistedFrontier === undefined ? {} : { memberFrontier: persistedFrontier }),
+				...(completedSourceCustody ? { completedSourceCustody: true } : {}),
+				...(prior?.reissueOrigins === undefined ? {} : { reissueOrigins: prior.reissueOrigins }),
+			},
+			scope
+		);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
 		const future = {...before.rows, plans: [...before.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 		encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -17971,6 +17980,10 @@ async function issueLocal(
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
 	}
+	// The effect the row commits. A hand-back effect carries the record's move origin, so the same issuance
+	// transaction adds the reissue's origin entry (SettlementPlan.reissueOrigins); the store refuses an
+	// origin other than the record's.
+	let planEffect = input.planEffect;
 	if (input.planEffect?.kind === "hand-back") {
 		// A move the settlement window (or the creator's frontier) gave back, offered again as a new move:
 		// its row consumes the durable hand-back record in its own issuance transaction (the store
@@ -17995,6 +18008,12 @@ async function issueLocal(
 		) {
 			return localIssueFailure("issuance-rejected", "v3 settlement hand-back is unavailable");
 		}
+		planEffect = ObjectFreeze({
+			intent: effect.intent,
+			kind: "hand-back" as const,
+			originSequence: record.originSequence ?? record.sourceSequence,
+			sourceSequence: effect.sourceSequence,
+		});
 	}
 	if (input.planEffect?.kind === "replacement" && input.settlementSource === undefined) {
 		return localIssueFailure(
@@ -18106,7 +18125,7 @@ async function issueLocal(
 				first.logicalTime,
 				applicationOperation,
 				false,
-				input.planEffect
+				planEffect
 			);
 			if (issued.ok) await drainPendingIngress(registration);
 			return issued;
@@ -26518,6 +26537,23 @@ export interface V3RetainedWorkFrontier {
  * @param plane - Original live handle.
  * @returns Every retained application row with its frontier proof.
  */
+/**
+ * The creator-signed settlement frontier in this plane's installed settlement capability: the highest
+ * own author sequence it admitted (terminalThrough; null when none), or undefined without a valid one.
+ * Signed evidence only, never local acceptance or relay evidence: the room drops a reissue-origin entry
+ * (SettlementPlan.reissueOrigins) once this reaches its chain's last carrier.
+ * @param plane - The live plane.
+ * @returns The admitted author sequence, null, or undefined.
+ */
+export function v3InstalledSettlementAdmittedThrough(plane: V3PlaneHandle): number | null | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration)) return undefined;
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	return frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)
+		? undefined
+		: frontier.terminalThrough;
+}
+
 export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promise<readonly V3RetainedWorkFrontier[]> {
 	const registration = v3HandleRegistrations.get(plane);
 	if (registration === undefined || !currentRegistration(registration)) throw new TypeError("creator source custody owner is unavailable");
@@ -26946,6 +26982,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	// row no settlement policy derives once displaced. It is expired unrecorded; every other row's
 	// operations are given back.
 	let handBacks = prior.handBacks;
+	let reissueOrigins = prior.reissueOrigins;
 	if (frontierProof) {
 		const row = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === selector.sourceSequence);
 		const authenticated = row === undefined ? undefined : authenticateRetainedSourceVertex(second.retained.contract,
@@ -26957,14 +26994,27 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
 		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
 			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted") {
-			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
-				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
-				sourceEpoch: authenticated.vertex.epoch, intent: index, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
-				reissueSequence: null})));
+			// Each record keeps its move's origin (a reissued or replaced row's move began earlier).
+			const recorded = settlementHandBacksAtOrigin(
+				prior,
+				prior.handBacks,
+				prior.reissueOrigins,
+				intents.map((intent, index) =>
+					ObjectFreeze({
+						sourceSequence: selector.sourceSequence,
+						sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
+						sourceEpoch: authenticated.vertex.epoch,
+						intent: index,
+						exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+						reissueSequence: null,
+					})
+				)
+			);
 			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
 			// retained (the next drain resolves it once a record is free).
-			if (handBacks === undefined)
-				throw new TypeError("creator source abandonment hand-back records are full");
+			if (recorded === undefined) throw new TypeError("creator source abandonment hand-back records are full");
+			handBacks = recorded.handBacks;
+			reissueOrigins = recorded.reissueOrigins;
 		}
 	}
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
@@ -26973,10 +27023,20 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	const contexts = [...(prior.sourceContexts ?? [])];
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
-	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks}),
-		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier}),
-		...(prior.completedSourceCustody === true ? {completedSourceCustody: true} : {})}, scope);
+	const plan = copySettlementPlan(
+		{
+			scope,
+			revision: prior.revision + 1,
+			fenceSequence: prior.fenceSequence,
+			entries,
+			sourceContexts: contexts,
+			...(handBacks === undefined ? {} : { handBacks }),
+			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
+			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
+			...(reissueOrigins === undefined ? {} : { reissueOrigins }),
+		},
+		scope
+	);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -27195,6 +27255,7 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 		throw new TypeError("creator source frontier resolution source currency changed");
 	const prior = second.plan;
 	let handBacks = prior.handBacks;
+	let reissueOrigins = prior.reissueOrigins;
 	const resolved = new Map<number, (typeof expiries)[number]>();
 	const pinnedBootstrap = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
 	for (let index = 0; index < receipts.length; index += 1) {
@@ -27211,14 +27272,27 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
 		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
 			await frontierRetainedResolution(registration, row.selector.sourceSequence, authenticated.vertex.epoch, second.scan) === "never-admitted") {
-			const next = settlementHandBacksWith(handBacks, intents.map((intent, intentIndex) => ObjectFreeze({
-				sourceSequence: row.selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(row.entry.sourceDigest),
-				sourceEpoch: authenticated.vertex.epoch, intent: intentIndex, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
-				reissueSequence: null})));
+			// Each record keeps its move's origin (a reissued or replaced row's move began earlier).
+			const next = settlementHandBacksAtOrigin(
+				prior,
+				handBacks,
+				reissueOrigins,
+				intents.map((intent, intentIndex) =>
+					ObjectFreeze({
+						sourceSequence: row.selector.sourceSequence,
+						sourceDigest: new Uint8ArrayConstructor(row.entry.sourceDigest),
+						sourceEpoch: authenticated.vertex.epoch,
+						intent: intentIndex,
+						exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+						reissueSequence: null,
+					})
+				)
+			);
 			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
 			// retained (the next drain resolves it once a record is free).
 			if (next === undefined) continue;
-			handBacks = next;
+			handBacks = next.handBacks;
+			reissueOrigins = next.reissueOrigins;
 		}
 		resolved.set(row.selector.sourceSequence, expiries[index]!);
 	}
@@ -27232,10 +27306,20 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 	for (const expiry of resolved.values())
 		if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
-	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks}),
-		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier}),
-		...(prior.completedSourceCustody === true ? {completedSourceCustody: true} : {})}, scope);
+	const plan = copySettlementPlan(
+		{
+			scope,
+			revision: prior.revision + 1,
+			fenceSequence: prior.fenceSequence,
+			entries,
+			sourceContexts: contexts,
+			...(handBacks === undefined ? {} : { handBacks }),
+			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
+			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
+			...(reissueOrigins === undefined ? {} : { reissueOrigins }),
+		},
+		scope
+	);
 	if (plan == null) throw new TypeError("creator source frontier resolution plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -27521,10 +27605,20 @@ async function resolveCreatorReplacedSources(registration: V3PlaneRegistration, 
 	for (const resolution of signed.values())
 		if (!contexts.some(value => sameBytes(value.digest, resolution.digest))) contexts.push(resolution);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
-	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts, ...(prior.handBacks === undefined ? {} : {handBacks: prior.handBacks}),
-		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier}),
-		...(prior.completedSourceCustody === true ? {completedSourceCustody: true} : {})}, scope);
+	const plan = copySettlementPlan(
+		{
+			scope,
+			revision: prior.revision + 1,
+			fenceSequence: prior.fenceSequence,
+			entries,
+			sourceContexts: contexts,
+			...(prior.handBacks === undefined ? {} : { handBacks: prior.handBacks }),
+			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
+			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
+			...(prior.reissueOrigins === undefined ? {} : { reissueOrigins: prior.reissueOrigins }),
+		},
+		scope
+	);
 	if (plan == null) throw new TypeError("creator replaced source resolution plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
