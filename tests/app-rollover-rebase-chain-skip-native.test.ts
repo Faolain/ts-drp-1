@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { Session } from "node:inspector/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterAll, afterEach, expect, it } from "vitest";
 
 import { callSite, installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
@@ -20,7 +20,7 @@ import {
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { observeEd25519Verifications } from "@ts-drp/protocol-v3/instrumentation";
 import { readV3SettlementWorkCounts, V3_SETTLEMENT_DRAIN_TURN_ROWS } from "../packages/node/src/v3-live.js";
-import { readV3RoomStageTimes, V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
+import { readV3RoomSettlementBatchCounts, readV3RoomStageTimes, V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import {
 	nodeIssuanceReadCounts,
 	nodeRecoveryCensusCounts,
@@ -60,6 +60,11 @@ const ownFenceVerifiesSince = (before: { computed: number; memo: number }) => ({
 	computed: ownFenceVerifies.computed - before.computed,
 	memo: ownFenceVerifies.memo - before.memo,
 });
+// Observation only: how this file's settlement drains issued their rows (batched vs singly, fallbacks).
+afterAll(() => {
+	process.stdout.write(`SETTLEMENT_BATCH_COUNTS ${JSON.stringify(readV3RoomSettlementBatchCounts())}\n`);
+});
+
 afterEach(async () => {
 	await Promise.allSettled([...track.rooms].map((room) => room.close()));
 	await Promise.allSettled([...track.heads].map((head) => head.close()));
