@@ -16215,6 +16215,10 @@ async function acquireLocalReplacementCustody(
 			if (owner === registration.liveJournalStore) journalReservation = reservation;
 			else reservations.push(reservation);
 		}
+		// Test seam, like the __warmProofEvent observer: a hook may hold this custody open while
+		// it holds the store's and the live journal's native read reservations. Unset in production.
+		const hold = Reflect.get(globalThis, "__replacementCustodyHold");
+		if (typeof hold === "function") await hold();
 		const floorReservation = await floor.acquireNativeReadReservation({ scope: floorScope });
 		reservations.push(floorReservation);
 		byOwner.set(floor, floorReservation);
