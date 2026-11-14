@@ -23776,13 +23776,25 @@ function applicationStateAdmitsChain(
 		authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
 		charges.set(candidate.digest, candidate.byteCharge);
 	}
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	let admitted = true;
+	let stateBytes: number | undefined;
 	try {
-		foldApplicationProjection(registration, base, vertices, authors, charges);
+		stateBytes = foldApplicationProjection(registration, base, vertices, authors, charges)?.exactStateByteLength;
 	} catch (error) {
 		// Only the state bound is judged here; any other fold failure is another check's to refuse.
-		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") return false;
+		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") admitted = false;
 	}
-	return true;
+	// Observation only (the "__warmProofEvent" proof hook): the chunk's refold cost, for the batch bench.
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({ kind: "application-state-bound-chain", rows: candidates.length, admitted,
+				receiver: registration.issuanceScope.author,
+				durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000),
+				...(stateBytes === undefined ? {} : { stateBytes }) });
+	} catch { /* Diagnostics cannot alter admission. */ }
+	return admitted;
 }
 
 /**
