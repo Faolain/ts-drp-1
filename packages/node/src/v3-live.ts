@@ -34,10 +34,10 @@ import {
 	type DurableOutboxPublicationTransitionInput,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
-	type SettlementPlan,
-	type SettlementSourceContext,
 	settlementHandBacksAtOrigin,
+	type SettlementPlan,
 	settlementReplacementLastLogicalTimeFromPreimage,
+	type SettlementSourceContext,
 } from "@ts-drp/issuance-store";
 import {
 	bindDurableIssuancePruningMaintenance,

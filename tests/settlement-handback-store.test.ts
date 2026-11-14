@@ -43,12 +43,20 @@ const expired = Object.freeze({
 	sourceDigest: new Uint8Array(32).fill(0xd1),
 	sourceSequence: 7,
 });
+type PlanFixture = Readonly<{
+	entries: readonly (typeof expired)[];
+	fenceSequence: number | null;
+	handBacks?: readonly unknown[];
+	reissueOrigins?: readonly unknown[];
+	revision: number;
+	scope: typeof SCOPE;
+}>;
 const plan = (
 	revision: number,
 	handBacks: readonly unknown[] | undefined,
 	fenceSequence: number | null = 4,
 	reissueOrigins?: readonly unknown[]
-) =>
+): PlanFixture =>
 	Object.freeze({
 		entries: Object.freeze([expired]),
 		fenceSequence,
@@ -58,7 +66,8 @@ const plan = (
 		scope: SCOPE,
 	});
 // The reissue's own issuance transaction also maps the reissued row to its move's origin (track 46).
-const origin = (reissueSequence: number, originSequence = 7) => Object.freeze({ originSequence, reissueSequence });
+const origin = (reissueSequence: number, originSequence = 7): Readonly<{ originSequence: number; reissueSequence: number }> =>
+	Object.freeze({ originSequence, reissueSequence });
 const effect = (intent = 0) => Object.freeze({ intent, kind: "hand-back", sourceSequence: 7 });
 
 function commit(authorSequence: number, planEffect: unknown) {

@@ -32,6 +32,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /**
  * A member's room. Every issued row gets the next author sequence; a row `displace`d never reaches the
  * creator, and `giveBack` lists its move as one durable hand-back record until a reissue consumes it.
+ * @param displacementIdentity - The policy identity the room's `supersededBy` uses (none: no supersession).
  * @returns The room, the rows the creator admitted (in order), and the controls.
  */
 function memberRoom(displacementIdentity?: (operation: Readonly<Record<string, unknown>>) => string | undefined) {

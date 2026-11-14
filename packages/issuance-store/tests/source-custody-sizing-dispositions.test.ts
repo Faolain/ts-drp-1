@@ -152,13 +152,22 @@ describe("merged custody sizing covers every written disposition (G22)", () => {
 // (64 unconsumed records plus 64 entries); the reissue's admission sizes the plan after its own effect
 // (consumption plus the entry), and later writes stay within the reserve.
 describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", () => {
-	const measured = (written: SettlementPlan, resource: ReturnType<typeof issuanceSourceCustodyPlanResourceForSizing>, label: string) => {
+	const defined = <T,>(value: T | undefined, label: string): T => {
+		if (value === undefined) throw new Error(`${label}: fixture undefined`);
+		return value;
+	};
+	const measured = (written: SettlementPlan, resource: ReturnType<typeof issuanceSourceCustodyPlanResourceForSizing>, label: string): void => {
 		const canonical = encodeCanonical(written, {maxBytes: resource.byteLength, maxItems: resource.items, maxDepth: resource.maxDepth});
 		expect(canonical.byteLength, `${label}: canonical width`).toBeLessThanOrEqual(resource.byteLength);
 		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
 		expect(Buffer.byteLength(native), `${label}: native carrier`).toBeLessThanOrEqual(resource.nativeStorageByteLength);
 	};
-	/** A prior plan with `records` unconsumed hand-back records (each of one operation byte) and `origins` entries. */
+	/**
+	 * A prior plan with unconsumed hand-back records (each of one operation byte) and reissue-origin entries.
+	 * @param records - How many unconsumed records.
+	 * @param origins - How many reissueOrigins entries.
+	 * @returns The plan.
+	 */
 	const withRecords = (records: number, origins: number): SettlementPlan => {
 		const {plan} = priorPlan(2, 0);
 		const value = copySettlementPlan({...plan,
@@ -170,7 +179,12 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		if (value === undefined) throw new Error("prior plan fixture invalid");
 		return value;
 	};
-	/** Every unconsumed record consumed by its own reissue (each effect adds its entry), in record order. */
+	/**
+	 * Every unconsumed record consumed by its own reissue (each effect adds its entry), in record order.
+	 * @param prior - The plan with the records.
+	 * @param from - The first reissued row's author sequence.
+	 * @returns The plan after every reissue.
+	 */
 	const consumeAll = (prior: SettlementPlan, from: number): SettlementPlan => {
 		let plan = prior;
 		for (const [index, record] of (prior.handBacks ?? []).entries())
@@ -194,8 +208,9 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		expect(written.reissueOrigins).toHaveLength(64);
 		measured(written, resource, "entry bound");
 		// The bound itself refuses the next reissue (a separate record, unconsumed).
-		const full = copySettlementPlan({...written, handBacks: [...written.handBacks!, {...written.handBacks![0]!, sourceSequence: 5_000,
-			reissueSequence: null, originSequence: 4_000}]}, scope)!;
+		const records = defined(written.handBacks, "records");
+		const full = defined(copySettlementPlan({...written, handBacks: [...records, {...defined(records[0], "first record"), sourceSequence: 5_000,
+			reissueSequence: null, originSequence: 4_000}]}, scope), "full plan");
 		expect(() => applySettlementPlanEffect(full, {kind: "hand-back", sourceSequence: 5_000, intent: 0}, Number.MAX_SAFE_INTEGER - 1)).toThrow();
 	});
 
@@ -205,9 +220,9 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		// consumed records were still present covers the 64 entries those reissues write.
 		const consumed = consumeAll(withRecords(SETTLEMENT_HAND_BACK_LIMITS.maxRecords, 0), 2_000_000);
 		const {reissueOrigins: _settled, ...withoutEntries} = consumed;
-		const prior = copySettlementPlan(withoutEntries, scope)!;
+		const prior = defined(copySettlementPlan(withoutEntries, scope), "prior plan");
 		expect(prior.reissueOrigins).toBeUndefined();
-		expect(prior.handBacks!.every(record => record.reissueSequence !== null)).toBe(true);
+		expect(defined(prior.handBacks, "records").every(record => record.reissueSequence !== null)).toBe(true);
 		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 0, geometry, OPERATION);
 		expect(consumed.reissueOrigins).toHaveLength(64);
 		measured(consumed, resource, "64 consumed records and 64 new entries");
@@ -219,9 +234,9 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		const prior = withRecords(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords);
 		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 4, geometry, OPERATION);
 		const written = writtenPlan(prior, 4, "expire-frontier");
-		const withEntries = copySettlementPlan({...written, reissueOrigins: prior.reissueOrigins}, scope)!;
+		const withEntries = defined(copySettlementPlan({...written, reissueOrigins: prior.reissueOrigins}, scope), "plan with entries");
 		expect(withEntries.handBacks).toHaveLength(64);
-		expect(withEntries.handBacks!.every(record => record.originSequence !== undefined)).toBe(true);
+		expect(defined(withEntries.handBacks, "records").every(record => record.originSequence !== undefined)).toBe(true);
 		expect(withEntries.reissueOrigins).toHaveLength(64);
 		expect(() => assertSettlementPlanProgressTransition(prior, withEntries)).not.toThrow();
 		measured(withEntries, resource, "64 records with origin plus 64 entries");

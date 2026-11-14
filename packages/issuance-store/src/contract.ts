@@ -885,20 +885,23 @@ export function settlementWindowHandBacks(
  * @returns The chain's last carrier.
  */
 export function settlementReissueLastCarrier(plan: Pick<SettlementPlan, "entries">, reissueSequence: number): number {
-	return settlementReissueChain(plan, reissueSequence).at(-1)!;
+	return settlementReissueChain(plan, reissueSequence).last;
 }
 
 /**
  * The rows carrying a reissued move, oldest first: the reissued row, then each replacement the plan links
- * forward from it (settlementReissueLastCarrier is the last).
+ * forward from it; `last` is the newest (settlementReissueLastCarrier).
  * @param plan - The durable plan, or null.
  * @param reissueSequence - The reissued row.
- * @returns The chain.
+ * @returns The chain's rows and its last carrier.
  */
-function settlementReissueChain(plan: Pick<SettlementPlan, "entries"> | null, reissueSequence: number): readonly number[] {
-	const chain = [reissueSequence];
+function settlementReissueChain(
+	plan: Pick<SettlementPlan, "entries"> | null,
+	reissueSequence: number
+): Readonly<{ rows: readonly number[]; last: number }> {
+	const rows = [reissueSequence];
+	let current = reissueSequence;
 	for (let depth = 0; plan !== null && depth <= plan.entries.length; depth++) {
-		const current = chain.at(-1)!;
 		const entry = plan.entries.find(
 			(candidate) => candidate.sourceObjectId === undefined && candidate.sourceSequence === current
 		);
@@ -907,9 +910,10 @@ function settlementReissueChain(plan: Pick<SettlementPlan, "entries"> | null, re
 				? undefined
 				: (entry.replacementSequence ?? entry.replacementProgress?.chunks.at(-1)?.replacementSequence);
 		if (next === undefined || next <= current) break;
-		chain.push(next);
+		rows.push(next);
+		current = next;
 	}
-	return chain;
+	return { rows, last: current };
 }
 
 /**
@@ -1010,8 +1014,8 @@ export function settlementBacklogMoves(
 		// displaced) still counts here, on the last carrier, which no creator row reaches while it is
 		// displaced: counting it zero times let the Writer accept moves past the record bound.
 		const chain = settlementReissueChain(plan, reissued);
-		if (chain.some((sequence) => counted.has(sequence))) continue;
-		pending.push(Object.freeze({ rows: Object.freeze([chain.at(-1)!]), moves: 1 }));
+		if (chain.rows.some((sequence) => counted.has(sequence))) continue;
+		pending.push(Object.freeze({ rows: Object.freeze([chain.last]), moves: 1 }));
 	}
 	return Object.freeze({ fixed, pending: Object.freeze(pending) });
 }

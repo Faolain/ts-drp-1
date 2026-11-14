@@ -1,15 +1,18 @@
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import {
-	settlementBacklogMoves,
-	settlementMoveOrigin,
-	settlementReissueOriginsUnsettled,
-	settlementWindowHandBacks,
-} from "@ts-drp/issuance-store";
 import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
-import { SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
+import {
+	SETTLEMENT_HAND_BACK_LIMITS,
+	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
+	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	settlementBacklogMoves,
+	settlementMoveOrigin,
+	settlementReissueOriginsUnsettled,
+	settlementSourceContextsForEntries,
+	settlementWindowHandBacks,
+} from "@ts-drp/issuance-store";
 import { nativeIssuanceSignAdmissionForStore } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { createSnapshotChunkProtocolPort, CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
