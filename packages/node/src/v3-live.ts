@@ -17600,7 +17600,7 @@ async function issueReplacementBatch(
 		const reservation = reserveOperation(registration.operationAdmissionPolicy, row.operation, scope.author);
 		if (reservation === null) {
 			releaseReservations();
-			return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+			return localIssueFailure("admission-rejected", V3_LOCAL_POLICY_REFUSAL_DETAIL);
 		}
 		reservations.push(reservation);
 	}
@@ -17609,6 +17609,7 @@ async function issueReplacementBatch(
 	let cryptoEntered = false;
 	let signerResolved = false;
 	let capacityRejected = false;
+	let stateLimitRejected = false;
 	let signingRow: (typeof rows)[number] | undefined;
 	try {
 		const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
@@ -17653,6 +17654,28 @@ async function issueReplacementBatch(
 					if (!hasGraphCapacity(registration, selectedScope.author, byteCharge, preimages.length)) {
 						capacityRejected = true;
 						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					// The room's application state limit, judged as each single row's issue judges it, over the
+					// whole chain, before anything is signed. A chunk that would pass it is issued singly, so the
+					// singles' own check refuses exactly the crossing row (and its replay is handed back).
+					if (
+						!applicationStateAdmitsChain(
+							registration,
+							preimages.map((bytes, index) => {
+								const unsigned = decodeCanonical(bytes);
+								const dependencies = ownDataValue(unsigned, "dependencies");
+								return ObjectFreeze({
+									digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+									author: selectedScope.author,
+									dependencies: ArrayIsArray(dependencies) ? (dependencies as string[]) : [],
+									operation: batchElement(rows, index, "row").operation,
+									byteCharge: bytes.byteLength,
+								});
+							})
+						)
+					) {
+						stateLimitRejected = true;
+						throw new TypeError("v3 local operation would pass the room's application state limit");
 					}
 					return nativeSignAdmission(
 						preimages.map((bytes, index) =>
@@ -17708,6 +17731,8 @@ async function issueReplacementBatch(
 					kind: "batch-retry" as const,
 					detail: error instanceof Error ? error.message : "settlement plan revision changed",
 				});
+			// A chunk past the room's application state limit: nothing was signed or written; singles judge each row.
+			if (stateLimitRejected) return unavailable("a row would pass the room's application state limit");
 			// The store's sizing refused the whole batch before anything was written: singles size each row.
 			const refusal = issuanceCapacityRefusalOf(error);
 			if (refusal !== undefined && !capacityRejected) return unavailable(`batch sizing refused: ${refusal}`);
@@ -23704,6 +23729,60 @@ function applicationStateAdmits(
 	emit({ mode: "exact", refolded, admitted, sortsLast, ...(seedPending ? { seedPending } : {}),
 		...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
 	return admitted;
+}
+
+/**
+ * The application state check of one settlement drain chunk issued as a batch (issueReplacementBatch):
+ * whether the epoch's fold with ALL the chunk's rows (a chain: the first depends on the tips, each later
+ * one on its predecessor) stays within the room's application state limit. A single row is judged
+ * exactly as a single local issue judges it (applicationStateAdmits). Several rows are judged by one
+ * exact refold of the admitted graph with the whole chain inserted (the seal's fold), on a staged fork:
+ * applicationStateAdmits stages one candidate at a time and cannot judge a row whose predecessor is not
+ * admitted yet. Nothing here is cached or staged; the admitted rows are caught up by the next check.
+ * @returns False only when the chain's fold passes the room's state limit.
+ */
+function applicationStateAdmitsChain(
+	registration: V3PlaneRegistration,
+	candidates: readonly Readonly<{
+		digest: string;
+		author: string;
+		dependencies: readonly string[];
+		operation: Readonly<Record<string, unknown>>;
+		byteCharge: number;
+	}>[]
+): boolean {
+	const [only] = candidates;
+	if (only !== undefined && candidates.length === 1) return applicationStateAdmits(registration, only, "local");
+	const base = registration.blueprintMachine;
+	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
+	const vertices = copyCloseVertices(registration.closeVertices);
+	const authors = copyCloseAuthors(registration.closeAuthors);
+	if (vertices === undefined || authors === undefined) return true;
+	const charges = new IntrinsicMap(registration.closeCharges);
+	for (const candidate of candidates) {
+		if (registration.closeVertices.has(candidate.digest)) continue;
+		vertices.set(
+			candidate.digest,
+			ObjectFreeze({
+				hash: candidate.digest,
+				kind: "drp-vertex",
+				objectId: registration.payload.provenance.objectId,
+				epoch: registration.payload.provenance.epoch,
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies: [...candidate.dependencies],
+				operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+			})
+		);
+		authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+		charges.set(candidate.digest, candidate.byteCharge);
+	}
+	try {
+		foldApplicationProjection(registration, base, vertices, authors, charges);
+	} catch (error) {
+		// Only the state bound is judged here; any other fold failure is another check's to refuse.
+		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") return false;
+	}
+	return true;
 }
 
 /**
