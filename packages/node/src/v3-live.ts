@@ -862,13 +862,15 @@ type RebaseSourceOwner = Readonly<{
  * singly (a portable or creator-selected source, a store without transactIssueBatch, a row that
  * needs a split or a join, a batch the store's sizing refuses). `batch-retry`: the plan moved past
  * the revision the drain re-checked; nothing was written and the drain re-checks the chunk.
- * Any other failure is the singles' failure of the row it stopped at.
+ * Any other failure is the singles' failure of the row it stopped at. `journal`: how the accepted rows
+ * were journaled (`batch`: one native write for the chunk; `rows`: one append per row).
  */
 export type V3ReplacementBatchResult =
 	| Readonly<{
 			readonly ok: true;
 			readonly kind: "accepted";
 			readonly rows: readonly Readonly<{ readonly authorSequence: number; readonly digest: string }>[];
+			readonly journal: "batch" | "rows";
 	  }>
 	| Readonly<{ readonly ok: false; readonly kind: "batch-unavailable" | "batch-retry"; readonly detail: string }>
 	| Extract<V3LocalIssueResult, { readonly ok: false }>;
@@ -17082,6 +17084,19 @@ async function issueOneVertex(
  * @param maintenanceAdmission - The creator maintenance admission the issue held, if any.
  * @returns The local issue result of this row.
  */
+type CommittedLocalFailure = (
+	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+	detail: string
+) => InternalLocalIssueResult;
+
+/** One committed local row's checks before its journal append (admitCommittedLocalVertex). */
+interface PreparedCommittedLocalVertex {
+	readonly row: SnapshottedOutboxRow;
+	readonly authenticated: AuthenticatedRecoveryVertex;
+	readonly retained: RetainedCloseSignedAdmissionCapture;
+	readonly acceptedAcl: ReturnType<typeof aclOperation>;
+}
+
 async function admitCommittedLocalVertex(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput,
@@ -17092,15 +17107,95 @@ async function admitCommittedLocalVertex(
 	requireTerminalAuthorization: boolean,
 	maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined
 ): Promise<InternalLocalIssueResult> {
-	const committedFailure = (
-		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
-		detail: string
-	): InternalLocalIssueResult => {
+	const committedFailure: CommittedLocalFailure = (kind, detail) => {
 		registration.operationAdmissionHalted = true;
 		return requireTerminalAuthorization
 			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
 			: localIssueFailure(kind, detail);
 	};
+	const prepared = prepareCommittedLocalVertex(
+		registration,
+		input,
+		scope,
+		commit,
+		controlOperation,
+		requireTerminalAuthorization,
+		committedFailure
+	);
+	if ("ok" in prepared) return prepared;
+	const { row, authenticated } = prepared;
+	let appended;
+	try {
+		const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
+		if (custodyImage !== undefined && maintenanceImage !== undefined &&
+			(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
+				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
+			throw new TypeError("local journal contexts disagree");
+		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		appended = await registration.liveJournalStore.appendAccepted({
+			author: scope.author,
+			authorSequence: row.authorSequence,
+			scope: liveJournalScope(registration.payload),
+			sourceKind: "local-issued",
+			vertexDigest: authenticated.digest,
+			...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
+		});
+		if (input.settlementCustody !== undefined) {
+			if (!appended.ok || appended.nativeImage === undefined)
+				throw new TypeError("replacement journal source-bound readback is unavailable");
+			await input.settlementCustody.resumeJournalReads(appended.nativeImage);
+		}
+		if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
+			throw new TypeError("ordinary local journal postimage is unavailable");
+	} catch {
+		return committedFailure("journal-rejected", "v3 local issue journal append failed");
+	}
+	if (
+		!appended.ok ||
+		appended.idempotent ||
+		appended.sourceKind !== "local-issued" ||
+		appended.vertexDigest !== authenticated.digest ||
+		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
+	) {
+		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
+	}
+	return finishCommittedLocalVertex(
+		registration,
+		input,
+		scope,
+		prepared,
+		appended.journalSequence,
+		appended.nativeImage,
+		controlOperation,
+		reservation,
+		maintenanceAdmission,
+		committedFailure
+	);
+}
+
+/**
+ * Every check admitCommittedLocalVertex makes of one committed local row before its journal append
+ * (authentication, terminal authorization, ACL, graph capacity). No side effect.
+ * @param registration - The live plane.
+ * @param input - The row's captured issue input.
+ * @param scope - The issuance scope.
+ * @param commit - The row's durable commit.
+ * @param controlOperation - Whether the row is a control operation.
+ * @param requireTerminalAuthorization - Whether the row must classify as terminal-authorized.
+ * @param committedFailure - The halting failure of a committed row.
+ * @param pending - Rows of the same batch already prepared, not yet admitted (counted against capacity).
+ * @returns The prepared row, or its failure.
+ */
+function prepareCommittedLocalVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	scope: DurableIssueScope,
+	commit: unknown,
+	controlOperation: boolean,
+	requireTerminalAuthorization: boolean,
+	committedFailure: CommittedLocalFailure,
+	pending: Readonly<{ byteCharge: number; vertices: number }> = { byteCharge: 0, vertices: 0 }
+): PreparedCommittedLocalVertex | InternalLocalIssueResult {
 	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
 	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
 
@@ -17162,46 +17257,47 @@ async function admitCommittedLocalVertex(
 	) {
 		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
-	if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
+	if (
+		!hasGraphCapacity(
+			registration,
+			authenticated.author,
+			pending.byteCharge + authenticated.byteCharge,
+			pending.vertices + 1
+		)
+	) {
 		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
+	return ObjectFreeze({ row, authenticated, retained, acceptedAcl });
+}
 
-	let appended;
-	try {
-		const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
-		if (custodyImage !== undefined && maintenanceImage !== undefined &&
-			(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
-				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
-			throw new TypeError("local journal contexts disagree");
-		const expectedNativeImage = custodyImage ?? maintenanceImage;
-		appended = await registration.liveJournalStore.appendAccepted({
-			author: scope.author,
-			authorSequence: row.authorSequence,
-			scope: liveJournalScope(registration.payload),
-			sourceKind: "local-issued",
-			vertexDigest: authenticated.digest,
-			...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
-		});
-		if (input.settlementCustody !== undefined) {
-			if (!appended.ok || appended.nativeImage === undefined)
-				throw new TypeError("replacement journal source-bound readback is unavailable");
-			await input.settlementCustody.resumeJournalReads(appended.nativeImage);
-		}
-		if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
-			throw new TypeError("ordinary local journal postimage is unavailable");
-	} catch {
-		return committedFailure("journal-rejected", "v3 local issue journal append failed");
-	}
-	if (
-		!appended.ok ||
-		appended.idempotent ||
-		appended.sourceKind !== "local-issued" ||
-		appended.vertexDigest !== authenticated.digest ||
-		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
-	) {
-		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
-	}
-
+/**
+ * Everything admitCommittedLocalVertex does after one committed local row is journaled: the graph and
+ * close admission, the policy commit, the capacity geometry, and the delivery.
+ * @param registration - The live plane.
+ * @param input - The row's captured issue input.
+ * @param scope - The issuance scope.
+ * @param prepared - The row as prepareCommittedLocalVertex checked it.
+ * @param journalSequence - The row's journal sequence.
+ * @param nativeImage - The journal postimage right after the row (undefined: none observed).
+ * @param controlOperation - Whether the row is a control operation.
+ * @param reservation - The row's operation admission reservation.
+ * @param maintenanceAdmission - The creator maintenance admission, if any.
+ * @param committedFailure - The halting failure of a committed row.
+ * @returns The row's local issue result.
+ */
+async function finishCommittedLocalVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	scope: DurableIssueScope,
+	prepared: PreparedCommittedLocalVertex,
+	journalSequence: number,
+	nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined,
+	controlOperation: boolean,
+	reservation: FreshOperationAdmissionReservation | undefined,
+	maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined,
+	committedFailure: CommittedLocalFailure
+): Promise<InternalLocalIssueResult> {
+	const { row, authenticated, retained, acceptedAcl } = prepared;
 	const updatedEpochBytes = nextEpochBytes(
 		registration.epochBytes,
 		authenticated.byteCharge,
@@ -17238,15 +17334,15 @@ async function admitCommittedLocalVertex(
 	}
 	const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
 	advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
-		appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
-		acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
+		journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), nativeImage,
+		acceptedEffect === undefined ? undefined : {journalSequence, sourceKind: "local-issued",
 			byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
 			detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
 		{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
 			canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
 	maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
 		detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
-		...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
+		...(nativeImage === undefined ? {} : {nativeJournal: nativeImage})});
 	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
 	try {
 		await input.settlementCustody?.check();
@@ -17286,7 +17382,9 @@ async function admitCommittedLocalVertex(
  * ACL, reservation, native source/plan currency against the chunk's one census, the exact owned
  * bytes before its signature); the first row depends on the current frontier and each later row on
  * its predecessor alone (the frontier the same singles see without foreign ingress). The committed
- * rows are then admitted in sequence order exactly as singles are (admitCommittedLocalVertex).
+ * rows are then journaled in one native write (journalReplacementBatch) and admitted in sequence order
+ * exactly as singles are after their own appends (finishCommittedLocalVertex), or, when the journal
+ * cannot batch them, admitted a row at a time (admitCommittedLocalVertex).
  * Anything a single would split, join or refuse is `batch-unavailable` before anything is reserved,
  * so the drain issues those rows singly and gets the single's own outcome.
  * @param registration - The live plane issuing the chunk.
@@ -17527,23 +17625,53 @@ async function issueReplacementBatch(
 		return localIssueFailure("issuance-rejected", "v3 replacement batch commit is incomplete");
 	}
 	const accepted: Readonly<{ authorSequence: number; digest: string }>[] = [];
-	for (let index = 0; index < commits.length; index += 1) {
+	const committedRecord = (index: number) => {
 		const committed = commits[index]!;
-		const admitted = await admitCommittedLocalVertex(
-			registration,
-			rows[index]!.input,
-			scope,
-			ObjectFreeze({
-				authorSequence: committed.authorSequence,
-				envelope: committed.envelope,
-				issuedRecord: committed.issuedRecord,
-				outboxEntry: committed.outboxEntry,
-			}),
-			false,
-			reservations[index],
-			false,
-			undefined
-		);
+		return ObjectFreeze({
+			authorSequence: committed.authorSequence,
+			envelope: committed.envelope,
+			issuedRecord: committed.issuedRecord,
+			outboxEntry: committed.outboxEntry,
+		});
+	};
+	// The chunk's rows journaled in ONE native write (appendAcceptedLocalBatch) and read back once, then each
+	// row admitted in sequence order exactly as admitCommittedLocalVertex admits it after its own append.
+	const journaled = await journalReplacementBatch(
+		registration,
+		rows.map((row) => row.input),
+		scope,
+		commits.map((_, index) => committedRecord(index)),
+		custody
+	);
+	if (journaled !== undefined && "ok" in journaled)
+		return journaled.ok || journaled.kind === "split-required"
+			? localIssueFailure("issuance-rejected", "v3 replacement batch admission is invalid")
+			: journaled;
+	for (let index = 0; index < commits.length; index += 1) {
+		const admitted =
+			journaled === undefined
+				? await admitCommittedLocalVertex(
+						registration,
+						rows[index]!.input,
+						scope,
+						committedRecord(index),
+						false,
+						reservations[index],
+						false,
+						undefined
+					)
+				: await finishCommittedLocalVertex(
+						registration,
+						rows[index]!.input,
+						scope,
+						journaled.prepared[index]!,
+						journaled.sequences[index]!,
+						index === commits.length - 1 ? journaled.nativeImage : undefined,
+						false,
+						reservations[index],
+						undefined,
+						haltedLocalFailure(registration)
+					);
 		if (!admitted.ok) {
 			// The rest are durably committed: recovery admits them from the outbox, never re-issues them.
 			registration.operationAdmissionHalted = true;
@@ -17554,7 +17682,106 @@ async function issueReplacementBatch(
 		accepted.push(ObjectFreeze({ authorSequence: admitted.authorSequence, digest: admitted.digest }));
 	}
 	await drainPendingIngress(registration);
-	return ObjectFreeze({ ok: true as const, kind: "accepted" as const, rows: ObjectFreeze(accepted) });
+	return ObjectFreeze({
+		ok: true as const,
+		kind: "accepted" as const,
+		rows: ObjectFreeze(accepted),
+		journal: journaled === undefined ? ("rows" as const) : ("batch" as const),
+	});
+}
+
+function haltedLocalFailure(registration: V3PlaneRegistration): CommittedLocalFailure {
+	return (kind, detail) => {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure(kind, detail);
+	};
+}
+
+/**
+ * Journals one committed replacement chunk in ONE native write when the journal offers
+ * appendAcceptedLocalBatch: every row is first checked exactly as admitCommittedLocalVertex checks it
+ * (prepareCommittedLocalVertex, counting the chunk's earlier rows against capacity), then the rows are
+ * appended against the chunk custody's one journal checkpoint and the custody resumes on the one
+ * postimage. Undefined: the chunk is admitted a row at a time instead (no batch journal, an ACL row, or a
+ * plane tracking ordinary runtime geometry, which records each row's own postimage). A failure after
+ * the commit halts admission; recovery admits the committed rows from the outbox.
+ * @param registration - The live plane.
+ * @param inputs - The chunk's captured inputs, in commit order.
+ * @param scope - The issuance scope.
+ * @param commits - The chunk's durable commits, in order.
+ * @param custody - The chunk's one native replacement custody.
+ * @returns The prepared rows, their journal sequences and the postimage; a failure; or undefined.
+ */
+async function journalReplacementBatch(
+	registration: V3PlaneRegistration,
+	inputs: readonly CapturedLocalIssueInput[],
+	scope: DurableIssueScope,
+	commits: readonly unknown[],
+	custody: LocalReplacementCustody
+): Promise<
+	| Readonly<{
+			prepared: readonly PreparedCommittedLocalVertex[];
+			sequences: readonly number[];
+			nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>;
+	  }>
+	| InternalLocalIssueResult
+	| undefined
+> {
+	const journal = registration.liveJournalStore;
+	const appendBatch = journal.appendAcceptedLocalBatch;
+	if (typeof appendBatch !== "function" || ordinaryRuntimeCapacityGeometry.has(registration)) return undefined;
+	const committedFailure = haltedLocalFailure(registration);
+	const prepared: PreparedCommittedLocalVertex[] = [];
+	let byteCharge = 0;
+	for (let index = 0; index < commits.length; index += 1) {
+		const row = prepareCommittedLocalVertex(
+			registration,
+			inputs[index]!,
+			scope,
+			commits[index],
+			false,
+			false,
+			committedFailure,
+			{ byteCharge, vertices: index }
+		);
+		if ("ok" in row) return row;
+		if (row.acceptedAcl !== null && row.acceptedAcl !== undefined) return undefined;
+		byteCharge += row.authenticated.byteCharge;
+		prepared.push(row);
+	}
+	const journalScope = liveJournalScope(registration.payload);
+	let appended: Awaited<ReturnType<typeof appendBatch>>;
+	try {
+		const expectedNativeImage = await custody.joinJournalReads();
+		appended = await ReflectApply(appendBatch, journal, [
+			ObjectFreeze({
+				scope: journalScope,
+				rows: ObjectFreeze(
+					prepared.map((row) =>
+						ObjectFreeze({ author: scope.author, authorSequence: row.row.authorSequence, vertexDigest: row.authenticated.digest })
+					)
+				),
+				expectedNativeImage,
+			}),
+		]) as Awaited<ReturnType<typeof appendBatch>>;
+		if (!appended.ok) throw new TypeError(`replacement batch journal append refused: ${appended.kind}`);
+		await custody.resumeJournalReads(appended.nativeImage);
+	} catch {
+		return committedFailure("journal-rejected", "v3 replacement batch journal append failed");
+	}
+	const sequences = appended.rows.map((row) => row.journalSequence);
+	if (
+		!sameLiveJournalScope(appended.scope, journalScope) ||
+		appended.rows.length !== prepared.length ||
+		appended.rows.some(
+			(row, index) =>
+				row.vertexDigest !== prepared[index]!.authenticated.digest ||
+				!NumberIsSafeInteger(row.journalSequence) ||
+				row.journalSequence !== sequences[0]! + index
+		)
+	)
+		return committedFailure("journal-rejected", "v3 replacement batch journal append was rejected");
+	return ObjectFreeze({ prepared: ObjectFreeze(prepared), sequences: ObjectFreeze(sequences), nativeImage: appended.nativeImage });
 }
 
 async function issueAuthorFence(

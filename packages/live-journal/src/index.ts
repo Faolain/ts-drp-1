@@ -3,6 +3,8 @@ export {
 	captureLiveJournalInput,
 	validateLiveJournalSnapshot,
 	captureSourceBoundJournalAppendInput,
+	captureLocalBatchJournalAppendInput,
+	classifyLiveJournalBatchAppendObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
@@ -12,8 +14,15 @@ export {
 	deriveLiveJournalSnapshotReadiness,
 	createLiveJournalSnapshotValidation,
 } from "./contract.js";
-export { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_DOMAINS, LIVE_JOURNAL_FAILURE_KINDS } from "./types.js";
+export {
+	LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES,
+	LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS,
+	LIVE_JOURNAL_DOMAINS,
+	LIVE_JOURNAL_FAILURE_KINDS,
+} from "./types.js";
 export type {
+	AppendAcceptedLocalBatchInput,
+	AppendAcceptedLocalBatchResult,
 	AppendAcceptedVertexInput,
 	AppendAcceptedVertexResult,
 	DurableLiveJournalStore,

@@ -2,6 +2,8 @@ import { encodeCanonical } from "@ts-drp/canonical";
 import {
 	advanceJournalRetirementMutationControl,
 	captureJournalRetirementControl,
+	type AppendAcceptedLocalBatchInput,
+	type AppendAcceptedLocalBatchResult,
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
 	captureJournalRetirementObject,
@@ -15,6 +17,8 @@ import {
 	captureLiveJournalInput,
 	validateLiveJournalSnapshot,
 	captureSourceBoundJournalAppendInput,
+	captureLocalBatchJournalAppendInput,
+	classifyLiveJournalBatchAppendObservation,
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
 	classifyLiveJournalMutationObservation,
@@ -1539,6 +1543,185 @@ function appendWriter(
 	});
 }
 
+type LocalPendingRow = Extract<PendingRow, { readonly sourceKind: "local-issued" }>;
+type BatchWriterOutcome = Readonly<{
+	readonly rejected?: LiveJournalFailureKind;
+	readonly before?: StoredScope;
+	readonly rows?: readonly StoredRow[];
+	readonly nativeImage?: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>;
+}>;
+
+/**
+ * One drain chunk's freshly issued local rows in ONE readwrite transaction: each row appended exactly as
+ * its source-bound single would be (the same duplicate decision, sequence, fence admission and mutation
+ * advance), the postimage derived once from the RW's own whole-object capture. Whole or nothing.
+ * @param database - The journal connection.
+ * @param candidates - The captured rows, in order, of one scope.
+ * @param expectedNativeImage - The exact native source checkpoint.
+ * @param validation - The facade's leaf validation owner.
+ * @returns The writer outcome (rejected, or the scope before, the stored rows and the postimage).
+ */
+function appendLocalBatchWriter(
+	database: IDBDatabase,
+	candidates: readonly LocalPendingRow[],
+	expectedNativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>,
+	validation?: ReturnType<typeof createLiveJournalSnapshotValidation>
+): Promise<BatchWriterOutcome> {
+	return new Promise((resolve, reject) => {
+		let transaction: IDBTransaction;
+		try {
+			transaction = strictTransaction(database, JOURNAL_STORES, "readwrite");
+		} catch (error) {
+			reject(error);
+			return;
+		}
+		const selected = candidates[0]!.scope;
+		let outcome: BatchWriterOutcome | undefined;
+		const rejectWriter = (kind: LiveJournalFailureKind): void => {
+			outcome = { rejected: kind };
+			try {
+				transaction.abort();
+			} catch {
+				/* already terminal */
+			}
+		};
+		const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes"));
+		const entries = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"));
+		const controls = transaction.objectStore(roomStoreName(transaction.db, "journal", "retirementControls"));
+		const body = async (): Promise<void> => {
+			// The original bounded whole-object capture inside this exact RW (as the single source-bound append).
+			let sourceImage: RetirementSnapshot;
+			try {
+				sourceImage = await retirementSnapshot(database, selected.objectId, undefined, false, transaction);
+			} catch {
+				rejectWriter("retirement-stale");
+				return;
+			}
+			const sourceControlBytes =
+				sourceImage.control === null ? null : encodeJournalRetirementControl(sourceImage.control);
+			if (
+				sourceImage.image.imageDigest !== expectedNativeImage.imageDigest ||
+				(sourceControlBytes === null || expectedNativeImage.controlBytes === null
+					? sourceControlBytes !== expectedNativeImage.controlBytes
+					: !sameBytes(sourceControlBytes, expectedNativeImage.controlBytes))
+			) {
+				rejectWriter("retirement-stale");
+				return;
+			}
+			const [rawScopeValue, rawRows, rawControl] = await Promise.all([
+				requestResult(scopes.get(scopeKey(selected))),
+				requestResult(entries.getAll(rowRange(selected))),
+				requestResult(controls.get(selected.objectId)),
+			]);
+			let control = admitRetirementControl(rawControl, selected);
+			const rows = (rawRows as unknown[]).map(fromRawRow);
+			const scope = rawScopeValue === undefined ? null : fromRawScope(rawScopeValue);
+			if (scope === null) {
+				if (rows.length !== 0) rejectWriter("store-poisoned");
+				else {
+					const key = await requestResult(scopes.getKey(scopeSelectorRange(selected)));
+					rejectWriter(key === undefined ? "not-installed" : "wrong-scope");
+				}
+				return;
+			}
+			const before = captureAddressedClosure({ rows, scope }, validation);
+			if (before === undefined) {
+				rejectWriter("store-poisoned");
+				return;
+			}
+			for (const candidate of candidates) {
+				const digestRow = before.rows.find(({ vertexDigest }) => vertexDigest === candidate.vertexDigest);
+				const referenceRow = before.rows.find(
+					(row) =>
+						row.sourceKind === "local-issued" &&
+						row.author === candidate.author &&
+						row.authorSequence === candidate.authorSequence
+				);
+				const decision = decideLiveJournalDuplicate({
+					candidate,
+					digestRow: existingProbe(digestRow),
+					referenceRow: existingProbe(referenceRow),
+				} as never);
+				if (decision.action !== "append") {
+					rejectWriter("evidence-conflict");
+					return;
+				}
+			}
+			const stored: RawRow[] = [];
+			let postControlValue = sourceImage.control;
+			for (let index = 0; index < candidates.length; index++) {
+				admitRetirementMutation(control, selected);
+				const raw = rawRow(candidates[index]!, scope.nextJournalSequence + index);
+				entries.add(raw);
+				stored.push(raw);
+				advanceRetirementControl(transaction, control);
+				if (control !== null) control = advanceJournalRetirementMutationControl(control);
+				if (postControlValue !== null) postControlValue = advanceJournalRetirementMutationControl(postControlValue);
+			}
+			// Preserve opaque header evidence while advancing ordinary detail.
+			const postScope = {
+				...(rawScopeValue as Record<string, unknown>),
+				nextJournalSequence: scope.nextJournalSequence + candidates.length,
+			};
+			scopes.put(postScope);
+			const key = (value: unknown): IDBValidKey => {
+				const row = fromRawRow(value);
+				return [...scopeKey(row.scope), row.journalSequence];
+			};
+			const postRows = [...sourceImage.rows, ...stored].sort((left, right) => indexedDB.cmp(key(left), key(right)));
+			const postImage = journalRetirementImage(
+				sourceImage.scopes.map((value) => {
+					const selectedScope = fromRawScope(value).scope;
+					if (indexedDB.cmp(scopeKey(selectedScope), scopeKey(scope.scope)) === 0) return postScope;
+					if (
+						sourceImage.control?.drain?.plan.prefixes.some(
+							(prefix) => indexedDB.cmp(scopeKey(prefix.scope), scopeKey(selectedScope)) === 0
+						)
+					) {
+						const retained = { ...(value as Record<string, unknown>) };
+						delete retained.closedMembershipBytes;
+						return retained;
+					}
+					return value;
+				}),
+				postRows
+			);
+			outcome = {
+				before: scope,
+				rows: stored.map(fromRawRow),
+				nativeImage: Object.freeze({
+					imageDigest: postImage.imageDigest,
+					controlBytes: postControlValue === null ? null : encodeJournalRetirementControl(postControlValue),
+				}),
+			};
+		};
+		body().catch((error: unknown) => rejectWriter(retirementFailure(error)));
+		transaction.addEventListener(
+			"complete",
+			() =>
+				resolve(
+					outcome?.rejected === undefined && outcome?.rows !== undefined ? outcome : { rejected: "internal-invariant" }
+				),
+			{ once: true }
+		);
+		transaction.addEventListener(
+			"abort",
+			() =>
+				outcome?.rejected === undefined
+					? reject(transaction.error ?? new Error("indexeddb-transaction-aborted"))
+					: resolve(outcome),
+			{ once: true }
+		);
+		transaction.addEventListener(
+			"error",
+			() => {
+				if (outcome?.rejected === undefined) reject(transaction.error ?? new Error("indexeddb-transaction-failed"));
+			},
+			{ once: true }
+		);
+	});
+}
+
 /**
  * Creates the strict Browser live-journal capability.
  * @param options - Exact primary IndexedDB name options.
@@ -1828,6 +2011,104 @@ function createJournalStoreOver(
 			sourceKind: outcome.row.sourceKind,
 			vertexDigest: outcome.row.vertexDigest,
 			...(outcome.nativeImage === undefined ? {} : { nativeImage: outcome.nativeImage }),
+		});
+	};
+
+	// One readwrite for the whole chunk (appendLocalBatchWriter), then ONE readonly read of the header, the
+	// rows at the batch's sequences and the complete postimage.
+	const readLocalBatch = async (
+		scope: LiveJournalScope,
+		sequences: readonly number[]
+	): Promise<Readonly<{ scope: StoredScope | null; rows: (StoredRow | null)[]; image: RetirementSnapshot }>> => {
+		if (needsNativeReadReservationTurn(database))
+			return runNativeReservedRead(database, () => readLocalBatch(scope, sequences));
+		const transaction = strictTransaction(database, JOURNAL_STORES, "readonly");
+		const entries = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"));
+		const scopeRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(scope));
+		const rowRequests = sequences.map((sequence) => entries.get([...scopeKey(scope), sequence]));
+		const [storedScope, rawRows, image] = await Promise.all([
+			requestResult(scopeRequest),
+			Promise.all(rowRequests.map((request) => requestResult(request))),
+			readRetirementSnapshot(scope.objectId, undefined, false, transaction),
+		]);
+		await transactionComplete(transaction);
+		return {
+			scope: storedScope === undefined ? null : fromRawScope(storedScope),
+			rows: (rawRows as unknown[]).map((row) => (row === undefined ? null : fromRawRow(row))),
+			image,
+		};
+	};
+	const appendAcceptedLocalBatch = async (
+		input: AppendAcceptedLocalBatchInput
+	): Promise<AppendAcceptedLocalBatchResult> => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let captured: ReturnType<typeof captureLocalBatchJournalAppendInput>;
+		try {
+			captured = captureLocalBatchJournalAppendInput(input);
+			if (!captured.ok) return failed(captured.kind);
+		} catch {
+			return failed("malformed-input");
+		}
+		const { scope, rows: candidates, expectedNativeImage } = captured.value;
+		let outcome: BatchWriterOutcome;
+		try {
+			outcome = await appendLocalBatchWriter(database, candidates, expectedNativeImage, snapshotValidation);
+		} catch {
+			return failed("substrate-failure");
+		}
+		if (outcome.rejected === "retirement-fenced" || outcome.rejected === "retirement-stale") return failed(outcome.rejected);
+		if (outcome.rejected !== undefined) {
+			const actual = await postWriteSnapshot(scope);
+			if (outcome.rejected === "store-poisoned") poison();
+			if (actual === undefined && outcome.rejected !== "store-poisoned") return failed("outcome-unknown");
+			if (actual !== undefined && actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) {
+				poison();
+				return failed("store-poisoned");
+			}
+			return failed(outcome.rejected);
+		}
+		const { before, rows, nativeImage } = outcome;
+		if (before === undefined || rows === undefined || nativeImage === undefined || rows.length !== candidates.length)
+			return failed("internal-invariant");
+		let observed: Awaited<ReturnType<typeof readLocalBatch>> | undefined;
+		try {
+			observed = await readLocalBatch(
+				scope,
+				rows.map(({ journalSequence }) => journalSequence)
+			);
+		} catch {
+			observed = undefined;
+		}
+		let decision: unknown;
+		try {
+			decision = classifyLiveJournalBatchAppendObservation({
+				before,
+				actual: observed === undefined ? undefined : { scope: observed.scope, rows: observed.rows },
+				targets: rows,
+			});
+		} catch {
+			decision = "mixed";
+		}
+		if (decision === "exact-old") return failed("substrate-failure");
+		if (decision === "unreadable") return failed("outcome-unknown");
+		if (decision !== "exact-new" || observed === undefined) {
+			poison();
+			return failed("store-poisoned");
+		}
+		const controlBytes = observed.image.control === null ? null : encodeJournalRetirementControl(observed.image.control);
+		if (
+			observed.image.image.imageDigest !== nativeImage.imageDigest ||
+			(controlBytes === null || nativeImage.controlBytes === null
+				? controlBytes !== nativeImage.controlBytes
+				: !sameBytes(controlBytes, nativeImage.controlBytes))
+		)
+			return failed("outcome-unknown");
+		return Object.freeze({
+			ok: true,
+			scope: Object.freeze({ ...scope }),
+			rows: Object.freeze(rows.map((row) => Object.freeze({ journalSequence: row.journalSequence, vertexDigest: row.vertexDigest }))),
+			nativeImage,
 		});
 	};
 
@@ -2640,6 +2921,7 @@ function createJournalStoreOver(
 			}});
 		},
 		appendAccepted,
+		appendAcceptedLocalBatch,
 		close,
 		installEpochAnchor,
 		installGenesis,

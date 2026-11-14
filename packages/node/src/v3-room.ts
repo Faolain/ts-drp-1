@@ -208,13 +208,15 @@ const noteV3RoomStage = (stage: string, started: number): void => {
 	}
 };
 // Diagnostics (measurement only): how this process's settlement drains issued their replacement rows, summed
-// over its rooms. `batches`/`rowsBatched`: chunks issued as one batched issuance and their rows; `rowsSingly`:
+// over its rooms. `batches`/`rowsBatched`: chunks issued as one batched issuance and their rows;
+// `journalBatches`: of those chunks, the ones journaled in one native write (appendAcceptedLocalBatch); `rowsSingly`:
 // rows the per-row loop issued (a chunk the batch could not carry, a split row, rows the batches left);
 // `retries`: a chunk refused by a moved plan and re-checked; `recoveries`: an entered chunk resumed whole;
 // `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted").
 const v3RoomSettlementBatchCounts = {
 	batches: 0,
 	rowsBatched: 0,
+	journalBatches: 0,
 	rowsSingly: 0,
 	retries: 0,
 	recoveries: 0,
@@ -224,6 +226,7 @@ const v3RoomSettlementBatchCounts = {
 export interface V3RoomSettlementBatchCounts {
 	readonly batches: number;
 	readonly rowsBatched: number;
+	readonly journalBatches: number;
 	readonly rowsSingly: number;
 	readonly retries: number;
 	readonly recoveries: number;
@@ -7996,6 +7999,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (issued.ok) {
 				v3RoomSettlementBatchCounts.batches += 1;
 				v3RoomSettlementBatchCounts.rowsBatched += issued.rows.length;
+				if (issued.journal === "batch") v3RoomSettlementBatchCounts.journalBatches += 1;
 				if (settlementDrainPublication === "immediate") await publishAccepted();
 				continue;
 			}
