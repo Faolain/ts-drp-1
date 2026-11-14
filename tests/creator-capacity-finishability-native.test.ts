@@ -149,6 +149,62 @@ afterEach(async () => {
 	expect(await closeFixtures()).toEqual([]);
 });
 
+/** Records the forecast probe admits before it projects the settlement boundary. */
+const FORECAST_SAMPLE_RECORDS = 4;
+
+/** One admitted record's next-epoch admission forecast, from the creator's maintenance book. */
+type ForecastSample = Readonly<{ forecast: number; max: number }>;
+
+/**
+ * Sizes the settlement workload from the creator's current next-epoch admission
+ * forecast, so the workload reaches the admission bound wherever proof capacity
+ * currently puts it (a hard-coded count stops reaching it when sizing improves).
+ * An exact-only room admits a few records while its maintenance book reports
+ * each charge (the incremental reservation answers early records without the
+ * book). Each admitted record raises the forecast by about the same bytes, so
+ * the first refusal is projected at sample + (max - forecast) / slope. The
+ * workload offers twice that: finite, and always past the projected bound.
+ * @returns The projection's inputs, the projected boundary and the workload size.
+ */
+async function forecastSettlementWorkload() {
+	const fixture = await creatorDeliveryRoom({ profile: "settlement" });
+	const creator = await fixture.open(0);
+	const incremental = vi
+		.spyOn(closedRollbackData, "reserveCreatorOrdinaryFinishingCapacity")
+		.mockResolvedValue(undefined);
+	const previous: unknown = Reflect.get(globalThis, "__warmProofEvent");
+	const seen: { book?: ForecastSample } = {};
+	Reflect.set(globalThis, "__warmProofEvent", (event: Record<string, unknown>) => {
+		const { kind, outcome, nextEpochForecastBytes: forecast, maxBytes: max } = event;
+		if (kind === "creator-issuance-maintenance-book" && outcome === "charged")
+			if (typeof forecast === "number" && typeof max === "number") seen.book = { forecast, max };
+	});
+	const samples: ForecastSample[] = [];
+	try {
+		for (let index = 0; index < FORECAST_SAMPLE_RECORDS; index++) {
+			delete seen.book;
+			await creator.room.issue({
+				action: "placeBlock",
+				id: `forecast-${index}`,
+				kind: "stone",
+				x: index % 10,
+				y: index,
+			});
+			samples.push(required(seen.book));
+		}
+	} finally {
+		if (previous === undefined) Reflect.deleteProperty(globalThis, "__warmProofEvent");
+		else Reflect.set(globalThis, "__warmProofEvent", previous);
+		incremental.mockRestore();
+	}
+	const first = required(samples[0]),
+		last = required(samples[samples.length - 1]);
+	const slope = (last.forecast - first.forecast) / (samples.length - 1);
+	expect(slope, "each admitted record raises the next-epoch admission forecast").toBeGreaterThan(0);
+	const projected = samples.length + Math.ceil((last.max - last.forecast) / slope);
+	return { forecast: last.forecast, max: last.max, slope, projected, limit: 2 * projected };
+}
+
 /**
  * Offers distinct settlement records until the first refusal.
  * @param exactOnly - Decline the incremental source-program reservation, so the
@@ -190,12 +246,13 @@ async function settlementAdmissionBoundary(exactOnly: boolean, limit: number) {
 }
 
 it("incremental settlement admission never accepts a record the exact maintenance sizing refuses", async () => {
-	const limit = 96;
+	const workload = await forecastSettlementWorkload();
+	const { limit } = workload;
 	const exact = await settlementAdmissionBoundary(true, limit);
 	const incremental = await settlementAdmissionBoundary(false, limit);
 	console.info(
 		`CREATOR_CAPACITY_BOUNDARY ${JSON.stringify({
-			limit,
+			workload,
 			exact: { accepted: exact.accepted, error: exact.error },
 			incremental: { accepted: incremental.accepted, error: incremental.error },
 		})}`
@@ -215,8 +272,12 @@ it.each([
 ] as const)(
 	"%s settlement admission reserves the adoption fence and its successor, so the full epoch seals and adopts",
 	async (_label, exactOnly) => {
-		const boundary = await settlementAdmissionBoundary(exactOnly, 96);
-		expect(boundary.accepted, "admission finds a finite settlement boundary").toBeLessThan(96);
+		const workload = await forecastSettlementWorkload();
+		const boundary = await settlementAdmissionBoundary(exactOnly, workload.limit);
+		console.info(
+			`CREATOR_CAPACITY_SEAL_BOUNDARY ${JSON.stringify({ exactOnly, workload, accepted: boundary.accepted, error: boundary.error })}`
+		);
+		expect(boundary.accepted, "admission finds a finite settlement boundary").toBeLessThan(workload.limit);
 		expect(capacityRefusal(boundary.error), String(boundary.error)).toBe(true);
 		expect(boundary.after, "the boundary refusal performs no native writes").toEqual(boundary.before);
 		const { fixture, creator } = boundary;
