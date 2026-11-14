@@ -794,6 +794,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 			: createV3RoomRolloverPolicy({
 					role,
 					budget: V3_CHAT_ROLLOVER_BUDGET,
+					writerCapacity: { maxDependencies: PARAMETERS.maxDependencies },
 					hooks: {
 						publishSuccessor: (offer, epoch): Promise<void> => delivery.publish(offer, epoch),
 						requestSuccessor: () => delivery.request(),

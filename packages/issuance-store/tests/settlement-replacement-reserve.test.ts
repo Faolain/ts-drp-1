@@ -1,6 +1,7 @@
 import {encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import {describe, expect, it} from "vitest";
-import {ISSUANCE_RETIREMENT_LIMITS, issuanceSettlementReplacementReserveCharge, captureIssuanceNativeSignContext,
+import {ISSUANCE_RETIREMENT_LIMITS, issuanceSettlementReplacementReserveCharge, issuanceSettlementReserveForecast,
+	captureIssuanceNativeSignContext,
 	type IssuanceRetirementRows} from "../src/retirement.js";
 
 // fix/maintenance-image-capacity: a settlement-profile Writer's own move is admitted only if one
@@ -123,4 +124,69 @@ describe("settlement replacement reserve", () => {
 		expect(() => captureIssuanceNativeSignContext({settlementReplacementReserve: {maxDependencies: 0}})).toThrow();
 		expect(() => captureIssuanceNativeSignContext({settlementReplacementReserve: {maxDependencies: 4, extra: 1}})).toThrow();
 	});
+
+	// fix/capacity-refusal-prompt-roll: the creator forecasts each Writer's admission from counts and a
+	// preimage bound (issuanceSettlementReserveForecast). Its answer must never exceed what the Writer's
+	// own admission admits: a forecast that is too high lets the Writer hit its wall before the creator rolls.
+	it("the creator's forecast never reports more admissible moves than the Writer's own admission", () => {
+		let seed = 0x5eed;
+		const random = (limit: number): number => {
+			seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+			return seed % limit;
+		};
+		const epoch = 9;
+		const cases: {retained: number; epochRows: number; forecast: number; admitted: number}[] = [];
+		for (let index = 0; index < 14; index++) {
+			const retained = random(320);
+			const epochRows = random(90);
+			const large = index % 3 === 2;
+			const operationBytes = (): number => (large ? 400 + random(2_200) : random(200));
+			const dependencies = (): number => random(MAX_DEPENDENCIES + 1);
+			const issued: IssuanceRetirementRows["issued"][number][] = [];
+			for (let sequence = 0; sequence < retained + epochRows; sequence++) {
+				const canonicalPreimageBytes = preimage(sequence, sequence < retained ? epoch - 1 : epoch,
+					dependencies(), operationBytes());
+				issued.push({...scope, authorSequence: sequence, canonicalPreimageBytes, digest: digestOf(canonicalPreimageBytes), signature});
+			}
+			const withPlan = index % 2 === 1 && retained > 0;
+			const planned = issued.slice(0, Math.min(retained, random(retained + 1)));
+			const futures = Array.from({length: 1_100}, () => [dependencies(), operationBytes()] as const);
+			let bound = Math.max(0, ...issued.map((row) => row.canonicalPreimageBytes.byteLength));
+			const futureRows = futures.map(([deps, bytes], offset) => preimage(retained + epochRows + offset, epoch, deps, bytes));
+			bound = Math.max(bound, ...futureRows.map((bytes) => bytes.byteLength));
+			const rowsWith = (extra: number): IssuanceRetirementRows => {
+				const all = [...issued, ...futureRows.slice(0, extra).map((canonicalPreimageBytes, offset) => ({...scope,
+					authorSequence: retained + epochRows + offset, canonicalPreimageBytes, digest: digestOf(canonicalPreimageBytes), signature}))];
+				return {
+					lineages: [{...scope, next: all.length, exhausted: false, prunedThroughAuthorSequence: null}],
+					issued: all,
+					outbox: all.map((row) => ({...scope, authorSequence: row.authorSequence, digest: row.digest, publishState: "published" as const})),
+					plans: withPlan ? [{scope, revision: 1_000, fenceSequence: 0, entries: planned.map((source, entry) => ({
+						sourceSequence: source.authorSequence, sourceDigest: source.digest, disposition: "rebase" as const,
+						replacementSequence: entry}))}] : [],
+				};
+			};
+			let admitted = 0;
+			for (;; admitted++) {
+				const rows = rowsWith(admitted);
+				const next = futureRows[admitted]!;
+				try {
+					issuanceSettlementReplacementReserveCharge(rows, scope, {authorSequence: rows.lineages[0]!.next,
+						canonicalPreimageBytes: next, digest: digestOf(next)}, {maxDependencies: MAX_DEPENDENCIES});
+				} catch (error) {
+					if (!String(error).includes("settlement replacement reserve") && !String(error).includes("exceeds")) throw error;
+					break;
+				}
+			}
+			const forecast = issuanceSettlementReserveForecast({scope, maxDependencies: MAX_DEPENDENCIES, retainedRows: retained,
+				epochRows, rowPreimageBytes: bound});
+			cases.push({retained, epochRows, forecast, admitted});
+			expect(forecast, JSON.stringify(cases.at(-1))).toBeLessThanOrEqual(admitted);
+		}
+		// Conservative, not useless: where rows bind (small moves) the forecast stays close to the Writer's own answer.
+		for (const row of cases.filter((_, index) => index % 3 !== 2 && _.admitted > 8))
+			expect(row.forecast, JSON.stringify(row)).toBeGreaterThanOrEqual(Math.floor(row.admitted * 0.6) - 4);
+		console.log(`RESERVE_FORECAST ${JSON.stringify(cases)}`);
+	}, 120_000);
 });
+

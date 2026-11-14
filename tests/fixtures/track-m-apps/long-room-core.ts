@@ -433,6 +433,8 @@ function appRolloverPolicy(
 	return createV3RoomRolloverPolicy({
 		role,
 		budget: context.override ?? shipped,
+		// A capacity trigger, not a budget value: kept under a test override, as the native refusal trigger is.
+		writerCapacity: { maxDependencies: PARAMETERS.maxDependencies },
 		hooks: chat ? { ...hooks, clearedByRollover: shippingChatRefusalClearedByRollover } : hooks,
 	});
 }

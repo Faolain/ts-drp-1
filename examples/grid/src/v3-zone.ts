@@ -752,6 +752,7 @@ export function createV3ZoneApi(
 						? `${action}\u0000${application.displacedOperationIdentity(operation)}`
 						: undefined;
 				},
+				writerCapacity: { maxDependencies: PARAMETERS.maxDependencies },
 				hooks: {
 					publishSuccessor:
 						publishSuccessor ?? ((offer, epoch): Promise<void> => delivery?.publish(offer, epoch) ?? Promise.resolve()),

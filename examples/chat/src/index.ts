@@ -435,6 +435,8 @@ async function openSession(
 		: createV3RoomRolloverPolicy({
 				role: operation === "create" ? "creator" : "member",
 				budget: shippingChatRolloverBudget({ objectId, shares: context.shares }),
+				// The room parameters' dependency bound (exactCanonicalParametersCarrierBytes below).
+				writerCapacity: { maxDependencies: 16 },
 				hooks: {
 					publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
 					requestSuccessor: () => successors.request(),

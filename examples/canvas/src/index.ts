@@ -241,6 +241,8 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 				? createV3RoomRolloverPolicy({
 						role: "creator",
 						budget: CANVAS_ROLLOVER_BUDGET,
+						// The room parameters' dependency bound (exactCanonicalParametersCarrierBytes above).
+						writerCapacity: { maxDependencies: 16 },
 						hooks: {
 							publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
 							onError: (error) => console.warn("Canvas rollover failed; it is retried", error),

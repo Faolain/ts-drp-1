@@ -86,6 +86,13 @@ export {
 	type V3RoomSuccessorOffer,
 } from "./rollover.js";
 export {
+	createV3RoomWriterCapacity,
+	V3_ROOM_WRITER_CAPACITY_AUTHORS_MAX,
+	V3_ROOM_WRITER_RETAINED_EPOCHS,
+	type V3RoomWriterCapacity,
+	type V3RoomWriterCapacityReading,
+} from "./writer-capacity.js";
+export {
 	createV3RoomSuccessorChannel,
 	createV3RoomSuccessorDelivery,
 	openV3RoomSuccessorDelivery,

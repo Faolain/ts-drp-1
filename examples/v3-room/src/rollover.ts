@@ -2,6 +2,8 @@ import { decodeCanonical } from "@ts-drp/canonical";
 import { isV3RoomClosePendingRefusal, V3RoomAwaitingAuthorFence, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
 import type { V3RoomAcceptedVertex, V3RoomHandBack, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
 
+import { createV3RoomWriterCapacity, type V3RoomWriterCapacity, type V3RoomWriterCapacityReading } from "./writer-capacity.js";
+
 /** The adopted successor's offer (the four exact canonical byte strings a member installs). */
 export type V3RoomSuccessorOffer = Awaited<ReturnType<V3RoomSession["exportCreatorSuccessor"]>>;
 
@@ -28,7 +30,15 @@ export interface V3RoomRolloverBudget {
 export type V3RoomRolloverEvent = Readonly<{
 	epoch: number;
 	successorEpoch: number;
-	trigger: "budget" | "idle" | "refusal";
+	/**
+	 * `capacity`: a settlement Writer's forecast admission (writer-capacity.ts) is about to end, so the
+	 * creator rolls before the Writer's own store refuses its next move. `silence`: a Writer past half
+	 * of its forecast admission stopped issuing (its refused move is waiting), so the creator does not
+	 * wait for the idle period. Both are capacity triggers: a test's budget override does not replace
+	 * them, as it does not replace the native refusal trigger, and each fires at most once per epoch,
+	 * only from admitted rows.
+	 */
+	trigger: "budget" | "idle" | "refusal" | "capacity" | "silence";
 	/** The most moves (and weight) any one author had admitted in the closed epoch. */
 	moves: number;
 	weight: number;
@@ -423,6 +433,13 @@ function offerSuccessorEpoch(offer: V3RoomSuccessorOffer): number | undefined {
  * yields between its native phases and defers to registered foreground issues.
  * @param work - The rollover.
  */
+/** The capacity trigger's margin floor, in moves. */
+const CAPACITY_MARGIN_MIN_MOVES = 4;
+/** The rollover length the margin assumes before the first rollover is measured. */
+const CAPACITY_DEFAULT_ROLL_MS = 2_000;
+/** The shortest silence of a Writer past half its admission that rolls the room. */
+const SILENCE_MIN_MS = 2_000;
+
 function later(work: () => void): void {
 	const idle = Reflect.get(globalThis, "requestIdleCallback") as
 		| ((callback: () => void, options: Readonly<{ timeout: number }>) => unknown)
@@ -456,6 +473,12 @@ export function createV3RoomRolloverPolicy(
 		 * same identity (author order); without it, kept moves are offered again as they are.
 		 */
 		identity?(operation: Readonly<Record<string, unknown>>): string | undefined;
+		/**
+		 * Creator, settlement profile: the room parameters' dependency bound, which turns on the forecast of
+		 * each Writer's own admission (the capacity and silence triggers). Without it only budget, idle and
+		 * refusal roll the room.
+		 */
+		writerCapacity?: Readonly<{ maxDependencies: number }>;
 	}>
 ): V3RoomRolloverPolicy {
 	const { role, budget } = input;
@@ -484,6 +507,15 @@ export function createV3RoomRolloverPolicy(
 	let failures = 0;
 	// Creator: the highest successor epoch handed to publishSuccessor.
 	let published = 0;
+	// Writer capacity (creator, settlement profile): the forecast, the epoch each of its triggers last
+	// fired in (once per epoch each), the silence watch on the hottest Writer, and the last rollover's
+	// length (the trigger's margin covers the Writer's moves during the next one).
+	let writerCapacity: V3RoomWriterCapacity | null | undefined;
+	let capacityFired = -1;
+	let silenceFired = -1;
+	let silenceTimer: ReturnType<typeof setTimeout> | undefined;
+	let silenceWatch: (V3RoomWriterCapacityReading & { epoch: number }) | undefined;
+	let lastRollMs = CAPACITY_DEFAULT_ROLL_MS;
 	let waiting = 0;
 	let successorWaits = 0;
 	const kept: Readonly<Record<string, unknown>>[] = [];
@@ -530,6 +562,7 @@ export function createV3RoomRolloverPolicy(
 		if (idleTimer !== undefined) clearTimeout(idleTimer);
 		if (keptTimer !== undefined) clearTimeout(keptTimer);
 		if (settlementTimer !== undefined) clearTimeout(settlementTimer);
+		if (silenceTimer !== undefined) clearTimeout(silenceTimer);
 		for (const wake of [...epochWaiters]) wake();
 	}
 	// Member only: the creator is unreachable now (read-only), or its moves are not reaching it.
@@ -585,6 +618,9 @@ export function createV3RoomRolloverPolicy(
 		moves.clear();
 		weights.clear();
 		acceptedThisEpoch = 0;
+		if (silenceTimer !== undefined) clearTimeout(silenceTimer);
+		silenceTimer = undefined;
+		silenceWatch = undefined;
 		for (const wake of [...epochWaiters]) wake();
 	};
 	// The room can advance without this policy (a host's own seal, a member's install); its
@@ -622,6 +658,7 @@ export function createV3RoomRolloverPolicy(
 			failures = 0;
 			retryAt = 0;
 			published = Math.max(published, sealed.successorEpoch);
+			lastRollMs = performance.now() - started;
 			advance(sealed.successorEpoch);
 			hooks.onRollover?.(
 				Object.freeze({
@@ -695,7 +732,7 @@ export function createV3RoomRolloverPolicy(
 			});
 		return rolling;
 	};
-	const schedule = (trigger: "budget" | "idle"): void => {
+	const schedule = (trigger: "budget" | "idle" | "capacity" | "silence"): void => {
 		if (scheduled || rolling !== undefined || closed || role !== "creator") return;
 		if (Date.now() < retryAt) {
 			// After a failed rollover, try again once the backoff ends.
@@ -707,12 +744,64 @@ export function createV3RoomRolloverPolicy(
 			return;
 		}
 		scheduled = true;
+		const scheduledIn = currentEpoch();
 		later(() => {
 			scheduled = false;
 			// A rollover that ran meanwhile (a refused move's) may have cleared the trigger.
-			const due = trigger === "budget" ? overBudget() : (advance(currentEpoch()), most(moves) > 0);
-			if (due) void roll(trigger);
+			const due =
+				trigger === "budget"
+					? overBudget()
+					: trigger === "idle"
+						? (advance(currentEpoch()), most(moves) > 0)
+						: currentEpoch() === scheduledIn &&
+							(trigger === "capacity" ? capacityFired : silenceFired) !== scheduledIn;
+			if (!due) return;
+			if (trigger === "capacity") capacityFired = scheduledIn;
+			if (trigger === "silence") silenceFired = scheduledIn;
+			void roll(trigger);
 		});
+	};
+	// The forecast exists once the room is bound and only for a settlement-profile creator given its
+	// dependency bound.
+	const capacityOf = (): V3RoomWriterCapacity | undefined => {
+		if (writerCapacity !== undefined) return writerCapacity ?? undefined;
+		const authority = room?.authority();
+		if (authority === undefined || authority === null) return undefined;
+		writerCapacity =
+			role === "creator" && input.writerCapacity !== undefined && authority.profileId === "creator-trusted-settlement-v1"
+				? createV3RoomWriterCapacity({ objectId: authority.objectId, maxDependencies: input.writerCapacity.maxDependencies })
+				: null;
+		return writerCapacity ?? undefined;
+	};
+	// One admitted row of the current epoch: roll before the Writer's admission ends (capacity), or watch
+	// a Writer past half of it for silence. Margin: the Writer's moves during a rollover and its install
+	// (twice the last rollover), at its recent rate, and never less than CAPACITY_MARGIN_MIN_MOVES.
+	const watchCapacity = (vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void => {
+		if (role !== "creator" || vertex.authorSequence === undefined) return;
+		const reading = capacityOf()?.observe(
+			vertex as Pick<V3RoomAcceptedVertex, "author" | "epoch" | "authorSequence"> & Partial<V3RoomAcceptedVertex>,
+			epoch
+		);
+		if (reading === undefined) return;
+		const rate = Number.isFinite(reading.gapMs) && reading.gapMs > 0 ? 1_000 / reading.gapMs : 0;
+		const margin = Math.max(CAPACITY_MARGIN_MIN_MOVES, Math.ceil((2 * lastRollMs * rate) / 1_000));
+		if (reading.moves <= margin && capacityFired !== epoch) {
+			schedule("capacity");
+			return;
+		}
+		if (reading.used < 0.5 || silenceFired === epoch) return;
+		// One watch: the Writer furthest into its admission, renewed by its own next row.
+		if (silenceWatch !== undefined && silenceWatch.author !== reading.author && silenceWatch.used > reading.used) return;
+		silenceWatch = { ...reading, epoch };
+		if (silenceTimer !== undefined) clearTimeout(silenceTimer);
+		const quiet = Math.max(SILENCE_MIN_MS, Number.isFinite(reading.gapMs) ? 4 * reading.gapMs : SILENCE_MIN_MS);
+		silenceTimer = setTimeout(() => {
+			silenceTimer = undefined;
+			const watched = silenceWatch;
+			silenceWatch = undefined;
+			if (closed || watched === undefined || currentEpoch() !== watched.epoch || silenceFired === watched.epoch) return;
+			schedule("silence");
+		}, quiet);
 	};
 	const armIdle = (): void => {
 		if (role !== "creator" || closed) return;
@@ -1115,6 +1204,7 @@ export function createV3RoomRolloverPolicy(
 				);
 			armIdle();
 			if (overBudget()) schedule("budget");
+			watchCapacity(vertex);
 		},
 		refused(reason: string): void {
 			if (closed || role !== "creator" || !clearedByRollover(new Error(reason))) return;
