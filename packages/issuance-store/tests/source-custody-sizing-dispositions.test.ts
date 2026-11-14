@@ -330,6 +330,54 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 		measured(withEntries, resource, "64 records with origin plus 64 entries");
 	});
 
+	it("an unconsumed record without an origin is charged at both widest widths: consumed (bb6455fe) and with an origin", () => {
+		// Both G22 charges apply to the same record: its reissue sets reissueSequence (up to MAX_SAFE_INTEGER)
+		// and a record carries originSequence (up to MAX_SAFE_INTEGER); neither replaces the other.
+		const { plan } = priorPlan(2, 0);
+		const record = {
+			sourceSequence: 1_000,
+			sourceDigest: new Uint8Array(32).fill(5),
+			sourceEpoch: 1,
+			intent: 0,
+			exactCanonicalOperationBytes: new Uint8Array(OPERATION).fill(6),
+			reissueSequence: null,
+		};
+		const prior = defined(copySettlementPlan({ ...plan, handBacks: [record] }, scope), "prior plan");
+		expect(defined(prior.handBacks, "records")[0]?.originSequence).toBeUndefined();
+		for (const count of [0, 4]) {
+			const resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, count, geometry, OPERATION);
+			// Its reissue at the widest author sequence: consumed, plus its reissue-origin entry.
+			const written = consumeAll(prior, Number.MAX_SAFE_INTEGER - 1);
+			expect(written.handBacks?.[0]?.reissueSequence).toBe(Number.MAX_SAFE_INTEGER - 1);
+			expect(written.reissueOrigins).toHaveLength(1);
+			measured(written, resource, `reissue of an unconsumed record without origin, ${count} sources`);
+			// The widest record either charge covers: consumed and with an origin, both at their maximum.
+			const widest = defined(
+				copySettlementPlan(
+					{
+						...written,
+						handBacks: [
+							{ ...record, reissueSequence: Number.MAX_SAFE_INTEGER, originSequence: Number.MAX_SAFE_INTEGER - 1 },
+						],
+						reissueOrigins: [{ originSequence: Number.MAX_SAFE_INTEGER - 1, reissueSequence: Number.MAX_SAFE_INTEGER }],
+					},
+					scope
+				),
+				"widest plan"
+			);
+			measured(widest, resource, `widest record, ${count} sources`);
+			// With a one-byte origin only the consumed-width charge widens the record: less than both charges.
+			const consumedWidthOnly = issuanceSourceCustodyPlanResourceForSizing(
+				scope,
+				defined(copySettlementPlan({ ...plan, handBacks: [{ ...record, originSequence: 1 }] }, scope), "with origin"),
+				count,
+				geometry,
+				OPERATION
+			);
+			expect(resource.byteLength).toBeGreaterThan(consumedWidthOnly.byteLength);
+		}
+	});
+
 	it("measured widths: an origin adds 25 bytes per record, an entry is 53 bytes, 64 entries add 3,410", () => {
 		const max = Number.MAX_SAFE_INTEGER;
 		const recordFields = {
