@@ -611,6 +611,13 @@ export function createV3RoomSuccessorDelivery(
 							selected = later;
 							return { offer: later.offer, peers, ...(laterCurrency === undefined ? {} : { currency: laterCurrency }) };
 						},
+						// Asked during the install's settlement drain, without consuming the offer: this loop installs a
+						// newer offer next, so the creator has sealed the epoch being installed and a replacement signed
+						// into it could never be admitted (the room defers its replacements to that next install).
+						queued: () => {
+							const later = candidate;
+							return later !== undefined && later.successorEpoch > epoch() && !inBackoff(later);
+						},
 					});
 					stats.installed++;
 					const previous = backoffOf(selected.bytes);

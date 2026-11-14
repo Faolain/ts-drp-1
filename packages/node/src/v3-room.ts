@@ -212,7 +212,9 @@ const noteV3RoomStage = (stage: string, started: number): void => {
 // `journalBatches`: of those chunks, the ones journaled in one native write (appendAcceptedLocalBatch); `rowsSingly`:
 // rows the per-row loop issued (a chunk the batch could not carry, a split row, rows the batches left);
 // `retries`: a chunk refused by a moved plan and re-checked; `recoveries`: an entered chunk resumed whole;
-// `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted").
+// `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted");
+// `deferredDrains`: install drains that left their remaining replacements to the next install (rule R: the
+// caller already held a newer offer, so the epoch installed was sealed).
 const v3RoomSettlementBatchCounts = {
 	batches: 0,
 	rowsBatched: 0,
@@ -220,6 +222,7 @@ const v3RoomSettlementBatchCounts = {
 	rowsSingly: 0,
 	retries: 0,
 	recoveries: 0,
+	deferredDrains: 0,
 	fallbacks: new Map<string, number>(),
 };
 /** The settlement batch counters of this process (see v3RoomSettlementBatchCounts). */
@@ -230,6 +233,7 @@ export interface V3RoomSettlementBatchCounts {
 	readonly rowsSingly: number;
 	readonly retries: number;
 	readonly recoveries: number;
+	readonly deferredDrains: number;
 	readonly fallbacks: Readonly<Record<string, number>>;
 }
 /**
@@ -1838,6 +1842,15 @@ export type V3RoomCreatorSuccessorInstallRequest = Readonly<{
 	newest?: () =>
 		| Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
 		| undefined;
+	/**
+	 * Asked by the install's settlement drain before each replacement batch (each row when issued singly),
+	 * without consuming anything: whether the caller already holds a newer offer it will install next. The
+	 * creator has then sealed the epoch this install reaches, and ingress admits only the current anchor, so
+	 * a replacement signed into it could never be admitted: the drain still merges the plan, expires the
+	 * window, resolves retained work and signs the author fence, and leaves the remaining rows eligible for
+	 * the next install's drain (rule R, packages/node/formal/slow-member-follow.qnt).
+	 */
+	queued?: () => boolean;
 }>;
 
 /**
@@ -7611,6 +7624,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// fence and replacements locally and the startup barrier publishes them after readiness
 	// (rebasePromise). Every other drain (successor adoption) publishes each issue at once.
 	let settlementDrainPublication: "immediate" | "after-readiness" = "immediate";
+	// Rule R: set only while an install adopts (installCreatorSuccessor's `queued`). True once the caller
+	// holds a newer offer, so the epoch being installed is sealed and the drain's remaining replacements
+	// wait for the next install's drain (never signed into an epoch whose ingress no longer admits them).
+	let installNewerQueued: (() => unknown) | undefined;
+	const newerOfferQueued = (): boolean => {
+		const ask = installNewerQueued;
+		if (ask === undefined) return false;
+		try {
+			return ask() === true;
+		} catch {
+			return false;
+		}
+	};
 	const issueSettlement = async (
 		operations: readonly Readonly<{
 			readonly logicalTime: number;
@@ -7952,9 +7978,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// another writer moved meanwhile refuses the chunk with nothing written and the chunk is
 		// re-checked; a chunk the batch cannot carry (see V3ReplacementBatchResult) and every row the
 		// batches leave are issued singly by the loop below, which skips each row already replaced.
+		// Rule R: before each chunk (and each row issued singly below), an install whose caller already holds a
+		// newer offer stops here. That epoch is sealed and admits no replacement; the rows stay eligible
+		// (replacementSequence null, the window counted from their origin as before) and the next install's
+		// drain replaces them, in sequence order, into the epoch it reaches. The plan, expiries, retained
+		// resolution and the author fence above are done either way. A row with replacement progress (a split
+		// replacement already partly issued) is always finished.
 		for (let retries = 0, recoveries = 0; ; ) {
 			await checkpoint();
 			assertSessionOpen();
+			if (newerOfferQueued()) {
+				v3RoomSettlementBatchCounts.deferredDrains += 1;
+				return;
+			}
 			const current = await issuanceStore.readSettlementPlan(settlementScope);
 			if (current === null) throw new TypeError("v3 room settlement plan is unavailable");
 			const chunk: Readonly<{ entry: RoomSettlementPlanEntry; source: DisplacedSource; ordered: readonly Readonly<Record<string, unknown>>[] }>[] = [];
@@ -8041,6 +8077,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				(row) => row.sourceSequence === entry.sourceSequence
 			);
 			if (now === undefined || !eligible(now) || !sameBytes(now.sourceDigest, entry.sourceDigest)) continue;
+			if (now.replacementProgress === undefined && newerOfferQueued()) {
+				v3RoomSettlementBatchCounts.deferredDrains += 1;
+				return;
+			}
 			v3RoomSettlementBatchCounts.rowsSingly += 1;
 			await refreshSourceOwner();
 			const ordered = orderedBySequence.get(entry.sourceSequence);
@@ -9809,21 +9849,29 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let peers: readonly string[];
 		let currency: V3RoomCurrencyStatement | undefined;
 		let newest: (() => unknown) | undefined;
+		let queued: (() => unknown) | undefined;
 		try {
 			const withCurrency = request !== null && typeof request === "object" && Object.hasOwn(request, "currency");
 			const withNewest = request !== null && typeof request === "object" && Object.hasOwn(request, "newest");
+			const withQueued = request !== null && typeof request === "object" && Object.hasOwn(request, "queued");
 			const fields = exactRecord(request, [
 				...(withCurrency ? ["currency"] : []),
 				...(withNewest ? ["newest"] : []),
 				"offer",
 				"peers",
+				...(withQueued ? ["queued"] : []),
 			]);
-			if (fields === undefined || (withNewest && typeof fields.newest !== "function"))
+			if (
+				fields === undefined ||
+				(withNewest && typeof fields.newest !== "function") ||
+				(withQueued && typeof fields.queued !== "function")
+			)
 				throw new TypeError("creator recipient request is invalid");
 			offer = captureCreatorSuccessorOffer(fields.offer);
 			peers = captureCreatorSuccessorPeers(fields.peers);
 			currency = withCurrency ? captureCurrencyStatement(fields.currency) : undefined;
 			newest = withNewest ? (fields.newest as () => unknown) : undefined;
+			queued = withQueued ? (fields.queued as () => unknown) : undefined;
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -9985,7 +10033,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				await timedStage("install.adopt", () =>
 					withCreatorReceivedPromotionDependencies(received, async () => {
 						assertSessionOpen();
-						await performCreatorSuccessorAdoption(received);
+						installNewerQueued = queued;
+						try {
+							await performCreatorSuccessorAdoption(received);
+						} finally {
+							installNewerQueued = undefined;
+						}
 					})
 				);
 			} catch (error) {
