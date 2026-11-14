@@ -640,9 +640,15 @@ export interface DRPNetworkNode {
 	 * Sends a message to a specific peer
 	 * @param peerId - The ID of the peer to send to
 	 * @param message - The message to send
-	 * @returns Resolves when the message has been sent
+	 * @param options - `signal` aborts; `acknowledged` resolves only once the peer admitted the message
+	 * to its message queue (a receipt), for callers that pace themselves by awaiting each send
+	 * @returns Resolves when the message has been sent (or, acknowledged, admitted by the peer)
 	 */
-	sendMessage(peerId: string, message: Message, options?: { readonly signal?: AbortSignal }): Promise<void>;
+	sendMessage(
+		peerId: string,
+		message: Message,
+		options?: { readonly signal?: AbortSignal; readonly acknowledged?: boolean }
+	): Promise<void>;
 
 	/**
 	 * Sends a message to a random peer in a group

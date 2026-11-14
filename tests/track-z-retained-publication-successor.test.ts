@@ -610,7 +610,12 @@ it("guard: a send that fails while the serving plane is still current still reje
 	const room = await openPlayed();
 
 	const { wire, publication } = await holdPublication("recipient");
-	wire.hold.release?.(new Error("TRACK_Z_SEND_REFUSED"));
+	// Track 46: the transport's typed failure (sendMessage never resolves for a frame it did not take).
+	// Shaped, not imported: with @ts-drp/network imported in this file every room open fails its native
+	// recovery census (observed on the sandbox; the module-loading cause is not isolated).
+	wire.hold.release?.(
+		Object.assign(new Error("TRACK_Z_SEND_REFUSED"), { name: "DirectMessageSendError", code: "DIRECT_SESSION_RESET" })
+	);
 
 	expect(await publication).toEqual({ ok: false, error: "v3 room retained publication failed: publish-failed" });
 	await playEpochs(room, options, 1, PLAYED);

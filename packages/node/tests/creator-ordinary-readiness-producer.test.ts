@@ -1615,13 +1615,15 @@ function roomBoundary(options: {profile?: string; receiveOnly?: boolean; prepare
 	 const shutdown=async()=>{calls.push("shutdown");closed=true;};
 	 const combineFailures=(primary,cleanup)=>new AggregateError([primary,cleanup]);
 	 const prepareCreatorOrdinaryReadiness=async current=>{calls.push("prepare");await options.prepare?.(current);};
+	 let poolMaintenanceBarrier;
+	 const drainPendingIssues=async()=>{};
 	 ${roomVariable("prepareCurrentCreatorOrdinaryReadiness")}
 	 ${roomVariable("rebasePromise")}
-	 return {done:rebasePromise,swap:()=>{activeHandle={};},failure:()=>terminalFailure};
+	 return {done:rebasePromise,swap:()=>{activeHandle={};},failure:()=>terminalFailure,issueBarrier:()=>poolMaintenanceBarrier};
 	`;
 	const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText;
 	return {plane, calls, ...new Function("options", "plane", "calls", js)(options, plane, calls)} as
-		{plane: object; calls: string[]; done: Promise<void>; swap(): void; failure(): unknown};
+		{plane: object; calls: string[]; done: Promise<void>; swap(): void; failure(): unknown; issueBarrier(): unknown};
 }
 
 describe("room explicit readiness boundary wiring", () => {
@@ -1634,7 +1636,10 @@ describe("room explicit readiness boundary wiring", () => {
 		await enteredPromise;
 		expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare"]);
 		expect(observed).toEqual([room.plane]); expect(ready).toBe(false);
+		// Local issues wait at the room's issue barrier while the readiness job holds the consumer.
+		expect(room.issueBarrier()).toBeInstanceOf(Promise);
 		release(); await room.done;
+		expect(room.issueBarrier()).toBeUndefined();
 		expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare", "publish"]);
 		expect(ready).toBe(true);
 	});

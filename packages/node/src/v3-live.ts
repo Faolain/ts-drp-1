@@ -8365,6 +8365,19 @@ async function handleV3Ingress(
 	evidence: VerifiedV3IngressEvidence,
 	signedAdmission?: RetainedCloseSignedAdmission
 ): Promise<boolean> {
+	// The creator's close shut application admission (its stage set blueprintClosing after
+	// the close shut the maintenance consumer) and is about to take, or holds, the live
+	// journal's single native read reservation for its sources. Custody takes the same
+	// reservation, and the consumer would refuse this append anyway, so meet the closed gate
+	// before custody: retain the row as the consumer's refusal does. Ingress queued before
+	// the stage finished ahead of it; this is a retained row's drain queued behind it.
+	if (registration.creatorMaintenanceBound && registration.blueprintClosing && registration.receivedTransition !== true &&
+		!registration.index.has(evidence.authenticated.digest)) {
+		retainPendingIngress(registration, evidence, V3Envelope.encode({
+			canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
+		ingressFailureLog("admission-rejected", "received-maintenance-closing");
+		return false;
+	}
 	if (evidence.authenticated.admitted.settlementSource === undefined) {
 		if (!registration.creatorMaintenanceBound || registration.index.has(evidence.authenticated.digest))
 			return handleV3IngressWithSource(registration, evidence, false, undefined, signedAdmission);
@@ -14318,8 +14331,23 @@ function previewCreatorOrdinarySuccessorSettlement(input: Readonly<{
 	if (plan.revision !== (priorPlan === null ? 0 : priorPlan.revision + (priorPlan.fenceSequence === null ? 0 : 1)) ||
 		!sameBytes(encodeCanonical(plan.entries), encodeCanonical(priorPlan?.entries ?? [])))
 		throw new TypeError("prospective successor settlement plan differs from original merge");
-	const previewBytes = encodeCanonical(readout);
-	return ObjectFreeze({plan, checkPreview: () => sameBytes(encodeCanonical(preview(previewInput)), previewBytes)});
+	// The successor census charges the fence's clock over its whole domain (never this
+	// readout's value), so only the plan is sizing input. The room clock may advance after
+	// this quote: a creator move takes the next logical time as it passes the barriers, even
+	// one an adoption then holds. A re-read plan must be the same; its clock only stays valid.
+	try {
+		// Diagnostic observer only: the previewed successor fence clock, never sizing or authority.
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({kind: "successor-settlement-preview", author: scope.author, successorEpoch: epoch + 1,
+				fenceLogicalTime: readout.fenceLogicalTime});
+	} catch { /* Observation cannot alter the preview. */ }
+	const planBytes = encodeCanonical(readout.plan);
+	return ObjectFreeze({plan, checkPreview: () => {
+		const current = preview(previewInput);
+		return sameBytes(encodeCanonical(current.plan), planBytes) &&
+			NumberIsSafeInteger(current.fenceLogicalTime) && current.fenceLogicalTime >= lastTime + 2;
+	}});
 }
 
 function settlementOwnRowClass(
@@ -16251,6 +16279,10 @@ async function acquireLocalReplacementCustody(
 			if (owner === registration.liveJournalStore) journalReservation = reservation;
 			else reservations.push(reservation);
 		}
+		// Test seam, like the __warmProofEvent observer: a hook may hold this custody open while
+		// it holds the store's and the live journal's native read reservations. Unset in production.
+		const hold = Reflect.get(globalThis, "__replacementCustodyHold");
+		if (typeof hold === "function") await hold();
 		const floorReservation = await floor.acquireNativeReadReservation({ scope: floorScope });
 		reservations.push(floorReservation);
 		byOwner.set(floor, floorReservation);
@@ -17881,7 +17913,16 @@ async function issueAuthorFence(
 		false,
 		ObjectFreeze({ kind: "fence" as const })
 	);
-	if (issued.ok) await drainPendingIngress(registration);
+	if (issued.ok) {
+		// Diagnostic observer only: the clock this fence was issued with, never authority.
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({kind: "author-fence-issued", author: registration.issuanceScope.author,
+					epoch: registration.payload.provenance.epoch, logicalTime: fenceLogicalTime});
+		} catch { /* Observation cannot alter the issued fence. */ }
+		await drainPendingIngress(registration);
+	}
 	return issued;
 }
 
@@ -20433,8 +20474,12 @@ async function republishRetained(
 			if (targetPeerId === undefined) {
 				published = await registration.networkNode.publishMessage(registration.topic, message);
 			} else {
+				// Track 46: the replay paces itself by awaiting each row, so each waits for the
+				// target's receipt; a send that resolved on the local write would land the
+				// whole window in the target's input pool at once.
 				await registration.networkNode.sendMessage(targetPeerId, message, {
 					signal: AbortSignal.any([signal, AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)]),
+					acknowledged: true,
 				});
 				published = true;
 			}

@@ -6317,7 +6317,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					},
 				})
 			: undefined;
-	// Holds new local issues while an explicit recovery-pool boundary owns the plane.
+	// Holds new local issues while an explicit recovery-pool boundary or the creator's ordinary
+	// readiness owns the plane.
 	let poolMaintenanceBarrier: Promise<void> | undefined;
 	// Receipt continuations handed from issueWithReceipt to the synchronous start of issue().
 	let nextIssueReceiptHooks: LocalPresentationHooks | undefined;
@@ -8491,7 +8492,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed || activeHandle === undefined) throw new TypeError("v3 room ordinary readiness owner is unavailable");
 		const plane = activeHandle;
-		await prepareCreatorOrdinaryReadiness(plane);
+		// The readiness job holds the creator's issuance maintenance consumer, which refuses every
+		// other job ("creator issuance maintenance authority is unavailable"). Received appends wait
+		// behind it (decision row 51); local issues wait at the same barrier as a pool boundary, and
+		// those already admitted join first. A rollover policy holds its moves only across its own
+		// rollover, not across the session's retry of an interrupted close, whose adoption runs here.
+		let open!: () => void;
+		const barrier = new Promise<void>((resolve) => {
+			open = resolve;
+		});
+		poolMaintenanceBarrier = barrier;
+		try {
+			await drainPendingIssues();
+			if (closed || activeHandle !== plane) throw new TypeError("v3 room ordinary readiness owner changed");
+			await prepareCreatorOrdinaryReadiness(plane);
+		} finally {
+			if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+			open();
+		}
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed || activeHandle !== plane) throw new TypeError("v3 room ordinary readiness owner changed");
 	};

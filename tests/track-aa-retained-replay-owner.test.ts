@@ -225,6 +225,31 @@ it("a slow target cannot hold another target's ordered replay or grow its captur
 	});
 }, 30_000);
 
+// Track 46: the replay paces itself by awaiting each row. A direct session send resolves on the local
+// write, so without a receipt the whole window lands in the target's 32-job input pool at once, the
+// pool refuses copies, and delivery repair asks for the window again (the admission-rejected spike).
+it("each targeted retained row waits for the target's receipt (an acknowledged send)", async () => {
+	const sender = await retainedSender(3);
+	const healthy = sender.fixture.bare("receipt-reader");
+	const options: unknown[] = [];
+	const send = sender.creator.networkNode.sendMessage.bind(sender.creator.networkNode);
+	Object.assign(sender.creator.networkNode, {
+		sendMessage: (...args: Parameters<typeof send>) => {
+			if (args[0] === healthy.peerId && args[1].type === MessageType.MESSAGE_TYPE_V3_ENVELOPE) options.push(args[2]);
+			return send(...args);
+		},
+	});
+	try {
+		await expect(republishV3RetainedTo(sender.plane, healthy.peerId)).resolves.toMatchObject({ ok: true });
+		expect(options.length).toBeGreaterThanOrEqual(3);
+		expect(options.every((option) => (option as { acknowledged?: unknown } | undefined)?.acknowledged === true)).toBe(
+			true
+		);
+	} finally {
+		sender.release();
+	}
+}, 30_000);
+
 it("retirement aborts the shared replay but keeps its native slot charged until the actual send settles", async () => {
 	const sender = await retainedSender(2);
 	const jobs = [republishV3RetainedTo(sender.plane, sender.receiver.peerId)];
