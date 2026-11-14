@@ -111,7 +111,10 @@ function memberRoom(displacementIdentity?: (operation: Readonly<Record<string, u
 	};
 }
 
-const policyFor = (room: ReturnType<typeof memberRoom>["room"], identity?: (operation: Readonly<Record<string, unknown>>) => string | undefined) => {
+const policyFor = (
+	room: ReturnType<typeof memberRoom>["room"],
+	identity?: (operation: Readonly<Record<string, unknown>>) => string | undefined
+) => {
 	const policy = (
 		rollover.createV3RoomRolloverPolicy as (input: Record<string, unknown>) => rollover.V3RoomRolloverPolicy
 	)({

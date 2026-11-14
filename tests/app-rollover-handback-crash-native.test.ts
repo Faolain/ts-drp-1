@@ -345,8 +345,14 @@ it.runIf(INNER)(
 			const wire = successorWire(() => [creator, writer] as const);
 			// rehandback: the wire loses every row carrying TARGET after reconnecting (its reissue and any
 			// replacement of it), so the window gives the move back a second time.
-			const wireRows = rowWire(creator, writer, (row) =>
-				edge === "rehandback" && watch.before >= 0 && row.authorSequence > watch.before && moveIds(rowValue(row).operation).has(TARGET)
+			const wireRows = rowWire(
+				creator,
+				writer,
+				(row) =>
+					edge === "rehandback" &&
+					watch.before >= 0 &&
+					row.authorSequence > watch.before &&
+					moveIds(rowValue(row).operation).has(TARGET)
 			);
 			const ordinal = { next: 0 };
 			const ids: string[] = [];

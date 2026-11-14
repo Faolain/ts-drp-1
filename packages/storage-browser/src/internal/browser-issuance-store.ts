@@ -500,7 +500,8 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
 			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
-			...(hasReissueOrigins ? ["reissueOrigins"] : [])]) ||
+			...(hasReissueOrigins ? ["reissueOrigins"] : []),
+		]) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId
 	) {
@@ -509,11 +510,11 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 	return copySettlementPlan(
 		{
 			entries: value.entries,
-			...(hasContexts ? {sourceContexts: value.sourceContexts} : {}),
-			...(hasHandBacks ? {handBacks: value.handBacks} : {}),
-			...(hasMemberFrontier ? {memberFrontier: value.memberFrontier} : {}),
-			...(hasCompletedSourceCustody ? {completedSourceCustody: value.completedSourceCustody} : {}),
-			...(hasReissueOrigins ? {reissueOrigins: value.reissueOrigins} : {}),
+			...(hasContexts ? { sourceContexts: value.sourceContexts } : {}),
+			...(hasHandBacks ? { handBacks: value.handBacks } : {}),
+			...(hasMemberFrontier ? { memberFrontier: value.memberFrontier } : {}),
+			...(hasCompletedSourceCustody ? { completedSourceCustody: value.completedSourceCustody } : {}),
+			...(hasReissueOrigins ? { reissueOrigins: value.reissueOrigins } : {}),
 			fenceSequence: value.fenceSequence,
 			revision: value.revision,
 			scope,
@@ -527,11 +528,13 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 	return {
 		...copyDurableIssueScope(detached.scope),
 		entries: detached.entries,
-		...(detached.sourceContexts === undefined ? {} : {sourceContexts: detached.sourceContexts}),
-		...(detached.handBacks === undefined ? {} : {handBacks: detached.handBacks}),
-		...(detached.memberFrontier === undefined ? {} : {memberFrontier: detached.memberFrontier}),
-		...(detached.completedSourceCustody === undefined ? {} : {completedSourceCustody: detached.completedSourceCustody}),
-		...(detached.reissueOrigins === undefined ? {} : {reissueOrigins: detached.reissueOrigins}),
+		...(detached.sourceContexts === undefined ? {} : { sourceContexts: detached.sourceContexts }),
+		...(detached.handBacks === undefined ? {} : { handBacks: detached.handBacks }),
+		...(detached.memberFrontier === undefined ? {} : { memberFrontier: detached.memberFrontier }),
+		...(detached.completedSourceCustody === undefined
+			? {}
+			: { completedSourceCustody: detached.completedSourceCustody }),
+		...(detached.reissueOrigins === undefined ? {} : { reissueOrigins: detached.reissueOrigins }),
 		fenceSequence: detached.fenceSequence,
 		revision: detached.revision,
 	};

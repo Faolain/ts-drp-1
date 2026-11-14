@@ -66,8 +66,10 @@ const plan = (
 		scope: SCOPE,
 	});
 // The reissue's own issuance transaction also maps the reissued row to its move's origin (track 46).
-const origin = (reissueSequence: number, originSequence = 7): Readonly<{ originSequence: number; reissueSequence: number }> =>
-	Object.freeze({ originSequence, reissueSequence });
+const origin = (
+	reissueSequence: number,
+	originSequence = 7
+): Readonly<{ originSequence: number; reissueSequence: number }> => Object.freeze({ originSequence, reissueSequence });
 const effect = (intent = 0) => Object.freeze({ intent, kind: "hand-back", sourceSequence: 7 });
 
 function commit(authorSequence: number, planEffect: unknown) {
