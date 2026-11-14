@@ -378,7 +378,9 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	for (let index = 0; index < 2 + either - potentialReplacedSources + fixedExtraContexts; index++) contextShapes.push(contextShape);
 	if (rawContextBytes > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes)
 		throw issuanceRetirementRefusal("source custody contexts exceed original plan bound");
-	// Hand-back records already in the plan are charged exactly. A frontier resolution of any
+	// Hand-back records already in the plan are charged exactly, an unconsumed one at its consumed
+	// width (G22): its reissue (plan effect "hand-back") is a plan write that sets reissueSequence, so
+	// the record is charged with a maximum reissueSequence, never the null it carries now. A frontier resolution of any
 	// unresolved entry or potential source may add records (model issuance-image-capacity.qnt, HB):
 	// while any such source exists, every free record slot is reserved. A record's operation is at
 	// most the widest own source preimage (an intent's operation is part of its row's operation), and
@@ -395,11 +397,13 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const handBackOverhead = unsignedRecordWidth({}, handBackFields) - recordOperation;
 	const reservedOperation = Math.min(operationBudget, freeHandBacks * recordOperation);
 	const handBackShape = unsignedRecordShape({}, Object.fromEntries(Object.keys(handBackFields).map(key => [key, leaf])));
+	const widestHandBacks = existingHandBacks.map(record =>
+		record.reissueSequence === null ? {...record, reissueSequence: Number.MAX_SAFE_INTEGER} : record);
 	const handBacks = existingHandBacks.length + freeHandBacks === 0 ? undefined : {
-		width: unsignedArrayWidth([...existingHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
+		width: unsignedArrayWidth([...widestHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
 			...Array.from({length: freeHandBacks}, (_, index) => handBackOverhead +
 				Math.floor(reservedOperation / freeHandBacks) + Number(index < reservedOperation % freeHandBacks))]),
-		shape: unsignedArrayShape([...existingHandBacks.map(unsignedCanonicalShape),
+		shape: unsignedArrayShape([...widestHandBacks.map(unsignedCanonicalShape),
 			...Array.from({length: freeHandBacks}, () => handBackShape)]),
 	};
 	// The last-member frontier: the stored record exactly, or the one a removing close may persist.

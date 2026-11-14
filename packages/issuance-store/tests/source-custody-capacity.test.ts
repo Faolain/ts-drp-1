@@ -104,6 +104,24 @@ describe("accepted source custody numerical reserve", () => {
 		// The default reserve (no preimage bound) is the codec's whole shared budget, and covers this plan too.
 		expect(issuanceSourceCustodyPlanResourceForSizing(scope, null, count, geometry).byteLength).toBeGreaterThanOrEqual(resource.byteLength);
 	});
+	// G22 (sized >= written): a hand-back record's reissue (plan effect "hand-back") sets its
+	// reissueSequence in a plan write the custody image must hold, so an unconsumed record is charged
+	// at its consumed width: a maximum reissueSequence, never the null it carries now.
+	it.each([0, 4])("charges an unconsumed hand-back record at its widest legal (consumed) width, %i potential sources", count => {
+		const plan = (reissueSequence: number | null) => copySettlementPlan({scope, revision: 1, fenceSequence: null, entries: [],
+			handBacks: [{sourceSequence: 5, sourceDigest: new Uint8Array(32).fill(7), sourceEpoch: 3, intent: 0,
+				exactCanonicalOperationBytes: new Uint8Array(OPERATION).fill(9), reissueSequence}]}, scope)!;
+		const unconsumed = plan(null), consumed = plan(Number.MAX_SAFE_INTEGER);
+		expect(unconsumed).toBeDefined();
+		expect(consumed).toBeDefined();
+		const sizedUnconsumed = issuanceSourceCustodyPlanResourceForSizing(scope, unconsumed, count, geometry, OPERATION);
+		const sizedConsumed = issuanceSourceCustodyPlanResourceForSizing(scope, consumed, count, geometry, OPERATION);
+		expect(sizedUnconsumed.byteLength).toBeGreaterThanOrEqual(sizedConsumed.byteLength);
+		expect(sizedUnconsumed.nativeStorageByteLength).toBeGreaterThanOrEqual(sizedConsumed.nativeStorageByteLength);
+		expect(sizedUnconsumed.items).toBeGreaterThanOrEqual(sizedConsumed.items);
+		expect(sizedUnconsumed.maxDepth).toBeGreaterThanOrEqual(sizedConsumed.maxDepth);
+		expect(sizedUnconsumed.byteLength).toBeGreaterThanOrEqual(encodeCanonical(consumed).byteLength);
+	});
 	it("charges the same custody alternative in exact and warmed native forecasts", () => {
 		const commit = d109bCommit(scope, 0, 0);
 		const intent = {kind: "v3-issuance-pending-unsigned-1" as const, authorSequence: 0,

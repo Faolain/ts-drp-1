@@ -23657,8 +23657,9 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 				physical: journal.value,
 				...(verifyVertex === undefined ? {} : { verifyVertex: (value: Parameters<typeof verifyReceivedVertex>[0]) =>
 					verifyVertex.call(lifetime, value) }),
-				...(lifetime.readSettledLocalSource === undefined ? {} : { readSettledLocalSource:
-					(source: CreatorSettledLocalSource) => lifetime.readSettledLocalSource!(source) }),
+				// One classification: its settled-source reads share one own-fence scan.
+				...(lifetime.readSettledLocalSource === undefined ? {} : ((walk: object) => ({ readSettledLocalSource:
+					(source: CreatorSettledLocalSource) => lifetime.readSettledLocalSource!(source, walk) }))({})),
 				...(lifetime.readClosedJournalAuthority === undefined ? {} : { readClosedJournalAuthority:
 					(value: Omit<ReceivedClosedJournalAuthorityRead, "exactCanonicalPinnedGenesisTrustStateRecordBytes">) =>
 						lifetime.readClosedJournalAuthority!({ ...value,
@@ -24892,8 +24893,9 @@ async function reconcileSnapshotRecoveryRoles(
 			authenticatedScopes: journalScopes,
 			journalMembershipAuthorities: roleProofs.flatMap(proof => proof.journalMembershipAuthorities),
 			...(lifetime.verifyVertex === undefined ? {} : {verifyVertex: value => lifetime.verifyVertex!(value)}),
-			...(lifetime.readSettledLocalSource === undefined ? {} :
-				{readSettledLocalSource: source => lifetime.readSettledLocalSource!(source)}),
+			// One classification: its settled-source reads share one own-fence scan.
+			...(lifetime.readSettledLocalSource === undefined ? {} : ((walk: object) =>
+				({readSettledLocalSource: (source: CreatorSettledLocalSource) => lifetime.readSettledLocalSource!(source, walk)}))({})),
 			...(lifetime.readClosedJournalAuthority === undefined ? {} : {
 				readClosedJournalAuthority: value => lifetime.readClosedJournalAuthority!({ ...value,
 					exactCanonicalPinnedGenesisTrustStateRecordBytes: sourceFrame.input.exactCanonicalPinnedGenesisTrustStateRecordBytes }) }),

@@ -1092,7 +1092,9 @@ async function receivedRecoveryTurnoverDue(source: CreatorRecipientSource,
  * exact current Cut it classified from, the recovery-role inventory it left (all but
  * the single-use custody) and the member's own settlement plan (its held unresolved
  * work, which the journal classification reads: an abandonment or a settlement
- * resolution rewrites it without moving the head, the Cut or the inventory). Keyed by
+ * resolution rewrites it without moving the head, the Cut or the inventory), as the
+ * turnover reads it (receivedTurnoverPlanInput: a hand-back's reissue between the lull
+ * and the install leaves the boundary standing). Keyed by
  * the live plane handle, so a successor plane, a recovery reopen (including a
  * retirement-halt discharge) and a new session never see it; a lull clears it on entry
  * and an install consumes it. Scheduling only: it lets an install skip a turnover whose
@@ -1101,6 +1103,26 @@ async function receivedRecoveryTurnoverDue(source: CreatorRecipientSource,
 type ReceivedTurnoverBoundary = Readonly<{ objectId: string; epoch: number; anchorDigest: string; cut: Uint8Array; inventory: string;
 	plan: Uint8Array }>;
 const reconciledReceivedTurnovers = new WeakMap<object, ReceivedTurnoverBoundary>();
+
+/** The settlement plan as a received turnover reads it: every field but the plan's revision
+ * and each hand-back record's consumption mark. A hand-back is offered again by its own new
+ * row, whose issuance transaction (plan effect "hand-back") only sets that record's
+ * `reissueSequence` and bumps the revision. No turnover decision reads either: a resolution
+ * merges its new records by (sourceSequence, intent) under the record bound, which counts
+ * consumed records too, and writes against the plan it reads then. The closed journal's
+ * custody sizing (issuanceSourceCustodyPlanResourceForSizing) charges the revision at its
+ * widest and an unconsumed record at its consumed width (a maximum reissueSequence), so the
+ * sizing the lull's turnover did already holds the reissued plan (G22, sized >= written;
+ * pinned in source-custody-capacity.test.ts). So a member whose lull's turnover gave a move back, and
+ * whose application offered it again before the next install, keeps that install's skip.
+ * Every other plan change (an entry, a source context, the fence, a record added, pruned or
+ * changed in any other field) still ends the boundary. */
+function receivedTurnoverPlanInput(plan: Awaited<ReturnType<DurableIssuanceStore["readSettlementPlan"]>>): unknown {
+	if (plan === null) return null;
+	const { revision: _revision, handBacks, ...read } = plan;
+	return handBacks === undefined ? read
+		: { ...read, handBacks: handBacks.map(({ reissueSequence: _reissueSequence, ...record }) => record) };
+}
 
 async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,
 	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
@@ -1111,7 +1133,7 @@ async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,
 	if (epoch < 2 || cut === undefined || inventory === undefined || inventory.owner.migration !== "ready" ||
 		inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
 	const { custody: _custody, ...observed } = inventory;
-	const plan = encodeCanonical(await source.issuanceStore.readSettlementPlan(source.issuanceScope));
+	const plan = encodeCanonical(receivedTurnoverPlanInput(await source.issuanceStore.readSettlementPlan(source.issuanceScope)));
 	return Object.freeze({objectId: source.objectId, epoch, anchorDigest: source.currentTrust.currentAnchorDigest,
 		cut: Uint8Array.from(cut.bytes), inventory: JSON.stringify(observed), plan});
 }
