@@ -17164,8 +17164,7 @@ async function admitCommittedLocalVertex(
 		input,
 		scope,
 		prepared,
-		appended.journalSequence,
-		appended.nativeImage,
+		appended,
 		controlOperation,
 		reservation,
 		maintenanceAdmission,
@@ -17277,8 +17276,7 @@ function prepareCommittedLocalVertex(
  * @param input - The row's captured issue input.
  * @param scope - The issuance scope.
  * @param prepared - The row as prepareCommittedLocalVertex checked it.
- * @param journalSequence - The row's journal sequence.
- * @param nativeImage - The journal postimage right after the row (undefined: none observed).
+ * @param appended - The row's journal sequence, and the journal postimage right after the row (undefined: none observed).
  * @param controlOperation - Whether the row is a control operation.
  * @param reservation - The row's operation admission reservation.
  * @param maintenanceAdmission - The creator maintenance admission, if any.
@@ -17290,8 +17288,10 @@ async function finishCommittedLocalVertex(
 	input: CapturedLocalIssueInput,
 	scope: DurableIssueScope,
 	prepared: PreparedCommittedLocalVertex,
-	journalSequence: number,
-	nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined,
+	appended: Readonly<{
+		journalSequence: number;
+		nativeImage?: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+	}>,
 	controlOperation: boolean,
 	reservation: FreshOperationAdmissionReservation | undefined,
 	maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined,
@@ -17334,15 +17334,15 @@ async function finishCommittedLocalVertex(
 	}
 	const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
 	advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
-		journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), nativeImage,
-		acceptedEffect === undefined ? undefined : {journalSequence, sourceKind: "local-issued",
+		appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
+		acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
 			byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
 			detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
 		{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
 			canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
 	maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
 		detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
-		...(nativeImage === undefined ? {} : {nativeJournal: nativeImage})});
+		...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
 	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
 	try {
 		await input.settlementCustody?.check();
@@ -17665,8 +17665,10 @@ async function issueReplacementBatch(
 						rows[index]!.input,
 						scope,
 						journaled.prepared[index]!,
-						journaled.sequences[index]!,
-						index === commits.length - 1 ? journaled.nativeImage : undefined,
+						{
+							journalSequence: journaled.sequences[index]!,
+							nativeImage: index === commits.length - 1 ? journaled.nativeImage : undefined,
+						},
 						false,
 						reservations[index],
 						undefined,

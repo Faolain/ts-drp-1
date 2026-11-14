@@ -25,6 +25,8 @@ export const PHASE_3A1B_P2_METHODS = Object.freeze([
 	"readOutboxPage",
 	"readSettlementPlan",
 	"transactIssue",
+	// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+	"transactIssueBatch",
 	"transactWriteSettlementPlan",
 ] as const);
 

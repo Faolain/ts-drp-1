@@ -2374,16 +2374,15 @@ class BrowserIssuanceImplementation {
 				}
 			}
 			const after = durableLineageAfterBatch(first, candidates.length);
-			await requestResult(
-				(rawPrior === undefined ? lineages.add.bind(lineages) : lineages.put.bind(lineages))({
-					...scope,
-					exhausted: after.exhausted,
-					next: after.next,
-					...(current!.prunedThroughAuthorSequence === null
-						? {}
-						: { prunedThroughAuthorSequence: current!.prunedThroughAuthorSequence }),
-				})
-			);
+			const nextLineage = {
+				...scope,
+				exhausted: after.exhausted,
+				next: after.next,
+				...(current!.prunedThroughAuthorSequence === null
+					? {}
+					: { prunedThroughAuthorSequence: current!.prunedThroughAuthorSequence }),
+			};
+			await requestResult(rawPrior === undefined ? lineages.add(nextLineage) : lineages.put(nextLineage));
 			for (const candidate of candidates) {
 				await requestResult(issued.add(nativeIssued(candidate)));
 				await requestResult(outbox.add(nativeOutbox(candidate)));

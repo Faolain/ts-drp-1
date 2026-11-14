@@ -1802,6 +1802,8 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 					"readRetirementImage",
 					"recordClosedMembership",
 					"readClosedMembership",
+					// A settlement drain chunk's local rows in one write (perf/settlement-batch-transaction).
+					"appendAcceptedLocalBatch",
 				].sort()
 			);
 			expect(fs.existsSync(primaryFilename)).toBe(false);

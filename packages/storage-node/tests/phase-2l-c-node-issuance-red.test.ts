@@ -945,7 +945,7 @@ async function withStore<T>(primaryFilename: string, run: (store: DurableIssuanc
 }
 
 describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
-	it("exports one runtime factory and returns the frozen nine-member capability synchronously", async () => {
+	it("exports one runtime factory and returns the frozen ten-member capability synchronously", async () => {
 		const namespace = await loadPhase2lCNodeModule();
 		expect(Object.keys(namespace)).toEqual(["createNodeDurableIssuanceStore"]);
 		const result = namespace.createNodeDurableIssuanceStore({ primaryFilename: primary("surface") });
@@ -959,6 +959,8 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			"readOutboxPage",
 			"readSettlementPlan",
 			"transactIssue",
+			// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+			"transactIssueBatch",
 			"transactWriteSettlementPlan",
 		]);
 		expect(Reflect.ownKeys(result).sort()).toEqual([
@@ -970,6 +972,8 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			"readOutboxPage",
 			"readSettlementPlan",
 			"transactIssue",
+			// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+			"transactIssueBatch",
 			"transactWriteSettlementPlan",
 		]);
 		expect(Object.getPrototypeOf(result)).toBe(Object.prototype);

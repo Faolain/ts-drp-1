@@ -2025,10 +2025,10 @@ function createJournalStoreOver(
 		const transaction = strictTransaction(database, JOURNAL_STORES, "readonly");
 		const entries = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"));
 		const scopeRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(scope));
-		const rowRequests = sequences.map((sequence) => entries.get([...scopeKey(scope), sequence]));
+		const rowResults = sequences.map((sequence) => requestResult(entries.get([...scopeKey(scope), sequence])));
 		const [storedScope, rawRows, image] = await Promise.all([
 			requestResult(scopeRequest),
-			Promise.all(rowRequests.map((request) => requestResult(request))),
+			Promise.all(rowResults),
 			readRetirementSnapshot(scope.objectId, undefined, false, transaction),
 		]);
 		await transactionComplete(transaction);
