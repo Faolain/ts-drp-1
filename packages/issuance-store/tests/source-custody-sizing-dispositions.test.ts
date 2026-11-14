@@ -351,15 +351,14 @@ describe("reissue origins are sized (G22; CLOSED_RETIREMENT_BYTES unchanged)", (
 			expect(written.handBacks?.[0]?.reissueSequence).toBe(Number.MAX_SAFE_INTEGER - 1);
 			expect(written.reissueOrigins).toHaveLength(1);
 			measured(written, resource, `reissue of an unconsumed record without origin, ${count} sources`);
-			// The widest record either charge covers: consumed and with an origin, both at their maximum.
+			// The widest legal record both charges cover: consumed at the maximum reissueSequence and with an
+			// origin (an origin is below the record's own source, so at most 999 here).
 			const widest = defined(
 				copySettlementPlan(
 					{
 						...written,
-						handBacks: [
-							{ ...record, reissueSequence: Number.MAX_SAFE_INTEGER, originSequence: Number.MAX_SAFE_INTEGER - 1 },
-						],
-						reissueOrigins: [{ originSequence: Number.MAX_SAFE_INTEGER - 1, reissueSequence: Number.MAX_SAFE_INTEGER }],
+						handBacks: [{ ...record, reissueSequence: Number.MAX_SAFE_INTEGER, originSequence: 999 }],
+						reissueOrigins: [{ originSequence: 999, reissueSequence: Number.MAX_SAFE_INTEGER }],
 					},
 					scope
 				),
