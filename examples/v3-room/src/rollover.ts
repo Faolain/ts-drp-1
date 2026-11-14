@@ -176,6 +176,37 @@ export class V3RoomKeptMoveRefused extends Error {
 }
 
 /**
+ * Reported through `onError` (never thrown to the caller): a kept or given-back move was superseded by
+ * a newer accepted move of the same author and identity (the policy's `identity`, as a later placement
+ * of the same block). Offered again as a new move, the older move would land after the newer one and
+ * replace it in every replica, so the newer move stands as the author's final state for that identity:
+ * a superseded kept move is not offered again; a superseded given-back move is offered again with its
+ * record (only its own row consumes the record) and `supersededBy` is offered again right after it, so
+ * it lands last. Either way the older move is accounted for here, never silently dropped.
+ */
+export class V3RoomKeptMoveSuperseded extends Error {
+	/**
+	 * @param operation - The older kept or given-back move.
+	 * @param supersededBy - The newer accepted move of the same identity that stands in its place.
+	 * @param epoch - The epoch the policy found it superseded in.
+	 * @param givenBack - Whether the older move was a given-back move (offered again with its record).
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly supersededBy: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly givenBack: boolean
+	) {
+		super(
+			givenBack
+				? "a given-back move was superseded by a newer accepted move of the same identity; the newer move is sent again after it"
+				: "a kept move was superseded by a newer accepted move of the same identity; the newer move stands in its place"
+		);
+		this.name = "V3RoomKeptMoveSuperseded";
+	}
+}
+
+/**
  * A member's new move refused because its undelivered moves fill the room's backlog
  * (V3RoomLocalBacklogFull): they are not reaching the host. The move was never accepted, so it is not
  * lost: the policy keeps it and offers it again once the member's moves reach the creator
@@ -343,6 +374,28 @@ const CLOSING_RETRY_MS = 250;
 const CLOSING_LIMIT_MS = 120_000;
 const RETRY_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
 
+/**
+ * The same move: equal plain-data operations, key order aside.
+ * @param left - One operation (or a value inside one).
+ * @param right - The other.
+ * @returns Whether both hold the same data.
+ */
+function sameMove(left: unknown, right: unknown): boolean {
+	if (left === right) return true;
+	if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+	if (Array.isArray(left) !== Array.isArray(right)) return false;
+	const leftKeys = Object.keys(left).sort();
+	const rightKeys = Object.keys(right).sort();
+	return (
+		leftKeys.length === rightKeys.length &&
+		leftKeys.every(
+			(key, index) =>
+				key === rightKeys[index] &&
+				sameMove((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key])
+		)
+	);
+}
+
 function message(error: unknown): string {
 	if (error instanceof Error) return `${error.message} ${message(error.cause)}`;
 	return error === undefined ? "" : String(error);
@@ -396,6 +449,13 @@ export function createV3RoomRolloverPolicy(
 		memberWaitMs?: number;
 		/** How long a move waits through a closing or a close-pending retry (default 120 s). */
 		closingLimitMs?: number;
+		/**
+		 * The identity under which a later move supersedes an earlier one (the application's
+		 * displacedOperationIdentity for its "rebase" actions), or undefined for a move nothing
+		 * supersedes. With it, a kept or given-back move never lands after a newer accepted move of the
+		 * same identity (author order); without it, kept moves are offered again as they are.
+		 */
+		identity?(operation: Readonly<Record<string, unknown>>): string | undefined;
 	}>
 ): V3RoomRolloverPolicy {
 	const { role, budget } = input;
@@ -447,6 +507,19 @@ export function createV3RoomRolloverPolicy(
 	const handBackOf = new WeakMap<object, V3RoomHandBack>();
 	const handBackKey = (handBack: V3RoomHandBack): string => `${handBack.sourceSequence}:${handBack.intent}`;
 	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
+	// Author order (input.identity): each new move's place in the order the page asked for moves, and the
+	// last accepted move of each identity with that place. A given-back move is an earlier accepted move
+	// (place 0, older than every move asked for in this session).
+	let requests = 0;
+	const requestOrder = new WeakMap<object, number>();
+	const latest = new Map<string, Readonly<{ operation: Readonly<Record<string, unknown>>; order: number }>>();
+	const identityOf = (operation: Readonly<Record<string, unknown>>): string | undefined => {
+		try {
+			return input.identity?.(operation);
+		} catch {
+			return undefined;
+		}
+	};
 	let lastStatus = "";
 	const epochWaiters = new Set<() => void>();
 	let stopAdoptions: (() => void) | undefined;
@@ -753,9 +826,49 @@ export function createV3RoomRolloverPolicy(
 	};
 	// One kept move offered again. "stop-new": the room refused it at the undelivered-move bound (the
 	// batch's other new moves are not offered); "stop-all": the room stayed busy (no move is offered).
+	//
+	// Author order: a kept move is older than any accepted move of its identity the page asked for after
+	// it, and a given-back move is older than every accepted move of its identity. Offered again as a
+	// new move it would land after that newer move and replace it in every replica. So a kept new move
+	// such a move supersedes is not offered again (the newer accepted move stands in its place). A
+	// superseded given-back move is still offered again with its record (only its own row may consume
+	// the record), and the newest accepted move of its identity is offered right after it, so the newer
+	// move lands last. Either is reported (V3RoomKeptMoveSuperseded), never silently dropped. The newer
+	// move offered again is a kept re-offer like any other: it takes what the epoch's budget leaves, and
+	// with none left (or while it is kept already) it waits, kept, for a later epoch, still after the
+	// older move.
 	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<"next" | "stop-new" | "stop-all"> => {
+		const identity = identityOf(operation);
+		const newest = identity === undefined ? undefined : latest.get(identity);
+		const givenBack = handBackOf.has(operation);
+		const superseded =
+			newest !== undefined &&
+			!sameMove(newest.operation, operation) &&
+			(givenBack || (requestOrder.get(operation) ?? 0) < newest.order);
+		if (superseded && !givenBack) {
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), false));
+			return "next";
+		}
+		const answer = await offerOne(operation);
+		if (answer !== "issued") return answer;
+		if (superseded) {
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), true));
+			if (kept.includes(newest.operation)) return "next";
+			if (!keptRoomLeft()) {
+				keep(newest.operation, currentEpoch());
+				return "next";
+			}
+			const again = await offerOne(newest.operation);
+			return again === "issued" ? "next" : again;
+		}
+		return "next";
+	};
+	const offerOne = async (
+		operation: Readonly<Record<string, unknown>>
+	): Promise<"issued" | "next" | "stop-new" | "stop-all"> => {
 		try {
 			await issue(operation);
+			return "issued";
 		} catch (error) {
 			if (error instanceof V3RoomNotReachingHost) return "stop-new";
 			if (error instanceof V3RoomBusy) return "stop-all";
@@ -788,6 +901,16 @@ export function createV3RoomRolloverPolicy(
 		else keptEpoch = Math.max(keptEpoch, waitPast);
 		reportStatus();
 		watchKept();
+	};
+
+	// The last accepted move of each identity (author order). A move accepted at an earlier place never
+	// replaces a later one: a given-back move (place 0) is recorded only when nothing of its identity is.
+	const noteAccepted = (operation: Readonly<Record<string, unknown>>, order: number): void => {
+		const identity = identityOf(operation);
+		if (identity === undefined) return;
+		const prior = latest.get(identity);
+		if (prior === undefined || (order > 0 && order >= prior.order))
+			latest.set(identity, Object.freeze({ operation, order }));
 	};
 
 	// A member follows its own settlement: the moves the room's settlement window gave back are kept
@@ -836,6 +959,7 @@ export function createV3RoomRolloverPolicy(
 	async function issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
 		const selected = room;
 		if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
+		if (!handBackOf.has(operation) && !requestOrder.has(operation)) requestOrder.set(operation, ++requests);
 		if (readOnly()) {
 			// The creator is unreachable: a move issued now could only wait out the settlement window.
 			keep(operation, currentEpoch());
@@ -856,6 +980,7 @@ export function createV3RoomRolloverPolicy(
 				handBackOf.delete(operation);
 				advance(currentEpoch());
 				if (currentEpoch() === attempted) acceptedThisEpoch++;
+				noteAccepted(operation, handBack === undefined ? (requestOrder.get(operation) ?? 0) : 0);
 				// A given-back move's reissue never counted against the bound; only a new move reopens it.
 				// Any move, a reissue too, still waits for the author fence (the node refuses it until then).
 				if ((handBack === undefined && backlogFullEpoch !== undefined) || awaitingFenceEpoch !== undefined) {

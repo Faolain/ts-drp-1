@@ -744,6 +744,14 @@ export function createV3ZoneApi(
 			const policy = createV3RoomRolloverPolicy({
 				role: creatorFinalitySigner === undefined ? "member" : "creator",
 				budget: GRID_ROLLOVER_BUDGET,
+				// A later placement of a block supersedes an earlier one (the zone's displacement identity):
+				// a kept or given-back placement never lands after a newer accepted one of the same block.
+				identity: (operation) => {
+					const action = operation.action;
+					return typeof action === "string" && application.displacementPolicies[action] === "rebase"
+						? `${action}\u0000${application.displacedOperationIdentity(operation)}`
+						: undefined;
+				},
 				hooks: {
 					publishSuccessor:
 						publishSuccessor ?? ((offer, epoch): Promise<void> => delivery?.publish(offer, epoch) ?? Promise.resolve()),
