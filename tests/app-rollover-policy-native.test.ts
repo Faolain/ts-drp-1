@@ -153,25 +153,38 @@ async function playPastCeiling(
 	// A burst of creator moves outside the sequential loop (as a page's placements and moves keep
 	// coming), started when `arm`'s callback runs: `count` moves, one every `everyMs`, not awaited
 	// one by one. Every one must be accepted.
-	burst?: Readonly<{ count: number; everyMs: number; arm: (start: () => void) => void }>
+	burst?: Readonly<{
+		count: number;
+		everyMs: number;
+		// `room` issues one creator move straight to the room (past the policy, as its own re-offer
+		// does) and `track` counts a move like a burst move: accepted, or a recorded error.
+		arm: (
+			start: () => void,
+			room: Readonly<{ issue: (ordinal: number) => Promise<unknown>; track: (ordinal: number, move: Promise<unknown>) => void }>
+		) => void;
+	}>
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
 	const burstMoves: Promise<void>[] = [];
 	const burstErrors: string[] = [];
-	burst?.arm(() => {
-		for (let index = 0; index < burst.count; index++) {
-			const ordinal = 100_000 + index;
-			burstMoves.push(
-				new Promise((resolve) => setTimeout(resolve, index * burst.everyMs))
-					.then(() => creator.issue(0, ordinal))
-					.then(
-						() => void accepted.push({ role: 0, ordinal }),
-						(error: unknown) => void burstErrors.push(`${ordinal}: ${error instanceof Error ? error.message : String(error)}`)
-					)
-			);
-		}
-	});
+	const track = (ordinal: number, move: Promise<unknown>): void => {
+		burstMoves.push(
+			move.then(
+				() => void accepted.push({ role: 0, ordinal }),
+				(error: unknown) => void burstErrors.push(`${ordinal}: ${error instanceof Error ? error.message : String(error)}`)
+			)
+		);
+	};
+	burst?.arm(
+		() => {
+			for (let index = 0; index < burst.count; index++) {
+				const ordinal = 100_000 + index;
+				track(ordinal, new Promise((resolve) => setTimeout(resolve, index * burst.everyMs)).then(() => creator.issue(0, ordinal)));
+			}
+		},
+		{ issue: (ordinal) => creator.issueRoom(0, ordinal), track }
+	);
 	const writer = recipient === "writer";
 	const delivered: (number | null)[] = [null, null];
 	const wire = successorWire(() => peers);
@@ -387,6 +400,72 @@ it.each([
 	},
 	1_200_000
 );
+
+// The play-stopping follow-on, pinned (browser diag dd250ea4, fcd1 4/4: "creator issuance
+// maintenance authority is unavailable [jobs=1,pending=false,kind=local-issuance]" in the epoch the
+// retry adopted). After a failed close the session's own retry seals and adopts without the policy,
+// whose moves wait only across its own rollover. A creator move made right after the failure is
+// refused close-pending and waits for the epoch; it is offered again as soon as the retried
+// adoption exposes the successor, while that adoption's ordinary readiness job still holds the
+// creator's maintenance consumer (held open here by the test seam for 3 s). It must be accepted.
+it("grid with a writer: a creator move refused close-pending and offered again while the retried adoption prepares readiness is accepted", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	const fault: RoleSourceFault = {
+		skip: 2,
+		fail: 1,
+		refusal: { ok: false, kind: "ahe-rejected", cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" } },
+		injected: [],
+	};
+	roleSourceFault.armed = fault;
+	const seam = globalThis as { __creatorOrdinaryReadinessHold?: (epoch: number) => Promise<void> };
+	const heldEpochs: number[] = [];
+	let firstOffer = "not made";
+	try {
+		const policy = await playPastCeiling(
+			"grid",
+			"writer",
+			Number(process.env.FAILED_CLOSE_MOVES ?? 60),
+			undefined,
+			undefined,
+			/role transfer source failed|promotion source failed/u,
+			{
+				count: 0,
+				everyMs: 0,
+				// The policy's own re-offer, made straight to the room: natively the policy's next
+				// rollover joins the slower retry and its cut would hold the move, which the browser's
+				// faster retry does not.
+				arm: (_start, room) => {
+					const ordinal = 200_000;
+					fault.onFail = () => {
+						// Once the failed close set its close-pending gate: the first offer is refused.
+						setTimeout(() => {
+							room.issue(ordinal).then(
+								() => (firstOffer = "accepted"),
+								(error: unknown) => (firstOffer = error instanceof Error ? error.message : String(error))
+							);
+						}, 50);
+						// Only the first readiness after the failure: the retried close's adoption. The
+						// move is offered again inside it, with the successor exposed.
+						seam.__creatorOrdinaryReadinessHold = (epoch) => {
+							delete seam.__creatorOrdinaryReadinessHold;
+							heldEpochs.push(epoch);
+							room.track(ordinal, room.issue(ordinal));
+							return new Promise((resolve) => setTimeout(resolve, 3_000));
+						};
+					};
+				},
+			}
+		);
+		process.stdout.write(`FAILED_CLOSE_FAULT ${JSON.stringify({ injected: fault.injected, heldEpochs, firstOffer, errors: policy?.errors })}\n`);
+		expect(fault.injected, "the fault fired in a close").toHaveLength(1);
+		expect(firstOffer, "the first offer met the close-pending gate").toMatch(/close-pending/u);
+		expect(heldEpochs, "the retried adoption's readiness was held").toHaveLength(1);
+	} finally {
+		roleSourceFault.armed = undefined;
+		delete seam.__creatorOrdinaryReadinessHold;
+		restore();
+	}
+}, 1_200_000);
 
 // The refusal path: with trigger values too high to fire, the creator's move at the native
 // ceiling (Canvas: the 169th since fix/maintenance-image-capacity; the 41st before, when the next
