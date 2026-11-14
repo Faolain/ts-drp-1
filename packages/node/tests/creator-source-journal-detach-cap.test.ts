@@ -31,7 +31,7 @@ function body(name: string): string {
 }
 // The owner's detach and carrier functions with the helpers they use, compiled from the owner's own declarations. A
 // typed refusal is requireLaw's (here a TypeError naming its kind).
-const OWNERS = ["detachClosedCaptureJournal", "creatorIssuanceMaintenanceObservationCarriers", "closedJournalObservationControl",
+const OWNERS = ["detachClosedCaptureJournal", "closedWarmSourceBytes", "creatorIssuanceMaintenanceObservationCarriers", "closedJournalObservationControl",
 	"closedJournalDrainPlanCarriers", "closedJournalObservationRowsDigest", "closedRetirementBytes", "closedRetirementDigest",
 	"closedObservationCarrierBytes"];
 const compiled = new Function("encodeCanonical", "decodeCanonical", "hashDomain", "CLOSED_RETIREMENT_BYTES", "CanonicalEncodingError",
@@ -113,6 +113,41 @@ describe("a creator's warm source detaches every journal its acquisition charged
 		// Today: untyped:canonical value exceeds byte limit (rows plus the whole plan plus its native carrier, about 1.8 MB
 		// under the 786,432-byte cap), which escapes the warm source's typed decline and refuses the creator's move.
 		expect(outcome(() => compiled.detach(journal))).toMatch(/^(detached|typed:proof-budget-exceeded)$/u);
+	});
+
+	it("the detach holds exactly the charged carrier: the plan by digest, the native carriers copied beside it", () => {
+		const detached = compiled.detach(journal) as typeof journal & { control: { drain: { plan: unknown } } };
+		const carrier = compiled.carriers({ journal, ...rest })[0] as Record<string, unknown>;
+		// The encoded fields are the carrier's, byte for byte: what acquisition charged bounds what the detach encodes.
+		const { exactCanonicalControlCarriers, drainSource, ...encoded } = detached as unknown as Record<string, unknown>;
+		expect(encodeCanonical(encoded, CAP)).toEqual(compiled.carrierBytes(carrier));
+		expect(JSON.stringify(detached.control.drain.plan)).not.toContain("authorSequence");
+		// The exact plan stays available as the native carrier (copied, not shared), and drainSource rides in memory.
+		expect(exactCanonicalControlCarriers).toEqual(journal.exactCanonicalControlCarriers);
+		expect((exactCanonicalControlCarriers as Uint8Array[])[1]).not.toBe(journal.exactCanonicalControlCarriers[1]);
+		expect(drainSource).toBe(journal.drainSource);
+	});
+
+	it("backstop: a journal whose carrier itself passes the cap is the typed budget refusal, never the codec's", () => {
+		const wide = Array.from({ length: 80 }, (_, sequence) => receivedFrame(scopes[2]!, 1_000 + sequence));
+		const over = { ...journal, canonicalRows: [...canonicalRows, ...wide] };
+		expect(compiled.carrierBytes(compiled.carriers({ journal: over, ...rest })[0])).toBeUndefined();
+		expect(outcome(() => compiled.detach(over))).toBe("typed:proof-budget-exceeded");
+	});
+
+	it("every encode the warm source copies or charges on its path is the typed one", () => {
+		// detach(material), the journal observation copy, the native issuance charge and the proof's result detach:
+		// past the cap each is the typed refusal the warm source declines on, so the cold route keeps the move.
+		for (const name of ["captureCreatorOrdinaryIssuanceProofSource", "prepareCreatorOrdinaryIssuanceProofSourceReadiness",
+			"acquireCreatorOrdinaryIssuanceMaintenanceProof"]) {
+			expect(body(name), name).not.toMatch(/decodeCanonical\(closedRetirementBytes\(/u);
+			expect(body(name), name).not.toMatch(/closedRetirementBytes\((creatorIssuanceMaintenanceObservationCarriers|nativeIssuance\))/u);
+		}
+		expect(body("captureCreatorOrdinaryIssuanceProofSource")).toMatch(/const detach = <T>\(value: T\): T => decodeCanonical\(closedWarmSourceBytes\(value\)\)/u);
+		expect(body("acquireCreatorOrdinaryIssuanceMaintenanceProof")).toMatch(/chargeProofObservation\(accounting, closedWarmSourceBytes\(nativeIssuance\)\)/u);
+		// The warm reuse compares the present journal control through the same projection the source holds.
+		expect(body("acquireCreatorOrdinaryIssuanceMaintenanceProof"))
+			.toMatch(/sameOrdinaryControl\(closedJournalObservationControl\(journal\.value\.control\)/u);
 	});
 
 	it("control: the same journal with no drain detaches", () => {

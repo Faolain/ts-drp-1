@@ -5777,7 +5777,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 	// from its already-detached corpus rather than copying the same bytes again.
 	// Native/snapshot/OBS annotations remain unchanged in the complete use vector.
 	const knownProtectedMaterial = Object.freeze(knownMaterial.filter((_, index) => knownMaterialUses[index]!.protected));
-	const journalObservation = closedRetirementBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
+	const journalObservation = closedWarmSourceBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
 		snapshot: capture.snapshot, ahe: capture.ahe, floor: capture.floorImage.state, floorImage: capture.floorImage,
 		snapshotInventory: {scopes: custody.snapshotInventory.scopes, owner: custody.snapshotInventory.owner}})[0]);
 	const replaceableJournalBytes = proofMaterialOwners.get(frame.accounting)?.captureObservationOnlyMaterial(journalObservation);
@@ -5790,7 +5790,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 		if (original === undefined || original.source !== frame.input.liveJournalStore) return decline("anchor-dependency-owner");
 		anchorPreimages.push(Object.freeze({scope: Object.freeze({...original.scope}), bytes: original.exactCanonicalAnchorPreimageBytes.slice()}));
 	}
-	const detach = <T>(value: T): T => decodeCanonical(closedRetirementBytes(value)) as T;
+	const detach = <T>(value: T): T => decodeCanonical(closedWarmSourceBytes(value)) as T;
 	const originalMaterial = resolveCreatorForwardPromotionSource(proof.observation, frame.input.store, frame.input.snapshotStore);
 	// Genesis has no closed source to promote. The same authenticated cold frame
 	// can spell that empty history, but cannot mint an empty forward capability.
@@ -6060,7 +6060,7 @@ export async function prepareCreatorOrdinaryIssuanceProofSourceReadiness(
 			knownMaterial.reduce((sum, bytes) => sum + bytes.byteLength, 0) !== proof.accounting.chargedBytes)
 			return decline("known-material-UNKNOWN-mismatch");
 		const capture = facts.capture, currentTrust = seed.currentTrust;
-		const journalObservation = closedRetirementBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
+		const journalObservation = closedWarmSourceBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
 			snapshot: capture.snapshot, ahe: capture.ahe, floor: capture.floorImage.state, floorImage: capture.floorImage,
 			// The warm proof freshly compared this WHOLE exact inventory before
 			// enrollment. Decode only its private DATA; it is not native custody.
@@ -6068,7 +6068,7 @@ export async function prepareCreatorOrdinaryIssuanceProofSourceReadiness(
 		const replaceableJournalBytes = owner.captureObservationOnlyMaterial(journalObservation);
 		const {capacity: _oldCapacity, replaceableJournalObservation: _oldJournalObservation, adoptionFencePostimage: _joinedFencePostimage,
 			runtimeCensusObservation: oldRuntimeObservation, ...unchanged} = seed;
-		const detach = <T>(value: T): T => decodeCanonical(closedRetirementBytes(value)) as T;
+		const detach = <T>(value: T): T => decodeCanonical(closedWarmSourceBytes(value)) as T;
 		const sourceFacts: CreatorOrdinaryIssuanceSourceFacts = Object.freeze({...unchanged,
 			readinessRebased: true as const,
 			knownMaterial, knownMaterialUses,
@@ -6679,7 +6679,10 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		// A drain's reconstructed original is the adapter's deterministic function of (control, image,
 		// rows): while one is active, those inputs compare instead (an ordinary append cannot run mid-drain).
 		const draining = journal.value.control?.drain != null || seed.journal.control?.drain != null;
-		if (!sameOrdinaryControl(journal.value.control, seed.journal.control) ||
+		// The source holds its journal as the charged carrier (a drain plan by its rows' digest,
+		// detachClosedCaptureJournal); the present control compares through the same projection.
+		if (!sameOrdinaryControl(closedJournalObservationControl(journal.value.control) as typeof journal.value.control,
+			seed.journal.control) ||
 			draining && !(closedRetirementEqual(journal.value.image, seed.journal.image) &&
 				closedJournalRowsEqual(journal.value.canonicalRows, seed.journal.canonicalRows)))
 			throw unavailable;
@@ -6763,7 +6766,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 			requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 		for (const bytes of closedJournalNativeControlCarriers(journal.value))
 			requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
-		requireLaw(chargeProofObservation(accounting, closedRetirementBytes(nativeIssuance)), "proof-budget-exceeded");
+		requireLaw(chargeProofObservation(accounting, closedWarmSourceBytes(nativeIssuance)), "proof-budget-exceeded");
 		const replacedRuntimeCensusObservation = deferredRuntimeCensusObservation !== undefined &&
 			creatorOrdinaryRuntimeCensusHasFreshReplacement(seed, runtime, nativeIssuance, journalCorrespondence.currentRows)
 			? deferredRuntimeCensusObservation : undefined;
@@ -6891,7 +6894,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 				requireLaw(!released && capturedFrame.alive, "snapshot-unavailable"); writeStarted = true; });
 			return beginTask;
 		};
-		const detachResult = <T>(value: T): T => decodeCanonical(closedRetirementBytes(value)) as T;
+		const detachResult = <T>(value: T): T => decodeCanonical(closedWarmSourceBytes(value)) as T;
 		const proof: CreatorOrdinaryIssuanceMaintenanceProof = Object.freeze({kind: "ordinary" as const, source, accounting,
 			readJournalContext: function (this: CreatorOrdinaryIssuanceMaintenanceProof) {
 				if (this !== proof || creatorOrdinaryIssuanceProofFacts(proof)?.frame !== capturedFrame)
@@ -7103,15 +7106,23 @@ function creatorIssuanceMaintenanceObservationCarriers(input: Readonly<{
 	return [journal, input.snapshot, input.ahe, input.floor, input.floorImage, input.snapshotInventory];
 }
 
-/** Detaches a maintenance capture's journal through the closed encoder WITHOUT its in-memory drainSource.
- * The capture keeps that reconstruction (the adapter's pre-drain journal, a deterministic function of the
- * observed control, image and rows) only for the raw supplement sizing; encoded beside the residual rows it
- * holds a mid-drain journal about twice under the one encode cap. The capture's own frozen copy rides beside
- * the detached fields, unencoded and never persisted. */
-function detachClosedCaptureJournal<T extends Readonly<{ drainSource?: unknown }>>(journal: T): T {
-	const { drainSource, ...observed } = journal;
-	const detached = decodeCanonical(closedRetirementBytes(observed)) as Omit<T, "drainSource">;
-	return (drainSource === undefined ? detached : { ...detached, drainSource }) as T;
+/** Detaches a maintenance capture's journal for a warm ordinary source in the one shape its acquisition charged:
+ * the journal observation carrier, whose drain control holds its plan by digest (closedJournalObservationControl).
+ * The plan's frames duplicate rows the carrier still holds, and the exact plan is the native control carrier,
+ * which acquisition charges on its own and which rides beside the carrier as copied bytes, never encoded with it.
+ * Encoded whole (the plan beside its rows, then its native carrier again) a mid-drain journal whose carrier fits
+ * the one encode cap exceeded it, and the codec's untyped failure refused the creator's own move. The capture's
+ * in-memory drainSource (the adapter's pre-drain journal, only for the raw supplement sizing) rides beside the
+ * detached fields, unencoded and never persisted. A carrier past the cap is the typed budget refusal. */
+function detachClosedCaptureJournal<T extends Readonly<{ control: unknown; drainSource?: unknown;
+	exactCanonicalControlCarriers?: readonly Uint8Array[] }>>(journal: T): T {
+	const { drainSource, exactCanonicalControlCarriers, ...observed } = journal;
+	const detached = decodeCanonical(closedWarmSourceBytes({ ...observed,
+		control: closedJournalObservationControl(observed.control) })) as Record<string, unknown>;
+	return { ...detached,
+		...(exactCanonicalControlCarriers === undefined ? {} : {
+			exactCanonicalControlCarriers: Object.freeze(exactCanonicalControlCarriers.map(bytes => bytes.slice())) }),
+		...(drainSource === undefined ? {} : { drainSource }) } as unknown as T;
 }
 
 /** Actual detached native control carriers; materialized controls are not
@@ -10821,6 +10832,19 @@ function closedRetirementBytes(value: unknown): Uint8Array { return encodeCanoni
  * @param value - One carrier from creatorIssuanceMaintenanceObservationCarriers.
  * @returns Its exact canonical bytes, or undefined past the cap.
  */
+/**
+ * The close's encode of a value a warm ordinary source copies or charges (its detached journal, material and native
+ * issuance). Wider than the per-carrier cap it is the typed budget refusal ("proof-budget-exceeded"), which the warm
+ * source declines on (isCreatorOrdinarySourceCapacityRefusal) to keep the exact cold route; never the codec's untyped
+ * failure, which ended the creator's own local issue. Any other codec failure is rethrown unchanged.
+ * @param value - The value to encode.
+ * @returns Its exact canonical bytes under the cap.
+ */
+function closedWarmSourceBytes(value: unknown): Uint8Array {
+	const bytes = closedObservationCarrierBytes(value);
+	requireLaw(bytes !== undefined, "proof-budget-exceeded");
+	return bytes;
+}
 function closedObservationCarrierBytes(value: unknown): Uint8Array | undefined {
 	try { return closedRetirementBytes(value); }
 	catch (error) {
