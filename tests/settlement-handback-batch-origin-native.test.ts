@@ -190,11 +190,13 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])(
 			const store = await givenBackStore(factories[kind], `${kind}-batched`);
 			const fenced = await planOf(store);
 
-			// Single path: a batch carrying the hand-back with settlement work is refused before any signature.
+			// Single path: a batch carrying the hand-back with settlement work is refused and writes nothing; a native
+			// store refuses it before any signature (the ephemeral control's raw builder signs before the store
+			// validates, as in the batch conformance's mixed case).
 			const before = await snapshot(store, REISSUE, BATCH_FIRST + DRAIN.length - 1);
 			const mixed = await issueBatch(store, [reissueRow, replacement(DRAIN[0])]);
 			expect(mixed).toMatchObject({ ok: false, code: "ISSUANCE_COMMIT_INVALID" });
-			expect(mixed.signed).toEqual([]);
+			if (native) expect(mixed.signed).toEqual([]);
 			expect(await snapshot(store, REISSUE, BATCH_FIRST + DRAIN.length - 1)).toEqual(before);
 
 			// The reissue issues singly: the record is consumed, keeps its origin, and the entry maps the reissue to it.
