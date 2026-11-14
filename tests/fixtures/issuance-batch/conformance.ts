@@ -82,7 +82,7 @@ type Row = Readonly<{ effect?: DurableIssueCommit["planEffect"]; bytes(sequence:
  * @param store
  * @param row
  */
-async function issueOne(store: DurableIssuanceStore, row: Row): Promise<DurableIssueCommit> {
+export async function issueOne(store: DurableIssuanceStore, row: Row): Promise<DurableIssueCommit> {
 	return store.transactIssue(SCOPE, async (sequence, admission) => {
 		const bytes = row.bytes(sequence);
 		const signature =

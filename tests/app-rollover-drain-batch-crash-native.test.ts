@@ -18,6 +18,7 @@ import {
 	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
+import { readV3RoomSettlementBatchCounts } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Per-drain batching across process death (SIGKILL right after a real SQLite COMMIT of the Writer's
@@ -266,12 +267,33 @@ it.runIf(INNER)(
 		const exec = DatabaseSync.prototype.exec;
 		const watch = { author: "", armed: false, inside: false, journalCommits: null as number | null };
 		// Native write transactions since the drain's fence committed (observation only: the per-row cost).
-		const since = { fenced: false, issuance: 0, journal: 0 };
+		const since = { fenced: false, issuance: 0, journal: 0, issuanceSites: [] as string[] };
+		// The first library frames (function and file:line) of each counted issuance commit: what wrote it.
+		const commitSite = (): string => {
+			const limit = Error.stackTraceLimit;
+			Error.stackTraceLimit = 40;
+			const stack = new Error().stack ?? "";
+			Error.stackTraceLimit = limit;
+			return stack
+				.split("\n")
+				.filter((line) => line.includes("/packages/") && !line.includes("node:"))
+				.map((line) => line.trim().replace(/^at /u, "").replace(/\(.*\/packages\//u, "("))
+				.slice(0, 8)
+				.join(" < ");
+		};
 		const die = (detail: Record<string, unknown>) => {
 			const times = writerTimes(file, watch.author);
 			writeFileSync(
 				deathFile,
-				JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...times, commitsSinceFence: since, ...detail })
+				JSON.stringify({
+					edge,
+					pid: process.pid,
+					signal: "SIGKILL",
+					...times,
+					commitsSinceFence: since,
+					settlementBatch: readV3RoomSettlementBatchCounts(),
+					...detail,
+				})
 			);
 			process.kill(process.pid, "SIGKILL");
 			throw Error("SIGKILL_DID_NOT_TERMINATE");
@@ -279,7 +301,10 @@ it.runIf(INNER)(
 		DatabaseSync.prototype.exec = function (sql: string) {
 			const result = exec.call(this, sql);
 			if (since.fenced && (sql === "COMMIT" || sql.endsWith("COMMIT"))) {
-				if (this.location()?.endsWith(`/${basename(file)}`) === true) since.issuance += 1;
+				if (this.location()?.endsWith(`/${basename(file)}`) === true) {
+					since.issuance += 1;
+					if (since.issuanceSites.length < 40) since.issuanceSites.push(commitSite());
+				}
 				if (this.location()?.endsWith(`/${basename(journal)}`) === true) since.journal += 1;
 			}
 			if (
@@ -306,6 +331,7 @@ it.runIf(INNER)(
 					if (fence !== null && rebase.length === MOVES && replaced.length === 0 && !since.fenced) {
 						since.fenced = true;
 						since.issuance = 0;
+						since.issuanceSites.length = 0;
 					}
 					if (edge === "fence" && fence !== null && rebase.length === MOVES && replaced.length === 0)
 						die({ fence, rebase: rebase.length });

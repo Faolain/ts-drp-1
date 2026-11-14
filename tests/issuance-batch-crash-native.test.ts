@@ -1,3 +1,4 @@
+import { decodeCanonical } from "@ts-drp/canonical";
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, it } from "vitest";
 
-import { issueBatch, replacement, SCOPE, settledStore, snapshot } from "./fixtures/issuance-batch/conformance.js";
+import { issueBatch, issueOne, replacement, SCOPE, settledStore, snapshot } from "./fixtures/issuance-batch/conformance.js";
 import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/issuance.js";
 
 // transactIssueBatch crash atomicity on the SQLite store: the process is SIGKILLed around each of the
@@ -15,7 +16,21 @@ import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/iss
 // written; with the marker and no commit the marker alone is durable (no row, lineage unmoved) and
 // only the same whole batch resumes it; after the commit every row and the plan are durable.
 const INNER = process.env.RUN_ISSUANCE_BATCH_CRASH === "1";
-const EDGES = ["before-marker", "after-marker", "before-commit", "after-commit"] as const;
+// single-entered (G25, the older-store direction): a store an older build left with a single entered
+// marker. The single path and its marker codec are unchanged by batching, so this build writes exactly the
+// pre-batch record; the reopened store must read it as a single (pre-batch keys, no followingIntents),
+// refuse a batch over it before any signature, and resume it as the single it is.
+const EDGES = ["before-marker", "after-marker", "before-commit", "after-commit", "single-entered"] as const;
+const PRE_BATCH_MARKER_KEYS = [
+	"authorSequence",
+	"canonicalPreimageBytes",
+	"digest",
+	"exactCanonicalPlanBytes",
+	"incarnation",
+	"kind",
+	"phase",
+	"planEffect",
+];
 type Edge = (typeof EDGES)[number];
 const MOVES = 8;
 
@@ -35,13 +50,21 @@ const storeIn = (directory: string, reopen: boolean) =>
  * @param directory
  */
 function markerIntents(directory: string): number | null {
+	return markerBytes(directory)?.byteLength ?? null;
+}
+
+/**
+ * The lineage's raw pending marker bytes, if any.
+ * @param directory
+ * @returns The bytes, or null.
+ */
+function markerBytes(directory: string): Uint8Array | null {
 	const db = new DatabaseSync(join(directory, "issuance.drp-issuance-v1.sqlite"), { readOnly: true });
 	try {
 		const row = db.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(SCOPE.author) as
 			| { pending_unsigned: Uint8Array | null }
 			| undefined;
-		if (row?.pending_unsigned == null) return null;
-		return row.pending_unsigned.byteLength;
+		return row?.pending_unsigned ?? null;
 	} finally {
 		db.close();
 	}
@@ -84,6 +107,19 @@ it.runIf(INNER)(
 					}
 				).n
 			);
+			const entered =
+				pending &&
+				(
+					decodeCanonical(
+						(this.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(SCOPE.author) as { pending_unsigned: Uint8Array })
+							.pending_unsigned
+					) as { phase?: string }
+				).phase === "entered";
+			if (edge === "single-entered" && entered && rows === 0) {
+				const result = exec.call(this, sql);
+				die({ kind: "single-entered", rows });
+				return result;
+			}
 			const kind = !seen.marker && pending && rows === 0 ? "marker" : !seen.rows && rows === MOVES ? "rows" : undefined;
 			if (kind === "marker") seen.marker = true;
 			if (kind === "rows") seen.rows = true;
@@ -94,17 +130,19 @@ it.runIf(INNER)(
 				die({ kind, rows });
 			return result;
 		};
-		await issueBatch(
-			store,
-			sources.map((source) => replacement(source.authorSequence))
-		);
+		if (edge === "single-entered") await issueOne(store, replacement(sources[0]!.authorSequence));
+		else
+			await issueBatch(
+				store,
+				sources.map((source) => replacement(source.authorSequence))
+			);
 		throw Error(`ISSUANCE_BATCH_CRASH_EDGE_NOT_REACHED:${edge}:${JSON.stringify(seen)}`);
 	},
 	120_000
 );
 
 it.skipIf(INNER).each(EDGES)(
-	"SIGKILL %s: the reopened store holds none or all of the batch, and resumes only the whole batch",
+	"SIGKILL %s: the reopened store holds none or all of the batch (or the single), and resumes only it whole",
 	async (edge) => {
 		const directory = mkdtempSync(join(tmpdir(), `issuance-batch-crash-${edge}-`));
 		directories.push(directory);
@@ -138,6 +176,27 @@ it.skipIf(INNER).each(EDGES)(
 			const sourcesOf = Array.from({ length: MOVES }, (_, index) => index);
 			const rows = sourcesOf.map((sequence) => replacement(sequence));
 			process.stdout.write(`ISSUANCE_BATCH_CRASH ${JSON.stringify({ edge, marker, after: after.issued })}\n`);
+			if (edge === "single-entered") {
+				const record = decodeCanonical(markerBytes(directory)!) as Record<string, unknown>;
+				expect(Object.keys(record).sort()).toEqual(PRE_BATCH_MARKER_KEYS);
+				expect(record.kind).toBe("v3-issuance-pending-unsigned-1");
+				expect(record.phase).toBe("entered");
+				expect(after.issued).toEqual(none);
+				expect(after.lineage).toEqual(before.lineage);
+				// A batch over the single marker (same head row, more rows) is refused before any signature.
+				const over = await issueBatch(store, rows);
+				expect(over.ok).toBe(false);
+				expect(over.signed).toEqual([]);
+				expect((await snapshot(store, MOVES + 1, 2 * MOVES)).issued).toEqual(none);
+				// The single resumes as itself.
+				const single = await issueOne(store, rows[0]!);
+				expect(single.authorSequence).toBe(MOVES + 1);
+				const final = await snapshot(store, MOVES + 1, 2 * MOVES);
+				expect(final.issued).toEqual([MOVES + 1, ...none.slice(1)]);
+				expect(final.lineage).toEqual({ exhausted: false, next: MOVES + 2 });
+				expect(markerIntents(directory)).toBeNull();
+				return;
+			}
 			if (edge === "after-commit") {
 				expect(marker).toBeNull();
 				expect(after.issued).toEqual(all);
