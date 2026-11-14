@@ -1259,6 +1259,16 @@ for (const app of APPS)
 					)
 				)
 			).flat();
+			// Observation only: each page's settlement batch counters (null when the page does not expose them).
+			const [creatorBatch, memberBatch] = await Promise.all(
+				[creator, member].map((page) =>
+					page.evaluate(() => {
+						const read = Reflect.get(globalThis, "__TS_DRP_V3_SETTLEMENT_BATCH__") as (() => unknown) | undefined;
+						return typeof read === "function" ? read() : null;
+					})
+				)
+			);
+			const settlementBatch = { creator: creatorBatch, member: memberBatch };
 			const pages = { creator: meter.report("creator"), member: meter.report("member") };
 			const { windows, memberOverBound, rolloverIssueLatency } = issueLatency(meter, driver);
 			const stageCounts = {
@@ -1299,6 +1309,7 @@ for (const app of APPS)
 				rolloverIssueLatency,
 				app: { ...driver.report(meter), name: app },
 				successorDelivery: delivery,
+				settlementBatch,
 				harnessBridgeViolations: violations,
 				conservation,
 				clock: meter.clockCalibration(),

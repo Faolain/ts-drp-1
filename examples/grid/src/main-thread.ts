@@ -1,5 +1,6 @@
 import { acquireBrowserIdentity } from "@ts-drp/example-browser-network";
 import { DRPNode } from "@ts-drp/node";
+import { readV3RoomSettlementBatchCounts } from "@ts-drp/node/v3-room";
 import { enableTracing } from "@ts-drp/tracer";
 
 import { bindControls } from "./controls";
@@ -55,7 +56,11 @@ export async function main(): Promise<void> {
 	const target = window as typeof window & {
 		__TS_DRP_GRID_SESSION__?: GridNetworkSession;
 		__TS_DRP_V3_ZONE__?: V3ZoneApi;
+		__TS_DRP_V3_SETTLEMENT_BATCH__?: typeof readV3RoomSettlementBatchCounts;
 	};
+	// Measurement only: this page's settlement batch counters (the room runs on this thread; a room
+	// worker's counters live in the worker, so worker mode leaves this unset rather than report zeros).
+	target.__TS_DRP_V3_SETTLEMENT_BATCH__ = readV3RoomSettlementBatchCounts;
 	let session: GridNetworkSession | undefined;
 	let unloadHandler: (() => void) | undefined;
 	let zone: V3ZoneApi | undefined;

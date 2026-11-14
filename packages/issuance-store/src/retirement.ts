@@ -2,6 +2,7 @@ import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } 
 
 import {
 	applySettlementPlanEffect,
+	assertDurableIssueBatchEffects,
 	assertDurableIssueScope,
 	compareDurableIssuanceCompoundKeys,
 	copyDurableIssuanceBytes,
@@ -22,6 +23,7 @@ import {
 	type DurableIssueScope,
 	type DurableIssueSignContext,
 	type DurableLineage,
+	MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS,
 	SETTLEMENT_HAND_BACK_LIMITS,
 	SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
@@ -126,6 +128,67 @@ export interface DurableIssuancePendingUnsignedIntent {
 	readonly phase: "reserved" | "entered";
 	readonly planEffect?: NonNullable<DurableIssueCommit["planEffect"]>;
 	readonly exactCanonicalPlanBytes?: Uint8Array;
+	/**
+	 * A batched issue (transactIssueBatch): the batch's further intents at the following consecutive
+	 * sequences, bound by this ONE marker before any of them is signed. They carry plan effects exactly
+	 * when this intent does; exactCanonicalPlanBytes is the plan before the whole batch. The batch
+	 * commits (or resumes) whole. Older readers refuse the field (closed record).
+	 */
+	readonly followingIntents?: readonly DurableIssuancePendingFollowingIntent[];
+}
+
+/** One further intent of a batched pending marker. */
+export interface DurableIssuancePendingFollowingIntent {
+	readonly authorSequence: number;
+	readonly canonicalPreimageBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly planEffect?: NonNullable<DurableIssueCommit["planEffect"]>;
+}
+
+/** Every intent a pending marker binds, in sequence order (one, or a whole batch). */
+export function issuancePendingIntents(
+	pending: DurableIssuancePendingUnsignedIntent
+): readonly DurableIssuancePendingFollowingIntent[] {
+	return [
+		{
+			authorSequence: pending.authorSequence,
+			canonicalPreimageBytes: pending.canonicalPreimageBytes,
+			digest: pending.digest,
+			...(pending.planEffect === undefined ? {} : { planEffect: pending.planEffect }),
+		},
+		...(pending.followingIntents ?? []),
+	];
+}
+
+function captureIssuancePendingFollowingIntents(
+	value: unknown,
+	scope: DurableIssueScope,
+	head: Readonly<{ authorSequence: number; planEffect?: NonNullable<DurableIssueCommit["planEffect"]> }>
+): readonly DurableIssuancePendingFollowingIntent[] {
+	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length < 1 ||
+		value.length > MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS - 1 || head.authorSequence > Number.MAX_SAFE_INTEGER - value.length)
+		throw invalid();
+	const intents = Array.from({ length: value.length }, (_, index): DurableIssuancePendingFollowingIntent => {
+		const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable) throw invalid();
+		const raw: unknown = descriptor.value;
+		const hasEffect = raw !== null && typeof raw === "object" && Object.hasOwn(raw, "planEffect");
+		if (!isClosedDurableIssuanceRecord(raw, ["authorSequence", "canonicalPreimageBytes", "digest",
+			...(hasEffect ? ["planEffect"] : [])]) || hasEffect !== (head.planEffect !== undefined)) throw invalid();
+		const captured = captureIssuanceNativeSignInput({ scope, exactCanonicalUnsignedVertexBytes: raw.canonicalPreimageBytes });
+		if (captured.sequence !== head.authorSequence + index + 1 || raw.authorSequence !== captured.sequence ||
+			!(raw.digest instanceof Uint8Array) || !issuanceRetirementBytesEqual(captured.digest, raw.digest)) throw invalid();
+		const planEffect = hasEffect ? copySettlementPlanEffect(raw.planEffect) : undefined;
+		if (hasEffect && planEffect === undefined) throw invalid();
+		return Object.freeze({ authorSequence: captured.sequence, canonicalPreimageBytes: captured.bytes, digest: captured.digest,
+			...(planEffect === undefined ? {} : { planEffect }) });
+	});
+	try {
+		assertDurableIssueBatchEffects([head.planEffect, ...intents.map((intent) => intent.planEffect)]);
+	} catch {
+		throw invalid();
+	}
+	return Object.freeze(intents);
 }
 
 /** Validates stored original unsigned custody, without granting crypto eligibility. */
@@ -134,8 +197,9 @@ export function captureIssuancePendingUnsignedIntent(
 ): DurableIssuancePendingUnsignedIntent {
 	if (input === null || typeof input !== "object") throw invalid();
 	const hasEffect = Object.hasOwn(input, "planEffect");
+	const hasFollowing = Object.hasOwn(input, "followingIntents");
 	if (!isClosedDurableIssuanceRecord(input, ["kind", "incarnation", "authorSequence", "canonicalPreimageBytes", "digest", "phase",
-		...(hasEffect ? ["planEffect", "exactCanonicalPlanBytes"] : [])]) ||
+		...(hasEffect ? ["planEffect", "exactCanonicalPlanBytes"] : []), ...(hasFollowing ? ["followingIntents"] : [])]) ||
 		input.kind !== "v3-issuance-pending-unsigned-1" || typeof input.incarnation !== "string" ||
 		!/^[0-9a-f]{64}$/u.test(input.incarnation) || (input.phase !== "reserved" && input.phase !== "entered")) throw invalid();
 	const captured = captureIssuanceNativeSignInput({ scope, exactCanonicalUnsignedVertexBytes: input.canonicalPreimageBytes });
@@ -149,9 +213,16 @@ export function captureIssuancePendingUnsignedIntent(
 		const plan = copySettlementPlan(decodeCanonical(planBytes), scope);
 		if (plan === undefined || !issuanceRetirementBytesEqual(encodeCanonical(plan), planBytes)) throw invalid();
 	}
+	const followingIntents = hasFollowing
+		? captureIssuancePendingFollowingIntents(input.followingIntents, scope, {
+				authorSequence: captured.sequence,
+				...(planEffect === undefined ? {} : { planEffect }),
+			})
+		: undefined;
 	const detached: DurableIssuancePendingUnsignedIntent = { kind: "v3-issuance-pending-unsigned-1", incarnation: input.incarnation,
 		authorSequence: captured.sequence, canonicalPreimageBytes: captured.bytes, digest: captured.digest, phase: input.phase,
-		...(planEffect === undefined ? {} : {planEffect, exactCanonicalPlanBytes: planBytes!}) };
+		...(planEffect === undefined ? {} : {planEffect, exactCanonicalPlanBytes: planBytes!}),
+		...(followingIntents === undefined ? {} : { followingIntents }) };
 	encodeCanonical(detached, {maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 16, maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32});
 	return Object.freeze(detached);
 }
@@ -686,7 +757,54 @@ export function issuanceUnsignedPostimageCharge(
 	scope: DurableIssueScope,
 	pending: DurableIssuancePendingUnsignedIntent
 ): Readonly<{ logicalBytes: number; rowCount: number }> {
+	if (pending.followingIntents !== undefined) return issuanceUnsignedBatchPostimageCharge(rows, scope, pending);
 	return unsignedRowsWidth(unsignedFinalRows(rows, scope, pending));
+}
+
+/**
+ * Exact mechanical size of a whole batch's eventual native rows: every intent's issued/outbox pair (each
+ * signature charged at its UNKNOWN BYTES64 width) and the plan after every effect, applied in order with
+ * the single-commit law. Charged once, before the batch's marker; a refusal writes nothing.
+ * @param rows - Complete normalized native rows (the lineage at the batch's first sequence).
+ * @param scope - Original addressed lineage.
+ * @param pending - The batch marker (head intent, followingIntents, plan bytes before the batch).
+ * @returns Native final-row encoding width and cardinality.
+ */
+export function issuanceUnsignedBatchPostimageCharge(
+	rows: IssuanceRetirementRows,
+	scope: DurableIssueScope,
+	pending: Pick<DurableIssuancePendingUnsignedIntent, "authorSequence" | "canonicalPreimageBytes" | "digest" | "planEffect" |
+		"exactCanonicalPlanBytes" | "followingIntents">
+): Readonly<{ logicalBytes: number; rowCount: number }> {
+	const intents = [
+		{ authorSequence: pending.authorSequence, canonicalPreimageBytes: pending.canonicalPreimageBytes, digest: pending.digest,
+			...(pending.planEffect === undefined ? {} : { planEffect: pending.planEffect }) },
+		...(pending.followingIntents ?? []),
+	];
+	let final: IssuanceRetirementRows | UnsignedFinalRows = rows;
+	let planBytes = pending.exactCanonicalPlanBytes;
+	for (const intent of intents) {
+		final = unsignedFinalRows(final, scope, {
+			authorSequence: intent.authorSequence,
+			canonicalPreimageBytes: intent.canonicalPreimageBytes,
+			digest: intent.digest,
+			...(intent.planEffect === undefined ? {} : { planEffect: intent.planEffect, exactCanonicalPlanBytes: planBytes }),
+		});
+		if (intent.planEffect !== undefined) {
+			const plan = final.plans.find((value) => value.scope.author === scope.author && value.scope.objectId === scope.objectId);
+			if (plan === undefined) throw issuanceRetirementRefusal("unsigned settlement context changed");
+			planBytes = encodeCanonical(plan);
+		}
+	}
+	const rowCount = final.lineages.length + final.issued.length + final.outbox.length + final.plans.length;
+	if (rowCount > ISSUANCE_RETIREMENT_LIMITS.maxRows)
+		throw issuanceRetirementRefusal("unsigned batch postimage exceeds row bound");
+	// Each new row lacks only its signature field: OBJECT count stays one varuint; UNKNOWN BYTES64 is tag+varuint+64.
+	const logicalBytes = encodeCanonical(final, unsignedEncodingLimits).byteLength +
+		intents.length * (encodeCanonical("signature").byteLength + 1 + 1 + 64);
+	if (logicalBytes > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
+		throw issuanceRetirementRefusal("unsigned batch postimage exceeds byte bound");
+	return Object.freeze({ logicalBytes, rowCount });
 }
 
 const settlementReserveDigest = new Uint8Array(32);

@@ -1,5 +1,7 @@
 import {
 	advanceJournalRetirementMutationControl,
+	type AppendAcceptedLocalBatchInput,
+	type AppendAcceptedLocalBatchResult,
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
 	captureJournalRetirementObject,
@@ -15,6 +17,8 @@ import {
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
 	captureSourceBoundJournalAppendInput,
+	captureLocalBatchJournalAppendInput,
+	classifyLiveJournalBatchAppendObservation,
 	classifyLiveJournalMutationObservation,
 	createJournalRetirementControlCodec,
 	createJournalRetirementImageCapture,
@@ -1730,6 +1734,202 @@ export function createNodeDurableLiveJournalStore(
 		});
 	};
 
+	// One drain chunk's freshly issued local rows in ONE BEGIN IMMEDIATE (each row appended exactly as its
+	// source-bound single would be: the same duplicate decision, sequence, fence admission and mutation
+	// advance), then ONE read of the header, the rows and the postimage. Whole or nothing.
+	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
+	const appendAcceptedLocalBatch = async (input: AppendAcceptedLocalBatchInput): Promise<AppendAcceptedLocalBatchResult> => {
+		verifiedReplay = undefined;
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let captured: ReturnType<typeof captureLocalBatchJournalAppendInput>;
+		try {
+			captured = captureLocalBatchJournalAppendInput(input);
+			if (!captured.ok) return failed(captured.kind);
+		} catch {
+			return failed("malformed-input");
+		}
+		const { scope: selected, rows: candidates, expectedNativeImage } = captured.value;
+		let before: StoredScope | undefined;
+		const appended: StoredRow[] = [];
+		let rejected: LiveJournalFailureKind | undefined;
+		let writeVersion: number | undefined;
+		let nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+		try {
+			beginJournalTransaction(database, "BEGIN IMMEDIATE");
+			const image = retirementImage(database, selected.objectId),
+				control = readRetirementControl(database, selected.objectId, retirementCodec);
+			if (
+				image.imageDigest !== expectedNativeImage.imageDigest ||
+				!sameNativeControl(control === null ? null : encodeJournalRetirementControl(control), expectedNativeImage.controlBytes)
+			) {
+				database.exec("ROLLBACK");
+				return failed("retirement-stale");
+			}
+			admitJournalMutation(database, selected);
+			const scope = readScopeWriter(database, selected);
+			writeVersion = dataVersion(database);
+			const addressed = scope !== null && matchesWatermark(scope, writeVersion);
+			const storedRows = scope === null || !addressed ? readRows(database, selected) : undefined;
+			if (scope === null) {
+				invalidateWatermark(selected);
+				if (storedRows?.length !== 0) rejected = "store-poisoned";
+				else
+					rejected =
+						configuredStatement(database, "SELECT 1 AS present FROM main.scopes WHERE object_id=? AND epoch=? LIMIT 1").get(
+							selected.objectId,
+							selected.epoch
+						) === undefined
+							? "not-installed"
+							: "wrong-scope";
+			} else if (!addressed && captureAddressedClosure({ rows: storedRows ?? [], scope }, snapshotValidation) === undefined)
+				rejected = "store-poisoned";
+			else {
+				before = scope;
+				for (const candidate of candidates) {
+					const digestRow = addressed
+						? readRowByDigest(database, selected, candidate.vertexDigest)
+						: storedRows?.find(({ vertexDigest }) => vertexDigest === candidate.vertexDigest);
+					const referenceRow = addressed
+						? readRowByLocalReference(database, selected, candidate.author, candidate.authorSequence)
+						: storedRows?.find(
+								(item) =>
+									item.sourceKind === "local-issued" &&
+									item.author === candidate.author &&
+									item.authorSequence === candidate.authorSequence
+							);
+					const decision = decideLiveJournalDuplicate({
+						candidate,
+						digestRow: existingProbe(digestRow),
+						referenceRow: existingProbe(referenceRow),
+					} as never) as Readonly<Record<string, unknown>>;
+					if (decision.action !== "append") {
+						rejected = "evidence-conflict";
+						break;
+					}
+				}
+				for (let index = 0; rejected === undefined && index < candidates.length; index++) {
+					const candidate = candidates[index]!;
+					const retirement = admitJournalMutation(database, selected);
+					const journalSequence = scope.nextJournalSequence + index;
+					database.exec(
+						`INSERT INTO accepted_entries(object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence) VALUES(${sqlText(selected.objectId)},${selected.epoch},${sqlText(selected.anchorDigest)},${journalSequence},'local-issued',${sqlText(candidate.vertexDigest)},NULL,NULL,${sqlText(candidate.author)},${candidate.authorSequence})`
+					);
+					const update = configuredStatement(
+						database,
+						"UPDATE scopes SET next_journal_sequence=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND next_journal_sequence=?"
+					).run(journalSequence + 1, ...scopeParameters(selected), journalSequence);
+					if (update.changes !== 1) rejected = "internal-invariant";
+					else {
+						advanceMutation(retirement);
+						appended.push({ ...candidate, journalSequence } as StoredRow);
+					}
+				}
+			}
+			if (rejected === undefined) {
+				const postimage = retirementImage(database, selected.objectId),
+					postControl = readRetirementControl(database, selected.objectId, retirementCodec);
+				nativeImage = Object.freeze({
+					imageDigest: postimage.imageDigest,
+					controlBytes: postControl === null ? null : encodeJournalRetirementControl(postControl),
+				});
+				database.exec("COMMIT");
+			} else database.exec("ROLLBACK");
+		} catch (error) {
+			try {
+				database.exec("ROLLBACK");
+			} catch {
+				// Preserve the substrate failure.
+			}
+			invalidateWatermark(selected);
+			return failed(
+				error instanceof Error && (error.message === "retirement-fenced" || error.message === "retirement-exhausted")
+					? error.message
+					: "substrate-failure"
+			);
+		}
+		if (rejected !== undefined) {
+			invalidateWatermark(selected);
+			let actual: DurableSnapshot | null | undefined;
+			try {
+				const observed = readVersionedSnapshotReadonly(database, selected);
+				actual = observed === UNSTABLE_VERSION ? undefined : observed.snapshot;
+			} catch {
+				actual = undefined;
+			}
+			if (rejected === "store-poisoned") poison();
+			if (actual === undefined && rejected !== "store-poisoned") return failed("outcome-unknown");
+			if (actual !== undefined && actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) {
+				poison();
+				return failed("store-poisoned");
+			}
+			return failed(rejected);
+		}
+		if (before === undefined || nativeImage === undefined || appended.length !== candidates.length)
+			return failed("internal-invariant");
+		// The one readback: header, the batch's rows by sequence, and the postimage, in one snapshot.
+		let observed: Readonly<{ scope: StoredScope | null; rows: (StoredRow | null)[] }> | undefined;
+		let stableVersion: number | undefined;
+		let readImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+		let active = false;
+		try {
+			const versionBefore = dataVersion(database);
+			beginJournalTransaction(database, "BEGIN");
+			active = true;
+			const inside = dataVersion(database);
+			const storedScope = readScope(database, selected);
+			const rows = appended.map(({ journalSequence }) => readRowBySequence(database, selected, journalSequence));
+			const image = retirementImage(database, selected.objectId),
+				control = readRetirementControl(database, selected.objectId, retirementCodec);
+			database.exec("COMMIT");
+			active = false;
+			const versionAfter = dataVersion(database);
+			observed = { scope: storedScope, rows };
+			readImage = { imageDigest: image.imageDigest, controlBytes: control === null ? null : encodeJournalRetirementControl(control) };
+			if (versionBefore === inside && inside === versionAfter) stableVersion = versionAfter;
+		} catch {
+			if (active)
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* retain unknown debt */
+				}
+			observed = undefined;
+		}
+		let decision: unknown;
+		try {
+			decision = classifyLiveJournalBatchAppendObservation({ before, actual: observed, targets: appended });
+		} catch {
+			decision = "mixed";
+		}
+		if (decision !== "exact-new") {
+			invalidateWatermark(selected);
+			if (decision === "exact-old") return failed("substrate-failure");
+			if (decision === "unreadable") return failed("outcome-unknown");
+			poison();
+			return failed("store-poisoned");
+		}
+		if (
+			readImage === undefined ||
+			readImage.imageDigest !== nativeImage.imageDigest ||
+			!sameNativeControl(readImage.controlBytes, nativeImage.controlBytes)
+		) {
+			invalidateWatermark(selected);
+			return failed("outcome-unknown");
+		}
+		if (stableVersion !== undefined && stableVersion === writeVersion && observed?.scope != null)
+			establishWatermark(observed.scope, stableVersion);
+		else invalidateWatermark(selected);
+		return Object.freeze({
+			ok: true,
+			scope: Object.freeze({ ...selected }),
+			rows: Object.freeze(
+				appended.map((row) => Object.freeze({ journalSequence: row.journalSequence, vertexDigest: row.vertexDigest }))
+			),
+			nativeImage,
+		});
+	};
+
 	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
 	const readiness = async (input: LiveJournalReadinessInput): Promise<LiveJournalReadinessResult> => {
 		const blocked = unavailable();
@@ -2628,6 +2828,7 @@ export function createNodeDurableLiveJournalStore(
 			}});
 		},
 		appendAccepted,
+		appendAcceptedLocalBatch,
 		close,
 		installEpochAnchor,
 		installGenesis,

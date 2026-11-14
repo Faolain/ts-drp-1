@@ -2,7 +2,18 @@ import { CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND, issuanceLegacySettlementPlanEnt
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import {
 	applySettlementPlanEffect,
+	applySettlementPlanEffects,
+	assertDurableIssueBatchEffects,
 	assertDurableIssueScope,
+	captureDurableIssueBatchInput,
+	copyAndValidateDurableIssueBatch,
+	durableIssueBatchFirstSequence,
+	durableIssueBatchMatchesIntents,
+	durableLineageAfterBatch,
+	type DurableBuildAndSignBatch,
+	type DurableIssueBatchInput,
+	type DurableIssueBatchSignContext,
+	type DurableUnsignedBatchIntent,
 	assertSettlementPlanProgressTransition,
 	captureSettlementPlanWriteInput,
 	classifyDurableIssuanceTerminalSuppression,
@@ -83,8 +94,10 @@ import {
 	issuanceRetirementRefusal,
 	issuanceRetirementTransitionRows,
 	issuanceRetirementTransitionPlanBefore,
+	issuanceUnsignedBatchPostimageCharge,
 	issuanceUnsignedPostimageCharge,
 	issuanceUnsignedPostimageWidths,
+	issuancePendingIntents,
 	issuanceUnsignedOwnMaterialByteLength,
 	joinIssuanceNativeSign,
 	type IssuanceRetirementRows,
@@ -2339,6 +2352,500 @@ class NodeIssuanceImplementation {
 		}
 	}
 
+	/**
+	 * One batched issue (transactIssueBatch): ONE writer transaction durably binds every intent of the
+	 * batch to its consecutive sequence (the entered marker, before any crypto), the writer is held
+	 * through signing, and ONE transaction commits every issued/outbox row, the plan after every effect
+	 * and the lineage advance. A crash leaves the whole batch committed, or its entered marker (resumed
+	 * whole), or nothing.
+	 * @param input - Scope, commit count and the plan revision the caller checked.
+	 * @param buildAndSign - Builds the batch's commits; may enter the one batch crypto admission.
+	 * @returns The committed batch, in sequence order.
+	 */
+	transactIssueBatch(input: DurableIssueBatchInput, buildAndSign: DurableBuildAndSignBatch): Promise<readonly DurableIssueCommit[]> {
+		let captured: DurableIssueBatchInput;
+		try {
+			captured = captureDurableIssueBatchInput(input);
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		this.session?.assertCurrent();
+		this.session?.assertOwnedAuthor(captured.scope.author);
+		let resolveJob!: (value: readonly DurableIssueCommit[]) => void;
+		let rejectJob!: (cause: unknown) => void;
+		const operation = new Promise<readonly DurableIssueCommit[]>((resolve, reject) => {
+			resolveJob = resolve;
+			rejectJob = reject;
+		});
+		let finishSession: (() => void) | undefined;
+		const running = this.#transactIssueBatch(captured, buildAndSign, () => {
+			finishSession ??= this.session?.enter();
+			this.#signOperations.add(operation);
+		});
+		void running.then(
+			(value) => { finishSession?.(); resolveJob(value); },
+			(primary: unknown) => { finishSession?.(); rejectJob(primary); }
+		);
+		void operation.then(
+			() => this.#signOperations.delete(operation),
+			() => this.#signOperations.delete(operation)
+		);
+		return operation;
+	}
+
+	async #transactIssueBatch(
+		input: DurableIssueBatchInput,
+		buildAndSign: DurableBuildAndSignBatch,
+		enter: () => void
+	): Promise<readonly DurableIssueCommit[]> {
+		this.#assertAvailable();
+		if (typeof buildAndSign !== "function") throw invalid("buildAndSign must be a function");
+		const { scope, count, expectedPlanRevision } = input;
+		let prior: NativeLineage;
+		let first: number;
+		try {
+			const observed = readNativeLineage(this.#database, scope);
+			if (observed === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			prior = observed;
+			first = durableIssueBatchFirstSequence(prior, count);
+			const plan = readSettlementPlanRow(this.#database, scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if ((plan?.revision ?? null) !== expectedPlanRevision)
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+		} catch (error) {
+			throw this.#mapOperationError(error, "batch lineage selection failed");
+		}
+		let database: DatabaseSync | undefined;
+		let issueWriterIdentity: Readonly<{ dev: number; ino: number }> | undefined;
+		let releaseWriter: (() => void) | undefined;
+		let marker: DurableIssuancePendingUnsignedIntent | undefined;
+		let admissionUsed = false;
+		let signing: Promise<readonly Uint8Array[]> | undefined;
+		let inheritedEntered = prior.pendingUnsigned?.phase === "entered";
+		let markerCommitted = false;
+		let primaryFailed = false;
+		let primary: unknown;
+		try {
+			const admit = async (
+				intents: readonly DurableUnsignedBatchIntent[],
+				sign: (index: number) => Promise<Uint8Array>,
+				context: DurableIssueBatchSignContext | undefined
+			): Promise<readonly Uint8Array[]> => {
+				this.#assertAvailable();
+				if (admissionUsed) throw invalid("native batch sign admission is one-use");
+				admissionUsed = true;
+				if (typeof sign !== "function" || !Array.isArray(intents) || intents.length !== count)
+					throw invalid("native batch sign input changed");
+				const capturedContext =
+					context === undefined
+						? undefined
+						: captureIssuanceNativeSignContext({
+								...(context.expectedIssuanceImageDigest === undefined
+									? {}
+									: { expectedIssuanceImageDigest: context.expectedIssuanceImageDigest }),
+								...(context.expectedIssuanceControlBytes === undefined
+									? {}
+									: { expectedIssuanceControlBytes: context.expectedIssuanceControlBytes }),
+							});
+				const capturedIntents = intents.map((intent, index) => {
+					if (!isClosedDurableIssuanceRecord(intent, ["exactCanonicalUnsignedVertexBytes",
+						...(Object.hasOwn(intent ?? {}, "planEffect") ? ["planEffect"] : [])]))
+						throw invalid("native batch intent is malformed");
+					const bytes = captureIssuanceNativeSignInput({
+						scope,
+						exactCanonicalUnsignedVertexBytes: intent.exactCanonicalUnsignedVertexBytes,
+					});
+					if (bytes.sequence !== first + index) throw invalid("native batch intent sequence changed");
+					const planEffect = intent.planEffect === undefined ? undefined : copySettlementPlanEffect(intent.planEffect);
+					if (intent.planEffect !== undefined && planEffect === undefined)
+						throw invalid("native batch intent effect is malformed");
+					return { authorSequence: bytes.sequence, canonicalPreimageBytes: bytes.bytes, digest: bytes.digest,
+						...(planEffect === undefined ? {} : { planEffect }) };
+				});
+				assertDurableIssueBatchEffects(capturedIntents.map((intent) => intent.planEffect));
+				const contended = this.#writerFree("issuance batch write failed");
+				if (contended !== undefined) await contended;
+				enter();
+				const idle = this.#takeIdleIssueWriter();
+				if (idle !== undefined) {
+					database = idle.database;
+					issueWriterIdentity = idle;
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+				} else {
+					database = new DatabaseSync(this.#filename, {
+						allowExtension: false,
+						enableDoubleQuotedStringLiterals: false,
+						enableForeignKeyConstraints: false,
+					});
+					if (this.session === undefined) {
+						const opened = statSync(this.#filename);
+						issueWriterIdentity = { dev: opened.dev, ino: opened.ino };
+					}
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
+					database.exec("PRAGMA synchronous=FULL");
+					registerRetirementConnection(database);
+				}
+				const writer = database;
+				releaseWriter = holdNativeWriter(this.#filename);
+				writer.exec("BEGIN IMMEDIATE");
+				verifyAuthority(writer);
+				const current = readNativeLineage(writer, scope, "writer");
+				inheritedEntered ||= current?.pendingUnsigned?.phase === "entered";
+				if (!current || !sameLineage(current, prior) || current.exhausted)
+					throw issuanceRetirementRefusal("native batch lineage changed");
+				const rows = retirementRows(writer, scope.objectId);
+				const priorControl = readRetirementControl(writer, scope.objectId);
+				if (capturedContext?.expectedIssuanceImageDigest !== undefined) {
+					const expectedControl = capturedContext.expectedIssuanceControlBytes;
+					const actualControl = readRetirementControlRecord(writer, scope.objectId)?.bytes ?? null;
+					if (
+						issuanceRetirementImage(rows, scope.objectId).imageDigest !== capturedContext.expectedIssuanceImageDigest ||
+						(expectedControl === null || expectedControl === undefined
+							? actualControl !== null
+							: actualControl === null || !issuanceRetirementBytesEqual(actualControl, expectedControl))
+					)
+						throw issuanceRetirementRefusal("native issuance batch quote currency changed");
+				}
+				const plan = readSettlementPlanRow(writer, scope);
+				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+				if ((plan?.revision ?? null) !== expectedPlanRevision)
+					throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+				const withEffects = capturedIntents[0]!.planEffect !== undefined;
+				if (withEffects && plan === null) throw issuanceRetirementRefusal("native batch settlement plan is unavailable");
+				const control: DurableIssuanceRetirementControl = priorControl ?? {
+					kind: "v3-issuance-retirement-control-1",
+					objectId: scope.objectId,
+					incarnation: issuanceRetirementHex(globalThis.crypto.getRandomValues(new Uint8Array(32))),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+				const [head, ...following] = capturedIntents;
+				const requested = captureIssuancePendingUnsignedIntent(
+					{
+						kind: "v3-issuance-pending-unsigned-1",
+						incarnation: control.incarnation,
+						authorSequence: head!.authorSequence,
+						canonicalPreimageBytes: head!.canonicalPreimageBytes,
+						digest: head!.digest,
+						phase: "entered",
+						...(withEffects ? { planEffect: head!.planEffect, exactCanonicalPlanBytes: encodeCanonical(plan) } : {}),
+						...(following.length === 0 ? {} : { followingIntents: following }),
+					},
+					scope
+				);
+				const old = current.pendingUnsigned;
+				// Only the SAME whole batch may resume an existing marker (a crash after it): exact bytes,
+				// effects, plan and incarnation. Anything else is another intent's ordinal.
+				if (
+					old !== undefined &&
+					!issuanceRetirementBytesEqual(encodeCanonical({ ...old, phase: "entered" }), encodeCanonical(requested))
+				)
+					throw issuanceRetirementRefusal("native unsigned identity or context is unresolved");
+				if (old === undefined && following.length === 0 && count !== 1) throw invalid("native batch count changed");
+				const normalized = {
+					...scope,
+					next: current.next,
+					exhausted: current.exhausted,
+					prunedThroughAuthorSequence: current.prunedThroughAuthorSequence,
+					pendingUnsigned: requested,
+				};
+				const markedRows = {
+					...rows,
+					lineages: current.present
+						? rows.lineages.map((row) => (row.author === scope.author ? normalized : row))
+						: [...rows.lineages, normalized],
+				};
+				// The whole batch is charged once, before its marker: the marker postimage itself and every
+				// eventual pair plus the plan after every effect. A refusal writes nothing and signs nothing.
+				issuanceRetirementImageBound(markedRows, scope.objectId);
+				issuanceUnsignedBatchPostimageCharge(markedRows, scope, requested);
+				for (const intent of capturedIntents)
+					if (!issuanceRetirementAllows(priorControl, scope, intent.authorSequence, intent.canonicalPreimageBytes, intent.digest))
+						throw issuanceRetirementRefusal("issued epoch is retired");
+				if (old === undefined || old.phase !== "entered") {
+					if (priorControl === null)
+						configuredStatement(writer, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
+							scope.objectId,
+							encodeIssuanceRetirementControl(control)
+						);
+					if (current.present)
+						configuredStatement(writer, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
+							encodeCanonical(requested),
+							scope.objectId,
+							scope.author
+						);
+					else
+						configuredStatement(
+							writer,
+							"INSERT INTO lineages (object_id,author,next,exhausted,pending_unsigned) VALUES(?,?,?,?,?)"
+						).run(scope.objectId, scope.author, current.next, current.exhausted ? 1 : 0, encodeCanonical(requested));
+					bumpRetirement(writer, scope.objectId);
+				}
+				marker = requested;
+				releaseWriter?.();
+				writer.exec("COMMIT"); // the batch's entered marker survives an escaped signature
+				markerCommitted = true;
+				releaseWriter = holdNativeWriter(this.#filename);
+				writer.exec("BEGIN IMMEDIATE");
+				this.#assertAvailable();
+				const entered = readNativeLineage(writer, scope, "writer");
+				if (
+					entered?.pendingUnsigned === undefined ||
+					!issuanceRetirementBytesEqual(encodeCanonical(entered.pendingUnsigned), encodeCanonical(requested)) ||
+					readRetirementControl(writer, scope.objectId)?.incarnation !== requested.incarnation
+				)
+					throw issuanceRetirementRefusal("native batch entered source changed");
+				prior = { ...prior, pendingUnsigned: requested, present: true };
+				// Keep this exact writer through every signature and the commit.
+				signing = (async (): Promise<readonly Uint8Array[]> => {
+					const signatures: Uint8Array[] = [];
+					for (let index = 0; index < capturedIntents.length; index += 1) {
+						this.#assertAvailable();
+						const digest = capturedIntents[index]!.digest;
+						const signature = await (this.session
+							? this.session.withOwnedOperationSigning(digest, () => sign(index))
+							: sign(index));
+						this.#assertAvailable();
+						if (!(signature instanceof Uint8Array) || signature.byteLength !== 64)
+							throw invalid("native registered signature is malformed");
+						signatures.push(new Uint8Array(signature));
+					}
+					return Object.freeze(signatures);
+				})();
+				void signing.catch(() => undefined);
+				return signing;
+			};
+			const built = await buildAndSign(first, (intents, sign, context) => admit(intents, sign, context));
+			if (signing !== undefined) await signing;
+			const candidates = copyAndValidateDurableIssueBatch(built, scope, first, count);
+			this.#assertAvailable();
+			if (marker !== undefined && !durableIssueBatchMatchesIntents(issuancePendingIntents(marker), candidates))
+				throw invalid("native batch candidates differ from admitted unsigned bytes");
+			if (database === undefined) {
+				const contended = this.#writerFree("issuance batch write failed");
+				if (contended !== undefined) await contended;
+			}
+			return this.#commitBatch(scope, prior, first, candidates, marker, expectedPlanRevision, database, database !== undefined);
+		} catch (error) {
+			primaryFailed = true;
+			const enteredUncertainty = markerCommitted || inheritedEntered;
+			primary =
+				enteredUncertainty &&
+				!this.#closed &&
+				error !== this.#poison &&
+				!this.#hasCode(error, "ISSUANCE_OUTCOME_UNKNOWN")
+					? new DurableIssuanceUnknownOutcomeError(scope, { cause: error })
+					: error;
+			throw primary;
+		} finally {
+			if (signing !== undefined) await signing.catch(() => undefined);
+			if (database !== undefined) {
+				let cleanup: unknown;
+				try {
+					try {
+						database.exec("ROLLBACK");
+					} catch {
+						/* terminal may already have joined */
+					}
+				} catch (error) {
+					cleanup = error;
+				}
+				if (
+					!primaryFailed &&
+					issueWriterIdentity !== undefined &&
+					this.session === undefined &&
+					!this.#closed &&
+					this.#idleIssueWriter === undefined &&
+					(database as { isTransaction?: boolean }).isTransaction === false
+				)
+					this.#idleIssueWriter = Object.freeze({ database, dev: issueWriterIdentity.dev, ino: issueWriterIdentity.ino });
+				else
+					try {
+						database.close();
+					} catch (error) {
+						cleanup = cleanup === undefined ? error : new AggregateError([cleanup, error], "native batch release failed");
+					}
+				releaseWriter?.();
+				if (cleanup !== undefined)
+					throw primaryFailed
+						? new AggregateError([primary, cleanup], "native batch and release failed", { cause: primary })
+						: cleanup;
+			}
+		}
+	}
+
+	#commitBatch(
+		scope: DurableIssueScope,
+		prior: NativeLineage,
+		first: number,
+		candidates: readonly DurableIssueCommit[],
+		marker: DurableIssuancePendingUnsignedIntent | undefined,
+		expectedPlanRevision: number | null,
+		database = this.#database,
+		alreadyBegan = false
+	): readonly DurableIssueCommit[] {
+		let began = alreadyBegan;
+		let committing = false;
+		let expectedPlan: SettlementPlan | null = null;
+		try {
+			if (!alreadyBegan) database.exec("BEGIN IMMEDIATE");
+			began = true;
+			const current = readNativeLineage(database, scope, "writer");
+			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			if (marker === undefined) {
+				// A raw builder (no crypto admission): no marker may stand at these ordinals.
+				if (current.pendingUnsigned !== undefined) throw issuanceRetirementRefusal("issuance unsigned identity is unresolved");
+			} else if (
+				current.pendingUnsigned === undefined ||
+				!issuanceRetirementBytesEqual(encodeCanonical(current.pendingUnsigned), encodeCanonical(marker)) ||
+				marker.incarnation !== readRetirementControl(database, scope.objectId)?.incarnation
+			)
+				throw issuanceRetirementRefusal("issuance unsigned batch or incarnation changed");
+			if (!sameLineage(current, prior) || current.exhausted || current.next !== first) {
+				database.exec("ROLLBACK");
+				began = false;
+				throw failure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
+			}
+			const control = readRetirementControl(database, scope.objectId);
+			for (const candidate of candidates)
+				if (
+					!issuanceRetirementAllows(
+						control,
+						scope,
+						candidate.authorSequence,
+						candidate.envelope.canonicalPreimageBytes,
+						candidate.envelope.digest
+					)
+				)
+					throw issuanceRetirementRefusal("issued epoch is retired");
+			const plan = readSettlementPlanRow(database, scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if ((plan?.revision ?? null) !== expectedPlanRevision)
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+			if (candidates[0]!.planEffect !== undefined) {
+				if (plan === null) throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+				if (marker !== undefined && !issuanceRetirementBytesEqual(encodeCanonical(plan), marker.exactCanonicalPlanBytes!))
+					throw issuanceRetirementRefusal("issuance unsigned settlement source changed");
+				expectedPlan = applySettlementPlanEffects(plan, candidates);
+				const planChanges = configuredStatement(
+					database,
+					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+				).run(
+					expectedPlan!.revision,
+					expectedPlan!.fenceSequence,
+					settlementPlanEntriesJson(expectedPlan!),
+					scope.objectId,
+					scope.author,
+					plan.revision
+				).changes;
+				if (planChanges !== 1) throw this.#latchCorruption("settlement plan effect changed an impossible row count");
+			}
+			const after = durableLineageAfterBatch(first, candidates.length);
+			const lineageChanges = prior.present
+				? configuredStatement(
+						database,
+						"UPDATE lineages SET next=?,exhausted=?,pending_unsigned=NULL WHERE object_id=? AND author=? AND next=? AND exhausted=?"
+					).run(after.next, after.exhausted ? 1 : 0, scope.objectId, scope.author, prior.next, prior.exhausted ? 1 : 0).changes
+				: configuredStatement(database, "INSERT INTO lineages (object_id,author,next,exhausted) VALUES(?,?,?,?)").run(
+						scope.objectId,
+						scope.author,
+						after.next,
+						after.exhausted ? 1 : 0
+					).changes;
+			if (lineageChanges !== 1) throw this.#latchCorruption("lineage CAS changed an impossible row count");
+			for (const candidate of candidates) {
+				const issuedChanges = configuredStatement(
+					database,
+					"INSERT INTO issued_records (object_id,author,author_sequence,canonical_preimage,digest,signature) VALUES(?,?,?,?,?,?)"
+				).run(
+					scope.objectId,
+					scope.author,
+					candidate.authorSequence,
+					candidate.envelope.canonicalPreimageBytes,
+					candidate.envelope.digest,
+					candidate.envelope.signature
+				).changes;
+				if (issuedChanges !== 1) throw this.#latchCorruption("issued insert changed an impossible row count");
+				const outboxChanges = configuredStatement(
+					database,
+					"INSERT INTO issuance_outbox (object_id,author,author_sequence,digest,publish_state) VALUES(?,?,?,?,?)"
+				).run(scope.objectId, scope.author, candidate.authorSequence, candidate.envelope.digest, "pending").changes;
+				if (outboxChanges !== 1) throw this.#latchCorruption("outbox insert changed an impossible row count");
+			}
+			if (expectedPlan !== null && control)
+				assertIssuanceRetirementPlanAllowed(control, expectedPlan, retirementRows(database, scope.objectId));
+			bumpRetirement(database, scope.objectId);
+			committing = true;
+			database.exec("COMMIT");
+			began = false;
+			committing = false;
+		} catch (error) {
+			if (began || committing) {
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					// Preserve the mutation failure.
+				}
+			}
+			if (committing) return this.#classifyBatchAfterCommit(scope, candidates, expectedPlan, database);
+			if (error === this.#poison) throw error;
+			if (this.#hasCode(error, "ISSUANCE_RETRY_REQUIRED")) throw error;
+			if (this.#isConstraint(error)) throw this.#latchCorruption("issuance child-key collision");
+			throw mapSubstrate(error, "issuance batch write failed");
+		}
+		return this.#classifyBatchAfterCommit(scope, candidates, expectedPlan, database);
+	}
+
+	/**
+	 * The committed postimage of a batch, read back after its COMMIT (or an ambiguous COMMIT failure):
+	 * every row present with its exact digest and the plan after every effect, or none of them. A
+	 * partial batch is corruption.
+	 */
+	#classifyBatchAfterCommit(
+		scope: DurableIssueScope,
+		candidates: readonly DurableIssueCommit[],
+		expectedPlan: SettlementPlan | null,
+		database: DatabaseSync
+	): readonly DurableIssueCommit[] {
+		let present = 0;
+		let plan: SettlementPlan | null | undefined;
+		try {
+			database.exec("BEGIN");
+			try {
+				for (const candidate of candidates) {
+					const row = configuredStatement(
+						database,
+						"SELECT digest FROM issued_records WHERE object_id=? AND author=? AND author_sequence=?"
+					).get(scope.objectId, scope.author, candidate.authorSequence) as { digest?: unknown } | undefined;
+					if (row === undefined) continue;
+					const digest = copyDurableIssuanceBytes(row.digest);
+					if (digest === undefined || !issuanceRetirementBytesEqual(digest, candidate.envelope.digest))
+						throw this.#latchCorruption("batch issued row differs from its candidate");
+					present += 1;
+				}
+				plan = readSettlementPlanRow(database, scope);
+			} finally {
+				database.exec("COMMIT");
+			}
+		} catch (error) {
+			if (error === this.#poison) throw error;
+			throw new DurableIssuanceUnknownOutcomeError(scope, { cause: error });
+		}
+		if (present === 0) throw new DurableIssuanceUnknownOutcomeError(scope);
+		if (present !== candidates.length) throw this.#latchCorruption("batch committed partially");
+		if (
+			expectedPlan !== null &&
+			(plan === undefined ||
+				plan === null ||
+				!issuanceRetirementBytesEqual(encodeCanonical(plan), encodeCanonical(expectedPlan)))
+		)
+			throw this.#latchCorruption("settlement plan differs from the committed batch effects");
+		return Object.freeze(candidates.map((candidate) => cloneDurableIssueCommit(candidate)));
+	}
+
 	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
 		await Promise.resolve();
 		this.#assertAvailable();
@@ -3018,6 +3525,8 @@ export function createNodeDurableIssuanceStoreImplementation(
 			readSettlementPlan: (scope: DurableIssueScope) => implementation.readSettlementPlan(scope),
 			transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 				implementation.transactIssue(scope, buildAndSign),
+			transactIssueBatch: (input: DurableIssueBatchInput, buildAndSign: DurableBuildAndSignBatch) =>
+				implementation.transactIssueBatch(input, buildAndSign),
 			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
 		});
 		const readBoundedRecoveryCensus: DurableIssuanceRecoveryCensusReader = (input) => implementation.readBoundedRecoveryCensus(input);

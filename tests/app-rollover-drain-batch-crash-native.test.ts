@@ -18,22 +18,47 @@ import {
 	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
+import { readV3RoomSettlementBatchCounts } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Per-drain batching across process death (SIGKILL right after a real SQLite COMMIT of the Writer's
 // issuance store). A one-epoch install displaces the Writer's moves (they never reached the creator)
-// and its drain prepares every row in one dependency turn, issues the author fence, then issues one
-// replacement per row, each its own durable transaction. The whole process dies at:
+// and its drain prepares every row in one dependency turn, issues the author fence, then issues the
+// replacements one chunk of V3_SETTLEMENT_DRAIN_TURN_ROWS (8) at a time, each chunk ONE batched
+// issuance (transactIssueBatch: one entered-marker commit, then one commit of every row). The whole
+// process dies at:
 //   fence:          the commit that issues the drain's author fence (every row prepared, none replaced);
-//   between-issues: the commit of the drain's second replacement (some rows replaced, the rest not).
+//   chunk-marker:   the commit of the first chunk's entered marker (signed nothing, replaced nothing);
+//                   the reopened Writer resumes the marker whole before any plan write;
+//   between-chunks: the commit of the first chunk (8 rows replaced, the other 2 not);
+//   between-journal: after the first chunk's commit, the first journal write that journals any of its rows:
+//                   the chunk is journaled whole (all 8 rows in that one write, appendAcceptedLocalBatch),
+//                   never a row at a time; reopen admits each exactly once.
+// At death the Writer's replacement rows carry the logical times singles give them (fence + 2, + 4, ...):
+// a batch attempt that fell back or retried left no gap and reused no time.
+// Every commit of the Writer's issuance store is watched: a chunk is never partly replaced (no commit
+// leaves 0 < replaced-in-chunk < chunk). The fallback (a store without transactIssueBatch: one
+// replacement per transaction, as before) has its own edge (DRAIN_BATCH_CRASH_SINGLES=1, SINGLES_EDGES):
+//   between-issues: the commit of the drain's second single replacement (some rows replaced);
+//   single-marker:  the commit of the first single replacement's entered marker (the singles' chunk-marker;
+//                   its earlier reserved marker is cancellable, an entered one is resumed).
 // (The drain's one transform-refusal plan CAS needs an application whose displaced moves transform;
 // Grid and Chat rebase.)
 // The test reopens the same directory, reconnects, and requires every move to be admitted by the
 // creator exactly once: no loss, no double apply. No native write, signature or transaction is mocked.
 const INNER = process.env.RUN_DRAIN_BATCH_CRASH === "1";
-const EDGES = ["fence", "between-issues"] as const;
-type Edge = (typeof EDGES)[number];
-const MOVES = 6;
+type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-journal" | "between-issues" | "single-marker";
+/**
+ * The fallback edge: run with DRAIN_BATCH_CRASH_SINGLES=1 against a build whose issuance store has no
+ * transactIssueBatch (the drain then issues one replacement per transaction, as before batching).
+ */
+const SINGLES_EDGES: readonly Edge[] = ["between-issues", "single-marker"];
+const EDGES: readonly Edge[] =
+	process.env.DRAIN_BATCH_CRASH_SINGLES === "1"
+		? SINGLES_EDGES
+		: ["fence", "chunk-marker", "between-chunks", "between-journal"];
+const MOVES = 10;
+const CHUNK = 8;
 
 const track = {
 	rooms: new Set<{ close(): Promise<void> }>(),
@@ -57,6 +82,13 @@ const idOf = (operation: string): string | undefined => {
 	const value = JSON.parse(operation) as Record<string, unknown> | null;
 	return typeof value?.id === "string" ? value.id : undefined;
 };
+const journalFile = (directory: string, name: string) =>
+	join(
+		directory,
+		`${createHash("sha256")
+			.update(JSON.stringify(["journal", name]))
+			.digest("hex")}.sqlite.drp-live-journal-v1.sqlite`
+	);
 const issuanceFile = (directory: string, name: string) =>
 	join(
 		directory,
@@ -66,7 +98,74 @@ const issuanceFile = (directory: string, name: string) =>
 	);
 
 type PlanEntry = { disposition: string; sourceSequence: number; replacementSequence: number | null };
-/** The Writer's settlement plan, read straight from its SQLite file. */
+/**
+ * The logical times of the Writer's rows after its latest author fence, and the fence's own.
+ * @param file
+ * @param author
+ */
+function writerTimes(file: string, author: string) {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const rows = db
+			.prepare("SELECT canonical_preimage FROM issued_records WHERE author=? ORDER BY author_sequence")
+			.all(author)
+			.map(
+				(row) =>
+					decodeCanonical(new Uint8Array(row.canonical_preimage as Uint8Array)) as RowValue & { logicalTime: number }
+			);
+		const fence = rows.findLastIndex((row) => row.operation.action === "$drp.author-fence.v1");
+		const fenceRow = fence < 0 ? undefined : rows[fence];
+		return fenceRow === undefined
+			? { fenceTime: null, times: [] as number[] }
+			: { fenceTime: fenceRow.logicalTime, times: rows.slice(fence + 1).map((row) => row.logicalTime) };
+	} finally {
+		db.close();
+	}
+}
+/**
+ * The plan effect kind and phase of the Writer's pending marker, if any (a single's or a batch's).
+ * @param file
+ * @param author
+ */
+function writerMarkerEffect(file: string, author: string): string | null {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const row = db.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(author) as
+			| { pending_unsigned: Uint8Array | null }
+			| undefined;
+		if (row?.pending_unsigned == null) return null;
+		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as {
+			phase: string;
+			planEffect?: { kind?: string };
+		};
+		return `${pending.planEffect?.kind ?? "none"}:${pending.phase}`;
+	} finally {
+		db.close();
+	}
+}
+/**
+ * The size of the entered batch marker in the Writer's lineage (null: none, or a single's marker).
+ * @param file
+ * @param author
+ */
+function writerBatchMarker(file: string, author: string): number | null {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const row = db.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(author) as
+			| { pending_unsigned: Uint8Array | null }
+			| undefined;
+		if (row?.pending_unsigned == null) return null;
+		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as { followingIntents?: unknown[] };
+		return Array.isArray(pending.followingIntents) ? pending.followingIntents.length + 1 : null;
+	} finally {
+		db.close();
+	}
+}
+/**
+ * The Writer's settlement plan, read straight from its SQLite file.
+ * @param file
+ * @param author
+ */
 function writerPlan(file: string, author: string) {
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
@@ -83,6 +182,25 @@ function writerPlan(file: string, author: string) {
 					}
 				).entries;
 		return { entries, fence: row.fence_sequence };
+	} finally {
+		db.close();
+	}
+}
+
+/**
+ * How many of the given local rows of the author the journal holds, read straight from its SQLite file.
+ * @param file - The journal's SQLite file.
+ * @param author - The local author.
+ * @param sequences - The author sequences to look for.
+ * @returns How many of them the journal holds.
+ */
+function journaledLocal(file: string, author: string, sequences: readonly number[]): number {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		return db
+			.prepare("SELECT local_author_sequence FROM accepted_entries WHERE local_author=?")
+			.all(author)
+			.filter((row) => sequences.includes(row.local_author_sequence as number)).length;
 	} finally {
 		db.close();
 	}
@@ -162,17 +280,83 @@ it.runIf(INNER)(
 		const directory = process.env.DRAIN_BATCH_CRASH_DIRECTORY!;
 		const edge = process.env.DRAIN_BATCH_CRASH_EDGE as Edge;
 		const deathFile = join(directory, "death.json"),
-			setupFile = join(directory, "setup.json");
+			setupFile = join(directory, "setup.json"),
+			partialFile = join(directory, "partial-chunk.json");
+		const singles = process.env.DRAIN_BATCH_CRASH_SINGLES === "1";
 		const file = issuanceFile(directory, "recipient");
+		const journal = journalFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
-		const watch = { author: "", armed: false, inside: false };
+		const watch = { author: "", armed: false, inside: false, chunkSequences: null as number[] | null };
+		// Native transactions since the drain's fence committed, split by kind (observation only: the per-row cost).
+		// A write is a BEGIN IMMEDIATE transaction; a read is a plain BEGIN snapshot (no fsync); both end in COMMIT.
+		const since = {
+			fenced: false,
+			issuanceWrites: 0,
+			issuanceReads: 0,
+			journalWrites: 0,
+			journalReads: 0,
+			issuanceSites: [] as string[],
+		};
+		const transactionKind = new WeakMap<DatabaseSync, "write" | "read">();
+		// The first library frames (function and file:line) of each counted issuance commit, prefixed by its kind.
+		const commitSite = (): string => {
+			const limit = Error.stackTraceLimit;
+			Error.stackTraceLimit = 40;
+			const stack = new Error().stack ?? "";
+			Error.stackTraceLimit = limit;
+			return stack
+				.split("\n")
+				.filter((line) => line.includes("/packages/") && !line.includes("node:"))
+				.map((line) =>
+					line
+						.trim()
+						.replace(/^at /u, "")
+						.replace(/\(.*\/packages\//u, "(")
+				)
+				.slice(0, 8)
+				.join(" < ");
+		};
 		const die = (detail: Record<string, unknown>) => {
-			writeFileSync(deathFile, JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...detail }));
+			const times = writerTimes(file, watch.author);
+			writeFileSync(
+				deathFile,
+				JSON.stringify({
+					edge,
+					pid: process.pid,
+					signal: "SIGKILL",
+					...times,
+					commitsSinceFence: since,
+					settlementBatch: readV3RoomSettlementBatchCounts(),
+					...detail,
+				})
+			);
 			process.kill(process.pid, "SIGKILL");
 			throw Error("SIGKILL_DID_NOT_TERMINATE");
 		};
 		DatabaseSync.prototype.exec = function (sql: string) {
+			if (sql.startsWith("BEGIN")) transactionKind.set(this, sql.includes("IMMEDIATE") ? "write" : "read");
 			const result = exec.call(this, sql);
+			if (since.fenced && (sql === "COMMIT" || sql.endsWith("COMMIT"))) {
+				const kind = transactionKind.get(this) ?? "read";
+				if (this.location()?.endsWith(`/${basename(file)}`) === true) {
+					if (kind === "write") since.issuanceWrites += 1;
+					else since.issuanceReads += 1;
+					if (since.issuanceSites.length < 40) since.issuanceSites.push(`${kind}: ${commitSite()}`);
+				}
+				if (this.location()?.endsWith(`/${basename(journal)}`) === true) {
+					if (kind === "write") since.journalWrites += 1;
+					else since.journalReads += 1;
+				}
+			}
+			if (
+				watch.chunkSequences !== null &&
+				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
+				transactionKind.get(this) === "write" &&
+				this.location()?.endsWith(`/${basename(journal)}`) === true
+			) {
+				const chunkJournaled = journaledLocal(journal, watch.author, watch.chunkSequences);
+				if (chunkJournaled > 0) die({ chunkJournaled, replaced: CHUNK });
+			}
 			if (
 				watch.armed &&
 				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
@@ -184,8 +368,32 @@ it.runIf(INNER)(
 					const { entries, fence } = writerPlan(file, watch.author);
 					const rebase = entries.filter((entry) => entry.disposition === "rebase");
 					const replaced = rebase.filter((entry) => entry.replacementSequence !== null);
+					// A chunk commits whole: replaced counts only ever land on chunk boundaries.
+					if (!singles && rebase.length === MOVES && replaced.length % CHUNK !== 0 && replaced.length !== MOVES)
+						writeFileSync(partialFile, JSON.stringify({ replaced: replaced.length, rebase: rebase.length }));
+					if (fence !== null && rebase.length === MOVES && replaced.length === 0 && !since.fenced) {
+						since.fenced = true;
+						since.issuanceWrites = 0;
+						since.issuanceReads = 0;
+						since.issuanceSites.length = 0;
+					}
 					if (edge === "fence" && fence !== null && rebase.length === MOVES && replaced.length === 0)
 						die({ fence, rebase: rebase.length });
+					const marker = writerBatchMarker(file, watch.author);
+					if (edge === "chunk-marker" && marker !== null && replaced.length === 0)
+						die({ marker, rebase: rebase.length });
+					if (edge === "between-chunks" && replaced.length === CHUNK)
+						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
+					if (edge === "between-journal" && replaced.length === CHUNK)
+						watch.chunkSequences ??= replaced.flatMap((entry) =>
+							entry.replacementSequence === null ? [] : [entry.replacementSequence]
+						);
+					if (
+						edge === "single-marker" &&
+						replaced.length === 0 &&
+						writerMarkerEffect(file, watch.author) === "replacement:entered"
+					)
+						die({ marker: 1, rebase: rebase.length });
 					if (edge === "between-issues" && replaced.length === 2)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 				} finally {
@@ -257,6 +465,17 @@ it.skipIf(INNER).each(EDGES)(
 		const setup = JSON.parse(readFileSync(join(directory, "setup.json"), "utf8")) as Setup;
 		process.stdout.write(`DRAIN_BATCH_CRASH_DEATH ${JSON.stringify({ death, setup })}\n`);
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
+		expect(existsSync(join(directory, "partial-chunk.json")), "a chunk was partly replaced").toBe(false);
+		if (edge === "chunk-marker") expect(death).toMatchObject({ marker: CHUNK, rebase: MOVES });
+		if (edge === "between-chunks") expect((death.replaced as number[]).length).toBe(CHUNK);
+		// The first journal write holding any of the chunk's rows holds all of them.
+		if (edge === "between-journal") expect(death).toMatchObject({ chunkJournaled: CHUNK });
+		// Replacement logical times are the singles' own: fence + 2, + 4, ... (no gap, no reuse).
+		const times = death.times as number[];
+		if (edge !== "fence" && edge !== "chunk-marker" && edge !== "single-marker") {
+			expect(times.length).toBeGreaterThan(0);
+			expect(times).toEqual(times.map((_, index) => (death.fenceTime as number) + 2 * (index + 1)));
+		}
 
 		const restore = await installEnvironment("node", () => undefined);
 		try {

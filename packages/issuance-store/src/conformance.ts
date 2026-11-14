@@ -1,6 +1,11 @@
 import {
 	applySettlementPlanEffect,
+	applySettlementPlanEffects,
 	assertSettlementPlanProgressTransition,
+	captureDurableIssueBatchInput,
+	copyAndValidateDurableIssueBatch,
+	durableIssueBatchFirstSequence,
+	durableLineageAfterBatch,
 	captureSettlementPlanWriteInput,
 	cloneDurableIssueCommit as cloneCommit,
 	copyDurableIssueScope as cloneScope,
@@ -41,6 +46,8 @@ import {
 import { DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT, MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT } from "./types.js";
 import type {
 	DurableBuildAndSign,
+	DurableBuildAndSignBatch,
+	DurableIssueBatchInput,
 	DurableIssuanceOutboxRecord,
 	DurableIssuanceStore,
 	DurableIssueCommit,
@@ -357,6 +364,53 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		return cloneCommit(durable);
 	}
 
+	async transactIssueBatch(
+		input: DurableIssueBatchInput,
+		buildAndSign: DurableBuildAndSignBatch
+	): Promise<readonly DurableIssueCommit[]> {
+		this.#assertAvailable();
+		const { count, expectedPlanRevision, scope } = captureDurableIssueBatchInput(input);
+		if (typeof buildAndSign !== "function") {
+			throw new InvalidArgumentFailure("buildAndSign must be a function");
+		}
+		const key = scopeKey(scope);
+		const prior = cloneLineage(this.#lineages.get(key) ?? { exhausted: false, next: 0 });
+		const first = durableIssueBatchFirstSequence(prior, count);
+		const planRevision = (): number | null => this.#plans.get(key)?.revision ?? null;
+		if (planRevision() !== expectedPlanRevision) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+		}
+		const candidates = copyAndValidateDurableIssueBatch(await buildAndSign(first), scope, first, count);
+		this.#assertAvailable();
+		const current = this.#lineages.get(key) ?? { exhausted: false, next: 0 };
+		if (!durableIssuanceLineagesEqual(current, prior)) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "author sequence lineage changed during signing");
+		}
+		if (planRevision() !== expectedPlanRevision) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed during signing");
+		}
+		for (const candidate of candidates) {
+			const durableKey = recordKey(scope, candidate.authorSequence);
+			if (this.#issued.has(durableKey) || this.#outbox.has(durableKey)) {
+				throw failure("ISSUANCE_RECOVERY_CORRUPT", "issuance key already exists at the selected lineage");
+			}
+		}
+		const stored = this.#plans.get(key);
+		const plan = stored === undefined ? null : copySettlementPlan(stored, scope);
+		if (plan === undefined) throw this.#latchCorruption();
+		// Every effect is validated before anything is written: the batch lands whole or not at all.
+		const updatedPlan = applySettlementPlanEffects(plan, candidates);
+		this.#lineages.set(key, durableLineageAfterBatch(first, count));
+		const durable = candidates.map((candidate) => cloneCommit(candidate));
+		for (const commit of durable) {
+			const durableKey = recordKey(scope, commit.authorSequence);
+			this.#issued.set(durableKey, commit);
+			this.#outbox.set(durableKey, { commit, publishState: "pending" });
+		}
+		if (updatedPlan !== null && updatedPlan !== plan) this.#plans.set(key, cloneSettlementPlan(updatedPlan));
+		return durable.map((commit) => cloneCommit(commit));
+	}
+
 	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
 		await Promise.resolve();
 		this.#assertAvailable();
@@ -494,6 +548,7 @@ export function createEphemeralDurableIssuanceStore(
 		readOutboxPage: (input) => implementation.readOutboxPage(input),
 		readSettlementPlan: (scope) => implementation.readSettlementPlan(scope),
 		transactIssue: (scope, buildAndSign) => implementation.transactIssue(scope, buildAndSign),
+		transactIssueBatch: (input, buildAndSign) => implementation.transactIssueBatch(input, buildAndSign),
 		transactWriteSettlementPlan: (input) => implementation.transactWriteSettlementPlan(input),
 	};
 	implementationByStore.set(store, implementation);

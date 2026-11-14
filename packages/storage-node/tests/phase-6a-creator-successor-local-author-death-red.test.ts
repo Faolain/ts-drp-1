@@ -1218,6 +1218,8 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				"readOutboxPage",
 				"readSettlementPlan",
 				"transactIssue",
+				// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+				"transactIssueBatch",
 				"transactWriteSettlementPlan",
 			];
 			const publicSurface = {

@@ -87,6 +87,8 @@ test("prunes, reopens and preserves v2 plus later numeric-watermark issuance in 
 				"readOutboxPage",
 				"readSettlementPlan",
 				"transactIssue",
+				// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+				"transactIssueBatch",
 				"transactWriteSettlementPlan",
 			],
 			lineage: { exhausted: false, next: 3 },

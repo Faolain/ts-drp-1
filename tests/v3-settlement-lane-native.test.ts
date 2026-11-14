@@ -140,7 +140,8 @@ it("the room's settlement drain issues its fence through the settlement lane", (
 	const room = readFileSync(new URL("../packages/node/src/v3-room.ts", import.meta.url), "utf8");
 	expect(room).toContain("await (activeHandle.issueSettlementLocal ?? activeHandle.issueLocal)(localInput);");
 	const live = readFileSync(new URL("../packages/node/src/v3-live.ts", import.meta.url), "utf8");
-	// Replacements and frontier resolutions are the drain's own work too.
-	expect(live.match(/pool: "settlement",/gu)?.length).toBe(2);
+	// Replacements and frontier resolutions are the drain's own work too, and so is a batched
+	// replacement chunk (issueReplacementBatch, perf/settlement-batch-transaction).
+	expect(live.match(/pool: "settlement",/gu)?.length).toBe(3);
 	expect(live).toContain(': enqueueLocalIssue(registration, input, "settlement"),');
 });

@@ -207,6 +207,42 @@ const noteV3RoomStage = (stage: string, started: number): void => {
 		row.count += 1;
 	}
 };
+// Diagnostics (measurement only): how this process's settlement drains issued their replacement rows, summed
+// over its rooms. `batches`/`rowsBatched`: chunks issued as one batched issuance and their rows;
+// `journalBatches`: of those chunks, the ones journaled in one native write (appendAcceptedLocalBatch); `rowsSingly`:
+// rows the per-row loop issued (a chunk the batch could not carry, a split row, rows the batches left);
+// `retries`: a chunk refused by a moved plan and re-checked; `recoveries`: an entered chunk resumed whole;
+// `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted").
+const v3RoomSettlementBatchCounts = {
+	batches: 0,
+	rowsBatched: 0,
+	journalBatches: 0,
+	rowsSingly: 0,
+	retries: 0,
+	recoveries: 0,
+	fallbacks: new Map<string, number>(),
+};
+/** The settlement batch counters of this process (see v3RoomSettlementBatchCounts). */
+export interface V3RoomSettlementBatchCounts {
+	readonly batches: number;
+	readonly rowsBatched: number;
+	readonly journalBatches: number;
+	readonly rowsSingly: number;
+	readonly retries: number;
+	readonly recoveries: number;
+	readonly fallbacks: Readonly<Record<string, number>>;
+}
+/**
+ * Reads the settlement batch diagnostics (counts since the process started).
+ * @returns A snapshot.
+ */
+export function readV3RoomSettlementBatchCounts(): V3RoomSettlementBatchCounts {
+	const { fallbacks, ...counts } = v3RoomSettlementBatchCounts;
+	return Object.freeze({ ...counts, fallbacks: Object.freeze(Object.fromEntries(fallbacks)) });
+}
+const noteV3RoomSettlementFallback = (reason: string): void => {
+	v3RoomSettlementBatchCounts.fallbacks.set(reason, (v3RoomSettlementBatchCounts.fallbacks.get(reason) ?? 0) + 1);
+};
 const settlementManualReviewErrors = new WeakSet<TypeError>();
 // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
 // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
@@ -6777,6 +6813,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
 			{ ok: true; kind: "displaced" }
 		>["source"]["prepareReplacements"];
+		issueReplacements: Extract<
+			Awaited<ReturnType<RoomPlaneHandle["readRebaseOutbox"]>>,
+			{ ok: true; kind: "displaced" }
+		>["source"]["issueReplacements"];
 	}>;
 	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
 	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
@@ -7904,6 +7944,90 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			);
 			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
 		}
+		// Batched replacements: each chunk of at most V3_SETTLEMENT_DRAIN_TURN_ROWS legacy rows (no
+		// replacement progress) is re-checked against the plan as it now is and issued in ONE batched
+		// issuance transaction against that re-check's revision (issueReplacements): one entered marker
+		// and one commit for the chunk, not one of each per row, and one publication per chunk. A plan
+		// another writer moved meanwhile refuses the chunk with nothing written and the chunk is
+		// re-checked; a chunk the batch cannot carry (see V3ReplacementBatchResult) and every row the
+		// batches leave are issued singly by the loop below, which skips each row already replaced.
+		for (let retries = 0, recoveries = 0; ; ) {
+			await checkpoint();
+			assertSessionOpen();
+			const current = await issuanceStore.readSettlementPlan(settlementScope);
+			if (current === null) throw new TypeError("v3 room settlement plan is unavailable");
+			const chunk: Readonly<{ entry: RoomSettlementPlanEntry; source: DisplacedSource; ordered: readonly Readonly<Record<string, unknown>>[] }>[] = [];
+			for (const now of current.entries) {
+				if (!eligible(now) || now.replacementProgress !== undefined) continue;
+				const prepared = plan.entries.find((row) => row.sourceSequence === now.sourceSequence);
+				const ordered = orderedBySequence.get(now.sourceSequence);
+				if (prepared === undefined || !eligible(prepared) || !sameBytes(prepared.sourceDigest, now.sourceDigest) || ordered === undefined)
+					continue;
+				await refreshSourceOwner();
+				const source = sourceBySequence.get(now.sourceSequence);
+				if (source === undefined) throw new TypeError("v3 room replacement source is unavailable");
+				chunk.push(Object.freeze({ entry: now, source, ordered }));
+				if (chunk.length === V3_SETTLEMENT_DRAIN_TURN_ROWS) break;
+			}
+			const head = chunk[0]?.source;
+			if (head === undefined || typeof head.issueReplacements !== "function") break;
+			const firstLogicalTime = logicalTime;
+			let signed = false;
+			const signRegisteredVertexDigest = async (value: Uint8Array, request: Parameters<SignRegisteredVertexDigest>[1]) => {
+				const signature = await input.signRegisteredVertexDigest(value, request);
+				signed = true;
+				return signature;
+			};
+			const inputs = chunk.map(({ entry, ordered }) =>
+				Object.freeze({
+					operations: Object.freeze(
+						ordered.map((operation) => {
+							const selected = Object.freeze({ logicalTime, operation });
+							logicalTime += 2;
+							return selected;
+						})
+					),
+					planEffect: Object.freeze({ kind: "replacement" as const, sourceSequence: entry.sourceSequence }),
+					signRegisteredVertexDigest,
+				})
+			);
+			const issued = await head.issueReplacements(
+				chunk.map((row) => row.source),
+				inputs,
+				current.revision
+			);
+			if (issued.ok) {
+				v3RoomSettlementBatchCounts.batches += 1;
+				v3RoomSettlementBatchCounts.rowsBatched += issued.rows.length;
+				if (issued.journal === "batch") v3RoomSettlementBatchCounts.journalBatches += 1;
+				if (settlementDrainPublication === "immediate") await publishAccepted();
+				continue;
+			}
+			if (issued.kind === "batch-unavailable") {
+				logicalTime = firstLogicalTime;
+				noteV3RoomSettlementFallback(issued.detail);
+				break;
+			}
+			if (issued.kind === "batch-retry") {
+				logicalTime = firstLogicalTime;
+				v3RoomSettlementBatchCounts.retries += 1;
+				if (++retries >= V3_SETTLEMENT_REFUSAL_CAS_ATTEMPTS) {
+					noteV3RoomSettlementFallback("retry-exhausted");
+					break;
+				}
+				continue;
+			}
+			if (!signed)
+				throw new TypeError(`v3 room settlement batch issue failed: ${issued.kind}: ${issued.detail}`, { cause: issued });
+			// The chunk's marker was entered: it is resumed whole (never re-issued a row at a time) once
+			// the plane is recovered, and the next chunk re-checks the plan as that leaves it.
+			if (++recoveries > V3_SETTLEMENT_REFUSAL_CAS_ATTEMPTS)
+				throw new TypeError(`v3 room settlement batch did not recover: ${issued.kind}: ${issued.detail}`, { cause: issued });
+			v3RoomSettlementBatchCounts.recoveries += 1;
+			await recoverSettlementOwner();
+			if (!(await resumePendingIssuanceIntent())) return;
+			if (settlementDrainPublication === "immediate") await publishAccepted();
+		}
 		for (const entry of plan.entries) {
 			await checkpoint();
 			assertSessionOpen();
@@ -7916,6 +8040,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				(row) => row.sourceSequence === entry.sourceSequence
 			);
 			if (now === undefined || !eligible(now) || !sameBytes(now.sourceDigest, entry.sourceDigest)) continue;
+			v3RoomSettlementBatchCounts.rowsSingly += 1;
 			await refreshSourceOwner();
 			const ordered = orderedBySequence.get(entry.sourceSequence);
 			let source = sourceBySequence.get(entry.sourceSequence);

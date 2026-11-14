@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterAll, afterEach, expect, it } from "vitest";
 
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
 import { openRole, type RoleEnvironment } from "./fixtures/track-m-apps/long-room-core.js";
@@ -17,7 +17,7 @@ import {
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { V3_ROOM_NOT_REACHING_HOST_MARGIN } from "../examples/v3-room/src/rollover.js";
-import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
+import { readV3RoomSettlementBatchCounts, V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // A Grid Writer that installs more slowly than its creator rolls over (fix/slow-member-follow).
@@ -43,6 +43,11 @@ const track = {
 	ports: new Set<SnapshotChunkProtocolPort>(),
 };
 const directories: string[] = [];
+// Observation only: how this file's settlement drains issued their rows (batched vs singly, fallbacks).
+afterAll(() => {
+	process.stdout.write(`SETTLEMENT_BATCH_COUNTS ${JSON.stringify(readV3RoomSettlementBatchCounts())}\n`);
+});
+
 afterEach(async () => {
 	await Promise.allSettled([...track.rooms].map((room) => room.close()));
 	await Promise.allSettled([...track.heads].map((head) => head.close()));

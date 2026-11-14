@@ -264,6 +264,8 @@ describe("Phase 2l-a package and closed contract", () => {
 			"readOutboxPage",
 			"readSettlementPlan",
 			"transactIssue",
+			// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+			"transactIssueBatch",
 			"transactWriteSettlementPlan",
 		]);
 		const result = await store.transactIssue(SCOPE, (selected) => Promise.resolve(commitFor(SCOPE, selected, 19)));

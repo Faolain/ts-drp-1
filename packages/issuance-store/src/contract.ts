@@ -1,11 +1,12 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { durablePreimageHeader } from "./preimage-header.js";
-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
+import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
 import type {
 	DurableIssuanceError,
 	DurableIssuanceErrorCode,
 	DurableIssuanceRetryClass,
+	DurableIssueBatchInput,
 	DurableIssueCommit,
 	DurableIssuedRecord,
 	DurableIssueScope,
@@ -1258,4 +1259,173 @@ export function compareDurableIssuanceCompoundKeys(
 	if (left[0] !== right[0]) return left[0] < right[0] ? -1 : 1;
 	if (left[1] !== right[1]) return left[1] < right[1] ? -1 : 1;
 	return left[2] - right[2];
+}
+
+/**
+ * Captures one batched issue request (transactIssueBatch) as a detached closed record.
+ * @param value - Untrusted batch input.
+ * @returns The detached input.
+ */
+export function captureDurableIssueBatchInput(value: unknown): DurableIssueBatchInput {
+	try {
+		if (!isClosedDurableIssuanceRecord(value, ["count", "expectedPlanRevision", "scope"]))
+			throw new DurableIssuanceInvalidArgumentError("batch input must be an exact own-data record");
+		assertDurableIssueScope(value.scope);
+		if (
+			!Number.isSafeInteger(value.count) ||
+			(value.count as number) < 1 ||
+			(value.count as number) > MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS
+		)
+			throw new DurableIssuanceInvalidArgumentError("batch count is outside the closed range");
+		if (value.expectedPlanRevision !== null && !isValidDurableAuthorSequence(value.expectedPlanRevision))
+			throw new DurableIssuanceInvalidArgumentError("batch expected plan revision is invalid");
+		return {
+			count: value.count as number,
+			expectedPlanRevision: value.expectedPlanRevision as number | null,
+			scope: copyDurableIssueScope(value.scope),
+		};
+	} catch (error) {
+		if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
+		throw new DurableIssuanceInvalidArgumentError("batch input could not be inspected as a closed record");
+	}
+}
+
+/**
+ * The batch's first author sequence, or the exhaustion refusal when `count` consecutive sequences from
+ * the lineage do not exist (the last one may be Number.MAX_SAFE_INTEGER, which exhausts the lineage).
+ * @param lineage - The lineage the batch starts from.
+ * @param count - Commits in the batch.
+ * @returns The first sequence.
+ */
+export function durableIssueBatchFirstSequence(
+	lineage: Readonly<{ exhausted: boolean; next: number }>,
+	count: number
+): number {
+	if (lineage.exhausted || lineage.next > Number.MAX_SAFE_INTEGER - (count - 1))
+		throw createDurableIssuanceFailure("ISSUANCE_EXHAUSTED", "author sequence lineage cannot hold the batch");
+	return lineage.next;
+}
+
+/**
+ * The lineage after a committed batch.
+ * @param first - The batch's first author sequence.
+ * @param count - Commits in the batch.
+ * @returns The advanced lineage.
+ */
+export function durableLineageAfterBatch(first: number, count: number): { exhausted: boolean; next: number } {
+	const last = first + count - 1;
+	return last === Number.MAX_SAFE_INTEGER ? { exhausted: true, next: last } : { exhausted: false, next: last + 1 };
+}
+
+/**
+ * Closes and detaches a batch's commits: exactly `count` of them, commit `i` at `first + i` and
+ * validated exactly as a single commit (copyAndValidateDurableIssueCommit). Plan effects are carried by
+ * every commit of the batch or by none (a settlement batch never mixes ordinary moves with its work).
+ * @param value - Untrusted builder result.
+ * @param scope - Selected issuance scope.
+ * @param first - The batch's first author sequence.
+ * @param count - Commits in the batch.
+ * @returns The detached commits, in sequence order.
+ */
+export function copyAndValidateDurableIssueBatch(
+	value: unknown,
+	scope: DurableIssueScope,
+	first: number,
+	count: number
+): readonly DurableIssueCommit[] {
+	let entries: readonly unknown[];
+	try {
+		if (!Array.isArray(value) || value.length !== count || Object.getPrototypeOf(value) !== Array.prototype)
+			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "batch has an invalid commit count");
+		entries = Array.from({ length: count }, (_, index) => {
+			const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+			if (descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable)
+				throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "batch commit list is not dense");
+			return descriptor.value as unknown;
+		});
+	} catch (error) {
+		if (error instanceof DurableIssuanceContractError) throw error;
+		throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "batch commit list could not be inspected");
+	}
+	const commits = entries.map((entry, index) => copyAndValidateDurableIssueCommit(entry, scope, first + index));
+	assertDurableIssueBatchEffects(commits.map((commit) => commit.planEffect));
+	return commits;
+}
+
+/**
+ * Applies a batch's plan effects in commit order, each with the single-commit validation and one
+ * revision step (applySettlementPlanEffect). Any refusal refuses the whole batch.
+ * @param plan - The durable plan before the batch (null: absent).
+ * @param commits - The batch's validated commits.
+ * @returns The plan after every effect (the input plan when the batch carries none).
+ */
+export function applySettlementPlanEffects(
+	plan: SettlementPlan | null,
+	commits: readonly DurableIssueCommit[]
+): SettlementPlan | null {
+	let current = plan;
+	for (const commit of commits) {
+		if (commit.planEffect === undefined) continue;
+		if (current === null) throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+		current = applySettlementPlanEffect(
+			current,
+			commit.planEffect,
+			commit.authorSequence,
+			settlementReplacementLastLogicalTime(commit)
+		);
+	}
+	return current;
+}
+
+/**
+ * Checks the batch's crypto admission request against the commits the builder returned: one intent
+ * per commit, the exact unsigned bytes and the same plan effect.
+ * @param intents - The admitted unsigned intents.
+ * @param commits - The batch's validated commits.
+ * @returns Whether they agree exactly.
+ */
+export function durableIssueBatchMatchesIntents(
+	intents: readonly Readonly<{ canonicalPreimageBytes: Uint8Array; digest: Uint8Array; planEffect?: SettlementPlanEffect }>[],
+	commits: readonly DurableIssueCommit[]
+): boolean {
+	return (
+		intents.length === commits.length &&
+		commits.every((commit, index) => {
+			const intent = intents[index]!;
+			return (
+				durableIssuanceBytesEqual(intent.canonicalPreimageBytes, commit.envelope.canonicalPreimageBytes) &&
+				durableIssuanceBytesEqual(intent.digest, commit.envelope.digest) &&
+				durableIssuanceBytesEqual(encodeCanonical(intent.planEffect ?? null), encodeCanonical(commit.planEffect ?? null))
+			);
+		})
+	);
+}
+
+/**
+ * The batch rules on plan effects, checked on the admitted intents before any crypto and again on the
+ * commits: effects on every commit or on none; one effect per settlement source and at most one fence;
+ * a hand-back (a re-offered move) never shares a batch with settlement work. A source split into
+ * several replacement chunks spends one batch per chunk, so each chunk is applied against the progress
+ * the previous one committed.
+ * @param effects - The batch's plan effects in commit order (undefined: none).
+ */
+export function assertDurableIssueBatchEffects(effects: readonly (SettlementPlanEffect | undefined)[]): void {
+	const present = effects.filter((effect): effect is SettlementPlanEffect => effect !== undefined);
+	if (present.length !== 0 && present.length !== effects.length)
+		throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "batch mixes plan-effect and ordinary commits");
+	const handBacks = present.filter((effect) => effect.kind === "hand-back").length;
+	if (handBacks !== 0 && handBacks !== present.length)
+		throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "batch mixes hand-back and settlement effects");
+	const targets = new Set<string>();
+	for (const effect of present) {
+		const target =
+			effect.kind === "fence"
+				? "fence"
+				: effect.kind === "hand-back"
+					? `hand-back:${effect.sourceSequence}:${effect.intent}`
+					: `replacement:${effect.sourceSequence}`;
+		if (targets.has(target))
+			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "batch repeats a settlement effect target");
+		targets.add(target);
+	}
 }

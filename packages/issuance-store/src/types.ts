@@ -232,6 +232,68 @@ export type DurableTransactIssue = (
 	buildAndSign: DurableBuildAndSign
 ) => Promise<DurableIssueCommit>;
 
+/**
+ * Most commits one batched issuance transaction carries (transactIssueBatch). A settlement drain
+ * chunk (V3_SETTLEMENT_DRAIN_TURN_ROWS) plus its fence fits.
+ */
+export const MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS = 16;
+
+export type DurableIssuePlanEffect = NonNullable<DurableIssueCommit["planEffect"]>;
+
+/** One unsigned vertex of a batch, at the batch's next consecutive author sequence. */
+export interface DurableUnsignedBatchIntent {
+	readonly exactCanonicalUnsignedVertexBytes: Uint8Array;
+	readonly planEffect?: DurableIssuePlanEffect;
+}
+
+/** Mechanical issuance currency the batch's intents were derived under (same as DurableIssueSignContext). */
+export interface DurableIssueBatchSignContext {
+	readonly expectedIssuanceImageDigest?: string;
+	readonly expectedIssuanceControlBytes?: Uint8Array | null;
+}
+
+/**
+ * The store's one crypto admission for a whole batch: it makes ONE durable entered marker that binds
+ * every intent's exact bytes (and plan effect) to its consecutive author sequence, and only then calls
+ * `sign(index)` for each intent, in order. Returns the signatures in intent order. One-use.
+ */
+export type DurableUnsignedBatchSignAdmission = (
+	intents: readonly DurableUnsignedBatchIntent[],
+	sign: (index: number) => Promise<Uint8Array>,
+	context?: DurableIssueBatchSignContext
+) => Promise<readonly Uint8Array[]>;
+
+/** Builds the batch's `count` commits at firstAuthorSequence, firstAuthorSequence + 1, ... in order. */
+export type DurableBuildAndSignBatch = (
+	firstAuthorSequence: number,
+	nativeSignAdmission?: DurableUnsignedBatchSignAdmission
+) => Promise<readonly DurableIssueCommit[]>;
+
+export interface DurableIssueBatchInput {
+	readonly scope: DurableIssueScope;
+	/** 1..MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS consecutive commits. */
+	readonly count: number;
+	/**
+	 * The settlement plan revision the caller re-checked the batch's rows against (null: the scope has
+	 * no plan). Checked before any crypto; a mismatch refuses with ISSUANCE_RETRY_REQUIRED and writes
+	 * nothing. Native stores also bind the plan's exact bytes into the entered marker, so the plan the
+	 * effects apply to at commit is the plan the caller checked.
+	 */
+	readonly expectedPlanRevision: number | null;
+}
+
+/**
+ * Commits `count` issuance records at consecutive author sequences in ONE durable transaction: every
+ * issued row, outbox row, plan effect (applied in commit order, each the same validation and one
+ * revision step as a single commit's) and the lineage advance land together, or none of them do,
+ * across a crash. Each commit is validated exactly as transactIssue validates a single commit.
+ * A batch never resumes a single pending unsigned intent (ISSUANCE_RETRY_REQUIRED: resume it first).
+ */
+export type DurableTransactIssueBatch = (
+	input: DurableIssueBatchInput,
+	buildAndSign: DurableBuildAndSignBatch
+) => Promise<readonly DurableIssueCommit[]>;
+
 export interface DurableLineage {
 	readonly exhausted: boolean;
 	readonly next: number;
@@ -256,6 +318,8 @@ export interface DurableOutboxPublicationTransitionInput {
 
 export interface DurableIssuanceStore {
 	readonly transactIssue: DurableTransactIssue;
+	/** Optional: a store without it is driven one transactIssue per commit. */
+	readonly transactIssueBatch?: DurableTransactIssueBatch;
 	compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void>;
 	readIssued(scope: DurableIssueScope, authorSequence: number): Promise<DurableIssueCommit | null>;
 	readOutboxPage(input?: DurableOutboxPageInput): Promise<readonly DurableIssuanceOutboxRecord[]>;

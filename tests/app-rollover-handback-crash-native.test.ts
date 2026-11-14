@@ -3,7 +3,7 @@ import { decodeCanonical } from "@ts-drp/canonical";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -368,8 +368,15 @@ it.skipIf(INNER).each(EDGES)(
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let output = "";
-		child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
-		child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+		// HANDBACK_CRASH_CHILD_LOG_DIR: the child's whole stdout and stderr, unfiltered, one file per run (evidence only).
+		const childLogDirectory = process.env.HANDBACK_CRASH_CHILD_LOG_DIR;
+		const childLog = childLogDirectory === undefined ? undefined : join(childLogDirectory, `${edge}-${Date.now()}-${process.pid}.log`);
+		const record = (chunk: Buffer) => {
+			output += chunk.toString();
+			if (childLog !== undefined) appendFileSync(childLog, chunk);
+		};
+		child.stdout.on("data", record);
+		child.stderr.on("data", record);
 		await new Promise<void>((resolve) => child.on("exit", () => resolve()));
 		const deathFile = join(directory, "death.json");
 		if (!existsSync(deathFile)) throw new Error(`the Writer did not die at ${edge}:\n${output.slice(-6000)}`);

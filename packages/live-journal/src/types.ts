@@ -104,6 +104,31 @@ export type AppendAcceptedVertexResult =
 	  }>
 	| Failure;
 
+/** The most local rows one appendAcceptedLocalBatch journals (the issuance batch bound). */
+export const LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS = 16 as const;
+
+/**
+ * One drain chunk's freshly issued local rows, journaled in ONE native write transaction against one
+ * exact native source checkpoint. Every row must be new to the journal and to the batch.
+ */
+export interface AppendAcceptedLocalBatchInput {
+	readonly scope: LiveJournalScope;
+	readonly rows: readonly Readonly<{ author: string; authorSequence: number; vertexDigest: string }>[];
+	/** Exact bounded native source checkpoint; mechanical currency, not authorization. */
+	readonly expectedNativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>;
+}
+
+export type AppendAcceptedLocalBatchResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly scope: LiveJournalScope;
+			/** The rows' journal sequences, consecutive and in input order. */
+			readonly rows: readonly Readonly<{ journalSequence: number; vertexDigest: string }>[];
+			/** Original writer's exact verified postimage after the whole batch. */
+			readonly nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>;
+	  }>
+	| Failure;
+
 export interface LiveJournalReadinessInput {
 	readonly scope: LiveJournalScope;
 }
@@ -221,6 +246,14 @@ export interface DurableLiveJournalStore {
 	installGenesis(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
 	installEpochAnchor(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
 	appendAccepted(input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult>;
+	/**
+	 * Journals freshly issued local rows in ONE native write transaction and reads them back in ONE read:
+	 * the native state after it is exactly the state the same rows appended singly (each source-bound on the
+	 * previous postimage) leave. It commits whole or refuses whole: a stale source checkpoint is
+	 * `retirement-stale`, any row already journaled (exactly or not) `evidence-conflict`, a repeated or
+	 * out-of-bound row set `malformed-input`, each with nothing written.
+	 */
+	appendAcceptedLocalBatch?(input: AppendAcceptedLocalBatchInput): Promise<AppendAcceptedLocalBatchResult>;
 	readiness(input: LiveJournalReadinessInput): Promise<LiveJournalReadinessResult>;
 	readAnchorPreimage(input: LiveJournalAnchorReadInput): Promise<LiveJournalAnchorReadResult>;
 	readSignedAnchorEnvelope(input: LiveJournalSignedAnchorReadInput): Promise<LiveJournalSignedAnchorReadResult>;

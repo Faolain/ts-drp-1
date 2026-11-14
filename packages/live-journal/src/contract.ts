@@ -1,7 +1,7 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { parseStorageObjectId } from "@ts-drp/storage";
 
-import { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_DOMAINS } from "./types.js";
+import { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS, LIVE_JOURNAL_DOMAINS } from "./types.js";
 import { decodeJournalRetirementControl, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, LIVE_JOURNAL_RETIREMENT_LIMITS } from "./retirement.js";
 import type {
 	LiveJournalAcceptedRow,
@@ -735,6 +735,65 @@ export function captureSourceBoundJournalAppendInput(input:unknown):Captured<Rea
 	}catch{return failure("malformed-input");}
 }
 
+/**
+ * Captures one batched local append: one scope, one exact native source checkpoint, and 1 to
+ * LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS local rows, each captured exactly as a source-bound single append of
+ * it would be. A row repeating another row's digest or local reference is malformed.
+ * @param input - Untrusted batched append input.
+ * @returns The detached scope, rows and checkpoint, or a closed failure.
+ */
+export function captureLocalBatchJournalAppendInput(input: unknown): Captured<
+	Readonly<{
+		scope: LiveJournalScope;
+		rows: readonly Extract<LiveJournalPendingRow, { readonly sourceKind: "local-issued" }>[];
+		expectedNativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>;
+	}>
+> {
+	try {
+		const record = snapshotRecord(input, ["expectedNativeImage", "rows", "scope"]);
+		if (record === undefined || !arrayIsArray(record.rows)) return failure("malformed-input");
+		const lengthDescriptor = getOwnPropertyDescriptor(record.rows, "length");
+		const length: unknown = lengthDescriptor !== undefined && "value" in lengthDescriptor ? lengthDescriptor.value : undefined;
+		if (!isSafeIntegerBetween(length, 1, LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS) || ownKeys(record.rows).length !== (length as number) + 1)
+			return failure("malformed-input");
+		const rows: Extract<LiveJournalPendingRow, { readonly sourceKind: "local-issued" }>[] = [];
+		let scope: LiveJournalScope | undefined;
+		let expectedNativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+		for (let index = 0; index < (length as number); index++) {
+			const descriptor = getOwnPropertyDescriptor(record.rows, String(index));
+			if (descriptor === undefined || !("value" in descriptor)) return failure("malformed-input");
+			const row = snapshotRecord(descriptor.value, ["author", "authorSequence", "vertexDigest"]);
+			if (row === undefined) return failure("malformed-input");
+			const captured = captureSourceBoundJournalAppendInput({
+				author: row.author,
+				authorSequence: row.authorSequence,
+				expectedNativeImage: record.expectedNativeImage,
+				scope: record.scope,
+				sourceKind: "local-issued",
+				vertexDigest: row.vertexDigest,
+			});
+			if (!captured.ok) return captured;
+			const value = captured.value.row;
+			if (value.sourceKind !== "local-issued") return failure("malformed-input");
+			if (
+				rows.some(
+					(prior) =>
+						prior.vertexDigest === value.vertexDigest ||
+						(prior.author === value.author && prior.authorSequence === value.authorSequence)
+				)
+			)
+				return failure("malformed-input");
+			scope ??= value.scope;
+			expectedNativeImage ??= captured.value.expectedNativeImage;
+			rows.push(value);
+		}
+		if (scope === undefined || expectedNativeImage === undefined) return failure("malformed-input");
+		return objectFreeze({ ok: true, value: objectFreeze({ scope, rows: objectFreeze(rows), expectedNativeImage }) });
+	} catch {
+		return failure("malformed-input");
+	}
+}
+
 function validateReceived(candidate: LiveJournalPendingRow): Captured<LiveJournalPendingRow> {
 	if (candidate.sourceKind !== "received") return objectFreeze({ ok: true, value: candidate });
 	const vertex = exactDecoded(candidate.exactCanonicalPreimageBytes, VERTEX_KEYS,["settlementSource"]);
@@ -1061,6 +1120,51 @@ export function classifyLiveJournalMutationObservation(input: MutationObservatio
 		if (target === undefined) return "mixed";
 		if (targetIsPresent(actual, target)) return "exact-new";
 		if (exactBefore(actual, before, target)) return "exact-old";
+		return "mixed";
+	} catch {
+		return "mixed";
+	}
+}
+
+/**
+ * Classifies the one postcommit read of a batched local append: the stored scope header and the rows at
+ * the batch's journal sequences. Every target present (later unrelated appends permitted) is exact-new;
+ * no target present with the header where it was is exact-old; anything else is mixed.
+ * @param input - The scope header before the batch, the read (undefined: unreadable), and the targets.
+ * @returns The exact-new, exact-old, mixed, or unreadable classification.
+ */
+export function classifyLiveJournalBatchAppendObservation(
+	input: Readonly<{
+		before: unknown;
+		actual: Readonly<{ scope: unknown; rows: readonly unknown[] }> | undefined;
+		targets: readonly unknown[];
+	}>
+): MutationDecision {
+	try {
+		if (input.actual === undefined) return "unreadable";
+		const before = captureStoredScope(input.before);
+		const actualScope = input.actual.scope === null ? undefined : captureStoredScope(input.actual.scope);
+		const targets = input.targets.map((target) => captureStoredRow(target));
+		if (
+			before === undefined ||
+			actualScope === undefined ||
+			targets.length === 0 ||
+			targets.length !== input.actual.rows.length ||
+			!sameInstalledScope(actualScope, before)
+		)
+			return "mixed";
+		const first = before.nextJournalSequence;
+		const observed = input.actual.rows.map((row) => (row === null ? null : captureStoredRow(row)));
+		for (let index = 0; index < targets.length; index++) {
+			const target = targets[index];
+			if (target === undefined || observed[index] === undefined || target.journalSequence !== first + index) return "mixed";
+		}
+		if (
+			observed.every((row, index) => row !== null && sameStoredRow(row!, targets[index]!)) &&
+			actualScope.nextJournalSequence >= first + targets.length
+		)
+			return "exact-new";
+		if (observed.every((row) => row === null) && actualScope.nextJournalSequence === first) return "exact-old";
 		return "mixed";
 	} catch {
 		return "mixed";
