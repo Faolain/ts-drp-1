@@ -132,11 +132,11 @@ describe("settlement replacement reserve", () => {
 		let seed = 0x5eed;
 		const random = (limit: number): number => {
 			seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
-			return seed % limit;
+			return (seed >>> 8) % limit;
 		};
 		const epoch = 9;
 		const cases: {retained: number; epochRows: number; forecast: number; admitted: number}[] = [];
-		for (let index = 0; index < 14; index++) {
+		for (let index = 0; index < 18; index++) {
 			const retained = random(320);
 			const epochRows = random(90);
 			// Uniform rows (as a game's placements are), mixed small rows, and mixed large rows (bytes bind).
