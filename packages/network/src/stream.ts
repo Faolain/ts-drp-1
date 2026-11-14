@@ -38,24 +38,32 @@ interface FramedStreamSession {
 
 const framedStreamSessions = new WeakMap<Stream, FramedStreamSession>();
 
-// lpStream treats RangeError as an incomplete prefix, so enforce the bound
-// before returning that signal and letting it request another byte.
-const decodeFrameLength: LengthPrefixedStreamOpts["lengthDecoder"] = (data) => {
-	if (data.byteLength > MAX_FRAME_PREFIX_BYTES) {
-		throw new InvalidDataLengthLengthError(
-			`Message length length too long - ${data.byteLength} > ${MAX_FRAME_PREFIX_BYTES}`
-		);
-	}
+/**
+ * A varint length decoder for lpStream that bounds the prefix itself. lpStream treats RangeError as an
+ * incomplete prefix and reads another byte, and checks its own `maxLengthLength` only after a prefix
+ * decodes, so an unterminated prefix would otherwise grow without bound. This decoder refuses a prefix
+ * longer than `maxPrefixBytes` before returning that signal.
+ * @param maxPrefixBytes - The longest accepted prefix.
+ * @returns The decoder.
+ */
+export function boundedLengthDecoder(maxPrefixBytes: number): NonNullable<LengthPrefixedStreamOpts["lengthDecoder"]> {
+	return (data) => {
+		if (data.byteLength > maxPrefixBytes) {
+			throw new InvalidDataLengthLengthError(`Message length length too long - ${data.byteLength} > ${maxPrefixBytes}`);
+		}
 
-	let value = 0;
-	for (let index = 0; index < data.byteLength; index++) {
-		const byte = data.get(index);
-		value += (byte & 0x7f) * 2 ** (index * 7);
-		if ((byte & 0x80) === 0) return value;
-	}
+		let value = 0;
+		for (let index = 0; index < data.byteLength; index++) {
+			const byte = data.get(index);
+			value += (byte & 0x7f) * 2 ** (index * 7);
+			if ((byte & 0x80) === 0) return value;
+		}
 
-	throw new RangeError("Could not decode frame length");
-};
+		throw new RangeError("Could not decode frame length");
+	};
+}
+
+const decodeFrameLength = boundedLengthDecoder(MAX_FRAME_PREFIX_BYTES);
 
 function framedStreamSession(stream: Stream): FramedStreamSession {
 	const existing = framedStreamSessions.get(stream);
@@ -82,10 +90,16 @@ function framedStreamSession(stream: Stream): FramedStreamSession {
  * @param stream - The stream to write to.
  * @param input - The Uint8Array to write.
  */
-export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Promise<void> {
+export async function uint8ArrayToStream(
+	stream: Stream,
+	input: Uint8Array,
+	probe?: { written?: number; closed?: number }
+): Promise<void> {
 	const lp = lpStream(stream);
 	await lp.write(input);
+	if (probe !== undefined) probe.written = performance.timeOrigin + performance.now();
 	await lp.unwrap().close();
+	if (probe !== undefined) probe.closed = performance.timeOrigin + performance.now();
 }
 
 /**

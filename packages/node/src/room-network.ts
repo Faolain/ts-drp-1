@@ -3,7 +3,7 @@ import { bytesToHex, concatBytes } from "@noble/hashes/utils";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
 import { SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "@ts-drp/issuance-store";
-import { DRP_MESSAGE_PROTOCOL } from "@ts-drp/network";
+import { isDirectMessageProtocol } from "@ts-drp/network";
 import { type DRPNetworkNode, Message, MessageType } from "@ts-drp/types";
 
 import type { EphemeralAuthorizationProvider, NodeEphemeralAdapter } from "./ephemeral.js";
@@ -619,7 +619,7 @@ export class NodeRoomNetworkAdapter {
 			if (
 				evidence === undefined ||
 				evidence.transport.kind !== "authenticated-stream" ||
-				evidence.transport.protocol !== DRP_MESSAGE_PROTOCOL ||
+				!isDirectMessageProtocol(evidence.transport.protocol) ||
 				evidence.transport.sender !== evidence.message.sender ||
 				evidence.message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE ||
 				evidence.message.objectId !== registration.ingressId
@@ -820,7 +820,7 @@ export class NodeRoomNetworkAdapter {
 		if (
 			evidence === undefined ||
 			evidence.transport.kind !== "authenticated-stream" ||
-			evidence.transport.protocol !== DRP_MESSAGE_PROTOCOL ||
+			!isDirectMessageProtocol(evidence.transport.protocol) ||
 			evidence.transport.sender !== evidence.message.sender ||
 			evidence.message.type !== MessageType.MESSAGE_TYPE_CUSTOM ||
 			evidence.message.objectId !== registration.controlId

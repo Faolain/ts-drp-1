@@ -43,6 +43,16 @@ function dependencyMeshPeers(node: DRPNetworkNode, topic: string): string[] {
 	return [...(pubsub(node).mesh.get(topic) ?? new Set<string>())];
 }
 
+/**
+ * The peer a mocked `safeDial` was asked for. Track 46: a random-peer send is a direct message, so it
+ * dials the way `sendMessage` dials (`[/p2p/<peer>]`), not with the bare peer id.
+ * @param target - The first `safeDial` argument.
+ * @returns The dialed peer id.
+ */
+function dialedPeer(target: unknown): string | undefined {
+	return target === undefined ? undefined : String(target).replace(/^\/p2p\//, "");
+}
+
 function fakePeer(id: string): PeerId {
 	return { toString: (): string => id } as PeerId;
 }
@@ -84,10 +94,13 @@ describe("Track T2 mesh-bound implicit room partners", () => {
 
 		const dial = vi.spyOn(node, "safeDial").mockResolvedValue(undefined);
 		vi.spyOn(Math, "random").mockReturnValue(0.5);
-		await node.sendGroupMessageRandomPeer(topic, message(topic, node.peerId));
+		// Track 46: the undialable selected peer is a typed failure, never a silent success.
+		await expect(node.sendGroupMessageRandomPeer(topic, message(topic, node.peerId))).rejects.toMatchObject({
+			code: "DIRECT_DIAL_FAILED",
+		});
 		const selected = dial.mock.calls[0]?.[0];
 		expect(selected).toBeDefined();
-		expect(mesh).toContain(selected?.toString());
+		expect(mesh).toContain(dialedPeer(selected));
 
 		service.mesh.set(topic, new Set());
 		dial.mockClear();
@@ -119,10 +132,12 @@ describe("Track T2 mesh-bound implicit room partners", () => {
 		const random = vi
 			.spyOn(Math, "random")
 			.mockReturnValue((subscribers.indexOf(nonMeshPeer) + 0.1) / subscribers.length);
-		await hub.sendGroupMessageRandomPeer(topic, message(topic, hub.peerId));
+		await expect(hub.sendGroupMessageRandomPeer(topic, message(topic, hub.peerId))).rejects.toMatchObject({
+			code: "DIRECT_DIAL_FAILED",
+		});
 		const selectedBeforeDisconnect = dial.mock.calls[0]?.[0];
 		expect(selectedBeforeDisconnect).toBeDefined();
-		expect(observed).toContain(selectedBeforeDisconnect?.toString());
+		expect(observed).toContain(dialedPeer(selectedBeforeDisconnect));
 
 		const departingPeerId = observed[0];
 		const departingPeer = peers.find((peer) => peer.peerId === departingPeerId);
@@ -148,11 +163,13 @@ describe("Track T2 mesh-bound implicit room partners", () => {
 		random.mockReturnValue(
 			(subscribersAfterDisconnect.indexOf(nonMeshPeerAfterDisconnect) + 0.1) / subscribersAfterDisconnect.length
 		);
-		await hub.sendGroupMessageRandomPeer(topic, message(topic, hub.peerId));
+		await expect(hub.sendGroupMessageRandomPeer(topic, message(topic, hub.peerId))).rejects.toMatchObject({
+			code: "DIRECT_DIAL_FAILED",
+		});
 		const selectedAfterDisconnect = dial.mock.calls[0]?.[0];
 		expect(selectedAfterDisconnect).toBeDefined();
-		expect(afterFirstDisconnect).toContain(selectedAfterDisconnect?.toString());
-		expect(selectedAfterDisconnect?.toString()).not.toBe(departingPeerId);
+		expect(afterFirstDisconnect).toContain(dialedPeer(selectedAfterDisconnect));
+		expect(dialedPeer(selectedAfterDisconnect)).not.toBe(departingPeerId);
 
 		await Promise.all(peers.filter((peer) => peer !== departingPeer).map((peer) => hub.disconnect(peer.peerId)));
 		await waitFor(() => hub.getGroupPeers(topic).length === 0, "empty subscriber evidence");
