@@ -10844,9 +10844,19 @@ function closedRetirementEqual(left: unknown, right: unknown): boolean {
  */
 function closedJournalRowsEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
 	if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-	for (let index = 0; index < left.length; index++)
-		if (!closedRetirementEqual(left[index], right[index])) return false;
+	for (let index = 0; index < left.length; index++) {
+		const a = left[index], b = right[index];
+		// A plain Uint8Array's canonical bytes are its tag, its varuint length and its bytes: equal
+		// encodings are equal bytes. Rows that could reach the encode cap take the encoder (and its refusal).
+		if (plainClosedRowBytes(a) && plainClosedRowBytes(b)) {
+			if (a.byteLength !== b.byteLength || compareBytes(a, b) !== 0) return false;
+		} else if (!closedRetirementEqual(a, b)) return false;
+	}
 	return true;
+}
+function plainClosedRowBytes(value: unknown): value is Uint8Array {
+	return value instanceof Uint8Array && Object.getPrototypeOf(value) === Uint8Array.prototype &&
+		value.byteLength + 16 <= CLOSED_RETIREMENT_BYTES.maxBytes;
 }
 
 /** Exact comparison of already captured native components, not a new enclosing

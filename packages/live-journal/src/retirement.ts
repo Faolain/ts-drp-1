@@ -1,6 +1,7 @@
 import {
 	CanonicalEncodingError,
 	type CanonicalLimits,
+	compareBytes,
 	decodeCanonical,
 	encodeCanonical,
 	hashDomain,
@@ -314,7 +315,7 @@ function captureJournalRetirementControlWithPlan(
 function equalNative(left: unknown, right: unknown): boolean {
 	const a = encodeCanonical(left),
 		b = encodeCanonical(right);
-	return a.length === b.length && a.every((byte, index) => byte === b[index]);
+	return a.length === b.length && compareBytes(a, b) === 0;
 }
 function dense(value: unknown, maximum: number): readonly unknown[] {
 	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new TypeError("malformed-input");
@@ -683,7 +684,7 @@ function decodeCapturedJournalRetirementNativeCarriers(
 	const plan = capture(planBytes);
 	const previous = syntax?.plan;
 	const unchanged = previous !== undefined && plan.length === previous.bytes.length &&
-		plan.every((byte, index) => byte === previous.bytes[index]);
+		compareBytes(plan, previous.bytes) === 0;
 	const planDigest = unchanged ? previous.digest : nativePlanDigest(plan);
 	if (
 		bytes.byteLength + plan.byteLength > LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES ||
@@ -696,7 +697,7 @@ function decodeCapturedJournalRetirementNativeCarriers(
 		const encoded = encodeCanonical(capturedPlan, {
 			maxBytes: LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, maxItems: 65_536, maxDepth: 32,
 		});
-		if (encoded.length !== plan.length || !plan.every((byte, index) => byte === encoded[index]))
+		if (encoded.length !== plan.length || compareBytes(plan, encoded) !== 0)
 			throw new TypeError("store-poisoned");
 	}
 	const capturedSyntax = unchanged ? previous : Object.freeze({bytes: plan, digest: planDigest, plan: capturedPlan});
@@ -721,7 +722,7 @@ function decodeCapturedJournalRetirementNativeCarriers(
 	), {maxBytes: LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, maxItems: 65_536, maxDepth: 32});
 	if (
 		bytes.length !== encoded.length ||
-		!bytes.every((byte, index) => byte === encoded[index])
+		compareBytes(bytes, encoded) !== 0
 	)
 		throw new TypeError("store-poisoned");
 	if (syntax !== undefined) syntax.plan = capturedSyntax;
@@ -1051,6 +1052,66 @@ export function createJournalRetirementImageCapture(): Readonly<{
 		},
 		release,
 	});
+}
+/** One frame of {@link createJournalRetirementImageCapture}: its table, key and exact bytes. */
+export type JournalRetirementCapturedFrame = Readonly<{ table: string; key: readonly unknown[]; bytes: Uint8Array }>;
+let imageShell: Readonly<{ rowsHead: Uint8Array; scopesHead: Uint8Array }> | undefined;
+/**
+ * The exact image of a subset of one capture's frames, assembled from each frame's own row syntax
+ * instead of capturing and encoding every row again.
+ *
+ * A frame is `[table, key, row]` (an ARRAY of 3) and the image is `{rows, scopes}`, whose arrays hold
+ * the SAME captured row syntax (createJournalRetirementImageCapture appends each row once and encodes
+ * the frame and the image from that one capture). A canonical array is its tag, its varuint count and
+ * its elements' bytes; an object is its tag, count and its sorted key/value bytes. So the image of any
+ * subset of a capture's frames, in their capture order, is those row bytes under the codec's own
+ * headers, which are taken here from the public encoder (never written by hand). Each frame must begin
+ * with exactly the encoder's bytes of `[table, key]` (with count 3); otherwise this answers undefined
+ * and the caller captures as before. Every limit of the capture holds for a subset of rows it accepted;
+ * the counts and the final byte bound are checked again.
+ * @param frames - Frames of one successful capture (in its order within each table).
+ * @returns The exact image, or undefined when a frame is not of that exact shape.
+ */
+export function journalRetirementImageOfCapturedFrames(frames: readonly JournalRetirementCapturedFrame[]):
+	LiveJournalRetirementImage | undefined {
+	const scopes: Uint8Array[] = [], rows: Uint8Array[] = [];
+	let total = 0;
+	for (const frame of frames) {
+		const prefix = encodeCanonical([frame.table, frame.key]);
+		const bytes = frame.bytes;
+		if (prefix.byteLength < 2 || prefix[1] !== 0x02 || bytes.byteLength <= prefix.byteLength ||
+			bytes[0] !== prefix[0] || bytes[1] !== 0x03 ||
+			compareBytes(bytes.subarray(2, prefix.byteLength), prefix.subarray(2)) !== 0) return undefined;
+		const row = bytes.subarray(prefix.byteLength);
+		(frame.table === "scopes" ? scopes : rows).push(row);
+		total += row.byteLength;
+	}
+	if (!journalRetirementImageCountsFit(scopes.length, rows.length)) throw new TypeError("retirement-fenced");
+	imageShell ??= (() => {
+		// {rows: null, scopes: null}: tag, count 2, then each key followed by its one-byte null.
+		const shell = encodeCanonical({ rows: null, scopes: null }), rowsKey = encodeCanonical("rows"),
+			scopesKey = encodeCanonical("scopes"), at = 2 + rowsKey.byteLength;
+		if (shell.byteLength !== 4 + rowsKey.byteLength + scopesKey.byteLength || shell[at] !== 0x00 ||
+			shell[shell.byteLength - 1] !== 0x00 || compareBytes(shell.subarray(2, at), rowsKey) !== 0 ||
+			compareBytes(shell.subarray(at + 1, shell.byteLength - 1), scopesKey) !== 0)
+			throw new TypeError("retirement-image-layout");
+		return Object.freeze({ rowsHead: shell.slice(0, at), scopesHead: shell.slice(at + 1, shell.byteLength - 1) });
+	})();
+	const arrayHead = (count: number): Uint8Array => {
+		const nulls = encodeCanonical(new Array<null>(count).fill(null), { maxItems: Math.max(1, count) });
+		return nulls.subarray(0, nulls.byteLength - count);
+	};
+	const rowsHead = arrayHead(rows.length), scopesHead = arrayHead(scopes.length);
+	const length = imageShell.rowsHead.byteLength + rowsHead.byteLength + imageShell.scopesHead.byteLength +
+		scopesHead.byteLength + total;
+	if (length > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) throw new TypeError("retirement-fenced");
+	const exact = new Uint8Array(length);
+	let offset = 0;
+	for (const part of [imageShell.rowsHead, rowsHead, ...rows, imageShell.scopesHead, scopesHead, ...scopes]) {
+		exact.set(part, offset);
+		offset += part.byteLength;
+	}
+	return retirementImageFromExact(exact, scopes.length, rows.length);
 }
 /**
  * Charges one native row before retaining it in the bounded image.
@@ -2363,6 +2424,24 @@ function imageOfFrames(frames: readonly NativeFrame[]): LiveJournalRetirementIma
 		return capture.finish();
 	} finally { capture.release(); }
 }
+/**
+ * The image of a drain batch's residual frames: the exact row syntax of the adapter's captured frames
+ * (journalRetirementImageOfCapturedFrames), or, for any frame not of that exact shape, a full capture
+ * of the decoded rows (imageOfFrames). Debug mode (TS_DRP_DEBUG_RESIDUAL_IMAGE=1) also captures in full
+ * and refuses a divergence. The adapter still checks this digest against its own native residual.
+ */
+function residualImageOfFrames(frames: readonly NativeFrame[]): LiveJournalRetirementImage {
+	const spliced = journalRetirementImageOfCapturedFrames(frames);
+	if (spliced === undefined) return imageOfFrames(frames);
+	if (journalResidualImageDebug() && !equalNative(spliced, imageOfFrames(frames)))
+		throw new Error("journal residual image diverged from a full capture");
+	return spliced;
+}
+/** Debug mode (TS_DRP_DEBUG_RESIDUAL_IMAGE=1): every derived residual image is also captured in full and compared. */
+export function journalResidualImageDebug(): boolean {
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env?.TS_DRP_DEBUG_RESIDUAL_IMAGE === "1";
+}
 function compareFrameKeys(left: Pick<NativeFrame, "table" | "key">, right: Pick<NativeFrame, "table" | "key">): number {
 	if (left.table === "scopes" && right.table !== "scopes") return -1;
 	if (left.table !== "scopes" && right.table === "scopes") return 1;
@@ -2396,7 +2475,8 @@ export function reconstructJournalRetirementDrainSource(
 	image: LiveJournalRetirementImage,
 	frames: readonly Uint8Array[],
 	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array,
-	memo?: JournalRetirementDrainSourceMemo
+	memo?: JournalRetirementDrainSourceMemo,
+	framesProof?: object
 ): LiveJournalRetirementDrainSource | undefined {
 	const state = control?.drain;
 	if (state == null || control === null) return undefined;
@@ -2415,7 +2495,7 @@ export function reconstructJournalRetirementDrainSource(
 	}
 	if (memo === undefined) return deriveDrainSource(state, base, rows, frames, reconstructLocal).source;
 	const planBytes = encodeCanonical(state.plan);
-	const reused = memo.reuse(planBytes, state.cursor, frames);
+	const reused = memo.reuse(planBytes, state.cursor, frames, framesProof);
 	if (reused !== undefined) {
 		drainSourceWork.reuses++;
 		const source = Object.freeze({
@@ -2430,7 +2510,7 @@ export function reconstructJournalRetirementDrainSource(
 		return source;
 	}
 	const derived = deriveDrainSource(state, base, rows, frames, reconstructLocal);
-	memo.remember(planBytes, derived);
+	memo.remember(planBytes, derived, state.cursor, framesProof);
 	return derived.source;
 }
 /** Debug mode (TS_DRP_DEBUG_DRAIN_SOURCE=1): every reused drain source is also derived afresh and compared. */
@@ -2499,21 +2579,30 @@ function sameFrameBytes(left: Uint8Array, right: Uint8Array): boolean {
  * minus the items retired before the control's cursor (every residual frame present once and
  * unchanged, every retired one absent). Any other input re-derives in full, so every refusal the full
  * derivation makes ("retirement-stale") is unchanged. Nothing escapes: a reuse returns fresh copies.
+ *
+ * An adapter may also pass a frames proof: an opaque private object it passes again only with
+ * byte-identical frames (storage-node: its verified image memo entry, whose private frames every read
+ * copies). Once the frames under one proof have been checked (or derived) for a cursor, the same proof
+ * at the same cursor and plan bytes needs no second check of every frame.
  */
 export class JournalRetirementDrainSourceMemo {
 	#planBytes: Uint8Array | undefined;
 	#original: readonly Readonly<{ bytes: Uint8Array; item: number }>[] = [];
 	#image: LiveJournalRetirementImage | undefined;
+	#proof: Readonly<{ proof: object; cursor: number }> | undefined;
 	/** @internal */
-	remember(planBytes: Uint8Array, derived: DerivedDrainSource): void {
+	remember(planBytes: Uint8Array, derived: DerivedDrainSource, cursor: number, proof?: object): void {
 		this.#planBytes = planBytes.slice();
 		this.#original = derived.original;
 		this.#image = Object.freeze({ ...derived.source.image });
+		this.#proof = proof === undefined ? undefined : Object.freeze({ proof, cursor });
 	}
 	/** @internal */
-	reuse(planBytes: Uint8Array, cursor: number, frames: readonly Uint8Array[]):
+	reuse(planBytes: Uint8Array, cursor: number, frames: readonly Uint8Array[], proof?: object):
 		Readonly<{ image: LiveJournalRetirementImage; original: readonly Uint8Array[] }> | undefined {
-		if (this.#planBytes === undefined || this.#image === undefined || !sameFrameBytes(this.#planBytes, planBytes)) return undefined;
+		if (this.#planBytes === undefined || this.#image === undefined || compareBytes(this.#planBytes, planBytes) !== 0) return undefined;
+		if (proof !== undefined && this.#proof?.proof === proof && this.#proof.cursor === cursor)
+			return { image: this.#image, original: this.#original.map((frame) => frame.bytes) };
 		const residual = this.#original.filter((frame) => frame.item < 0 || frame.item >= cursor);
 		if (residual.length !== frames.length) return undefined;
 		const buckets = new Map<number, number[]>();
@@ -2528,6 +2617,7 @@ export class JournalRetirementDrainSourceMemo {
 			if (match === undefined) return undefined;
 			used[match] = 1;
 		}
+		this.#proof = proof === undefined ? undefined : Object.freeze({ proof, cursor });
 		return { image: this.#image, original: this.#original.map((frame) => frame.bytes) };
 	}
 }
@@ -2777,7 +2867,7 @@ function createCapturedJournalRetirementControlRead(
 						removed.add(found[0]);
 					}
 					const remaining = actual.filter((frame) => !removed.has(frame));
-					const postimage = imageOfFrames(remaining);
+					const postimage = residualImageOfFrames(remaining);
 					if (own.revision === Number.MAX_SAFE_INTEGER) throw new TypeError("retirement-exhausted");
 					// Validate the atomic cursor/revision postimage, never an impossible
 					// intermediate revision with the prior unfinished cursor.
