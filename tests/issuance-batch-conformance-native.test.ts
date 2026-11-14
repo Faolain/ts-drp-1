@@ -7,7 +7,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runBatchConformance } from "./fixtures/issuance-batch/conformance.js";
-import { createTransactionalVertexIssuer, type IssueCommit } from "../packages/protocol-v3/src/index.js";
+import {
+	createTransactionalVertexIssuer,
+	type IssueCommit,
+	type TransactionalVertexIssuer,
+} from "../packages/protocol-v3/src/index.js";
 import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/issuance.js";
 
 // transactIssueBatch conformance on the ephemeral control and the SQLite store (the IndexedDB store
@@ -49,9 +53,10 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 			planEqualsSingles: true,
 			replaced: [9, 10, 11, 12, 13, 14, 15, 16],
 		});
-		expect(report.commit!.revisionAfter).toBe((report.commit!.revisionBefore as number) + 8);
-		expect(report.commit!.revisionAfter).toBe(report.commit!.revisionSingles);
-		if (native) expect(report.commit!.signed).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
+		const commit = report.commit ?? {};
+		expect(commit.revisionAfter).toBe((commit.revisionBefore as number) + 8);
+		expect(commit.revisionAfter).toBe(commit.revisionSingles);
+		if (native) expect(commit.signed).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
 		expect(report.revisionCas).toEqual({
 			ok: false,
 			code: "ISSUANCE_RETRY_REQUIRED",
@@ -75,7 +80,7 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 			unchanged: true,
 			restOk: true,
 		});
-		if (native) expect(report.precondition!.signed).toBe(0);
+		if (native) expect(report.precondition?.signed).toBe(0);
 		expect(report.progress).toEqual({
 			firstOk: true,
 			secondOk: true,
@@ -119,7 +124,7 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 	const operations = Array.from({ length: 8 }, (_, index) => ({ action: "place", id: `m-${index}`, x: index, y: 2 }));
 	const singlesStore = await factories.sqlite("equivalence-singles");
 	const batchStore = await factories.sqlite("equivalence-batch");
-	const issuerOf = (store: DurableIssuanceStore) =>
+	const issuerOf = (store: DurableIssuanceStore): TransactionalVertexIssuer =>
 		createTransactionalVertexIssuer({
 			author,
 			privateKeySeed: seed,
@@ -127,17 +132,21 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 			transactIssue: (scope, build) => store.transactIssue(scope, build),
 		});
 	const singles: IssueCommit[] = [];
-	for (const [index, operation] of operations.entries())
+	for (const operation of operations) {
+		const previous = singles.at(-1);
 		singles.push(
 			await issuerOf(singlesStore).issue({
 				anchor,
-				dependencies: index === 0 ? [root] : [Buffer.from(singles[index - 1]!.envelope.digest).toString("hex")],
+				dependencies: previous === undefined ? [root] : [Buffer.from(previous.envelope.digest).toString("hex")],
 				epoch: 1,
-				logicalTime: 1 + 2 * index,
+				logicalTime: 1 + 2 * singles.length,
 				objectId,
 				operation,
 			})
 		);
+	}
+	const transactIssueBatch = batchStore.transactIssueBatch;
+	if (transactIssueBatch === undefined) throw new Error("the SQLite store has no transactIssueBatch");
 	const batched = await issuerOf(batchStore).issueBatch(
 		{
 			anchor,
@@ -147,12 +156,12 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 			entries: operations.map((operation, index) => ({ logicalTime: 1 + 2 * index, operation })),
 		},
 		(scope, count, build) =>
-			batchStore.transactIssueBatch!({ scope, count, expectedPlanRevision: null }, (first, admission) =>
+			transactIssueBatch({ scope, count, expectedPlanRevision: null }, (first, admission) =>
 				build(
 					first,
 					admission === undefined
 						? undefined
-						: (preimages, sign) =>
+						: (preimages, sign): Promise<readonly Uint8Array[]> =>
 								admission(
 									preimages.map((bytes) => ({ exactCanonicalUnsignedVertexBytes: bytes })),
 									sign
@@ -160,7 +169,9 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 				)
 			)
 	);
-	const view = (commits: readonly IssueCommit[]) =>
+	const view = (
+		commits: readonly IssueCommit[]
+	): { authorSequence: number; preimage: string; digest: string; signature: string }[] =>
 		commits.map((commit) => ({
 			authorSequence: commit.authorSequence,
 			preimage: Buffer.from(commit.envelope.canonicalPreimageBytes).toString("hex"),

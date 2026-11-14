@@ -17376,6 +17376,19 @@ async function finishCommittedLocalVertex(
 }
 
 /**
+ * The element of a batch's parallel arrays at index (equal-length by construction), or a typed failure.
+ * @param values - One of the batch's parallel arrays.
+ * @param index - The row's index in the batch.
+ * @param what - What the array holds, for the failure.
+ * @returns The element.
+ */
+function batchElement<T>(values: readonly T[], index: number, what: string): T {
+	const value = values[index];
+	if (value === undefined) throw new TypeError(`v3 replacement batch ${what} is missing at ${index}`);
+	return value;
+}
+
+/**
  * One drain chunk's legacy nonportable replacements in ONE batched issuance (transactIssueBatch):
  * one entered marker and one commit for every row, instead of one marker and one commit per row.
  * Every row passes the checks issueLocal and issueOneVertex make of it alone (source derivation,
@@ -17556,13 +17569,15 @@ async function issueReplacementBatch(
 					}
 					return nativeSignAdmission(
 						preimages.map((bytes, index) =>
-							ObjectFreeze({ exactCanonicalUnsignedVertexBytes: bytes, planEffect: rows[index]!.planEffect })
+							ObjectFreeze({ exactCanonicalUnsignedVertexBytes: bytes, planEffect: batchElement(rows, index, "row").planEffect })
 						),
 						async (index) => {
 							const row = rows[index];
 							const bytes = preimages[index];
 							if (row === undefined || bytes === undefined) throw new TypeError("replacement batch index is invalid");
-							deriveOwnedReplacement(registration, row.input.settlementSource!, row.input);
+							const source = row.input.settlementSource;
+							if (source === undefined) throw new TypeError("replacement batch row has no settlement source");
+							deriveOwnedReplacement(registration, source, row.input);
 							await custody.check();
 							const decoded = decodeCanonical(bytes);
 							if (
@@ -17581,7 +17596,7 @@ async function issueReplacementBatch(
 						context
 					);
 				});
-				return built.map((commit, index) => ObjectFreeze({ ...commit, planEffect: rows[index]!.planEffect }));
+				return built.map((commit, index) => ObjectFreeze({ ...commit, planEffect: batchElement(rows, index, "row").planEffect }));
 			});
 		commits = await issuer.issueBatch(
 			{
@@ -17626,7 +17641,7 @@ async function issueReplacementBatch(
 	}
 	const accepted: Readonly<{ authorSequence: number; digest: string }>[] = [];
 	const committedRecord = (index: number) => {
-		const committed = commits[index]!;
+		const committed = batchElement(commits, index, "commit");
 		return ObjectFreeze({
 			authorSequence: committed.authorSequence,
 			envelope: committed.envelope,
@@ -17648,11 +17663,12 @@ async function issueReplacementBatch(
 			? localIssueFailure("issuance-rejected", "v3 replacement batch admission is invalid")
 			: journaled;
 	for (let index = 0; index < commits.length; index += 1) {
+		const row = batchElement(rows, index, "row");
 		const admitted =
 			journaled === undefined
 				? await admitCommittedLocalVertex(
 						registration,
-						rows[index]!.input,
+						row.input,
 						scope,
 						committedRecord(index),
 						false,
@@ -17662,11 +17678,11 @@ async function issueReplacementBatch(
 					)
 				: await finishCommittedLocalVertex(
 						registration,
-						rows[index]!.input,
+						row.input,
 						scope,
-						journaled.prepared[index]!,
+						batchElement(journaled.prepared, index, "prepared row"),
 						{
-							journalSequence: journaled.sequences[index]!,
+							journalSequence: batchElement(journaled.sequences, index, "journal sequence"),
 							nativeImage: index === commits.length - 1 ? journaled.nativeImage : undefined,
 						},
 						false,
@@ -17738,7 +17754,7 @@ async function journalReplacementBatch(
 	for (let index = 0; index < commits.length; index += 1) {
 		const row = prepareCommittedLocalVertex(
 			registration,
-			inputs[index]!,
+			batchElement(inputs, index, "input"),
 			scope,
 			commits[index],
 			false,
@@ -17772,14 +17788,16 @@ async function journalReplacementBatch(
 		return committedFailure("journal-rejected", "v3 replacement batch journal append failed");
 	}
 	const sequences = appended.rows.map((row) => row.journalSequence);
+	const firstSequence = sequences[0];
 	if (
+		firstSequence === undefined ||
 		!sameLiveJournalScope(appended.scope, journalScope) ||
 		appended.rows.length !== prepared.length ||
 		appended.rows.some(
 			(row, index) =>
-				row.vertexDigest !== prepared[index]!.authenticated.digest ||
+				row.vertexDigest !== prepared[index]?.authenticated.digest ||
 				!NumberIsSafeInteger(row.journalSequence) ||
-				row.journalSequence !== sequences[0]! + index
+				row.journalSequence !== firstSequence + index
 		)
 	)
 		return committedFailure("journal-rejected", "v3 replacement batch journal append was rejected");
@@ -19553,12 +19571,18 @@ async function readRebaseOutbox(
 			(captureCustody) => {
 				const captured: CapturedLocalIssueInput[] = [];
 				for (let index = 0; index < rawInputs.length; index += 1) {
-					const input = capturedLocalIssueInput(registration.payload, rawInputs[index]!, captureCustody);
+					const rawInput = rawInputs[index];
+					const owner = owners[index];
+					if (rawInput === undefined || owner === undefined) {
+						const missing = localIssueFailure("malformed-input", "replacement batch input is missing");
+						return () => Promise.resolve(missing);
+					}
+					const input = capturedLocalIssueInput(registration.payload, rawInput, captureCustody);
 					if ("ok" in input) {
 						const refused: V3ReplacementBatchResult = input.ok ? localIssueFailure("malformed-input", "replacement batch input is invalid") : input;
 						return () => Promise.resolve(refused);
 					}
-					captured.push(ObjectFreeze({ ...input, settlementSource: owners[index]!.source }));
+					captured.push(ObjectFreeze({ ...input, settlementSource: owner.source }));
 				}
 				return async () => {
 					// Only what issueReplacement issues nonportable batches: no creator selection held,
@@ -19583,7 +19607,10 @@ async function readRebaseOutbox(
 					let outcome: V3ReplacementBatchResult;
 					let releaseFailed = false;
 					try {
-						for (const input of captured) deriveOwnedReplacement(registration, input.settlementSource!, input);
+						for (const input of captured) {
+							if (input.settlementSource === undefined) throw new TypeError("replacement batch input has no settlement source");
+							deriveOwnedReplacement(registration, input.settlementSource, input);
+						}
 						custody = await acquireLocalReplacementCustody(registration, floor);
 						if (registration.currentReplacementCustody !== undefined)
 							throw new TypeError("replacement native custody is already entered");
@@ -26630,19 +26657,20 @@ export function resumeV3PendingIssuanceIntent(
 					const preimages = intents.map((intent) => new Uint8ArrayConstructor(intent.canonicalPreimageBytes));
 					const digests = preimages.map((bytes, index) => {
 						const digest = hashDomain(V3_VERTEX_DOMAIN, bytes);
-						if (!sameBytes(digest, intents[index]!.digest)) throw new TypeError("v3 pending intent digest differs");
+						if (!sameBytes(digest, batchElement(intents, index, "pending intent").digest))
+							throw new TypeError("v3 pending intent digest differs");
 						return digest;
 					});
 					const signed = await nativeSignAdmission(
 						intents.map((intent, index) =>
 							ObjectFreeze({
-								exactCanonicalUnsignedVertexBytes: new Uint8ArrayConstructor(preimages[index]!),
+								exactCanonicalUnsignedVertexBytes: new Uint8ArrayConstructor(batchElement(preimages, index, "preimage")),
 								...(intent.planEffect === undefined ? {} : { planEffect: intent.planEffect }),
 							})
 						),
 						(index) =>
-							withAuthoredOperationSigningRequest(preimages[index]!, (request) =>
-								sign(new Uint8ArrayConstructor(digests[index]!), request)
+							withAuthoredOperationSigningRequest(batchElement(preimages, index, "preimage"), (request) =>
+								sign(new Uint8ArrayConstructor(batchElement(digests, index, "digest")), request)
 							)
 					);
 					if (signed.length !== intents.length) throw new TypeError("v3 pending batch signatures are incomplete");
@@ -26650,15 +26678,20 @@ export function resumeV3PendingIssuanceIntent(
 						const signature = copyDetachedBytes(value);
 						if (signature === undefined || signature.byteLength !== 64)
 							throw new TypeError("v3 pending intent signature is invalid");
-						const authorSequence = intents[index]!.authorSequence;
-						const envelope = ObjectFreeze({ canonicalPreimageBytes: preimages[index]!, digest: digests[index]!, signature });
+						const intent = batchElement(intents, index, "pending intent");
+						const authorSequence = intent.authorSequence;
+						const envelope = ObjectFreeze({
+							canonicalPreimageBytes: batchElement(preimages, index, "preimage"),
+							digest: batchElement(digests, index, "digest"),
+							signature,
+						});
 						const commit = ObjectFreeze({
 							authorSequence,
 							envelope,
 							issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
 							outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
 						});
-						const planEffect = intents[index]!.planEffect;
+						const planEffect = intent.planEffect;
 						return planEffect === undefined ? commit : ObjectFreeze({ ...commit, planEffect });
 					});
 				}

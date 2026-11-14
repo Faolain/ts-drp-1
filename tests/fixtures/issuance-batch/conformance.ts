@@ -37,6 +37,17 @@ export type BatchStoreFactory = (name: string) => Promise<DurableIssuanceStore>;
 
 export const SCOPE: DurableIssueScope = Object.freeze({ objectId: "issuance-batch-room", author: "c".repeat(64) });
 const hex = (seed: number): string => seed.toString(16).padStart(64, "0");
+/**
+ * The element at index of a fixture array, or a thrown fixture error.
+ * @param values - The array.
+ * @param index - The index.
+ * @returns The element.
+ */
+function at<T>(values: readonly T[], index: number): T {
+	const value = values[index];
+	if (value === undefined) throw new Error(`issuance-batch fixture: no element at ${index}`);
+	return value;
+}
 const digestOf = (bytes: Uint8Array) => hashDomain("ts-drp/vertex/v3", bytes);
 
 function preimage(sequence: number, epoch: number, operation: Readonly<Record<string, unknown>>): Uint8Array {
@@ -79,8 +90,9 @@ type Row = Readonly<{ effect?: DurableIssueCommit["planEffect"]; bytes(sequence:
 
 /**
  * One single issue as the live plane drives it (native admission when the store offers it).
- * @param store
- * @param row
+ * @param store - The issuance store.
+ * @param row - The row to issue.
+ * @returns The committed row.
  */
 export async function issueOne(store: DurableIssuanceStore, row: Row): Promise<DurableIssueCommit> {
 	return store.transactIssue(SCOPE, async (sequence, admission) => {
@@ -107,9 +119,10 @@ type BatchOptions = Readonly<{
 
 /**
  * One batch, driven as the drain drives it; returns the commits or the refusal, and the signatures made.
- * @param store
- * @param rows
- * @param options
+ * @param store - The issuance store.
+ * @param rows - The batch's rows, in order.
+ * @param options - Plan revision, tampering and raw-builder options.
+ * @returns The commits or the refusal, with the sequences signed.
  */
 export async function issueBatch(store: DurableIssuanceStore, rows: readonly Row[], options: BatchOptions = {}) {
 	const signed: number[] = [];
@@ -138,7 +151,12 @@ export async function issueBatch(store: DurableIssuanceStore, rows: readonly Row
 								return Promise.resolve(signatureFor(first + index));
 							});
 				const commits = intents.map((intent, index) =>
-					commitOf(first + index, intent.exactCanonicalUnsignedVertexBytes, signatures[index]!, rows[index]!.effect)
+					commitOf(
+						first + index,
+						intent.exactCanonicalUnsignedVertexBytes,
+						at(signatures, index),
+						at(rows, index).effect
+					)
 				);
 				return options.tamper === undefined ? commits : options.tamper(commits);
 			}
@@ -163,10 +181,11 @@ const rebase = (sourceSequence: number, sourceDigest: Uint8Array): SettlementPla
 
 /**
  * Epoch-0 moves, then the plan over them and its fence (single issue), as an install leaves them.
- * @param factory
- * @param name
- * @param moves
- * @param progress
+ * @param factory - Opens a named store.
+ * @param name - The store's name.
+ * @param moves - How many epoch-0 moves to issue.
+ * @param progress - Replacement progress digests per source sequence, if any.
+ * @returns The store and its source rows.
  */
 export async function settledStore(
 	factory: BatchStoreFactory,
@@ -199,8 +218,9 @@ export async function settledStore(
 }
 
 /**
- *
- * @param sourceSequence
+ * A replacement row for a plan source.
+ * @param sourceSequence - The source's author sequence.
+ * @returns The row.
  */
 export const replacement = (sourceSequence: number): Row => ({
 	effect: { kind: "replacement", sourceSequence },
@@ -208,10 +228,11 @@ export const replacement = (sourceSequence: number): Row => ({
 });
 
 /**
- *
- * @param store
- * @param from
- * @param through
+ * The store's observable state over a sequence range.
+ * @param store - The issuance store.
+ * @param from - The first author sequence.
+ * @param through - The last author sequence.
+ * @returns Lineage, issued sequences, plan revision and bytes, and pending outbox rows.
  */
 export async function snapshot(store: DurableIssuanceStore, from: number, through: number) {
 	const lineage = await store.readLineage(SCOPE);
@@ -235,9 +256,10 @@ const sameBytes = (left: readonly number[] | null, right: readonly number[] | nu
 	JSON.stringify(left) === JSON.stringify(right);
 
 /**
- *
- * @param factory
- * @param native
+ * Every batch conformance case against one store implementation.
+ * @param factory - Opens a named store.
+ * @param native - Whether the store is native (offers its sign admission).
+ * @returns The report, case by case.
  */
 export async function runBatchConformance(factory: BatchStoreFactory, native: boolean) {
 	const report: Record<string, unknown> = {};
@@ -320,10 +342,10 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 	{
 		const { store, sources } = await settledStore(factory, "duplicate", 3);
 		const before = await snapshot(store, 4, 6);
-		const first = sources[0]!.authorSequence;
+		const first = at(sources, 0).authorSequence;
 		const duplicate = await issueBatch(store, [
 			replacement(first),
-			replacement(sources[1]!.authorSequence),
+			replacement(at(sources, 1).authorSequence),
 			replacement(first),
 		]);
 		const mixed = await issueBatch(store, [replacement(first), { bytes: (sequence) => move(sequence, 1) }]);
@@ -347,7 +369,7 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 	// precondition: an entry another write already replaced refuses the whole batch before crypto
 	{
 		const { store, sources } = await settledStore(factory, "precondition", 3);
-		await issueOne(store, replacement(sources[1]!.authorSequence));
+		await issueOne(store, replacement(at(sources, 1).authorSequence));
 		const before = await snapshot(store, 5, 7);
 		const result = await issueBatch(
 			store,
@@ -355,8 +377,8 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 		);
 		const after = await snapshot(store, 5, 7);
 		const rest = await issueBatch(store, [
-			replacement(sources[0]!.authorSequence),
-			replacement(sources[2]!.authorSequence),
+			replacement(at(sources, 0).authorSequence),
+			replacement(at(sources, 2).authorSequence),
 		]);
 		report.precondition = {
 			ok: result.ok,
@@ -452,15 +474,16 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 		const plan = await store.readSettlementPlan(SCOPE);
 		const intents = fitting.map((row, index) => {
 			const bytes = row.bytes(9 + index);
+			if (row.effect === undefined) throw new Error("issuance-batch fixture: a sizing row has no plan effect");
 			return {
 				authorSequence: 9 + index,
 				canonicalPreimageBytes: bytes,
 				digest: digestOf(bytes),
-				planEffect: row.effect!,
+				planEffect: row.effect,
 			};
 		});
 		const charged = issuanceUnsignedBatchPostimageCharge(rowsBefore, SCOPE, {
-			...intents[0]!,
+			...at(intents, 0),
 			exactCanonicalPlanBytes: encodeCanonical(plan),
 			followingIntents: intents.slice(1),
 		}).logicalBytes;

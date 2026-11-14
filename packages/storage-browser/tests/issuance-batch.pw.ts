@@ -44,10 +44,10 @@ for (const mode of ["legacy", "room"]) {
 	}) => {
 		await page.goto(origin);
 		await page.waitForFunction(() => typeof Reflect.get(globalThis, "runIssuanceBatch") === "function");
-		const report = (await page.evaluate(
-			(mode) => Reflect.get(globalThis, "runIssuanceBatch")(mode),
-			mode
-		)) as Record<string, Record<string, unknown>>;
+		const report = (await page.evaluate((mode) => Reflect.get(globalThis, "runIssuanceBatch")(mode), mode)) as Record<
+			string,
+			Record<string, unknown>
+		>;
 		test.info().annotations.push({
 			type: "native-evidence",
 			description: JSON.stringify({ browserName, version: page.context().browser()?.version(), mode, report }),
