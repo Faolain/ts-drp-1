@@ -8329,6 +8329,19 @@ async function handleV3Ingress(
 	evidence: VerifiedV3IngressEvidence,
 	signedAdmission?: RetainedCloseSignedAdmission
 ): Promise<boolean> {
+	// The creator's close shut application admission (its stage set blueprintClosing after
+	// the close shut the maintenance consumer) and is about to take, or holds, the live
+	// journal's single native read reservation for its sources. Custody takes the same
+	// reservation, and the consumer would refuse this append anyway, so meet the closed gate
+	// before custody: retain the row as the consumer's refusal does. Ingress queued before
+	// the stage finished ahead of it; this is a retained row's drain queued behind it.
+	if (registration.creatorMaintenanceBound && registration.blueprintClosing && registration.receivedTransition !== true &&
+		!registration.index.has(evidence.authenticated.digest)) {
+		retainPendingIngress(registration, evidence, V3Envelope.encode({
+			canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
+		ingressFailureLog("admission-rejected", "received-maintenance-closing");
+		return false;
+	}
 	if (evidence.authenticated.admitted.settlementSource === undefined) {
 		if (!registration.creatorMaintenanceBound || registration.index.has(evidence.authenticated.digest))
 			return handleV3IngressWithSource(registration, evidence, false, undefined, signedAdmission);
@@ -16215,6 +16228,10 @@ async function acquireLocalReplacementCustody(
 			if (owner === registration.liveJournalStore) journalReservation = reservation;
 			else reservations.push(reservation);
 		}
+		// Test seam, like the __warmProofEvent observer: a hook may hold this custody open while
+		// it holds the store's and the live journal's native read reservations. Unset in production.
+		const hold = Reflect.get(globalThis, "__replacementCustodyHold");
+		if (typeof hold === "function") await hold();
 		const floorReservation = await floor.acquireNativeReadReservation({ scope: floorScope });
 		reservations.push(floorReservation);
 		byOwner.set(floor, floorReservation);
