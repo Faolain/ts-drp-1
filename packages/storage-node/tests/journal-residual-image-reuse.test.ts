@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { expect, test, vi } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { decodeCanonical } from "../../canonical/dist/src/index.js";
@@ -91,8 +91,14 @@ function golden(raw: DatabaseSync, objectId: string) {
 	} finally { capture.release(); }
 }
 
-async function drainingJournal() {
-	const directory = await mkdtemp(join(tmpdir(), "ts-drp-residual-image-reuse-"));
+/**
+ * The journal in the middle of its drain: genesis and 19 anchors, ROWS local rows, a committed fence through
+ * epoch 18 and a begun drain of the rows and the retired empty headers. Built once per file through the
+ * store (about 145 durable commits, each a synchronous=FULL fsync); every test drains its own copy of
+ * these exact native bytes, reopened.
+ */
+async function buildDrainingJournal() {
+	const directory = await mkdtemp(join(tmpdir(), "ts-drp-residual-image-reuse-template-"));
 	const filename = join(directory, "journal.sqlite");
 	const store = open(filename);
 	const materials = Array.from({ length: EPOCHS }, (_, epoch) => anchorMaterial(epoch));
@@ -122,10 +128,24 @@ async function drainingJournal() {
 	const plan = { baseControl: source.control, sourceImage: source.image, prefixes: [{ scope: materials[1]!.scope, highWatermark: ROWS, rows }],
 		retiredEmptyHeaders: headers, protectedHeaderScopes: [materials[0]!.scope, materials[18]!.scope, materials[19]!.scope] };
 	const begin = must(await store.acquireRetirementControl(selector)); must(await begin.beginDrain(plan)); await begin.release();
+	await store.close();
+	return { directory, selector, sourceRows: source.canonicalRows.length, items: rows.length + headers.length };
+}
+let template: Awaited<ReturnType<typeof buildDrainingJournal>> | undefined;
+beforeAll(async () => { template = await buildDrainingJournal(); });
+afterAll(async () => { if (template !== undefined) await rm(template.directory, { recursive: true, force: true }); });
+
+/** A copy of the draining journal's native files, opened by a new adapter (initialization "reopen"). */
+async function drainingJournal() {
+	const built = template!;
+	const directory = await mkdtemp(join(tmpdir(), "ts-drp-residual-image-reuse-"));
+	await cp(built.directory, directory, { recursive: true });
+	const filename = join(directory, "journal.sqlite");
+	const store = open(filename, true);
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	// The journal's triggers call the adapter's retirement predicate; this outside connection allows its edits.
 	raw.function("journal_retirement_allows", (_objectId: unknown, _epoch: unknown, _anchor: unknown) => 1);
-	return { directory, filename, store, raw, selector, sourceRows: source.canonicalRows.length, items: rows.length + headers.length };
+	return { directory, filename, store, raw, selector: built.selector, sourceRows: built.sourceRows, items: built.items };
 }
 
 /** One batch the way the creator's close drains (drainClosedJournalDetails): acquire and drain, then read back. */
@@ -144,6 +164,8 @@ test("a drain verifies its residual image once and returns the exact residual at
 	let { store } = fixture;
 	const { selector, raw } = fixture;
 	try {
+		// The reopened adapter verifies the residual and the plan once, as beginDrain's own adapter had.
+		const warm = must(await store.acquireRetirementControl(selector)); await warm.release();
 		const start = { ...work }, derivedBefore = journalResidualImageCounts().derived;
 		let batches = 0;
 		for (;;) {
@@ -188,7 +210,10 @@ test("a reused residual never masks another connection's change to a residual ro
 		const { store, selector, raw } = fixture;
 		try {
 			await batch(store, selector);
+			// The edit lands while the residual is reused: the second batch scans no native row.
+			const scanned = work.scanned;
 			await batch(store, selector);
+			expect(work.scanned - scanned, "the second batch reuses its residual").toBe(0);
 			expect(Number(raw.prepare(edit).run().changes), edit).toBe(1);
 			expect((await store.readRetirementImage(selector)).ok, edit).toBe(false);
 			expect((await store.acquireRetirementControl(selector)).ok, edit).toBe(false);
@@ -201,6 +226,9 @@ test("an unrelated commit by another connection makes the next read verify the r
 	const { store, selector, raw } = fixture;
 	try {
 		await batch(store, selector);
+		const reused = work.scanned;
+		must(await store.readRetirementImage(selector));
+		expect(work.scanned - reused, "the residual is reused before the outside commit").toBe(0);
 		raw.exec("CREATE TABLE IF NOT EXISTS outside_marker(x)");
 		raw.prepare("INSERT INTO outside_marker VALUES(1)").run();
 		const before = work.scanned;
