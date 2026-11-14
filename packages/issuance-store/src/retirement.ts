@@ -485,16 +485,30 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	// The widest each existing record can be written: an unconsumed record at its consumed width (a maximum
 	// reissueSequence, bb6455fe), and a record without an origin with a maximum originSequence (track 46).
 	// Both apply to the same record when it is unconsumed and has no origin.
-	const widestHandBacks = existingHandBacks.map(record => ({...record,
-		...(record.reissueSequence === null ? {reissueSequence: Number.MAX_SAFE_INTEGER} : {}),
-		...(record.originSequence === undefined ? {originSequence: Number.MAX_SAFE_INTEGER} : {})}));
-	const handBacks = existingHandBacks.length + freeHandBacks === 0 ? undefined : {
-		width: unsignedArrayWidth([...widestHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
-			...Array.from({length: freeHandBacks}, (_, index) => handBackOverhead +
-				Math.floor(reservedOperation / freeHandBacks) + Number(index < reservedOperation % freeHandBacks))]),
-		shape: unsignedArrayShape([...widestHandBacks.map(unsignedCanonicalShape),
-			...Array.from({length: freeHandBacks}, () => handBackShape)]),
-	};
+	const widestHandBacks = existingHandBacks.map((record) => ({
+		...record,
+		...(record.reissueSequence === null ? { reissueSequence: Number.MAX_SAFE_INTEGER } : {}),
+		...(record.originSequence === undefined ? { originSequence: Number.MAX_SAFE_INTEGER } : {}),
+	}));
+	const handBacks =
+		existingHandBacks.length + freeHandBacks === 0
+			? undefined
+			: {
+					width: unsignedArrayWidth([
+						...widestHandBacks.map((record) => encodeCanonical(record, unsignedEncodingLimits).byteLength),
+						...Array.from(
+							{ length: freeHandBacks },
+							(_, index) =>
+								handBackOverhead +
+								Math.floor(reservedOperation / freeHandBacks) +
+								Number(index < reservedOperation % freeHandBacks)
+						),
+					]),
+					shape: unsignedArrayShape([
+						...widestHandBacks.map(unsignedCanonicalShape),
+						...Array.from({ length: freeHandBacks }, () => handBackShape),
+					]),
+				};
 	// Reissue origins (a separate bound from the records): existing entries exactly, and one more entry for
 	// every record slot that could still yield one, up to the entry bound: each unconsumed record, each
 	// reserved free record, and each consumed record (a window write drops it and frees its slot for a new
