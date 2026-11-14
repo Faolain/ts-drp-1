@@ -31,8 +31,9 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 //   chunk-marker:   the commit of the first chunk's entered marker (signed nothing, replaced nothing);
 //                   the reopened Writer resumes the marker whole before any plan write;
 //   between-chunks: the commit of the first chunk (8 rows replaced, the other 2 not);
-//   between-journal: after the first chunk's commit, the journal commit of its third row (rows 4..8
-//                   committed to issuance but not yet journaled); reopen admits each exactly once.
+//   between-journal: after the first chunk's commit, the first journal write that journals any of its rows:
+//                   the chunk is journaled whole (all 8 rows in that one write, appendAcceptedLocalBatch),
+//                   never a row at a time; reopen admits each exactly once.
 // At death the Writer's replacement rows carry the logical times singles give them (fence + 2, + 4, ...):
 // a batch attempt that fell back or retried left no gap and reused no time.
 // Every commit of the Writer's issuance store is watched: a chunk is never partly replaced (no commit
@@ -185,6 +186,25 @@ function writerPlan(file: string, author: string) {
 	}
 }
 
+/**
+ * How many of the given local rows of the author the journal holds, read straight from its SQLite file.
+ * @param file - The journal's SQLite file.
+ * @param author - The local author.
+ * @param sequences - The author sequences to look for.
+ * @returns How many of them the journal holds.
+ */
+function journaledLocal(file: string, author: string, sequences: readonly number[]): number {
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		return db
+			.prepare("SELECT local_author_sequence FROM accepted_entries WHERE local_author=?")
+			.all(author)
+			.filter((row) => sequences.includes(row.local_author_sequence as number)).length;
+	} finally {
+		db.close();
+	}
+}
+
 async function openPair(directory: string, reopen: boolean) {
 	const options = {
 		app: "grid" as const,
@@ -265,7 +285,7 @@ it.runIf(INNER)(
 		const file = issuanceFile(directory, "recipient");
 		const journal = journalFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
-		const watch = { author: "", armed: false, inside: false, journalCommits: null as number | null };
+		const watch = { author: "", armed: false, inside: false, chunkSequences: null as number[] | null };
 		// Native transactions since the drain's fence committed, split by kind (observation only: the per-row cost).
 		// A write is a BEGIN IMMEDIATE transaction; a read is a plain BEGIN snapshot (no fsync); both end in COMMIT.
 		const since = {
@@ -328,12 +348,14 @@ it.runIf(INNER)(
 				}
 			}
 			if (
-				watch.journalCommits !== null &&
+				watch.chunkSequences !== null &&
 				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
-				this.location()?.endsWith(`/${basename(journal)}`) === true &&
-				++watch.journalCommits === 3
-			)
-				die({ journalCommits: watch.journalCommits, replaced: CHUNK });
+				transactionKind.get(this) === "write" &&
+				this.location()?.endsWith(`/${basename(journal)}`) === true
+			) {
+				const chunkJournaled = journaledLocal(journal, watch.author, watch.chunkSequences);
+				if (chunkJournaled > 0) die({ chunkJournaled, replaced: CHUNK });
+			}
 			if (
 				watch.armed &&
 				(sql === "COMMIT" || sql.endsWith("COMMIT")) &&
@@ -361,7 +383,10 @@ it.runIf(INNER)(
 						die({ marker, rebase: rebase.length });
 					if (edge === "between-chunks" && replaced.length === CHUNK)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
-					if (edge === "between-journal" && replaced.length === CHUNK) watch.journalCommits ??= 0;
+					if (edge === "between-journal" && replaced.length === CHUNK)
+						watch.chunkSequences ??= replaced.flatMap((entry) =>
+							entry.replacementSequence === null ? [] : [entry.replacementSequence]
+						);
 					if (
 						edge === "single-marker" &&
 						replaced.length === 0 &&
@@ -442,7 +467,8 @@ it.skipIf(INNER).each(EDGES)(
 		expect(existsSync(join(directory, "partial-chunk.json")), "a chunk was partly replaced").toBe(false);
 		if (edge === "chunk-marker") expect(death).toMatchObject({ marker: CHUNK, rebase: MOVES });
 		if (edge === "between-chunks") expect((death.replaced as number[]).length).toBe(CHUNK);
-		if (edge === "between-journal") expect(death).toMatchObject({ journalCommits: 3 });
+		// The first journal write holding any of the chunk's rows holds all of them.
+		if (edge === "between-journal") expect(death).toMatchObject({ chunkJournaled: CHUNK });
 		// Replacement logical times are the singles' own: fence + 2, + 4, ... (no gap, no reuse).
 		const times = death.times as number[];
 		if (edge !== "fence" && edge !== "chunk-marker" && edge !== "single-marker") {
