@@ -66,6 +66,13 @@ Stage exclusivity per proof and one generation per pass are implementation choic
 (creator-close.ts:2398-2449 `reconcileCreatorBoundedRecoveryMaintenance`; creator-closed-rollback-data.ts:21663-21673).
 A fused pass must still satisfy G9, G10, G14, G21 and G22, and its budget must be reviewed policy (BSL:261-263).
 
+Census reuse within one creator close hold is also an implementation choice (decision row 90). The recovery
+census stays census-proven (G27): a check may reuse the hold's classification only after an actual complete
+native census read, a read of every classified outbox page and the original replay verification, all
+byte-identical to the classified inputs. A new issuance lease no longer starts with a complete census when that
+holds. Its storage probe is still captured on an actual complete read in that lease, never carried from another.
+Latency never relaxes this (G26): any changed input runs the complete census or is refused as stale.
+
 ## What the checklist has already ruled out
 
 These verdicts come from Tracks R and R2. The reasoning is in

@@ -72,6 +72,9 @@ export {
 	journalRetirementFrameDigest,
 	journalRetirementDrainItemCount,
 	reconstructJournalRetirementDrainSource,
+	journalRetirementDrainSourceCounts,
+	createJournalRetirementDrainSourceMemo,
+	JournalRetirementDrainSourceMemo,
 	advanceJournalRetirementControl,
 	advanceJournalRetirementMutationControl,
 	journalRetirementImage,
@@ -86,6 +89,6 @@ export {
 	createJournalRetirementControlRead,
 } from "./retirement.js";
 export type { JournalRetirementDrainRow, JournalRetirementDrainHeader, JournalRetirementDrainItem } from "./retirement.js";
-export type { JournalFutureNativeWidths } from "./retirement.js";
+export type { JournalFutureNativeWidths, JournalRetirementDrainSourceCounts } from "./retirement.js";
 export type { JournalOrdinaryFinishingCapacityProjection, JournalOrdinaryPhysicalGeometry,
 	JournalOrdinarySchemaFinishingCapacityInput } from "./retirement.js";

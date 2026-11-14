@@ -407,6 +407,19 @@ async function retainedResolutionCost(count: number) {
 			const cpuBefore = process.cpuUsage();
 			wire.resume();
 			await wire.caughtUp(epoch, 1_200_000);
+			// The given-back moves as the install leaves them (an in-memory snapshot, no store read).
+			// Since 727b32f2 an idle member re-offers given-back moves in their listing epoch, so a
+			// later read can find some already re-offered.
+			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
+			// The window ends when both roles' once-per-epoch recovery-pool lull for this epoch has
+			// settled, so it always contains them. The creator's lull is requested by its last
+			// adoption, just before the window. It runs several readiness-maintenance holds, each with
+			// complete census reads, alongside the member's install. Ending at caughtUp alone counted
+			// however many of those holds had started by then: 0 to 5 full census reads, timing
+			// dependent. An explicit lull call queues behind the scheduled one and answers with its
+			// settled result; it does no second lull.
+			await creator.lull();
+			await writer.lull();
 			const ms = performance.now() - started;
 			const cpu = process.cpuUsage(cpuBefore);
 			const cpuMs = Math.round((cpu.user + cpu.system) / 1000);
@@ -437,7 +450,6 @@ async function retainedResolutionCost(count: number) {
 				retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
 				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
 			};
-			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
 			// The next one-epoch install, with the resolved rows still unretired: what each of its census
 			// reads costs in own-fence outbox scans.
 			const nextBefore = readV3SettlementWorkCounts();
@@ -486,15 +498,17 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	expect(large.work.fullCensusReads, "full census reads, 32 rows vs 8").toBeLessThanOrEqual(
 		small.work.fullCensusReads + 2
 	);
-	// One dependency turn reads its census completely twice: the seal, and the first check after the
-	// hold owns the turn's issuance reservation. Every later check of the turn (the turn's own two,
-	// and the two around its signing) reuses that held read: the reservation excludes every issuance
-	// writer for the whole turn, and each reuse still checks the native current probe, the replay
-	// and the bound context (six complete reads per turn before).
+	// One dependency turn classifies its census once: the seal. The first check after the hold owns the
+	// turn's issuance reservation is an actual complete native and page read with the replay verified,
+	// byte-identical to the classified inputs, so it reuses that classification (decision row 90; it was
+	// a second complete census before). Every later check of the turn (the turn's own two, and the two
+	// around its signing) reuses the held read: the reservation excludes every issuance writer for the
+	// whole turn, and each reuse still checks the native current probe, the replay and the bound context
+	// (six complete reads per turn originally).
 	expect(
 		[small.work.dependencyTurnCensusReads, large.work.dependencyTurnCensusReads],
 		"complete census reads per dependency turn"
-	).toEqual([2 * small.work.dependencyTurns, 2 * large.work.dependencyTurns]);
+	).toEqual([small.work.dependencyTurns, large.work.dependencyTurns]);
 	// The same holds for the issuance reads the turn's dependency checks repeat (outbox pages, plans,
 	// lineages, issued closures already read): under the reservation they read no row again, so each
 	// further row adds only its own reads (about 12 full reads per row; 23 when every re-read read
@@ -909,6 +923,7 @@ async function windowExpiredCensusCost(count: number) {
 				givenBack: status?.undelivered?.length,
 				plan: (await writer.settlementAudit()).dispositions,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
+				recoveryCensusReuses: after.recoveryCensusReuses - before.recoveryCensusReuses,
 				ownFenceScans: after.ownFenceScans - before.ownFenceScans,
 				ownFenceAuthentications: after.ownFenceAuthentications - before.ownFenceAuthentications,
 				ownFenceVerifies: ownFenceVerifiesSince(verifiesBefore),
@@ -926,8 +941,13 @@ async function windowExpiredCensusCost(count: number) {
 it("a census does not rescan the author's outbox for each expired row", async () => {
 	const result = await windowExpiredCensusCost(16);
 	expect((result.plan as Record<string, number>).expire ?? 0, "rows expired by the window").toBeGreaterThanOrEqual(16);
-	// One own-fence scan answers every row of one census read.
-	expect(result.ownFenceScans, "own-fence scans per census read").toBeLessThanOrEqual(result.recoveryCensusReads + 8);
+	// One own-fence scan answers every row of one census check. A check the close hold's census cell answers
+	// with byte-identical complete reads (recoveryCensusReuses, decision row 90) was a complete census read
+	// before, so the bound counts both: reuses were reads before 5dc5fe20, so reads + reuses is the same
+	// quantity the bound always counted, not a relaxation (same box: base 60 reads / 68 scans; 5dc5fe20
+	// 28 reads plus reuses / 58 scans). The scans must not grow with the expired rows.
+	expect(result.ownFenceScans, "own-fence scans per census check").toBeLessThanOrEqual(
+		result.recoveryCensusReads + result.recoveryCensusReuses + 8);
 }, 900_000);
 
 // The undelivered-move bound must hold at the install that settles them. A Writer's moves of its

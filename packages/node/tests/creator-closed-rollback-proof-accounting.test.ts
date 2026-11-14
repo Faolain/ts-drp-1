@@ -6261,7 +6261,8 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			let issuanceRead: CreatorHeldIssuanceCensusRead | undefined;
 			// ea4eb158: check/ownIssuanceReservation also own the unchanged-held fast
 			// cell and the optional current-journal enrollment (closure state).
-			let unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent;
+			let unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
@@ -6460,7 +6461,9 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
 			prepareCreatorUnchangedHeldCensusRead;`, cell.bindings);
 		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
-			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent;
+			${s.fn("censusReuseDebug").getText(s.file)}
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
@@ -6484,8 +6487,12 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 	function cellInputs() {
 		const native = {rows: {issued: [{preimage: Uint8Array.of(7), signature: new Uint8Array(64)}], lineages: [], plans: [], outbox: []}, image: {digest: "actual"}, control: null};
 		const pages: unknown[] = [], state = {identity: {}, key: {format: "raw", bytes: new Uint8Array(32).fill(4)}};
-		const store = Object.freeze({readOutboxPage: async () => pages, acquireNativeReadReservation: async () => undefined});
-		const maintenance = Object.freeze({readBoundedRecoveryCensus: async () => native});
+		const reads = {native: 0, pages: 0, probe: undefined as unknown};
+		const store = Object.freeze({readOutboxPage: async () => {reads.pages++; return pages;}, acquireNativeReadReservation: async () => undefined});
+		// The storage owner's read enrolls a currency probe on its own observation (captureCurrentProbe).
+		const readBoundedRecoveryCensus = Object.freeze(Object.assign(async () => {reads.native++; return native;},
+			{captureCurrentProbe: () => reads.probe}));
+		const maintenance = Object.freeze({readBoundedRecoveryCensus});
 		const floors = new WeakMap(), trust = {objectId: "room", currentEpoch: 3}, counted = new Set([1]);
 		const registration: any = {issuanceStore: store, liveJournalStore: Object.freeze({readiness: () => {}, readPage: () => {}}),
 			closeVertices: new Map([["vertex", {kind: "drp-vertex", hash: "vertex", operation: {bytes: Uint8Array.of(3)}}]]),
@@ -6496,6 +6503,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			authorization: {kind: "latched-acl", value: {writers: ["writer"]}}, issuanceScope: {objectId: "room", author: "writer"},
 			historicalIssuance: {capability: {}, originalIssuanceStore: store, count: 1, countedSequences: counted, maxEpochVertices: 64, scopeAuthorMatches: true}};
 		const bindings = {ObjectIsFrozen: Object.isFrozen, ObjectFreeze: Object.freeze, Uint8ArrayConstructor: Uint8Array,
+			v3SettlementWorkCounts: {recoveryCensusReuses: 0},
 			ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values, SetIteratorNext: Object.getPrototypeOf(new Set().values()).next,
 			ISSUANCE_RETIREMENT_LIMITS: {maxRows: 4096}, AHE_BOUNDED_READ_LIMITS, preparedMigrationTargetFloors: floors,
 			creatorOriginalIssuanceStore: () => store, durableIssuancePruningMaintenanceForStore: (value: unknown) => value === store ? maintenance : undefined,
@@ -6506,8 +6514,167 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 				return () => {try {return Buffer.compare(encodeCanonical(value), bytes) === 0;} catch {return false;}};
 			}, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0};
 		return {sealed: encodeCanonical({nativeIssuance: native}), registration, trust, runtime: {currentTrust: trust, sourceBound: true,
-			nativeBranchSource: undefined, migrationSource: undefined}, pages, state, floors, counted, bindings};
+			nativeBranchSource: undefined, migrationSource: undefined}, pages, state, floors, counted, bindings, native, reads};
 	}
+	// A close hold runs several issuance leases, and checks between them with no lease. Each lease used
+	// to start with a complete census (the full outbox walk, every row's signature and classification),
+	// and each unheld check was one too: about 4 complete censuses per hold and 19-20 per retiring seal
+	// (.logs/realtime-resume-2026-11-10/lull/trace1). The census is a pure function of its inputs: the
+	// complete native census, the outbox pages, the replay rows and the bound registration context. A
+	// later check that reads all of them again, byte for byte equal, needs no new classification.
+	function holdLeases() {
+		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
+		const state = {captures: 0, probes: 0, probeCurrent: true, replays: 0, replayCurrent: true, diverge: false,
+			byProbe: new Map<object, number>()};
+		// Each storage read enrolls a fresh probe object; byProbe counts each one's currency checks.
+		const newProbe = () => {
+			const value: object = Object.freeze({checkCurrent: async () => {state.probes++; state.byProbe.set(value, (state.byProbe.get(value) ?? 0) + 1); return state.probeCurrent;}});
+			return value;
+		};
+		const probe = newProbe();
+		cell.reads.probe = probe;
+		const original: Reservation = {check: async () => {}, release: async () => {}};
+		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
+			prepareCreatorUnchangedHeldCensusRead;`, {...cell.bindings,
+			ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor});
+		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			${s.fn("censusReuseDebug").getText(s.file)}
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = true, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
+			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
+			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
+			recoveryCloseHolds.set(capability, facts);
+			${s.fn("fullRecoveryCloseHoldFacts").getText(s.file)}
+			({facts});`, {
+			ObjectFreeze: Object.freeze, registration: cell.registration, currentTrust: cell.trust, capability, recoveryCloseHolds: registry, sealed,
+			live: () => true, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			sourceDependencies: undefined, activeSource: undefined, runtime: cell.runtime, readJournalCurrent: undefined,
+			replay: {verify: async () => {state.replays++; return state.replayCurrent;}},
+			prepareCreatorUnchangedHeldCensusRead: prepare,
+			// The complete walk, as readCreatorRecoveryDependencyCensus does it: it fills the captured input
+			// view (the pages it read; the storage probe only under a lease) and returns the sealed bytes.
+			captureCensus: async (held: unknown, captured?: {pages: unknown[]; retainedBytes: number; nativeCurrent?: unknown}) => {
+				state.captures++;
+				if (captured !== undefined) {
+					captured.pages.push({afterKey: null, bytes: encodeCanonical(cell.pages)}); captured.retainedBytes = 1;
+					if (held !== undefined) captured.nativeCurrent = probe;
+				}
+				return !state.diverge && state.replayCurrent && Buffer.compare(encodeCanonical({nativeIssuance: cell.native}), sealed) === 0
+					? sealed : encodeCanonical({changed: true});
+			},
+		});
+		return {facts: owner.facts, state, cell, newProbe, lease: () => owner.facts.ownIssuanceReservation(original)};
+	}
+	it("a later lease and an unheld check of the same hold reuse the classification after reading every input again, byte for byte", async () => {
+		const hold = holdLeases(), {state, cell} = hold;
+		let lease = hold.lease();
+		await hold.facts.check(); for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.captures, "first lease: one complete census, then storage currency").toBe(1); expect(state.probes).toBe(3);
+		await lease.release();
+		const native = cell.reads.native, pages = cell.reads.pages, replays = state.replays;
+		await hold.facts.check();
+		expect(state.captures, "unheld check: no new classification").toBe(1);
+		expect(cell.reads.native - native, "unheld check: an actual complete native census read").toBe(1);
+		expect(cell.reads.pages - pages, "unheld check: every outbox page read again").toBe(1);
+		expect(state.replays - replays, "unheld check: the original replay verification").toBe(1);
+		lease = hold.lease();
+		await hold.facts.check();
+		expect(state.captures, "second lease: no new classification").toBe(1);
+		expect(cell.reads.native - native, "second lease: an actual complete native census read").toBe(2);
+		const probes = state.probes;
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.captures).toBe(1); expect(state.probes - probes, "second lease: storage currency after its first check").toBe(3);
+		await lease.release();
+	});
+	it("a changed input between leases, or without a lease, makes the next check the complete census", async () => {
+		const changes: Record<string, (hold: ReturnType<typeof holdLeases>) => void> = {
+			"native census bytes": hold => {(hold.cell.native.rows.issued[0]!.preimage as Uint8Array)[0] ^= 1;},
+			"outbox page bytes": hold => {hold.cell.pages.push({foreign: 1});},
+			"replay rows": hold => {hold.state.replayCurrent = false;},
+			"authorization": hold => {hold.cell.registration.authorization.value.writers.push("foreign");},
+			"pending ingress": hold => {hold.cell.registration.pendingIngress.set("foreign", {});},
+			"source identity": hold => {hold.cell.state.identity = {};},
+			"carrier artifact bytes": hold => {hold.cell.registration.payload.catalog.exactArtifactBytes[0] ^= 1;},
+			"rebase snapshot": hold => {hold.cell.registration.rebaseSnapshot = [{}];},
+			"rebase cursor": hold => {hold.cell.registration.rebaseCursor = 0;},
+			"retained source custody": hold => {hold.cell.registration.historicalIssuance.retainedSources = new Map();},
+			"history counters": hold => {hold.cell.counted.add(2);},
+		};
+		for (const [change, apply] of Object.entries(changes)) for (const leased of [false, true]) {
+			const hold = holdLeases(), lease = hold.lease(), label = `${change} (${leased ? "new lease" : "unheld"})`;
+			await hold.facts.check(); await lease.release();
+			expect(hold.state.captures, `${label}: before`).toBe(1);
+			apply(hold);
+			const next = leased ? hold.lease() : undefined;
+			if (change === "native census bytes" || change === "replay rows") {
+				// A changed native census or replay row is stale: the hold is refused, as the complete census would refuse it.
+				await expect(hold.facts.check(), label).rejects.toThrow("stale or unclassified");
+			} else {
+				// Any other changed binding is decided by the complete census again.
+				await hold.facts.check();
+				expect(hold.state.captures, `${label}: the next check is complete`).toBe(2);
+			}
+			await next?.release();
+		}
+	}, 120_000);
+	it("a lease's storage probe never serves another lease; each lease enrolls its own on an actual complete read", async () => {
+		const hold = holdLeases(), {state, cell} = hold;
+		const first = cell.reads.probe as object;
+		let lease = hold.lease();
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.byProbe.get(first), "first lease uses its own probe").toBe(2);
+		await lease.release();
+		const second = hold.newProbe(); cell.reads.probe = second;
+		lease = hold.lease();
+		const native = cell.reads.native;
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.byProbe.get(first), "the first lease's probe is never consulted again").toBe(2);
+		expect(state.byProbe.get(second), "the second lease's own probe, after its first complete read").toBe(2);
+		expect(cell.reads.native - native, "one actual complete native read starts the second lease").toBe(1);
+		expect(state.captures).toBe(1);
+		await lease.release();
+	});
+	it("debug mode classifies every reuse afresh and refuses a divergence", async () => {
+		const prior = process.env.TS_DRP_DEBUG_CENSUS_REUSE;
+		process.env.TS_DRP_DEBUG_CENSUS_REUSE = "1";
+		try {
+			const hold = holdLeases(), {state} = hold;
+			let lease = hold.lease();
+			await hold.facts.check(); await hold.facts.check();
+			expect(state.captures, "the lease reuse was also classified").toBe(2);
+			await lease.release();
+			await hold.facts.check();
+			expect(state.captures, "the unheld reuse was also classified").toBe(3);
+			state.diverge = true;
+			await expect(hold.facts.check()).rejects.toThrow("diverged from a complete census");
+			lease = hold.lease();
+			await expect(hold.facts.check()).rejects.toThrow("diverged from a complete census");
+			await lease.release();
+		} finally {
+			if (prior === undefined) delete process.env.TS_DRP_DEBUG_CENSUS_REUSE; else process.env.TS_DRP_DEBUG_CENSUS_REUSE = prior;
+		}
+	});
+	it("the census reads no input outside the compared set (purity inventory)", () => {
+		// Every external read of readCreatorRecoveryDependencyCensus. Each is either compared byte for byte by the
+		// hold's cell (native census, outbox pages, replay), bound by identity or exact bytes in its context
+		// (prepareCreatorUnchangedHeldCensusRead owners()/context()/carriers()), required absent (pending ingress,
+		// rebase state, migration floor, source dependencies, active source), or a projection of the native census
+		// through a bound facade (plans, issued rows, lineages, own fences). A new read must join one of these.
+		const s = seam(), text = s.census.getText(s.file);
+		const calls = [...new Set([...text.matchAll(/await ([A-Za-z_.]+)\(/gu)].map(match => match[1]))].sort();
+		expect(calls).toEqual(["authenticatedOutboxRow", "checkpoint", "maintenance.readBoundedRecoveryCensus", "ownSourceSettlementIsComplete",
+			"readPlan", "registration.issuanceStore.readIssued", "registration.issuanceStore.readLineage",
+			"registration.issuanceStore.readOutboxPage", "registration.issuanceStore.readSettlementPlan", "replacementChainLive", "replay.verify",
+			"selectedStore.readIssued", "settledFences"].sort());
+		const fields = [...new Set([...text.matchAll(/registration\.([A-Za-z]+)/gu)].map(match => match[1]))].sort();
+		expect(fields).toEqual(["authorization", "displacedSource", "exactCanonicalPinnedGenesisBootstrapOperationBytes", "historicalIssuance",
+			"index", "issuanceScope", "issuanceStore", "payload"].sort());
+		// The prepared migration floor (preparedTargetFloor?.read()) is required absent by the cell.
+		expect(text).toContain("await preparedTargetFloor?.read()");
+		// No clock, randomness or counters.
+		for (const ambient of ["Date.", "performance.", "Math.random", "getRandomValues"]) expect(text).not.toContain(ambient);
+	});
 	it("a turn's checks after enrollment use the unchanged-held census; a bound input changed between checks forces the complete census", async () => {
 		// Positive control: first check after enrollment is complete (prepares the cell), later checks are not.
 		const control = turnHold();

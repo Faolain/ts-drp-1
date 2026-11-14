@@ -5389,10 +5389,13 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * (readCreatorRecoveryDependencyCensus), retained source contract preparations
  * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed, own-fence outbox
  * scans (scanOwnFences) and the own fence rows those scans authenticate (ownFenceAuthentications: one
- * registered-digest Ed25519 check each, through the exact-bytes verify memo). Monotonic
+ * registered-digest Ed25519 check each, through the exact-bytes verify memo). recoveryCensusReuses
+ * counts the checks a close hold's own census cell answered with byte-identical complete reads instead
+ * of a complete census (recoveryCensusReads + recoveryCensusReuses is the former count of complete
+ * reads). Monotonic
  * process-wide scalars; never authority, never reset by the runtime.
  */
-const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
+const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, recoveryCensusReuses: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
 	ownFenceScans: 0, ownFenceAuthentications: 0, dependencyTurnCensusReads: 0, maxDependencyTurnCensusReads: 0};
 // The complete census reads each recovery close hold made (its seal and every full check), by hold.
 const recoveryCloseHoldCensusReads = new WeakMap<CreatorSnapshotRecoveryCloseHold, () => number>();
@@ -11589,20 +11592,37 @@ interface CreatorRecoveryCensusInputCapture {
 	overCapacity: boolean;
 }
 
+/** Debug mode (TS_DRP_DEBUG_CENSUS_REUSE=1): every reused census classification is also
+ * classified afresh by the complete census and compared byte for byte. */
+function censusReuseDebug(): boolean {
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env?.TS_DRP_DEBUG_CENSUS_REUSE === "1";
+}
+
 /** A complete census is classified once by its original owner. Under that
  * SAME hold's native exclusion, unchanged complete inputs need fresh currency,
  * not another outbox/plan walk and semantic report construction. This closure
  * is private DATA reuse, never a reservation, paid credit or admission grant.
- * Cross-object/branch/rebase work keeps the original complete construction. */
+ * Cross-object/branch/rebase work keeps the original complete construction.
+ *
+ * Without preparedHeld, the cell belongs to the close hold itself, not to one
+ * issuance lease: every use is an ACTUAL complete native census read and a read
+ * of every captured outbox page (inside the caller's lease when it has one), and
+ * the original replay verification. Only byte-identical inputs skip the
+ * classification; the census is a deterministic function of them and the bound
+ * context checked below. It never uses a lease's storage probe. Under a lease,
+ * `probe` receives that lease's own storage probe, captured on this actual
+ * complete read, from which the caller may prepare the lease's currency cell. */
 function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration,
 	runtime: ReturnType<typeof captureCreatorRecoveryRuntime>, replay: Readonly<{verify(): Promise<boolean>}>,
 	sealed: Uint8Array, live: () => boolean, captured: CreatorRecoveryCensusInputCapture,
-	preparedHeld: CreatorHeldIssuanceCensusRead,
+	preparedHeld: CreatorHeldIssuanceCensusRead | undefined,
 	journalCurrent?: (held: CreatorHeldIssuanceCensusRead) => Promise<boolean | undefined>
-): ((held: CreatorHeldIssuanceCensusRead) => Promise<boolean | undefined>) | undefined {
+): ((held: CreatorHeldIssuanceCensusRead | undefined, probe?: {nativeCurrent?: CreatorRecoveryCensusInputCapture["nativeCurrent"]}) =>
+	Promise<boolean | undefined>) | undefined {
 	try {
 		if (captured.applicationPolicyRead || captured.overCapacity || captured.pages.length === 0 ||
-			!live() || !preparedHeld.available() || !runtime.sourceBound ||
+			!live() || (preparedHeld !== undefined && !preparedHeld.available()) || !runtime.sourceBound ||
 			runtime.nativeBranchSource !== undefined || runtime.migrationSource !== undefined ||
 			registration.pendingIngress.size !== 0 || registration.pendingIngressBytes !== 0 ||
 			(registration.rebaseSnapshot?.length ?? 0) !== 0 || registration.rebaseCursor !== undefined ||
@@ -11628,7 +11648,8 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 			// The original resolver intentionally returns a detached identity per
 			// call. Compare its complete typed value, never its allocation identity.
 			const identity = resolveVerifiedCreatorHistoricalIssuance(value.capability);
-			return [value, value.capability, value.memberFrontier, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
+			// retainedSources (frozen custody rows; replacementChainLive, ownSourceSettlementIsComplete) is bound by identity.
+			return [value, value.capability, value.memberFrontier, value.retainedSources, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
 				identity?.closedAnchorDigest, identity?.closedEpoch, identity?.objectId,
 				identity?.successorAnchorDigest, identity?.successorEpoch,
 				value.maxEpochVertices, value.scopeAuthorMatches, value.count, value.countedSequences, ...sequences];
@@ -11665,8 +11686,8 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 				return captured;
 			});
 		}
-		const verifyReplay = async (held: CreatorHeldIssuanceCensusRead): Promise<boolean> => {
-			const current = await journalCurrent?.(held);
+		const verifyReplay = async (held: CreatorHeldIssuanceCensusRead | undefined): Promise<boolean> => {
+			const current = held === undefined ? undefined : await journalCurrent?.(held);
 			if (current === undefined) return replay.verify();
 			if (!current || graphVertices === undefined || registration.closeVertices.size !== graphVertices.length ||
 				registration.closeCharges.size !== graphVertices.length) return false;
@@ -11701,7 +11722,8 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 		// whole-context encoding. Actual field/reference bindings and mutable
 		// history counters/Sets above remain freshly compared on every turn.
 		const contextIntact = captureCreatorOrdinaryDimensionIntegrity(contextValue);
-		const nativeCurrent = captured.nativeCurrent;
+		// A lease's storage probe is that lease's currency only, never the hold's.
+		const nativeCurrent = preparedHeld === undefined ? undefined : captured.nativeCurrent;
 		const expectedNative = nativeCurrent !== undefined ? undefined :
 			encodeCanonical((decodeCanonical(sealed) as {nativeIssuance: unknown}).nativeIssuance);
 		const carriers = () => [registration.payload, ...(registration.displacedSource === undefined ? [] : [registration.displacedSource.prepared])]
@@ -11713,8 +11735,12 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 		const capturedCarriers = originalCarriers.map(bytes => new Uint8ArrayConstructor(bytes));
 		const pages = (nativeCurrent === undefined ? captured.pages : []).map(page => ObjectFreeze({afterKey: page.afterKey == null ? page.afterKey : [...page.afterKey] as typeof page.afterKey,
 			bytes: new Uint8ArrayConstructor(page.bytes)}));
-		const available = (held: CreatorHeldIssuanceCensusRead): boolean => { try {return live() && held === preparedHeld && held.available() &&
-			held.store === store && held.objectId === runtime.currentTrust.objectId && registration.issuanceStore === store &&
+		const available = (held: CreatorHeldIssuanceCensusRead | undefined): boolean => { try {return live() &&
+			(preparedHeld === undefined ? held === undefined || held.available() && held.store === store && held.objectId === runtime.currentTrust.objectId
+				: held === preparedHeld && held.available() && held.store === store && held.objectId === runtime.currentTrust.objectId) &&
+			registration.issuanceStore === store &&
+			registration.pendingIngress.size === 0 && registration.pendingIngressBytes === 0 &&
+			(registration.rebaseSnapshot?.length ?? 0) === 0 && registration.rebaseCursor === undefined &&
 			creatorOriginalIssuanceStore(registration) === original &&
 			durableIssuancePruningMaintenanceForStore(store) === maintenance && maintenance.readBoundedRecoveryCensus === read &&
 			store.readOutboxPage === readPage &&
@@ -11725,7 +11751,7 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 		} catch {return false;} }; // Inconclusive context bindings use the original full check.
 		const intact = (): boolean => {try {return contextIntact() &&
 			carriers().every((bytes, index) => sameBytes(bytes, capturedCarriers[index]!));} catch {return false;} };
-		return async held => {
+		return async (held, probe) => {
 			if (!available(held) || !intact()) return undefined;
 			if (nativeCurrent !== undefined) {
 				// Enrolled by the ORIGINAL frozen native producer on its exact
@@ -11742,9 +11768,16 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 			if (expectedNative === undefined) return undefined;
 			// This is an ACTUAL complete native read in the same held transaction,
 			// including hidden/foreign rows, full PRE, plans, image and control.
-			const current = await ReflectApply(read, maintenance, [{objectId: runtime.currentTrust.objectId,
-				limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}}]);
+			const request = {objectId: runtime.currentTrust.objectId,
+				limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+			const current = await ReflectApply(read, maintenance, [request]);
 			if (!available(held)) return undefined;
+			// The lease's own storage probe, on this actual complete read (as the complete census enrolls it).
+			if (probe !== undefined && held !== undefined) try {
+				const method = ObjectGetOwnPropertyDescriptor(read, "captureCurrentProbe");
+				if (ObjectIsFrozen(read) && method !== undefined && "value" in method && typeof method.value === "function")
+					probe.nativeCurrent = read.captureCurrentProbe?.call(read, request, current);
+			} catch { /* Optional: without it the caller keeps this cell's complete reads. */ }
 			let currentBytes: Uint8Array;
 			try {currentBytes = encodeCanonical({rows: current.rows, image: current.image,
 				...(current.control === undefined ? {} : {control: current.control})});} catch {return undefined;}
@@ -11759,7 +11792,9 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 				try {if (!sameBytes(encodeCanonical(fresh), page.bytes)) return undefined;} catch {return undefined;}
 			}
 			if (!(await verifyReplay(held))) return false;
-			return available(held) && intact() ? true : undefined;
+			if (!available(held) || !intact()) return undefined;
+			if (preparedHeld === undefined) v3SettlementWorkCounts.recoveryCensusReuses += 1;
+			return true;
 		};
 	} catch {return undefined;} // Inconclusive preparation retains the full original route.
 }
@@ -13559,8 +13594,14 @@ async function sealCreatorRecoveryDependencies(
 	};
 	const census = (capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
 		const held = issuanceRead;
-		return held === undefined ? captureCensus() : held.read(() => captureCensus(held, capturedInputs));
+		return held === undefined ? captureCensus(undefined, capturedInputs) : held.read(() => captureCensus(held, capturedInputs));
 	};
+	const emptyCensusInputs = (): CreatorRecoveryCensusInputCapture =>
+		({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
+	// The hold's own unchanged-census cell (see prepareCreatorUnchangedHeldCensusRead without a lease):
+	// it outlives the hold's issuance leases and serves its unheld checks, always by actual complete reads.
+	let unchangedCensusBytes: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
+	let unchangedCensusInputs: CreatorRecoveryCensusInputCapture | undefined;
 	try {
 		if (migrationSource !== undefined)
 			sourceDependencies = await acquireCreatorDisplacedSourceDependencies(
@@ -13573,10 +13614,16 @@ async function sealCreatorRecoveryDependencies(
 				nativeBranchSource,
 				registration.issuanceStore
 			);
-		const sealed = await census();
-		if (sealed === undefined) return unavailable();
-		let mayPrepareUnchanged = sourceDependencies === undefined && activeSource === undefined &&
+		const censusBytesEligible = sourceDependencies === undefined && activeSource === undefined &&
 			runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
+		const sealInputs = censusBytesEligible ? emptyCensusInputs() : undefined;
+		const sealed = await census(sealInputs);
+		if (sealed === undefined) return unavailable();
+		if (sealInputs !== undefined) {
+			unchangedCensusInputs = sealInputs;
+			unchangedCensusBytes = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, sealInputs, undefined);
+		}
+		let mayPrepareUnchanged = censusBytesEligible;
 		let unchangedHeldCensus: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
 		const capability = ObjectFreeze({});
 		recoveryCloseHoldCensusReads.set(capability, () => completeCensusReads);
@@ -13613,25 +13660,56 @@ async function sealCreatorRecoveryDependencies(
 				const held = issuanceRead;
 				const journalAtStart = journalCurrent;
 				const fast = unchangedHeldCensus;
-				// First check AFTER native enrollment is always the original full
-				// held walk, not the pre-enrollment seal. Only its exact input view can
-				// initialize reuse. Never carry a view into another lease/reopen.
-				const capturedInputs = mayPrepareUnchanged && held !== undefined && unchangedHeldCensus === undefined
-					? {pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false} : undefined;
-				const reopened = fast !== undefined && held !== undefined
-					? await held.read(async () => {
+				const bytes = unchangedCensusBytes;
+				// The first check of a lease establishes that lease's currency cell from a
+				// complete read in the lease: the complete census, or the hold's cell (an
+				// actual complete native and page read whose inputs equal the classified
+				// ones). Never carry a lease's probe into another lease/reopen.
+				const capturedInputs = censusBytesEligible || mayPrepareUnchanged && held !== undefined && unchangedHeldCensus === undefined
+					? emptyCensusInputs() : undefined;
+				let leaseInputs: CreatorRecoveryCensusInputCapture | undefined;
+				let complete = false;
+				const crossCheckReuse = async (heldRead: CreatorHeldIssuanceCensusRead | undefined): Promise<void> => {
+					const fresh = await captureCensus(heldRead);
+					if (fresh === undefined || !sameBytes(fresh, sealed))
+						throw new TypeError("creator recovery census reuse diverged from a complete census");
+				};
+				let reopened: Uint8Array | undefined;
+				if (fast !== undefined && held !== undefined)
+					reopened = await held.read(async () => {
 						const unchanged = await fast(held);
+						if (unchanged === true && censusReuseDebug()) await crossCheckReuse(held);
 						return unchanged === undefined ? captureCensus(held) : unchanged ? sealed : undefined;
-					})
-					: await census(capturedInputs);
+					});
+				else if (bytes !== undefined) {
+					const classified = unchangedCensusInputs;
+					const probe: {nativeCurrent?: CreatorRecoveryCensusInputCapture["nativeCurrent"]} | undefined =
+						held !== undefined && mayPrepareUnchanged && unchangedHeldCensus === undefined ? {} : undefined;
+					const reuse = async (): Promise<Uint8Array | undefined> => {
+						const unchanged = await bytes(held, probe);
+						if (unchanged === undefined) { complete = true; return captureCensus(held, capturedInputs); }
+						if (unchanged && censusReuseDebug()) await crossCheckReuse(held);
+						if (unchanged && probe?.nativeCurrent !== undefined && classified !== undefined)
+							leaseInputs = {...emptyCensusInputs(), pages: classified.pages, retainedBytes: classified.retainedBytes, nativeCurrent: probe.nativeCurrent};
+						return unchanged ? sealed : undefined;
+					};
+					reopened = held === undefined ? await reuse() : await held.read(reuse);
+				} else { complete = true; reopened = await census(capturedInputs); }
 				if (reopened === undefined || !sameBytes(sealed, reopened))
 					throw new TypeError("creator recovery dependency census is stale or unclassified");
-				if (capturedInputs !== undefined && held !== undefined) {
+				// A complete census (re)classifies the hold's cell from the exact inputs it read.
+				if (complete && censusBytesEligible && capturedInputs !== undefined && capturedInputs.pages.length !== 0) {
+					const {nativeCurrent: _leaseProbe, ...view} = capturedInputs;
+					unchangedCensusInputs = view;
+					unchangedCensusBytes = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, unchangedCensusInputs, undefined);
+				}
+				const leaseView = leaseInputs ?? (complete ? capturedInputs : undefined);
+				if (leaseView !== undefined && held !== undefined && mayPrepareUnchanged && unchangedHeldCensus === undefined) {
 					mayPrepareUnchanged = false;
-					unchangedHeldCensus = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, capturedInputs, held,
+					unchangedHeldCensus = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, leaseView, held,
 						readJournalCurrent);
 				}
-				// Enrollment itself never skips validation. This exact check must
+				// Enrollment itself never skips the reads. This exact check must
 				// first complete the original replay read/equality inside the same
 				// issuance/native journal holds; only subsequent checks may use its
 				// nominal native currency port plus the retained graph guards.
@@ -13653,9 +13731,13 @@ async function sealCreatorRecoveryDependencies(
 				const facts = fullRecoveryCloseHoldFacts(capability);
 				if (facts === undefined || facts.releasing || issuanceRead !== undefined || !live())
 					throw new TypeError("creator held issuance census is unavailable");
-				// Releasing an OLD hold permanently revokes its fast cell. A NEW
+				// Releasing an OLD lease permanently revokes its currency cell. A NEW
 				// genuine enrollment may prepare a NEW cell, but only AFTER its first
-				// complete actual census check below succeeds under this new hold.
+				// check succeeds under this new lease with an actual complete read: the
+				// complete census, or the hold's cell (a complete native census read and
+				// a read of every classified page in this lease, plus the replay
+				// verification, all byte-identical to the classified inputs). Its probe
+				// is captured on that read, so a lease's probe never crosses leases.
 				unchangedHeldCensus = undefined;
 				mayPrepareUnchanged = sourceDependencies === undefined && activeSource === undefined &&
 					runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;

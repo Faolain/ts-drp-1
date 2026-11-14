@@ -65,6 +65,8 @@ import {
 	type LiveJournalSignedAnchorReadResult,
 	type LiveJournalSnapshotToken,
 	reconstructJournalRetirementDrainSource,
+	createJournalRetirementDrainSourceMemo,
+	type JournalRetirementDrainSourceMemo,
 } from "@ts-drp/live-journal";
 import { roomRetentionControlDigest, RoomRetentionRefusal } from "@ts-drp/storage/room-head";
 
@@ -738,8 +740,9 @@ function validateRetirementRow(rows: readonly unknown[], selected: JournalRetire
 	)
 		throw new Error("retirement-stale");
 }
-function retirementDrainSource(captured: Pick<RetirementSnapshot, "control" | "image" | "frames">): LiveJournalRetirementDrainSource | undefined {
-	return reconstructJournalRetirementDrainSource(captured.control, captured.image, captured.frames, retirementFrame);
+function retirementDrainSource(captured: Pick<RetirementSnapshot, "control" | "image" | "frames">,
+	memo: JournalRetirementDrainSourceMemo): LiveJournalRetirementDrainSource | undefined {
+	return reconstructJournalRetirementDrainSource(captured.control, captured.image, captured.frames, retirementFrame, memo);
 }
 
 function exactRaw(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
@@ -1622,6 +1625,8 @@ function createJournalStoreOver(
 	let poisoned = false;
 	// One bounded raw retirement basis, valid only in this facade's exact held
 	// native readonly transaction. Never used by mutation or native readback.
+	// The drain's original source, derived once per drain and reused while the residual frames match it exactly.
+	const drainSourceMemo = createJournalRetirementDrainSourceMemo();
 	let heldRetirementImage: Readonly<{
 		transaction: IDBTransaction;
 		objectId: string;
@@ -2269,7 +2274,7 @@ function createJournalStoreOver(
 				const afterCapture = unavailable();
 				if (afterCapture !== undefined) return afterCapture;
 				if (captured.image.scopeCount === 0) return failed("not-installed");
-				const drainSource = retirementDrainSource(captured);
+				const drainSource = retirementDrainSource(captured, drainSourceMemo);
 				if (basis === undefined && transaction !== undefined) {
 					// Do not change an already successful original read's outcome if
 					// its reservation was concurrently released after native readback.
@@ -2362,7 +2367,7 @@ function createJournalStoreOver(
 				observation.exactCanonicalControlCarriers.some((bytes, index) => !sameBytes(bytes, expectedCarriers[index]!)) ||
 				observation.canonicalRows.length !== basis.frames.length || observation.canonicalRows.some((bytes, index) => !sameBytes(bytes, basis.frames[index]!)) ||
 				!sameBytes(encodeCanonical(observation.image), encodeCanonical(basis.image))) return undefined;
-			const drainSource = retirementDrainSource({control, image: basis.image, frames: basis.frames});
+			const drainSource = retirementDrainSource({control, image: basis.image, frames: basis.frames}, drainSourceMemo);
 			if ((drainSource === undefined) !== (observation.drainSource === undefined) || drainSource !== undefined &&
 				!sameBytes(encodeCanonical(drainSource), encodeCanonical(observation.drainSource))) return undefined;
 		} catch { return undefined; } // Mutated/copy/unqualified data cannot mint a current probe.
@@ -2439,7 +2444,7 @@ function createJournalStoreOver(
 			const expectedCarriers = retirementCodec.encode(current);
 			let drainSource: LiveJournalRetirementDrainSource | undefined;
 			try {
-				drainSource = retirementDrainSource(captured);
+				drainSource = retirementDrainSource(captured, drainSourceMemo);
 			} catch {
 				return failed("retirement-stale");
 			}
@@ -2552,7 +2557,7 @@ function createJournalStoreOver(
 			const expectedCarriers = retirementCodec.encode(current);
 			let drainSource: LiveJournalRetirementDrainSource | undefined;
 			try {
-				drainSource = retirementDrainSource(captured);
+				drainSource = retirementDrainSource(captured, drainSourceMemo);
 			} catch {
 				return failed("retirement-stale");
 			}

@@ -218,7 +218,7 @@ describe("SAME-owner compound closed-journal classification", () => {
 			if (change === "pendingIngress") actual.pendingIngress = [{digest: "foreign"}];
 			if (change === "nativeControl") actual.nativeIssuance.control.revision++;
 			const calls: string[] = [];
-			const result = execute<Promise<void>>(`(async()=>{let issuanceRead, journalCurrent, unchangedHeldCensus, mayPrepareUnchanged=false;
+			const result = execute<Promise<void>>(`(async()=>{let issuanceRead, journalCurrent, unchangedHeldCensus, mayPrepareUnchanged=false, unchangedCensusBytes, unchangedCensusInputs; const censusBytesEligible=false, emptyCensusInputs=()=>({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 				const sourceLifetime={check:${check}}, detachedClassification=true, input={};
 				const acquireReservations=async()=>{calls.push("NEW-native");};
 				${finalQualification} calls.push("source-delivery");})();`, {
