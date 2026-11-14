@@ -266,9 +266,18 @@ it.runIf(INNER)(
 		const journal = journalFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
 		const watch = { author: "", armed: false, inside: false, journalCommits: null as number | null };
-		// Native write transactions since the drain's fence committed (observation only: the per-row cost).
-		const since = { fenced: false, issuance: 0, journal: 0, issuanceSites: [] as string[] };
-		// The first library frames (function and file:line) of each counted issuance commit: what wrote it.
+		// Native transactions since the drain's fence committed, split by kind (observation only: the per-row cost).
+		// A write is a BEGIN IMMEDIATE transaction; a read is a plain BEGIN snapshot (no fsync); both end in COMMIT.
+		const since = {
+			fenced: false,
+			issuanceWrites: 0,
+			issuanceReads: 0,
+			journalWrites: 0,
+			journalReads: 0,
+			issuanceSites: [] as string[],
+		};
+		const transactionKind = new WeakMap<DatabaseSync, "write" | "read">();
+		// The first library frames (function and file:line) of each counted issuance commit, prefixed by its kind.
 		const commitSite = (): string => {
 			const limit = Error.stackTraceLimit;
 			Error.stackTraceLimit = 40;
@@ -299,13 +308,19 @@ it.runIf(INNER)(
 			throw Error("SIGKILL_DID_NOT_TERMINATE");
 		};
 		DatabaseSync.prototype.exec = function (sql: string) {
+			if (sql.startsWith("BEGIN")) transactionKind.set(this, sql.includes("IMMEDIATE") ? "write" : "read");
 			const result = exec.call(this, sql);
 			if (since.fenced && (sql === "COMMIT" || sql.endsWith("COMMIT"))) {
+				const kind = transactionKind.get(this) ?? "read";
 				if (this.location()?.endsWith(`/${basename(file)}`) === true) {
-					since.issuance += 1;
-					if (since.issuanceSites.length < 40) since.issuanceSites.push(commitSite());
+					if (kind === "write") since.issuanceWrites += 1;
+					else since.issuanceReads += 1;
+					if (since.issuanceSites.length < 40) since.issuanceSites.push(`${kind}: ${commitSite()}`);
 				}
-				if (this.location()?.endsWith(`/${basename(journal)}`) === true) since.journal += 1;
+				if (this.location()?.endsWith(`/${basename(journal)}`) === true) {
+					if (kind === "write") since.journalWrites += 1;
+					else since.journalReads += 1;
+				}
 			}
 			if (
 				watch.journalCommits !== null &&
@@ -330,7 +345,8 @@ it.runIf(INNER)(
 						writeFileSync(partialFile, JSON.stringify({ replaced: replaced.length, rebase: rebase.length }));
 					if (fence !== null && rebase.length === MOVES && replaced.length === 0 && !since.fenced) {
 						since.fenced = true;
-						since.issuance = 0;
+						since.issuanceWrites = 0;
+						since.issuanceReads = 0;
 						since.issuanceSites.length = 0;
 					}
 					if (edge === "fence" && fence !== null && rebase.length === MOVES && replaced.length === 0)
