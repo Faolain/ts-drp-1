@@ -36,8 +36,18 @@
 //      a creator that never adopts) ends at the install deadline (V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS)
 //      with a typed refusal; the delivery re-targets the newest offer it knows, the same one included.
 //      An offer is authenticated by the install (forged: refused with no state change).
+//   R  (fix/replacement-retarget) an install's settlement drain runs after the adoption, on the
+//      epoch the install reached (adopt.drain). When that epoch is already closed (a newer offer is
+//      known: by A2, lag > 0 after the install), a replacement signed into it can never be admitted
+//      (ingress admits only the current anchor): it is displaced again and replaced again by the
+//      next install (the replacement chain). With R the drain still merges the plan, expires the
+//      window and signs the author fence, but defers its replacements to the next install, which
+//      reaches a newer epoch. The window (V3_SETTLEMENT_OWN_WINDOW_EPOCHS, measured from the move's
+//      origin epoch through its replacement chain) is unchanged: a move whose origin falls out of it
+//      is handed back (V3RoomHandBack) instead of replaced, with or without R.
 // Broken controls: "enqueue" (no F1), "single" (no K2), "refuse" (no H), "giveup" (D's expiry
-// ends following instead of re-targeting).
+// ends following instead of re-targeting), "noretarget" (no R, cb43680c: the drain replaces into the
+// closed epoch).
 //
 // Environment assumptions (the residual requirements the fix leaves):
 //   A1 a member's fetch window (selection to the last chunk) never spans a whole open period of
@@ -48,6 +58,10 @@
 //      pulled after a stale refusal by the delivery, not modeled).
 module slowMemberFollow {
   pure val CAP = 3
+  // The settlement window, in epochs from a displaced move's origin (4 in the code; 3 keeps the
+  // state space small: the bound has the same shape).
+  pure val WINDOW = 3
+  pure val AGE_CAP = 5
 
   var mode: str                // fixed | enqueue | single | refuse
   var phase: str               // creator: open | sealed (serving switched, offer not yet published)
@@ -61,11 +75,16 @@ module slowMemberFollow {
   var held: bool               // the creator holds the material of the member's target (not ready)
   var gaveUp: bool             // the member stopped following ("giveup" control only)
   var auth: bool               // the install's offer authenticates (false: forged)
+  var row: str                 // one displaced own move: none | owed | settled | handedBack
+  var rowAge: int              // creator epoch - the move's origin epoch, saturated at AGE_CAP
+  var rowWaits: int            // installs whose drain deferred its replacement (R)
+  var wasted: int              // replacements signed into a closed epoch (displaced again), saturated
 
   def f1: bool = mode != "enqueue"
   def k2: bool = mode != "single"
   def hold: bool = mode != "refuse"
   def giveUpOnExpiry: bool = mode == "giveup"
+  def retarget: bool = mode != "noretarget"
   def sat(n: int, m: int): int = if (n > m) m else n
   def windowed(i: str): bool = i == "material" or i == "chunks"
   def transition(i: str): bool = windowed(i) or i == "apply"
@@ -77,15 +96,18 @@ module slowMemberFollow {
   action initWith(m: str): bool = all {
     mode' = m, phase' = "open", stopped' = false, lag' = 0, inst' = "idle", behindTarget' = 0,
     windowAdopted' = false, move' = "none", last' = "init", held' = false, gaveUp' = false, auth' = true,
+    row' = "none", rowAge' = 0, rowWaits' = 0, wasted' = 0,
   }
   action init = initWith("fixed")
   action initEnqueue = initWith("enqueue")
   action initSingle = initWith("single")
   action initRefuse = initWith("refuse")
   action initGiveUp = initWith("giveup")
+  action initNoRetarget = initWith("noretarget")
 
   // The creator (no fairness: it may roll forever or stop).
   action creatorSeal = all {
+    rowKept,
     phase == "open", not(stopped), not(windowed(inst) and windowAdopted),
     phase' = "sealed", last' = "seal",
     stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget, windowAdopted' = windowAdopted,
@@ -93,11 +115,13 @@ module slowMemberFollow {
   }
   action creatorAdopt = all {
     phase == "sealed",
+    rowAge' = if (row == "owed") sat(rowAge + 1, AGE_CAP) else rowAge, row' = row, rowWaits' = rowWaits, wasted' = wasted,
     phase' = "open", lag' = sat(lag + 1, CAP), behindTarget' = if (inst == "idle") 0 else sat(behindTarget + 1, 2),
     windowAdopted' = (windowAdopted or windowed(inst)), last' = "adopt",
     stopped' = stopped, inst' = inst, move' = move, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
   action creatorStop = all {
+    rowKept,
     phase == "open", not(stopped), stopped' = true, last' = "stop",
     phase' = phase, lag' = lag, inst' = inst, behindTarget' = behindTarget, windowAdopted' = windowAdopted,
     move' = move, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
@@ -106,11 +130,13 @@ module slowMemberFollow {
   // The creator's serving of a published successor may be held (row 61's gate: its adoption tail,
   // a restart's startup readiness, or a creator that never adopts), and released when it progresses.
   action creatorHold = all {
+    rowKept,
     not(held), held' = true, last' = "hold",
     phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
     windowAdopted' = windowAdopted, move' = move, mode' = mode, gaveUp' = gaveUp, auth' = auth,
   }
   action creatorRelease = all {
+    rowKept,
     held, held' = false, last' = "release",
     phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
     windowAdopted' = windowAdopted, move' = move, mode' = mode, gaveUp' = gaveUp, auth' = auth,
@@ -119,6 +145,7 @@ module slowMemberFollow {
   // The member's install.
   // The install of an offer that authenticates (enqueue) or of a forged one (enqueueForged).
   action enqueueAs(offerAuthenticates: bool): bool = all {
+    rowKept,
     inst == "idle", lag > 0, not(gaveUp),
     inst' = "queued", behindTarget' = 0, last' = "enqueue", auth' = offerAuthenticates,
     phase' = phase, stopped' = stopped, lag' = lag, windowAdopted' = windowAdopted, move' = move, mode' = mode,
@@ -129,6 +156,7 @@ module slowMemberFollow {
   // The transition begins: the pre-drain journals the moves released before it (H), then the
   // install selects its offer (F1: the newest it knows).
   action beginFetch = all {
+    rowKept,
     inst == "queued",
     // The install authenticates the offer first: a forged one is refused with no state change.
     inst' = if (auth) "material" else "idle", behindTarget' = if (f1) 0 else behindTarget, windowAdopted' = false,
@@ -138,6 +166,7 @@ module slowMemberFollow {
   // A fetch that ends the transition releases the held moves (shared.finally releaseHeldIssues).
   def released(m: str): str = if (m == "held") "pending" else m
   action fetchMaterial = all {
+    rowKept,
     inst == "material",
     // A held serving answers nothing yet: the fetch retries (row 61 option E) until it is released.
     not(held and served(behindTarget)),
@@ -149,42 +178,66 @@ module slowMemberFollow {
   // D: the install deadline passes while the creator holds the material. The install ends with the
   // typed refusal and changes nothing; the delivery re-targets (enqueue again, F1: the newest offer).
   action expire = all {
+    rowKept,
     inst == "material", held, served(behindTarget),
     inst' = "idle", move' = released(move), last' = "expired", gaveUp' = giveUpOnExpiry,
     phase' = phase, stopped' = stopped, lag' = lag, behindTarget' = behindTarget, windowAdopted' = windowAdopted,
     mode' = mode, held' = held, auth' = auth,
   }
   action fetchChunks = all {
+    rowKept,
     inst == "chunks",
     if (served(behindTarget)) all { inst' = "apply", move' = move, last' = "chunks" }
     else all { inst' = "idle", move' = released(move), last' = "stale" },
     phase' = phase, stopped' = stopped, lag' = lag, behindTarget' = behindTarget, windowAdopted' = windowAdopted,
     mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
+  // The install's settlement drain (adopt.drain), on the epoch it reached: behindTarget epochs behind
+  // the creator's (closed when behindTarget > 0). A move out of the window is handed back; R defers a
+  // replacement the closed epoch could never admit; otherwise it is replaced, and a replacement into a
+  // closed epoch is displaced again (owed, its origin unchanged).
+  def reachedAge: int = rowAge - behindTarget
+  action settleDrain = all {
+    if (row != "owed") all { row' = row, rowAge' = rowAge, rowWaits' = rowWaits, wasted' = wasted }
+    else if (reachedAge >= WINDOW) all { row' = "handedBack", rowAge' = rowAge, rowWaits' = rowWaits, wasted' = wasted }
+    else if (behindTarget > 0 and retarget) all { row' = "owed", rowAge' = rowAge, rowWaits' = rowWaits + 1, wasted' = wasted }
+    else if (behindTarget > 0) all { row' = "owed", rowAge' = rowAge, rowWaits' = rowWaits, wasted' = sat(wasted + 1, CAP) }
+    else all { row' = "settled", rowAge' = rowAge, rowWaits' = rowWaits, wasted' = wasted },
+  }
   action applyDone = all {
-    inst == "apply",
+    inst == "apply", settleDrain,
     inst' = "idle", lag' = behindTarget, move' = released(move), last' = "installed",
     phase' = phase, stopped' = stopped, behindTarget' = behindTarget, windowAdopted' = windowAdopted, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
 
   // One move of the member's app.
   action issue = all {
+    rowKept,
     move == "none",
     move' = if (not(transition(inst))) "journaled" else if (hold) "held" else "retrying", last' = "issue",
     phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
     windowAdopted' = windowAdopted, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
+  // A journaled own move is displaced: its epoch closed without it (origin: the member's epoch).
+  action displace = all {
+    row == "none", row' = "owed", rowAge' = lag, rowWaits' = 0, wasted' = wasted, last' = "displace",
+    phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
+    windowAdopted' = windowAdopted, move' = move, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
+  }
   // The drain (H) or the policy's retry (refuse) lands the move only while no transition runs.
   action drain = all {
+    rowKept,
     (move == "pending" or move == "retrying"), not(transition(inst)),
     move' = "journaled", last' = "drain",
     phase' = phase, stopped' = stopped, lag' = lag, inst' = inst, behindTarget' = behindTarget,
     windowAdopted' = windowAdopted, mode' = mode, held' = held, gaveUp' = gaveUp, auth' = auth,
   }
 
+  action rowKept = all { row' = row, rowAge' = rowAge, rowWaits' = rowWaits, wasted' = wasted }
+
   action step = any {
     creatorSeal, creatorAdopt, creatorStop, creatorHold, creatorRelease, enqueue, enqueueForged, beginFetch, fetchMaterial, expire,
-    fetchChunks, applyDone, issue, drain,
+    fetchChunks, applyDone, issue, drain, displace,
   }
 
   // Safety: under A1 and A2 a fixed member's request is never refused as stale.
@@ -194,9 +247,19 @@ module slowMemberFollow {
   // No install proceeds from a forged offer: the fetch and the local adoption run only for an
   // authenticated one (and, by neverStale, only from a successor the creator still serves).
   val noUnauthenticatedInstall = (inst == "material" or inst == "chunks" or inst == "apply" or last == "installed") implies auth
-  val safety = neverStale and moveKept and noUnauthenticatedInstall
+  // R: a displaced move is owed until it is replaced into an open epoch (settled) or handed back; it
+  // waits at most WINDOW deferring installs (each reaches a newer epoch, and the window counts from its
+  // origin), and with R no replacement is signed into a closed epoch.
+  val rowAccounted = row == "none" or row == "owed" or row == "settled" or row == "handedBack"
+  val deferralBounded = rowWaits <= WINDOW
+  val noWastedReplacement = retarget implies wasted == 0
+  // The rows' part of safety alone (the stale controls break neverStale, not these).
+  val rowSafety = rowAccounted and deferralBounded and noWastedReplacement
+  // Holds only with R: the control "noretarget" violates it (the chain).
+  val noReplacementWasted = wasted == 0
+  val safety = neverStale and moveKept and noUnauthenticatedInstall and rowAccounted and deferralBounded and noWastedReplacement
 
-  val vars = (mode, phase, stopped, lag, inst, behindTarget, windowAdopted, move, last, held, gaveUp, auth)
+  val vars = (mode, phase, stopped, lag, inst, behindTarget, windowAdopted, move, last, held, gaveUp, auth, row, rowAge, rowWaits, wasted)
   // The deadline is a timer: an install held long enough expires (weak fairness of expire).
   temporal memberFair =
     weakFair(enqueue, vars) and weakFair(beginFetch, vars) and weakFair(fetchMaterial, vars) and weakFair(fetchChunks, vars)
@@ -214,6 +277,9 @@ module slowMemberFollow {
   // A move the member issued is eventually journaled by its room (from there settlement-window.qnt
   // carries it to the creator).
   temporal moveLands = environment implies always(move != "none" implies eventually(move == "journaled"))
+  // R: an owed move is settled or handed back: a deferral happens only at an install that leaves the
+  // member behind (lag > 0), so another install follows (memberFollows).
+  temporal rowResolves = environment implies always(row == "owed" implies eventually(row == "settled" or row == "handedBack"))
 
   // Witnesses.
   action rollOnce = creatorSeal.then(creatorAdopt)
@@ -247,6 +313,24 @@ module slowMemberFollow {
   // A forged offer is refused with no state change.
   run forgedTest = init.then(rollOnce).then(enqueueForged).then(all { assert(not(auth)), beginFetch })
     .then(all { assert(last == "forged" and inst == "idle" and lag == 1), creatorStop })
+  // R: a move displaced while the member lags; the install while the creator rolls on reaches a
+  // closed epoch and defers the replacement (none is wasted); the creator stops, the member catches
+  // up, and the install that reaches the open epoch replaces it (settled).
+  action rollingInstall = enqueue.then(beginFetch).then(fetchMaterial).then(rollOnce).then(fetchChunks).then(applyDone)
+  run retargetDefersTest = init.then(rollOnce).then(displace).then(rollingInstall)
+    .then(all { assert(row == "owed" and rowWaits == 1 and wasted == 0 and lag == 1), creatorStop })
+    .then(enqueue).then(beginFetch).then(fetchMaterial).then(fetchChunks).then(applyDone)
+    .then(all { assert(row == "settled" and lag == 0 and wasted == 0 and safety), creatorHold })
+  // R: the creator rolls during every install: the deferrals end at the window, where the move is
+  // handed back (as it is without R, at the same install), after at most WINDOW deferrals.
+  run retargetWindowTest = init.then(rollOnce).then(displace).then(rollingInstall).then(rollingInstall)
+    .then(all { assert(row == "owed" and rowWaits == 2 and wasted == 0), rollingInstall })
+    .then(all { assert(row == "handedBack" and rowWaits <= WINDOW and wasted == 0 and safety), creatorStop })
+  // The base (no R): the same schedule signs each replacement into the closed epoch, where it is
+  // displaced again (the chain), and hands the move back at the same install.
+  run noRetargetChainTest = initNoRetarget.then(rollOnce).then(displace).then(rollingInstall).then(rollingInstall)
+    .then(all { assert(row == "owed" and wasted == 2), rollingInstall })
+    .then(all { assert(row == "handedBack" and wasted == 2), creatorStop })
   // The base: the retry lands only between transitions, which back-to-back installs never leave.
   run refuseRetryTest = initRefuse.then(rollOnce).then(enqueue).then(beginFetch).then(issue)
     .then(all { assert(move == "retrying"), fetchMaterial }).then(fetchChunks).then(applyDone).then(rollOnce).then(enqueue)
