@@ -14282,8 +14282,16 @@ function previewCreatorOrdinarySuccessorSettlement(input: Readonly<{
 	if (plan.revision !== (priorPlan === null ? 0 : priorPlan.revision + (priorPlan.fenceSequence === null ? 0 : 1)) ||
 		!sameBytes(encodeCanonical(plan.entries), encodeCanonical(priorPlan?.entries ?? [])))
 		throw new TypeError("prospective successor settlement plan differs from original merge");
-	const previewBytes = encodeCanonical(readout);
-	return ObjectFreeze({plan, checkPreview: () => sameBytes(encodeCanonical(preview(previewInput)), previewBytes)});
+	// The successor census charges the fence's clock over its whole domain (never this
+	// readout's value), so only the plan is sizing input. The room clock may advance after
+	// this quote: a creator move takes the next logical time as it passes the barriers, even
+	// one an adoption then holds. A re-read plan must be the same; its clock only stays valid.
+	const planBytes = encodeCanonical(readout.plan);
+	return ObjectFreeze({plan, checkPreview: () => {
+		const current = preview(previewInput);
+		return sameBytes(encodeCanonical(current.plan), planBytes) &&
+			NumberIsSafeInteger(current.fenceLogicalTime) && current.fenceLogicalTime >= lastTime + 2;
+	}});
 }
 
 function settlementOwnRowClass(
