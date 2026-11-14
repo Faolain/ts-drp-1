@@ -8329,6 +8329,19 @@ async function handleV3Ingress(
 	evidence: VerifiedV3IngressEvidence,
 	signedAdmission?: RetainedCloseSignedAdmission
 ): Promise<boolean> {
+	// The creator's close shut application admission (its stage set blueprintClosing after
+	// the close shut the maintenance consumer) and is about to take, or holds, the live
+	// journal's single native read reservation for its sources. Custody takes the same
+	// reservation, and the consumer would refuse this append anyway, so meet the closed gate
+	// before custody: retain the row as the consumer's refusal does. Ingress queued before
+	// the stage finished ahead of it; this is a retained row's drain queued behind it.
+	if (registration.creatorMaintenanceBound && registration.blueprintClosing && registration.receivedTransition !== true &&
+		!registration.index.has(evidence.authenticated.digest)) {
+		retainPendingIngress(registration, evidence, V3Envelope.encode({
+			canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
+		ingressFailureLog("admission-rejected", "received-maintenance-closing");
+		return false;
+	}
 	if (evidence.authenticated.admitted.settlementSource === undefined) {
 		if (!registration.creatorMaintenanceBound || registration.index.has(evidence.authenticated.digest))
 			return handleV3IngressWithSource(registration, evidence, false, undefined, signedAdmission);
