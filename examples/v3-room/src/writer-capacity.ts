@@ -1,6 +1,6 @@
 import { issuanceSettlementReserveForecast } from "@ts-drp/issuance-store/maintenance";
 import type { V3RoomAcceptedVertex } from "@ts-drp/node/v3-room";
-import { vertexCanonicalBytes } from "@ts-drp/protocol-v3";
+import { encodeCanonical } from "@ts-drp/canonical";
 
 /**
  * Creator-side forecast of each settlement Writer's own admission (fix/capacity-refusal-prompt-roll).
@@ -66,15 +66,20 @@ export interface V3RoomWriterCapacity {
 export function createV3RoomWriterCapacity(input: Readonly<{ objectId: string; maxDependencies: number; now?: () => number }>): V3RoomWriterCapacity {
 	const now = input.now ?? ((): number => performance.now());
 	const authors = new Map<string, AuthorWindow>();
+	// The row's canonical preimage is the canonical encoding of its registered fields, which the admitted
+	// view carries (the digest is not one of them); a field the registry omits at its default only makes
+	// this longer, so it bounds the Writer's preimage from above.
 	const preimageLength = (vertex: Partial<V3RoomAcceptedVertex>): number | undefined => {
+		const { digest: _digest, ...fields } = vertex;
+		if (fields.operation === undefined || fields.dependencies === undefined || fields.anchor === undefined) return undefined;
 		try {
-			return vertexCanonicalBytes(vertex as Readonly<Record<string, unknown>>).byteLength;
+			return encodeCanonical(fields).byteLength;
 		} catch {
 			return undefined;
 		}
 	};
 	return Object.freeze({
-		observe(vertex, epoch): V3RoomWriterCapacityReading | undefined {
+		observe(vertex: Parameters<V3RoomWriterCapacity["observe"]>[0], epoch: number): V3RoomWriterCapacityReading | undefined {
 			if (vertex.epoch !== epoch || !Number.isSafeInteger(vertex.authorSequence) || vertex.authorSequence < 0) return undefined;
 			const length = preimageLength(vertex);
 			// A vertex whose preimage cannot be rebuilt is not forecast (the budget and idle triggers apply).
