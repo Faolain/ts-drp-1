@@ -1,5 +1,5 @@
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { settlementHandBacksWith } from "@ts-drp/issuance-store";
+import { settlementHandBacksWith, type SettlementHandBackReason } from "@ts-drp/issuance-store";
 import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
@@ -82,6 +82,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
+	ROOM_APPLICATION_STATE_BYTES,
 	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3CreatorSupersededVertex,
@@ -90,6 +91,8 @@ import {
 	type V3LiveDescriptor,
 	type V3LocalSettlementFloor,
 	type V3LocalSettlementPolicy,
+	type V3ApplicationStateBound,
+	type V3ApplicationStateBoundSeed,
 	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
 	type V3RetainedHashPage,
@@ -98,6 +101,7 @@ import {
 	type V3SettlementSourceSelectionRequest,
 	type V3TerminalMigrationSource,
 	V3_SETTLEMENT_DRAIN_TURN_ROWS,
+	V3_LOCAL_POLICY_REFUSAL_DETAIL,
 	withV3TerminalMigrationTargetFloor,
 	bindV3IngressCapacityRefusalListener,
 } from "@ts-drp/node/v3-live";
@@ -133,7 +137,12 @@ import { type DRPNetworkNode, type Message, MessageType, V3Envelope } from "@ts-
 import { beginForegroundWork, createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
 import { pauseCreatorSuccessorRetainedReads } from "./internal/creator-successor-live.js";
-import type { CreatorOrdinaryApplicationResourceBoundReader, CreatorOrdinaryFinishingWindowLimits } from "./internal/runtime-reclamation.js";
+import type {
+	CreatorOrdinaryApplicationResourceBoundReader,
+	CreatorOrdinaryApplicationResourceProjection,
+	CreatorOrdinaryApplicationResourceProjectionInput,
+	CreatorOrdinaryFinishingWindowLimits,
+} from "./internal/runtime-reclamation.js";
 import {
 	resolveRecoveryPoolAutoMaintenanceOptions,
 	startRecoveryPoolAutoScheduler,
@@ -445,6 +454,15 @@ export type V3RoomSettlementStatus = Readonly<{
 		operations: readonly Readonly<Record<string, unknown>>[];
 		/** The record's key: pass it back with the operation to consume the record. */
 		handBack: V3RoomHandBack;
+		/**
+		 * Why the room gave it back when its replay was refused by this Writer's own admission at an
+		 * install: "application-state-limit" (the room's application state limit), "admission-rejected"
+		 * (the room's admission policy), or "transient-exhausted" (a transient refusal, such as input
+		 * capacity or snapshot readiness, that its install's retries did not clear; offering it again
+		 * later may succeed). Absent: the settlement window or the creator's frontier gave it back.
+		 * Never offered again automatically.
+		 */
+		reason?: SettlementHandBackReason;
 	}>[];
 	/**
 	 * Safety net (observation only), expected 0: moves the window or the creator's frontier would give
@@ -465,6 +483,15 @@ export type V3RoomSettlementStatus = Readonly<{
 
 /** The key of one durable hand-back record (V3RoomSettlementStatus.undelivered). */
 export type V3RoomHandBack = Readonly<{ sourceSequence: number; intent: number }>;
+
+/**
+ * The outcome of declining one given-back move (V3RoomSession.declineHandBack).
+ * - "declined": this call dropped the unconsumed record in one durable plan write; the move is no
+ *   longer listed and never offered again.
+ * - "consumed": a row offering the move again already consumed the record; nothing changed.
+ * - "absent": no such record (never given back, or already declined); nothing changed.
+ */
+export type V3RoomHandBackDecline = Readonly<{ kind: "declined" | "consumed" | "absent"; handBack: V3RoomHandBack }>;
 
 /** Options of one issued move. */
 export type V3RoomIssueOptions = Readonly<{
@@ -623,7 +650,17 @@ export interface V3RoomTransport {
 
 export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
 	/** Optional pure, artifact-bound LOCAL planning bound. Undefined retains the
-	 * exact original forecast; this is not shared operation validity/admission. */
+	 * exact original forecast; this is not shared operation validity.
+	 *
+	 * The room's application state limit also reads it: where its incremental projection covers the
+	 * epoch's base (its base quote is within the limit), each node's local admission refuses a move
+	 * whose quoted bound passes the limit, instead of folding the exact state (the creator's refusal
+	 * is the authoritative one; a Writer's is advisory). So the state a room can actually reach near
+	 * its limit is bounded by this bound, not by the exact encoding: a conservative bound (Grid's
+	 * keeps the widest version of each re-placed block) refuses some moves whose exact state would
+	 * fit. A bound must dominate every exact state it covers; one that does not surfaces at the seal
+	 * as APPLICATION_STATE_BOUND_UNSOUND. Where the projection is absent or declines (undefined), the
+	 * room keeps the exact fold. */
 	readonly readOrdinaryApplicationResourceBound?: CreatorOrdinaryApplicationResourceBoundReader;
 	/** Local capacity ceilings, not an acceptance promise. Explicit preparation
 	 * may certify a smaller window; ordinary calls meter that window and refuse
@@ -697,6 +734,8 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 				admissionEpoch: number,
 				terminalThrough: number | null,
 			])[];
+			/** The room's application state limit in canonical bytes; the room refuses any operation past it. */
+			readonly maxApplicationStateBytes?: number;
 		}>
 	): V3OperationAdmissionPolicy;
 	readonly databaseName: string;
@@ -852,6 +891,15 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	 * settlement window gave back. Observation only (absent on room stubs). See V3RoomSettlementStatus.
 	 */
 	settlementStatus?(): V3RoomSettlementStatus;
+	/**
+	 * Declines one given-back move (a record of settlementStatus().undelivered) the application will not
+	 * offer again, typically after `issue(operation, { handBack })` was refused for a lasting reason
+	 * (V3RoomHandBackRefused.reason). One durable settlement plan write drops exactly that unconsumed
+	 * record: the move is never listed or offered again, and its backlog slot is free. Across a crash the
+	 * record is either still listed or gone. A record already consumed by a reissued row, or absent, is
+	 * left as it is and reported ("consumed" / "absent"). Absent on room stubs.
+	 */
+	declineHandBack?(handBack: V3RoomHandBack): Promise<V3RoomHandBackDecline>;
 	/**
 	 * Explicit, terminal local-author abandonment of one durable unresolved,
 	 * never-published accepted source. Owned local sessions only; it signs an
@@ -2016,15 +2064,81 @@ export class V3RoomLocalBacklogFull extends Error {
 	/**
 	 * @param backlog - The Writer's undelivered moves.
 	 * @param bound - V3_ROOM_LOCAL_BACKLOG_LIMIT.
+	 * @param handBackSlots - How many of them are given-back moves still listed (unconsumed hand-back
+	 * records): they free their slots only when offered again (`issue(operation, { handBack })`) or
+	 * declined (`declineHandBack`), never by delivery.
 	 */
 	constructor(
 		readonly backlog: number,
-		readonly bound: number
+		readonly bound: number,
+		readonly handBackSlots = 0
 	) {
-		super(`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host`);
+		super(
+			`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host` +
+				(handBackSlots === 0 ? "" : ` (${handBackSlots} are given-back moves to offer again or decline)`)
+		);
 		this.name = "V3RoomLocalBacklogFull";
 	}
 }
+
+/**
+ * A given-back move offered again with its hand-back record (`issue(operation, { handBack })`) that the
+ * room refused: the record is NOT consumed and the move stays listed, holding one backlog slot. The
+ * message is the room's ordinary issue failure ("v3 room issue failed: <kind>: <detail>").
+ * `reason` is set when the refusal is this Writer's own lasting decision about the operation: the room's
+ * application state limit ("application-state-limit") or the room's admission policy refusing it
+ * ("admission-rejected"). Offering it again in the same state would be refused again; an app that will
+ * not change it declines the record (`declineHandBack(handBack)`) and tells its user. Without `reason`
+ * the refusal is transient (capacity, readiness, recovery) and the move may be offered again later.
+ */
+export class V3RoomHandBackRefused extends TypeError {
+	readonly reason: "application-state-limit" | "admission-rejected" | undefined;
+	/**
+	 * @param handBack - The record the refused issue carried.
+	 * @param kind - The local issue failure kind.
+	 * @param detail - The local issue failure detail.
+	 */
+	constructor(
+		readonly handBack: V3RoomHandBack,
+		readonly kind: string,
+		readonly detail: string
+	) {
+		super(`v3 room issue failed: ${kind}: ${detail}`);
+		this.name = "V3RoomHandBackRefused";
+		this.reason = lastingLocalRefusal(kind, detail);
+	}
+}
+
+/**
+ * Whether a local issue failure is this Writer's own lasting refusal of the operation: the room's
+ * application state limit, or the admission policy's rejection (V3_LOCAL_POLICY_REFUSAL_DETAIL). Other
+ * "admission-rejected" failures are capacity, readiness or recovery refusals a retry can clear.
+ * @param kind - The local issue failure kind.
+ * @param detail - Its detail.
+ * @returns The refusal reason, or undefined when it is not lasting.
+ */
+function lastingLocalRefusal(kind: string, detail: string): "application-state-limit" | "admission-rejected" | undefined {
+	if (kind === "application-state-limit") return "application-state-limit";
+	if (kind === "admission-rejected" && detail === V3_LOCAL_POLICY_REFUSAL_DETAIL) return "admission-rejected";
+	return undefined;
+}
+
+/**
+ * Whether a local issue failure is a transient admission refusal (input capacity, snapshot readiness,
+ * admission halted or awaiting recovery or classification): "admission-rejected" without the policy's
+ * own rejection.
+ * @param kind - The local issue failure kind.
+ * @param detail - Its detail.
+ * @returns Whether a retry may clear it.
+ */
+function transientLocalRefusal(kind: string, detail: string): boolean {
+	return kind === "admission-rejected" && detail !== V3_LOCAL_POLICY_REFUSAL_DETAIL;
+}
+
+/** The first backoff of a settlement replay refused transiently, in ms (doubling per retry). */
+export const SETTLEMENT_TRANSIENT_RETRY_MS = 10;
+/** The retries of a settlement replay refused transiently, in its install (10 + 20 + ... + 640 ms). */
+export const SETTLEMENT_TRANSIENT_RETRIES = 7;
 
 /**
  * A new local move refused up front because this epoch's author fence is awaited
@@ -2940,10 +3054,102 @@ function validMigrationRecordOperation(
 function roomOrdinaryFinishingWindowForEpoch(application: V3RoomApplication,
 	context: Readonly<{objectId: string; epoch: number}>): CreatorOrdinaryFinishingWindowLimits | undefined {
 	const policy = application.ordinaryFinishingWindow;
-	if (typeof policy !== "function") return policy;
-	const selected = Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]);
-	if (selected === undefined) throw new TypeError("v3 room finishing window selector did not return limits");
+	const selected = typeof policy !== "function" ? policy :
+		Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]) as
+			CreatorOrdinaryFinishingWindowLimits | undefined;
+	if (typeof policy === "function" && selected === undefined) throw new TypeError("v3 room finishing window selector did not return limits");
+	// A window can never describe a state past the room's application state limit (admission refuses
+	// any fold past it), and the creator's window capture declines one that declares more: refused here,
+	// at the close binding, rather than opening a room whose every ordinary move is refused.
+	if (selected !== undefined && !(selected.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+		throw new TypeError("v3 room finishing window passes the room's application state limit");
 	return selected;
+}
+
+/**
+ * The application's own state bound (readOrdinaryApplicationResourceBound, the bound the creator's
+ * ordinary proof book charges) seeded with a plane's exact base state, as the live plane's admission
+ * reads it: the canonical byte length of every state reachable from the base and the operations advanced
+ * into it. Undefined when the application has no incremental bound for this blueprint; the live plane
+ * then judges the exact fold.
+ * @param application - The room's application.
+ * @param blueprintDigest - The room's blueprint.
+ * @param exactCanonicalBaseStateBytes - The plane's exact base state.
+ * @returns The bound, or undefined.
+ */
+function createRoomApplicationStateBound(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): V3ApplicationStateBound | undefined {
+	const create = application.readOrdinaryApplicationResourceBound?.createIncrementalProjection;
+	if (typeof create !== "function") return undefined;
+	const input = roomApplicationStateBoundInput(application, blueprintDigest, exactCanonicalBaseStateBytes);
+	return input === undefined ? undefined : roomApplicationStateBoundFacade(create(input));
+}
+
+/**
+ * The resumable form of {@link createRoomApplicationStateBound}: the application's own resumable seed of
+ * the same projection over the same input (beginIncrementalProjection), so the live plane seeds the
+ * bound in bounded turns. Undefined when the application has no resumable form.
+ */
+function beginRoomApplicationStateBound(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): V3ApplicationStateBoundSeed | undefined {
+	const begin = application.readOrdinaryApplicationResourceBound?.beginIncrementalProjection;
+	if (typeof begin !== "function") return undefined;
+	const input = roomApplicationStateBoundInput(application, blueprintDigest, exactCanonicalBaseStateBytes);
+	const seed = input === undefined ? undefined : begin(input);
+	if (seed === undefined) return undefined;
+	return Object.freeze({
+		step: (byteBudget: number) => seed.step(byteBudget) === true,
+		finish: () => roomApplicationStateBoundFacade(seed.finish()),
+	});
+}
+
+/** The catalog-bound projection input over one exact base state, or undefined when the blueprint does not resolve. */
+function roomApplicationStateBoundInput(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): CreatorOrdinaryApplicationResourceProjectionInput | undefined {
+	let resolved: ReturnType<V3RoomApplication["catalog"]["resolve"]>;
+	try {
+		resolved = application.catalog.resolve(blueprintDigest);
+	} catch {
+		return undefined;
+	}
+	if (resolved.blueprintDigest !== blueprintDigest) return undefined;
+	return {
+		catalog: Object.freeze({
+			blueprintDigest: resolved.blueprintDigest,
+			artifactId: resolved.artifactId,
+			artifactDigest: resolved.artifactDigest,
+			catalogDigest: resolved.evidence.catalogDigest,
+			runtimeProfile: resolved.runtimeProfile,
+			exactArtifactBytes: resolved.exactArtifactBytes,
+			canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes,
+		}),
+		material: Object.freeze({
+			exactCanonicalBaseStateBytes: Object.freeze([new Uint8Array(exactCanonicalBaseStateBytes)]),
+			currentOperations: Object.freeze([]),
+			protectedOperations: Object.freeze([]),
+			recoveryOperations: Object.freeze([]),
+		}),
+	} as CreatorOrdinaryApplicationResourceProjectionInput;
+}
+
+function roomApplicationStateBoundFacade(
+	projection: CreatorOrdinaryApplicationResourceProjection | undefined
+): V3ApplicationStateBound | undefined {
+	if (projection === undefined) return undefined;
+	return Object.freeze({
+		advance: (operations: readonly unknown[]) => projection.advance(operations),
+		quote: (candidateOperation: unknown) => projection.quote(candidateOperation)?.byteLength,
+		quoteBase: () => projection.quoteWithoutApplicationCandidate?.()?.byteLength,
+	});
 }
 
 function createRoomOperationAdmissionPolicy(
@@ -2952,7 +3158,9 @@ function createRoomOperationAdmissionPolicy(
 	context: Parameters<NonNullable<CreateV3RoomSessionInput["createOperationAdmissionPolicy"]>>[0]
 ): V3OperationAdmissionPolicy {
 	const authority = migrationInviteAuthority(material);
-	const applicationPolicy = input.createOperationAdmissionPolicy?.(context);
+	const applicationPolicy = input.createOperationAdmissionPolicy?.(
+		Object.freeze({ ...context, maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES })
+	);
 	let inherited = false;
 	let migrationPrefixOnly = context.epoch === 0 && context.authenticatedApplicationStateBytes === undefined;
 	const imports: Readonly<Record<string, unknown>>[] = [];
@@ -2964,6 +3172,15 @@ function createRoomOperationAdmissionPolicy(
 	const maxImportBytes = parameters.maxEpochBytes as number;
 	const maxImports = (parameters.maxEpochVertices as number) * 16;
 	return Object.freeze({
+		createApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
+			createRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
+		// Only for an application with a resumable seed: otherwise the plane seeds at install, as before.
+		...(typeof input.application.readOrdinaryApplicationResourceBound?.beginIncrementalProjection !== "function"
+			? {}
+			: {
+					beginApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
+						beginRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
+				}),
 		reserve(operation: Readonly<Record<string, unknown>>, authenticated?: Readonly<{ author: string }>) {
 			const expanded =
 				operation.action === "applicationBatch"
@@ -3663,6 +3880,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	ownsLocalSession = false
 ): Promise<V3RoomSession<Projection>> {
 	localOwner?.assertCurrent();
+	// A fixed finishing window past the room's application state limit is refused before anything opens
+	// (a selector's window is refused at each close binding, roomOrdinaryFinishingWindowForEpoch).
+	const fixedWindow = input.application.ordinaryFinishingWindow;
+	if (fixedWindow !== undefined && typeof fixedWindow !== "function" && !(fixedWindow.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+		throw new TypeError("CREATOR_ORDINARY_FINISHING_WINDOW_INVALID: the finishing window passes the room's application state limit");
 	// The trusted application owns displacement semantics for this room lifetime.
 	if (input.receiveOnly !== undefined && input.receiveOnly !== true)
 		throw new TypeError("v3 room receive-only restriction is invalid");
@@ -3772,14 +3994,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	const { invite, material, settlementProfile } = captureInvite(input.creatorInvite);
 	const ownedSettlementPolicy = localSettlementPolicy(input.application, material);
-	// A successor's projection base comes from the native plane, which bounds application state by
-	// the room's maxSnapshotBytes (with at most 16,384 items); the room accepts every state it seals.
-	const successorStateMaxBytes = Reflect.get(
-		decodeCanonical(material.exactCanonicalParametersCarrierBytes) as object,
-		"maxSnapshotBytes"
-	) as unknown;
-	if (!Number.isSafeInteger(successorStateMaxBytes) || (successorStateMaxBytes as number) < 32_768)
-		throw new TypeError("v3 room snapshot bound is invalid");
+	// A successor's projection base comes from the native plane, whose fold carries the room's
+	// application state limit and whose admission refuses any operation past it (with at most 16,384
+	// items); the room accepts every state it seals.
+	const successorStateMaxBytes = ROOM_APPLICATION_STATE_BYTES;
 	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
@@ -4574,7 +4792,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
 			projectionBaseResult.exactCanonicalApplicationStateBytes,
 			"migration",
-			successorStateMaxBytes as number
+			successorStateMaxBytes
 		);
 		if (
 			projectionBaseResult.objectId !== input.objectId ||
@@ -4601,7 +4819,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const projectedStateBytes = normalizeApplicationStateBytes(
 			Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
 			"migration",
-			successorStateMaxBytes as number
+			successorStateMaxBytes
 		);
 		if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
 			throw new TypeError("v3 room successor projection state differs");
@@ -6622,7 +6840,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return;
 		}
 		if (!issued.ok) {
-			rejectOwned(owned, new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`));
+			const handBack = owned.length === 1 ? owned[0]?.handBack : undefined;
+			rejectOwned(
+				owned,
+				handBack === undefined
+					? new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`)
+					: new V3RoomHandBackRefused(handBack, issued.kind, issued.detail)
+			);
 			return;
 		}
 		if (terminalFailure !== undefined) {
@@ -6828,7 +7052,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		readonly sourceSequence: number;
 		readonly throughIntent: number;
 	}>;
-	type RoomSettlementIssueResult = Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>> | null;
+	/** A replay the Writer's admission refused was given back (or, with no free record, left live). */
+	const SETTLEMENT_REPLAY_SETTLED = Object.freeze({ ok: false as const, kind: "replay-settled" as const });
+	type RoomSettlementIssueResult =
+		| Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>>
+		| typeof SETTLEMENT_REPLAY_SETTLED
+		| null;
 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
 	type RoomHandBack = NonNullable<RoomSettlementPlan["handBacks"]>[number];
 	let settlementStatusSnapshot: V3RoomSettlementStatus | undefined;
@@ -6839,6 +7068,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// record's reissue), as of that write: they leave the backlog once a creator row reaches every such
 	// row (settlementBacklogNow).
 	let settlementPendingRows: readonly Readonly<{ rows: readonly number[]; moves: number }>[] = [];
+	// Of those, the given-back moves still listed (unconsumed hand-back records), for V3RoomLocalBacklogFull.
+	let settlementHandBackSlots = 0;
+	const unconsumedHandBacks = (plan: RoomSettlementPlan | null): number =>
+		(plan?.handBacks ?? []).filter((record) => record.reissueSequence === null).length;
 	// The epoch whose author fence the last drain awaits (settlementAuthorFenceDecision "await-fence"):
 	// new moves in it are refused (V3RoomAwaitingAuthorFence) until an install fences. Each drain
 	// decides again; a later epoch clears it.
@@ -6959,6 +7192,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				.filter((record) => record.reissueSequence === null)
 				.map((record) =>
 					Object.freeze({
+						...(record.reason === undefined ? {} : { reason: record.reason }),
 						vertexDigest: hex(record.sourceDigest),
 						epoch: record.sourceEpoch,
 						operations: Object.freeze([
@@ -6991,6 +7225,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
 		recordSettlementBacklog(plan);
+		settlementHandBackSlots = unconsumedHandBacks(plan);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({
 				...settlementStatusSnapshot,
@@ -6998,6 +7233,49 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				deferred: deferredMovesOf(plan),
 				awaitingFence: authorFenceAwaited(),
 			});
+	};
+	/**
+	 * Declines one given-back move: ONE plan write (compare-and-swap on the plan revision) drops exactly
+	 * that unconsumed record and nothing else; the store refuses any other change in a decline write.
+	 * The source's entry stays as it is (an expired, handed-back source is never replayed). A reissued
+	 * row consuming the record races only through the store: whichever transaction commits first wins,
+	 * and the other sees the record consumed (this call reports "consumed") or absent (the reissue is
+	 * refused, its record unavailable). Runs as a lifetime transition, so never inside an install's drain.
+	 * @param handBack - The record's key.
+	 * @returns The outcome.
+	 */
+	const declineSettlementHandBack = async (handBack: V3RoomHandBack): Promise<V3RoomHandBackDecline> => {
+		for (let attempt = 1; ; attempt++) {
+			assertSessionOpen();
+			const current = await issuanceStore.readSettlementPlan(settlementScope);
+			const record = current?.handBacks?.find(
+				(value) => value.sourceSequence === handBack.sourceSequence && value.intent === handBack.intent
+			);
+			if (current === null || record === undefined || record.reissueSequence !== null) {
+				await refreshHandBackListing();
+				return Object.freeze({ kind: record === undefined ? ("absent" as const) : ("consumed" as const), handBack });
+			}
+			const remaining = (current.handBacks ?? []).filter((value) => value !== record);
+			const { handBacks: _declined, ...rest } = current;
+			try {
+				await issuanceStore.transactWriteSettlementPlan({
+					expectedRevision: current.revision,
+					scope: settlementScope,
+					declineHandBack: handBack,
+					plan: Object.freeze({
+						...rest,
+						revision: current.revision + 1,
+						...(remaining.length === 0 ? {} : { handBacks: Object.freeze(remaining) }),
+					}),
+				});
+			} catch (error) {
+				// A concurrent plan write (a reissue consuming another record) moved the revision: read again.
+				if (attempt < 8 && Reflect.get(Object(error), "code") === "ISSUANCE_RETRY_REQUIRED") continue;
+				throw error;
+			}
+			await refreshHandBackListing();
+			return Object.freeze({ kind: "declined" as const, handBack });
+		}
 	};
 	const authenticatedSettlementInheritance = (
 		sources: readonly DisplacedSource[]
@@ -7071,6 +7349,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
 		left.sourceResolutionKind === right.sourceResolutionKind &&
 		left.sourceResolutionScope === right.sourceResolutionScope &&
+		sameBytes(encodeCanonical(left.handedBack ?? null), encodeCanonical(right.handedBack ?? null)) &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -7102,7 +7381,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const inheritance = inheritances.get(source.authorSequence) ?? prior?.inheritance;
 			// The settlement window resolves an unreplaced displaced move as expired (settlementWindowExpired).
 			const expired = windowExpired.has(source.authorSequence);
-			const disposition = prior?.sourceContextDigest !== undefined ? prior.disposition :
+			// A refused replay's hand-back is terminal: the source keeps its `expire` (it is never replaced).
+			const disposition = prior?.sourceContextDigest !== undefined || prior?.handedBack !== undefined ? prior.disposition :
 				inheritance === undefined ? (expired ? "expire" : settlementDisposition(source)) : "inherited";
 			if (disposition === undefined) continue;
 			const sourceDigest = bytes(source.vertexDigest);
@@ -7126,6 +7406,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			entries.push(
 				Object.freeze({
 					disposition,
+					...(prior?.handedBack === undefined ? {} : { handedBack: prior.handedBack }),
 					...(sourceObjectId === undefined ? {} : { sourceObjectId }),
 					...(inheritance === undefined ? {} : { inheritance }),
 					...(prior?.replacementProgress === undefined ? {} : { replacementProgress: prior.replacementProgress }),
@@ -7373,6 +7654,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		settlementSources = sources;
 		settlementDisplaced = new Map(sources.map((source) => [source.authorSequence, source.intents.length] as const));
 		recordSettlementBacklog(plan);
+		settlementHandBackSlots = unconsumedHandBacks(plan);
 		// This plan write at `epoch` settled every own row of the epochs before it.
 		localMovesCountedFrom(epoch);
 		settlementStatusSnapshot = Object.freeze({
@@ -7449,6 +7731,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
 		recordSettlementBacklog(current);
+		settlementHandBackSlots = unconsumedHandBacks(current);
 		// The status reflects this drain's resolutions (given-back moves no longer wait).
 		recordSettlementStatus(settlementSources, current);
 		return current;
@@ -7611,6 +7894,88 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// fence and replacements locally and the startup barrier publishes them after readiness
 	// (rebasePromise). Every other drain (successor adoption) publishes each issue at once.
 	let settlementDrainPublication: "immediate" | "after-readiness" = "immediate";
+	/**
+	 * Settles a displaced source whose replay the Writer's own admission refused before signing: in ONE
+	 * plan write, its entry becomes `expire` with `handedBack {fromIntent, reason}` (written once, a
+	 * terminal chain end) and its intents from `fromIntent` on are given back to the application as
+	 * durable hand-back records carrying the reason. Never re-offered automatically: `expire` is never
+	 * replayed (eligible), and only the application's own issue(op, {handBack}) consumes a record. With no
+	 * free record the source is NOT expired: it stays live (not replayed now) and the next install
+	 * retries it, so no move is ever expired unrecorded.
+	 * @param source - The displaced source.
+	 * @param fromIntent - Its first intent not yet replaced.
+	 * @param reason - The refusal.
+	 */
+	const handBackRefusedReplay = async (
+		source: DisplacedSource,
+		fromIntent: number,
+		reason: SettlementHandBackReason
+	): Promise<void> => {
+		const current = await issuanceStore.readSettlementPlan(settlementScope);
+		const entry = current?.entries.find((candidate) => candidate.sourceSequence === source.authorSequence);
+		if (
+			current === null ||
+			entry === undefined ||
+			!sameBytes(entry.sourceDigest, bytes(source.vertexDigest)) ||
+			(entry.disposition !== "rebase" && entry.disposition !== "transform") ||
+			entry.replacementSequence !== null ||
+			entry.sourceContextDigest !== undefined ||
+			(entry.replacementProgress?.chunks.at(-1)?.throughIntent ?? 0) !== fromIntent ||
+			fromIntent >= (entry.replacementProgress?.intentCount ?? source.intents.length)
+		)
+			throw new TypeError("v3 room refused replay source changed");
+		// The records carry the source's own intents from `fromIntent` on. With signed chunks already
+		// (fromIntent > 0) that is exact only when the replay replays the source's intents one for one (a
+		// rebase of the same intent count); a transform's replacement intents need not map back to the
+		// source's, so such a source is not handed back here: it stays live, like a full record set.
+		const oneForOne =
+			fromIntent === 0 ||
+			(entry.disposition === "rebase" && entry.replacementProgress?.intentCount === source.intents.length);
+		const handBacks = !oneForOne
+			? undefined
+			: settlementHandBacksWith(
+					current.handBacks?.filter((record) => record.reissueSequence === null),
+					source.intents.slice(fromIntent).map((intent, index) =>
+						Object.freeze({
+							reason,
+							sourceSequence: source.authorSequence,
+							sourceDigest: bytes(source.vertexDigest),
+							sourceEpoch: source.epoch,
+							intent: fromIntent + index,
+							exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+							reissueSequence: null,
+						})
+					)
+				);
+		if (handBacks === undefined) {
+			// No free record (or no one-for-one hand-back): the move stays live (deferred), like the
+			// window's rule; the next install retries it.
+			windowDeferredMoves += source.intents.length - fromIntent;
+			await refreshHandBackListing();
+			return;
+		}
+		await issuanceStore.transactWriteSettlementPlan({
+			expectedRevision: current.revision,
+			scope: settlementScope,
+			plan: Object.freeze({
+				...current,
+				revision: current.revision + 1,
+				entries: Object.freeze(
+					current.entries.map((candidate) =>
+						candidate.sourceSequence === source.authorSequence
+							? Object.freeze({
+									...candidate,
+									disposition: "expire" as const,
+									handedBack: Object.freeze({ fromIntent, reason }),
+								})
+							: candidate
+					)
+				),
+				handBacks: Object.freeze([...handBacks]),
+			}),
+		});
+		await refreshHandBackListing();
+	};
 	const issueSettlement = async (
 		operations: readonly Readonly<{
 			readonly logicalTime: number;
@@ -7641,13 +8006,67 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		} as Parameters<RoomPlaneHandle["issueLocal"]>[0] & { planEffect: RoomReplacementEffect };
 		if (effect.kind === "replacement" && source === undefined)
 			throw new TypeError("v3 room replacement owning source is unavailable");
-		const issued =
+		const handle = activeHandle;
+		const attemptIssue = (): ReturnType<RoomPlaneHandle["issueLocal"]> =>
 			effect.kind === "replacement"
-				? await (source as DisplacedSource).issueReplacement(localInput)
+				? (source as DisplacedSource).issueReplacement(localInput)
 				: // The settlement lane: received rows and caller moves can never refuse this mandatory fence.
-					await (activeHandle.issueSettlementLocal ?? activeHandle.issueLocal)(localInput);
+					(handle.issueSettlementLocal ?? handle.issueLocal)(localInput);
+		let issued = await attemptIssue();
+		// A replay refused before signing for a transient reason (input capacity, snapshot readiness,
+		// admission halted or awaiting recovery) is retried in this install, with backoff
+		// (SETTLEMENT_TRANSIENT_RETRY_MS, doubling, SETTLEMENT_TRANSIENT_RETRIES times, about 1.3 s in
+		// all): this install is the last that can replay the source (a displaced row not replayed at its
+		// own epoch's install leaves the next scan), and a failed install is the room's terminal failure.
+		// Nothing was signed or written, so the retry is the same replay.
+		for (
+			let retry = 0;
+			retry < SETTLEMENT_TRANSIENT_RETRIES &&
+			!issued.ok &&
+			effect.kind === "replacement" &&
+			!signed &&
+			transientLocalRefusal(issued.kind, "detail" in issued ? issued.detail : "");
+			retry++
+		) {
+			// Observation only (the "__warmProofEvent" proof hook): how often installs wait on a transient refusal.
+			try {
+				const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function")
+					observer({ kind: "settlement-replay-transient-refusal", retry, detail: "detail" in issued ? issued.detail : "" });
+			} catch { /* Diagnostics never alter the install. */ }
+			await new Promise((resolve) => setTimeout(resolve, SETTLEMENT_TRANSIENT_RETRY_MS * 2 ** retry));
+			assertSessionOpen();
+			const unchangedPlan = await issuanceStore.readSettlementPlan(settlementScope);
+			const unchangedLineage = await issuanceStore.readLineage(settlementScope);
+			if (
+				unchangedPlan === null ||
+				!sameBytes(encodeCanonical(unchangedPlan), encodeCanonical(prior)) ||
+				unchangedLineage.next !== lineage.next
+			)
+				break;
+			issued = await attemptIssue();
+		}
 		if (!issued.ok) {
 			if (issued.kind === "split-required") return issued;
+			// Refused replay: the Writer's own admission (the room's state limit, or its admission policy)
+			// refused the replay BEFORE signing, so no row exists for these intents. The decision to hand
+			// back is the Writer's alone; the creator stays the only owner of graph admission.
+			// Still refused transiently after the retries: handed back as "transient-exhausted" (this is
+			// the last install that can replay it), so the move goes to the application, never stuck or lost.
+			const handBackReason =
+				lastingLocalRefusal(issued.kind, issued.detail) ??
+				(transientLocalRefusal(issued.kind, issued.detail) ? ("transient-exhausted" as const) : undefined);
+			if (effect.kind === "replacement" && source !== undefined && !signed && handBackReason === "transient-exhausted") {
+				try {
+					const observer = Reflect.get(globalThis, "__warmProofEvent");
+					if (typeof observer === "function")
+						observer({ kind: "settlement-replay-transient-exhausted", detail: issued.detail });
+				} catch { /* Diagnostics never alter the install. */ }
+			}
+			if (effect.kind === "replacement" && source !== undefined && !signed && handBackReason !== undefined) {
+				await handBackRefusedReplay(source, "fromIntent" in effect ? effect.fromIntent : 0, handBackReason);
+				return SETTLEMENT_REPLAY_SETTLED;
+			}
 			const observed = await issuanceStore.readSettlementPlan(settlementScope);
 			const linked = readSettlementEffect(prior, observed, lineage.next, effect);
 			const unchanged = observed !== null && sameBytes(encodeCanonical(observed), encodeCanonical(prior));
@@ -8018,6 +8437,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				}
 				continue;
 			}
+			if (
+				!signed &&
+				(lastingLocalRefusal(issued.kind, issued.detail) !== undefined || transientLocalRefusal(issued.kind, issued.detail))
+			) {
+				// Refused before anything was signed, by this Writer's own admission (its policy, or a transient
+				// refusal): the chunk's rows are issued singly, where a lasting refusal hands exactly the refused
+				// row's replay back and a transient one is retried in this install (issueSettlement), instead of
+				// failing the install.
+				logicalTime = firstLogicalTime;
+				noteV3RoomSettlementFallback(`refused: ${issued.detail}`);
+				break;
+			}
 			if (!signed)
 				throw new TypeError(`v3 room settlement batch issue failed: ${issued.kind}: ${issued.detail}`, { cause: issued });
 			// The chunk's marker was entered: it is resumed whole (never re-issued a row at a time) once
@@ -8080,7 +8511,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence }),
 					source
 				);
-				if (legacy === null || legacy.ok) continue;
+				if (legacy === null || legacy.ok || legacy === SETTLEMENT_REPLAY_SETTLED) continue;
 				if (legacy.kind !== "split-required") throw new TypeError("v3 room settlement split result is invalid");
 				initialPrefixLength = legacy.prefixLength;
 				const current = await issuanceStore.readSettlementPlan(settlementScope);
@@ -8220,13 +8651,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						throw new TypeError("v3 room settlement split prefix is invalid");
 					}
 					const throughIntent = fromIntent + initialPrefixLength;
-					await issueSettlement(remaining.slice(0, initialPrefixLength), effect(throughIntent), source);
+					if (
+						(await issueSettlement(remaining.slice(0, initialPrefixLength), effect(throughIntent), source)) ===
+						SETTLEMENT_REPLAY_SETTLED
+					)
+						break;
 					await refreshProgressPrefix(throughIntent);
 					fromIntent = throughIntent;
 					initialPrefixLength = undefined;
 					continue;
 				}
 				const attempted = await issueSettlement(remaining, effect(ordered.length), source);
+				if (attempted === SETTLEMENT_REPLAY_SETTLED) break;
 				if (attempted === null || attempted.ok) {
 					await refreshProgressPrefix(ordered.length);
 					fromIntent = ordered.length;
@@ -8241,7 +8677,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					throw new TypeError("v3 room settlement split prefix is invalid");
 				}
 				const throughIntent = fromIntent + attempted.prefixLength;
-				await issueSettlement(remaining.slice(0, attempted.prefixLength), effect(throughIntent), source);
+				if (
+					(await issueSettlement(remaining.slice(0, attempted.prefixLength), effect(throughIntent), source)) ===
+					SETTLEMENT_REPLAY_SETTLED
+				)
+					break;
 				await refreshProgressPrefix(throughIntent);
 				fromIntent = throughIntent;
 			}
@@ -10396,7 +10836,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const countsAgainstBacklog = handBack === undefined && redirectPromise === undefined && redirectedSession === undefined;
 			if (countsAgainstBacklog) {
 				const backlog = settlementBacklogNow() + undeliveredLocalMoves();
-				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
+				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT)
+					throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT, settlementHandBackSlots);
 			}
 			// A move (a given-back one too) signed while this epoch's author fence is awaited would have no
 			// own fence before it: refused up front, not accepted.
@@ -10645,6 +11086,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					awaitingFence: false,
 				})
 			);
+		},
+		async declineHandBack(handBack: V3RoomHandBack): Promise<V3RoomHandBackDecline> {
+			if (redirectedSession !== undefined) {
+				if (redirectedSession.declineHandBack === undefined) throw new TypeError("v3 room hand-back decline is unavailable");
+				return redirectedSession.declineHandBack(handBack);
+			}
+			localOwner?.assertCurrent();
+			assertSessionOpen();
+			const key = issueHandBack({ handBack });
+			if (key === undefined) throw new TypeError("v3 room hand-back is invalid");
+			if (input.receiveOnly) throw new TypeError("v3 room is receive-only");
+			return enqueueLifetimeTransition(() => declineSettlementHandBack(key));
 		},
 		async unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]> {
 			if (redirectedSession !== undefined) return redirectedSession.unresolvedAcceptedWork();

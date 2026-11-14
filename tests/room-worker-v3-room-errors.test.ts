@@ -61,6 +61,19 @@ describe("v3 room errors across the room worker boundary", () => {
 				new room.V3RoomPlayerDatabaseMigrationUnavailable("x"),
 				{ code: "V3_ROOM_PLAYER_DATABASE_MIGRATION_UNAVAILABLE" },
 			],
+			[new nodeRoom.V3RoomLocalBacklogFull(64, 64, 3), { backlog: 64, bound: 64, handBackSlots: 3 }],
+			[
+				new nodeRoom.V3RoomHandBackRefused(
+					{ sourceSequence: 7, intent: 0 },
+					"application-state-limit",
+					"v3 local operation would pass the room's application state limit (32768 bytes)"
+				),
+				{ handBack: { sourceSequence: 7, intent: 0 }, kind: "application-state-limit", reason: "application-state-limit" },
+			],
+			[
+				new room.V3RoomMoveDeclined({ action: "m" }, 8, "admission-rejected"),
+				{ operation: { action: "m" }, epoch: 8, reason: "admission-rejected" },
+			],
 		];
 		for (const [error, fields] of cases) {
 			const decoded = roundTrip(error) as Error;

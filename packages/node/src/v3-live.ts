@@ -199,6 +199,7 @@ import {
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
 import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
+import { createDeferredSeedRunner } from "./internal/deferred-seed.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 	rewriteCreatorCloseMembershipWitnesses } from "./internal/creator-close-membership.js";
 import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
@@ -386,6 +387,15 @@ const PROVENANCE_KEYS = [
 	"signerSetDigest",
 ] as const;
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
+/**
+ * The room's reviewed application state limit, in canonical bytes (with at most 16,384 items and
+ * depth 16). No room's parameters declare a limit, so every room takes 32,768 bytes: the bound the
+ * room's genesis and migration checks and the shipped applications' own state bounds already state.
+ * The plane's fold machine carries it, and admission refuses any vertex whose fold would pass it
+ * (`applicationStateAdmits`), so a seal's fold never refuses. maxSnapshotBytes bounds the snapshot
+ * carrier, not the state.
+ */
+export const ROOM_APPLICATION_STATE_BYTES = 32_768;
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
@@ -789,7 +799,8 @@ export type V3LocalIssueResult =
 				| "issuance-rejected"
 				| "admission-rejected"
 				| "journal-rejected"
-				| "graph-rejected";
+				| "graph-rejected"
+				| "application-state-limit";
 			readonly detail: string;
 	  }>;
 
@@ -1034,11 +1045,35 @@ type NativeReplacementPreparation = ReturnType<typeof derivePolicyReplacement> &
 		transformRefusal?: NonNullable<SettlementPlan["entries"][number]["transformRefusal"]>;
 	}>;
 
+/**
+ * The application's own upper bound on its state's canonical byte length, over a base state and every
+ * operation advanced into it, in any order and any subset (the same bound the creator's ordinary proof
+ * book charges: readOrdinaryApplicationResourceBound). quote never retains its candidate. Undefined means
+ * the bound does not cover that material; the caller then judges the exact fold.
+ */
+export interface V3ApplicationStateBound {
+	advance(operations: readonly unknown[]): boolean;
+	quote(candidateOperation: unknown): number | undefined;
+	/** The bound over the base and advanced operations alone, with no candidate. */
+	quoteBase(): number | undefined;
+}
+
+/** The resumable seed of a {@link V3ApplicationStateBound}: step consumes at most about `byteBudget`
+ * more base bytes (true once done), and finish returns the bound the synchronous seed returns. */
+export interface V3ApplicationStateBoundSeed {
+	step(byteBudget: number): boolean;
+	finish(): V3ApplicationStateBound | undefined;
+}
+
 export interface V3OperationAdmissionPolicy {
 	reserve(
 		operation: Readonly<Record<string, unknown>>,
 		context?: Readonly<{ author: string }>
 	): V3OperationAdmissionReservation;
+	/** The application's state bound seeded with this plane's exact base state, when it has one. */
+	createApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBound | undefined;
+	/** The same bound, seeded in bounded steps (the plane drives it in short turns after an install). */
+	beginApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBoundSeed | undefined;
 }
 export type V3OperationAdmissionPolicyFactory = (
 	context: Readonly<{
@@ -4796,7 +4831,7 @@ function resolveOrdinaryIssuanceRuntimeHold(value: unknown, owners: CreatorSnaps
 				...(typeof action === "string" ? {action} : {}), control}),
 			blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 				exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
 				catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 					runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 					canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -6228,6 +6263,13 @@ function localAdmittedFrontier(registration: V3PlaneRegistration, scope: Durable
 	return identity !== undefined && identity.author === scope.author && identity.objectId === scope.objectId &&
 		identity.successorEpoch === registration.payload.provenance.epoch ? identity.admittedAuthorSequence : null;
 }
+
+/**
+ * The detail of a local move the room's operation admission policy refused: its reservation came back
+ * rejected, the policy's own decision about this operation in this epoch. Every other
+ * "admission-rejected" local failure is a capacity, readiness or recovery refusal a retry can clear.
+ */
+export const V3_LOCAL_POLICY_REFUSAL_DETAIL = "v3 local operation was rejected before issuance";
 
 function localIssueFailure(
 	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
@@ -8537,6 +8579,21 @@ async function handleV3IngressWithSource(
 				);
 	if (reservation === null) {
 		ingressFailureLog("admission-rejected");
+		return false;
+	}
+	if (
+		!alreadyAccepted &&
+		!controlOperation &&
+		!applicationStateAdmits(registration, {
+			digest: authenticated.digest,
+			author: authenticated.author,
+			dependencies: authenticated.vertex.dependencies,
+			operation: authenticated.vertex.operation as Readonly<Record<string, unknown>>,
+			byteCharge: authenticated.byteCharge,
+		}, "received")
+	) {
+		releaseOperationReservation(reservation);
+		ingressFailureLog("admission-rejected", "application-state-limit");
 		return false;
 	}
 	let maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined;
@@ -13060,7 +13117,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		parameters: ObjectFreeze({...registration.payload.parameters}),
 		blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 			exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-			maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
 			catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 				runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 				canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -16830,7 +16887,7 @@ async function issueOneVertex(
 		? undefined
 		: reserveOperation(registration.operationAdmissionPolicy, operation, scope.author);
 	if (reservation === null) {
-		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+		return localIssueFailure("admission-rejected", V3_LOCAL_POLICY_REFUSAL_DETAIL);
 	}
 
 	const admittedFrontier = localAdmittedFrontier(registration, scope);
@@ -16849,6 +16906,23 @@ async function issueOneVertex(
 			: undefined;
 	let commit: unknown;
 	let capacityRejected = false;
+	let stateLimitRejected = false;
+	let stateBoundAdmitted: Uint8Array | undefined;
+	const stateBoundAdmits = (bytes: Uint8Array, author: string): boolean => {
+		// The pre-signing check already judged these exact bytes; judge each candidate once.
+		if (controlOperation || (stateBoundAdmitted !== undefined && sameBytes(stateBoundAdmitted, bytes))) return true;
+		const unsigned = decodeCanonical(bytes);
+		const unsignedDependencies = ownDataValue(unsigned, "dependencies");
+		const admitted = applicationStateAdmits(registration, {
+			digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+			author,
+			dependencies: ArrayIsArray(unsignedDependencies) ? (unsignedDependencies as string[]) : [],
+			operation,
+			byteCharge: bytes.byteLength,
+		}, "local");
+		if (admitted) stateBoundAdmitted = bytes;
+		return admitted;
+	};
 	let cryptoEntered = false;
 	let signerResolved = false;
 	let terminalTransactionStarted = false;
@@ -16924,6 +16998,10 @@ async function issueOneVertex(
 										capacityRejected = true;
 										throw new TypeError("v3 local issue graph is at capacity");
 									}
+									if (!stateBoundAdmits(bytes, selectedScope.author)) {
+										stateLimitRejected = true;
+										throw new TypeError("v3 local operation would pass the room's application state limit");
+									}
 									if (registration.creatorMaintenanceBound) {
 										const consumer = registration.creatorMaintenanceAdmission;
 										if (consumer === undefined || maintenanceAdmission !== undefined)
@@ -16965,6 +17043,10 @@ async function issueOneVertex(
 					) {
 						capacityRejected = true;
 						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					if (candidateRow !== undefined && !stateBoundAdmits(candidateRow.canonicalPreimageBytes, selectedScope.author)) {
+						stateLimitRejected = true;
+						throw new TypeError("v3 local operation would pass the room's application state limit");
 					}
 					return candidateCommit;
 				};
@@ -17060,7 +17142,7 @@ async function issueOneVertex(
 			if (issuanceOutcomeUnknown || cryptoEntered) {
 				// Durable entered debt is not disproved by this callback's entry count.
 				registration.operationAdmissionHalted = true;
-			} else if (!terminalTransactionStarted || capacityRejected) {
+			} else if (!terminalTransactionStarted || capacityRejected || stateLimitRejected) {
 				releaseOperationReservation(reservation);
 			} else if (reservation !== undefined) {
 				registration.operationAdmissionHalted = true;
@@ -17077,6 +17159,11 @@ async function issueOneVertex(
 			}
 			return capacityRejected
 				? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+				: stateLimitRejected
+					? localIssueFailure(
+							"application-state-limit",
+							`v3 local operation would pass the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes)`
+						)
 				: signerResolved
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
 					: localIssueFailure(
@@ -17545,7 +17632,7 @@ async function issueReplacementBatch(
 		const reservation = reserveOperation(registration.operationAdmissionPolicy, row.operation, scope.author);
 		if (reservation === null) {
 			releaseReservations();
-			return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+			return localIssueFailure("admission-rejected", V3_LOCAL_POLICY_REFUSAL_DETAIL);
 		}
 		reservations.push(reservation);
 	}
@@ -17554,6 +17641,7 @@ async function issueReplacementBatch(
 	let cryptoEntered = false;
 	let signerResolved = false;
 	let capacityRejected = false;
+	let stateLimitRejected = false;
 	let signingRow: (typeof rows)[number] | undefined;
 	try {
 		const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
@@ -17598,6 +17686,28 @@ async function issueReplacementBatch(
 					if (!hasGraphCapacity(registration, selectedScope.author, byteCharge, preimages.length)) {
 						capacityRejected = true;
 						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					// The room's application state limit, judged as each single row's issue judges it, over the
+					// whole chain, before anything is signed. A chunk that would pass it is issued singly, so the
+					// singles' own check refuses exactly the crossing row (and its replay is handed back).
+					if (
+						!applicationStateAdmitsChain(
+							registration,
+							preimages.map((bytes, index) => {
+								const unsigned = decodeCanonical(bytes);
+								const dependencies = ownDataValue(unsigned, "dependencies");
+								return ObjectFreeze({
+									digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+									author: selectedScope.author,
+									dependencies: ArrayIsArray(dependencies) ? (dependencies as string[]) : [],
+									operation: batchElement(rows, index, "row").operation,
+									byteCharge: bytes.byteLength,
+								});
+							})
+						)
+					) {
+						stateLimitRejected = true;
+						throw new TypeError("v3 local operation would pass the room's application state limit");
 					}
 					return nativeSignAdmission(
 						preimages.map((bytes, index) =>
@@ -17653,6 +17763,8 @@ async function issueReplacementBatch(
 					kind: "batch-retry" as const,
 					detail: error instanceof Error ? error.message : "settlement plan revision changed",
 				});
+			// A chunk past the room's application state limit: nothing was signed or written; singles judge each row.
+			if (stateLimitRejected) return unavailable("a row would pass the room's application state limit");
 			// The store's sizing refused the whole batch before anything was written: singles size each row.
 			const refusal = issuanceCapacityRefusalOf(error);
 			if (refusal !== undefined && !capacityRejected) return unavailable(`batch sizing refused: ${refusal}`);
@@ -20733,7 +20845,8 @@ function terminalFailure(
 
 function terminalIssueFailure(result: Exclude<V3LocalIssueResult, { readonly ok: true }>): V3TerminalPublishResult {
 	return terminalFailure(
-		result.kind === "split-required" ? "malformed-input" : result.kind,
+		// A terminal is a control operation, which the application state bound never judges.
+		result.kind === "split-required" ? "malformed-input" : result.kind === "application-state-limit" ? "admission-rejected" : result.kind,
 		result.detail,
 		Reflect.get(result, "terminalIntent") === "outcome-unknown" ? "outcome-unknown" : "absent"
 	);
@@ -21303,6 +21416,8 @@ function stageClosedBlueprintEpoch(
 			vertices: projection.vertices,
 		});
 	} catch (error) {
+		const unsound = applicationStateBoundUnsound(registration, error);
+		if (unsound !== undefined) return blueprintFoldFailure("fold-rejected", unsound);
 		return blueprintFoldFailure(
 			"fold-rejected",
 			`v3 blueprint epoch fold was rejected: ${error instanceof Error ? error.message : "unknown failure"}`
@@ -23214,6 +23329,556 @@ function resolvePostAdoptionCensusSizing(
 	}
 }
 
+/** One plane's running application fold: its machine after folding the admitted epoch graph (at
+ * `graphVersion`, on `base`) in the derived projection order. Never adopted into the plane. */
+type ApplicationStateFold = Readonly<{
+	base: BlueprintStateMachine;
+	/** The epoch graph's index and payload: a reset plane replaces both, so a fold cannot outlive it. */
+	index: V3PlaneRegistration["index"];
+	payload: V3PlaneRegistration["payload"];
+	graphVersion: number;
+	digest: string | undefined;
+	machine: BlueprintStateMachine;
+	/** The running fold this one extends by one apply, when it was forked from it. */
+	from?: BlueprintStateMachine;
+}>;
+/** One plane's application state bound, advanced with its admitted non-control operations. */
+type ApplicationStateBoundCache = {
+	base: BlueprintStateMachine;
+	index: V3PlaneRegistration["index"];
+	payload: V3PlaneRegistration["payload"];
+	/** Undefined once the bound does not cover this plane's material: the exact fold judges instead. */
+	bound: V3ApplicationStateBound | undefined;
+	advanced: Set<string>;
+	pending?: Readonly<{ digest: string; operation: unknown }>;
+	/** The bound admitted a candidate on this plane (the seal names the bound if its fold refuses). */
+	admittedByBound: boolean;
+};
+const applicationStateBounds = new WeakMap<V3PlaneRegistration, ApplicationStateBoundCache>();
+
+/** A deferred seed turn stops stepping after this long (plus at most one step), so each turn stays under 1 ms. */
+const APPLICATION_STATE_SEED_TURN_MS = 0.8;
+/** Base bytes per seed step (a few dozen Grid blocks): one step is a small fraction of a turn. */
+const APPLICATION_STATE_SEED_STEP_BYTES = 512;
+const HostSetImmediate: unknown = Reflect.get(globalThis, "setImmediate");
+const HostMessageChannel: unknown = Reflect.get(globalThis, "MessageChannel");
+let seedTurnChannel: Readonly<{ queue: (() => void)[]; post(): void }> | undefined;
+/**
+ * Runs a seed turn in the next host task, back to back with the previous one but never inside it: the
+ * host's own work (I/O, timers, a browser's frames) runs between turns. Node's setImmediate, else a
+ * MessageChannel task (unclamped, unlike a nested setTimeout), else setTimeout.
+ */
+function scheduleSeedTurn(turn: () => void): void {
+	if (typeof HostSetImmediate === "function") {
+		ReflectApply(HostSetImmediate, globalThis, [turn]);
+		return;
+	}
+	if (typeof HostMessageChannel === "function") {
+		if (seedTurnChannel === undefined) {
+			const channel = new (HostMessageChannel as typeof MessageChannel)();
+			const queue: (() => void)[] = [];
+			channel.port1.onmessage = () => queue.shift()?.();
+			seedTurnChannel = ObjectFreeze({ queue, post: () => channel.port2.postMessage(undefined) });
+		}
+		seedTurnChannel.queue.push(turn);
+		seedTurnChannel.post();
+		return;
+	}
+	setTimeout(turn, 0);
+}
+/**
+ * Seeds each plane's bound after its machine install, in host turns of under 1 ms run back to back (one
+ * live seed per plane), so the seed has usually finished before the first move after the install.
+ */
+const applicationStateBoundSeeds = createDeferredSeedRunner<V3PlaneRegistration, V3ApplicationStateBound>({
+	schedule: scheduleSeedTurn,
+	now: () => (typeof performance === "undefined" ? Date.now() : performance.now()),
+	turnMs: APPLICATION_STATE_SEED_TURN_MS,
+	stepBytes: APPLICATION_STATE_SEED_STEP_BYTES,
+});
+
+/**
+ * The application's bound when it fits this room: the closed shape, and a base bound within the room's
+ * limit. A bound that does not fit the limit even before any operation (a constant ceiling above the
+ * room's limit) cannot decide this room's moves: the exact fold judges them.
+ */
+function fittingApplicationStateBound(created: unknown): V3ApplicationStateBound | undefined {
+	const bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
+		typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
+		? created as V3ApplicationStateBound : undefined;
+	const quotedBase = bound?.quoteBase();
+	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES
+		? undefined : bound;
+}
+
+/** Records a plane's seeded bound over its base (fresh: nothing advanced yet but the anchor). */
+function installApplicationStateBound(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	bound: V3ApplicationStateBound | undefined,
+	event: Readonly<Record<string, unknown>>
+): ApplicationStateBoundCache {
+	const cache: ApplicationStateBoundCache = { base, index: registration.index, payload: registration.payload, bound,
+		advanced: new IntrinsicSet(), admittedByBound: false };
+	cache.advanced.add(registration.payload.provenance.anchorDigest);
+	applicationStateBounds.set(registration, cache);
+	emitApplicationStateBoundSeed(registration, { covered: bound !== undefined, ...event });
+	return cache;
+}
+
+function emitApplicationStateBoundSeed(registration: V3PlaneRegistration, event: Readonly<Record<string, unknown>>, kind =
+	"application-state-bound-seed"): void {
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({ kind, receiver: registration.issuanceScope.author, ...event });
+	} catch { /* Diagnostics cannot alter admission. */ }
+}
+
+/**
+ * Seeds a plane's application state bound over its base in one call: the application decodes the base
+ * state once. The fallback seed: an application without a resumable seed at install, and any admission
+ * check that finds no finished seed for the current base (a self-seed, counted by its mode).
+ * @returns The seeded cache, or undefined when the plane's policy offers no bound.
+ */
+function seedApplicationStateBound(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	mode: "install" | "self"
+): ApplicationStateBoundCache | undefined {
+	const policy = registration.operationAdmissionPolicy;
+	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
+	if (typeof create !== "function") return undefined;
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	let bound: V3ApplicationStateBound | undefined;
+	try {
+		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]));
+	} catch {
+		bound = undefined;
+	}
+	const durationUs = typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000);
+	return installApplicationStateBound(registration, base, bound, { mode, durationUs, maxTurnUs: durationUs, turns: 1 });
+}
+
+/** Whether the plane still has the machine, index and payload a seed was begun for. */
+function applicationStateBoundBaseCurrent(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	index: V3PlaneRegistration["index"],
+	payload: V3PlaneRegistration["payload"]
+): boolean {
+	return registration.active && registration.blueprintMachine === base && registration.index === index &&
+		registration.payload === payload && !registration.blueprintClosing && !registration.blueprintFolded;
+}
+
+/**
+ * Seeds the plane's application state bound when its machine is installed (genesis bind, successor or
+ * recovery install), never failing the install. With the application's resumable seed, the seed runs in
+ * short host turns after the install (each well under 1 ms), so no move's admission check and no install
+ * turn pays the base decode; the next install abandons an unfinished seed and begins one over its own
+ * base. Without one, the install seeds in one call, as before.
+ */
+function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): void {
+	try {
+		const base = registration.blueprintMachine;
+		if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return;
+		const policy = registration.operationAdmissionPolicy;
+		const begin = policy === undefined ? undefined : Reflect.get(policy, "beginApplicationStateBound");
+		if (typeof begin !== "function") {
+			applicationStateBoundSeeds.cancel(registration);
+			seedApplicationStateBound(registration, base, "install");
+			return;
+		}
+		const index = registration.index;
+		const payload = registration.payload;
+		applicationStateBoundSeeds.begin(registration, {
+			start: () => {
+				const exactCanonicalStateBytes = base.snapshot().exactCanonicalStateBytes;
+				const seed: unknown = ReflectApply(begin, policy, [exactCanonicalStateBytes]);
+				if (!isObject(seed) || typeof Reflect.get(seed, "step") !== "function" || typeof Reflect.get(seed, "finish") !== "function") {
+					// No resumable seed for this base: the synchronous seed, in this deferred turn.
+					const create = Reflect.get(policy as object, "createApplicationStateBound");
+					return typeof create !== "function" ? undefined : ObjectFreeze({
+						step: () => true,
+						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes])),
+					});
+				}
+				return ObjectFreeze({
+					step: (byteBudget: number) => ReflectApply(Reflect.get(seed, "step") as (budget: number) => unknown, seed, [byteBudget]) === true,
+					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, [])),
+				});
+			},
+			current: () => applicationStateBoundBaseCurrent(registration, base, index, payload),
+			done: (bound, stats) => {
+				if (!applicationStateBoundBaseCurrent(registration, base, index, payload)) return;
+				// A check that self-seeded this same base meanwhile keeps its cache (and what it advanced).
+				const existing = applicationStateBounds.get(registration);
+				if (existing !== undefined && existing.base === base && existing.index === index && existing.payload === payload) return;
+				// A forced seed was finished inside an admission check: durationUs is the residual that check paid.
+				installApplicationStateBound(registration, base, bound, { ...stats, mode: stats.forced ? "forced" : "deferred",
+					durationUs: stats.forced ? stats.forcedUs : stats.busyUs });
+			},
+			discarded: (stats) => emitApplicationStateBoundSeed(registration, stats, "application-state-bound-seed-discarded"),
+		});
+	} catch { /* A seed is an optimization: the first admission check seeds instead. */ }
+}
+
+/**
+ * The bound path of the application state check: whether the application's own state bound, over this
+ * plane's base and admitted operations plus the candidate, stays within the room's limit. O(operation).
+ * The exact state is at most the bound (the application's theorem, property-tested per shipped app), so
+ * a vertex admitted here never makes the seal's fold refuse; the seal names the bound if it ever does.
+ * Conservative near the limit: the usable state there is bounded by the application's bound.
+ *
+ * While the plane's deferred seed has not finished, a candidate that sorts last is judged by the exact
+ * fold instead (its running fold plus one apply), so no move pays the seed; the bound catches up over
+ * the epoch graph once it is seeded (the exact fold never admits past the limit, and the bound covers
+ * every admitted vertex). Any other candidate would refold the epoch: it finishes the pending seed in
+ * this turn, paying only the walk the seed's own turns had not done yet.
+ * @returns The verdict and the quoted bound; "seed-pending" when the exact fold judges this candidate while
+ * the seed finishes; undefined when the plane has no bound covering this material.
+ */
+function applicationStateBoundAdmits(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>,
+	sortsLast: boolean
+): Readonly<{ admitted: boolean; quoted: number; rebuilt: boolean }> | "seed-pending" | undefined {
+	const stale = (cache: ApplicationStateBoundCache | undefined): boolean =>
+		cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload;
+	let cache = applicationStateBounds.get(registration);
+	let rebuilt = false;
+	if (stale(cache) && applicationStateBoundSeeds.pending(registration)) {
+		if (sortsLast) return "seed-pending";
+		applicationStateBoundSeeds.finishNow(registration);
+		cache = applicationStateBounds.get(registration);
+		rebuilt = true;
+	}
+	if (stale(cache)) {
+		// No seed over this base, finished or pending (the plane was reset since its install): self-seed
+		// now, in this turn.
+		applicationStateBoundSeeds.cancel(registration);
+		cache = seedApplicationStateBound(registration, base, "self");
+		rebuilt = true;
+	}
+	if (cache === undefined) return undefined;
+	const disable = (): undefined => {
+		cache.bound = undefined;
+		return undefined;
+	};
+	const pending = cache.pending;
+	cache.pending = undefined;
+	if (cache.bound === undefined) return undefined;
+	try {
+		// Advance with what was admitted since: the last admitted candidate at once, any other vertex
+		// (received under another path, or control) by a catch-up over the epoch graph.
+		if (pending !== undefined && !cache.advanced.has(pending.digest) && registration.closeVertices.has(pending.digest)) {
+			if (!cache.bound.advance([pending.operation])) return disable();
+			cache.advanced.add(pending.digest);
+		}
+		if (cache.advanced.size !== registration.closeVertices.size) {
+			const operations: unknown[] = [];
+			for (const [hash, vertex] of registration.closeVertices) {
+				if (cache.advanced.has(hash)) continue;
+				cache.advanced.add(hash);
+				if (!registration.controlVertices.has(hash) && vertex.operation !== undefined) operations.push(vertex.operation);
+			}
+			if (operations.length !== 0 && !cache.bound.advance(operations)) return disable();
+		}
+		const quoted = cache.bound.quote(candidate.operation);
+		if (quoted === undefined || !NumberIsSafeInteger(quoted) || quoted < 1) return disable();
+		const admitted = quoted <= ROOM_APPLICATION_STATE_BYTES;
+		if (admitted) {
+			cache.pending = ObjectFreeze({ digest: candidate.digest, operation: candidate.operation });
+			cache.admittedByBound = true;
+		}
+		return ObjectFreeze({ admitted, quoted, rebuilt });
+	} catch {
+		return disable();
+	}
+}
+
+/**
+ * The typed internal error when the seal's exact fold passes the room's application state limit although
+ * the application's state bound admitted this plane's vertices: the bound is wrong (it claims to cover
+ * every reachable state), never a silent stall.
+ * @returns The error detail, or undefined when the failure is not that.
+ */
+function applicationStateBoundUnsound(registration: V3PlaneRegistration, error: unknown): string | undefined {
+	if (!isObject(error) || Reflect.get(error, "code") !== "INVALID_APPLICATION_STATE" || !applicationStateBoundUsed(registration))
+		return undefined;
+	const detail = `APPLICATION_STATE_BOUND_UNSOUND: the application's state bound (readOrdinaryApplicationResourceBound) admitted ` +
+		`operations whose exact fold passes the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes); ` +
+		`the application's bound is wrong: ${error instanceof Error ? error.message : "unknown failure"}`;
+	try {
+		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-application-state", detail]);
+	} catch { /* Diagnostics only. */ }
+	return detail;
+}
+
+/** Whether this plane admitted any vertex on the application's state bound (the seal names it). */
+function applicationStateBoundUsed(registration: V3PlaneRegistration): boolean {
+	const cache = applicationStateBounds.get(registration);
+	return cache !== undefined && cache.admittedByBound && cache.base === registration.blueprintMachine;
+}
+
+const applicationStateFolds = new WeakMap<
+	V3PlaneRegistration,
+	{ running?: ApplicationStateFold; pending?: ApplicationStateFold }
+>();
+
+/**
+ * Whether this epoch's application fold, with one more non-control vertex, stays within the room's
+ * application state limit.
+ *
+ * Invariant: the fold judged here is exactly the fold the seal runs (the admitted epoch graph plus
+ * the candidate, in the derived projection order, on the plane's machine, whose limits are the
+ * room's). The creator is the authoritative admitter: every vertex that enters its epoch graph
+ * passes this check there, so no admitted vertex can make the seal's fold refuse. A Writer runs the
+ * same check on its own view; that refusal is early and advisory (another Writer's concurrent move
+ * may change the creator's fold), and correctness never rests on it.
+ *
+ * Incremental by construction. The plane keeps a running fold of its admitted graph. A candidate
+ * that depends on every tip of the epoch graph is a descendant of every vertex, so it sorts last in
+ * the derived order and the new fold is the running fold plus one apply: O(operation + state). The
+ * creator sequences, so its own and received moves are almost always such candidates. Otherwise
+ * (or when the running fold is stale) the epoch is refolded once and the running fold is rebuilt.
+ * Authorization and the application's own admission are judged elsewhere; only the state bound is
+ * judged here.
+ * @param registration - The current plane.
+ * @param candidate - The candidate vertex: its digest, author, dependencies, operation and byte charge.
+ * @param path - Diagnostics label of the admission path.
+ * @returns False only when the fold passes the room's state limit.
+ */
+function applicationStateAdmits(
+	registration: V3PlaneRegistration,
+	candidate: Readonly<{
+		digest: string;
+		author: string;
+		dependencies: readonly string[];
+		operation: Readonly<Record<string, unknown>>;
+		byteCharge: number;
+	}>,
+	path: "local" | "received"
+): boolean {
+	const base = registration.blueprintMachine;
+	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
+	if (registration.closeVertices.has(candidate.digest)) return true;
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	const emit = (event: Readonly<Record<string, unknown>>): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "application-state-bound", path, author: candidate.author, receiver: registration.issuanceScope.author,
+					durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000), ...event });
+		} catch { /* Diagnostics cannot alter admission. */ }
+	};
+	const tips = registration.index.tips();
+	const sortsLast = tips.every((tip) => candidate.dependencies.includes(tip));
+	// The application's own state bound, when it covers this material: O(operation), no fold.
+	const bounded = applicationStateBoundAdmits(registration, base, candidate, sortsLast);
+	const seedPending = bounded === "seed-pending";
+	if (bounded !== undefined && bounded !== "seed-pending") {
+		emit({ mode: "bound", refolded: bounded.rebuilt, admitted: bounded.admitted, sortsLast, stateBytes: bounded.quoted });
+		return bounded.admitted;
+	}
+	const limitRefusal = (error: unknown): boolean =>
+		isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE";
+	const context = ObjectFreeze({ author: candidate.author });
+	let cache = applicationStateFolds.get(registration);
+	if (cache === undefined) {
+		cache = {};
+		applicationStateFolds.set(registration, cache);
+	}
+	const graphVersion = registration.graphVersion;
+	if (
+		cache.pending !== undefined &&
+		cache.pending.base === base &&
+		cache.pending.index === registration.index &&
+		cache.pending.payload === registration.payload &&
+		cache.pending.graphVersion === graphVersion &&
+		cache.pending.digest !== undefined &&
+		registration.closeVertices.has(cache.pending.digest)
+	) {
+		const pending = cache.pending;
+		const previous = cache.running;
+		let machine: BlueprintStateMachine | undefined = pending.machine;
+		if (previous !== undefined && pending.from === previous.machine) {
+			// Advance the running machine in place, so an admission never retains the previous state
+			// through its fork's parent link: memory stays one running state per plane.
+			try {
+				previous.machine.adopt(pending.machine);
+				machine = previous.machine;
+			} catch {
+				machine = undefined;
+			}
+		}
+		cache.running = machine === undefined ? undefined : ObjectFreeze({ base, index: registration.index,
+			payload: registration.payload, graphVersion, digest: pending.digest, machine });
+	}
+	cache.pending = undefined;
+	let running = cache.running !== undefined && cache.running.base === base && cache.running.graphVersion === graphVersion &&
+		cache.running.index === registration.index && cache.running.payload === registration.payload
+		? cache.running : undefined;
+	let refolded = false;
+	let admitted = true;
+	try {
+		if (running === undefined) {
+			// Rebuild the running fold of the admitted graph, in the seal's order.
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			if (vertices === undefined || authors === undefined) return true;
+			const fold = foldApplicationProjection(registration, base, vertices, authors, new IntrinsicMap(registration.closeCharges));
+			if (fold === undefined) return true;
+			running = ObjectFreeze({ base, index: registration.index, payload: registration.payload, graphVersion,
+				digest: undefined, machine: fold });
+			cache.running = running;
+			refolded = true;
+		}
+		let next: BlueprintStateMachine | undefined;
+		let from: BlueprintStateMachine | undefined;
+		if (sortsLast) {
+			from = running.machine;
+			next = running.machine.fork();
+			next.apply(candidate.operation, context);
+		} else {
+			refolded = true;
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			if (vertices === undefined || authors === undefined) return true;
+			vertices.set(
+				candidate.digest,
+				ObjectFreeze({
+					hash: candidate.digest,
+					kind: "drp-vertex",
+					objectId: registration.payload.provenance.objectId,
+					epoch: registration.payload.provenance.epoch,
+					anchor: registration.payload.provenance.anchorDigest,
+					dependencies: [...candidate.dependencies],
+					operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+				})
+			);
+			authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+			const charges = new IntrinsicMap(registration.closeCharges);
+			charges.set(candidate.digest, candidate.byteCharge);
+			next = foldApplicationProjection(registration, base, vertices, authors, charges);
+		}
+		if (next !== undefined)
+			cache.pending = ObjectFreeze({ base, index: registration.index, payload: registration.payload,
+				graphVersion: graphVersion + 1, digest: candidate.digest, machine: next,
+				...(from === undefined ? {} : { from }) });
+	} catch (error) {
+		// Only the state bound is judged here; any other fold failure is another check's to refuse.
+		if (limitRefusal(error)) admitted = false;
+	}
+	const staged = cache.pending?.digest === candidate.digest ? cache.pending.machine : undefined;
+	emit({ mode: "exact", refolded, admitted, sortsLast, ...(seedPending ? { seedPending } : {}),
+		...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
+	return admitted;
+}
+
+/**
+ * The application state check of one settlement drain chunk issued as a batch (issueReplacementBatch):
+ * whether the epoch's fold with ALL the chunk's rows (a chain: the first depends on the tips, each later
+ * one on its predecessor) stays within the room's application state limit. A single row is judged
+ * exactly as a single local issue judges it (applicationStateAdmits). Several rows are judged by one
+ * exact refold of the admitted graph with the whole chain inserted (the seal's fold), on a staged fork:
+ * applicationStateAdmits stages one candidate at a time and cannot judge a row whose predecessor is not
+ * admitted yet. Nothing here is cached or staged; the admitted rows are caught up by the next check.
+ * @returns False only when the chain's fold passes the room's state limit.
+ */
+function applicationStateAdmitsChain(
+	registration: V3PlaneRegistration,
+	candidates: readonly Readonly<{
+		digest: string;
+		author: string;
+		dependencies: readonly string[];
+		operation: Readonly<Record<string, unknown>>;
+		byteCharge: number;
+	}>[]
+): boolean {
+	const [only] = candidates;
+	if (only !== undefined && candidates.length === 1) return applicationStateAdmits(registration, only, "local");
+	const base = registration.blueprintMachine;
+	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
+	const vertices = copyCloseVertices(registration.closeVertices);
+	const authors = copyCloseAuthors(registration.closeAuthors);
+	if (vertices === undefined || authors === undefined) return true;
+	const charges = new IntrinsicMap(registration.closeCharges);
+	for (const candidate of candidates) {
+		if (registration.closeVertices.has(candidate.digest)) continue;
+		vertices.set(
+			candidate.digest,
+			ObjectFreeze({
+				hash: candidate.digest,
+				kind: "drp-vertex",
+				objectId: registration.payload.provenance.objectId,
+				epoch: registration.payload.provenance.epoch,
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies: [...candidate.dependencies],
+				operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+			})
+		);
+		authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+		charges.set(candidate.digest, candidate.byteCharge);
+	}
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	let admitted = true;
+	let stateBytes: number | undefined;
+	try {
+		stateBytes = foldApplicationProjection(registration, base, vertices, authors, charges)?.exactStateByteLength;
+	} catch (error) {
+		// Only the state bound is judged here; any other fold failure is another check's to refuse.
+		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") admitted = false;
+	}
+	// Observation only (the "__warmProofEvent" proof hook): the chunk's refold cost, for the batch bench.
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({ kind: "application-state-bound-chain", rows: candidates.length, admitted,
+				receiver: registration.issuanceScope.author,
+				durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000),
+				...(stateBytes === undefined ? {} : { stateBytes }) });
+	} catch { /* Diagnostics cannot alter admission. */ }
+	return admitted;
+}
+
+/**
+ * The plane's machine after folding the given epoch graph in the derived projection order, exactly
+ * as the seal folds it, on a staged fork that is never adopted.
+ * @returns The staged machine, or undefined when the graph has no projection order.
+ */
+function foldApplicationProjection(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	vertices: Map<string, EpochVertex>,
+	authors: Map<string, CloseVertexIdentity>,
+	charges: Map<string, number>
+): BlueprintStateMachine | undefined {
+	const anchorDigest = registration.payload.provenance.anchorDigest;
+	let projection: ReturnType<typeof deriveApplicationProjectionOrder>;
+	try {
+		const index = new CausalityIndex(vertices, topologicalOrder(vertices, anchorDigest), {
+			initialByteCharges: charges,
+			maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+			maxEpochVertices: registration.payload.parameters.maxEpochVertices,
+		});
+		projection = deriveApplicationProjectionOrder(registration.payload, vertices, new IntrinsicSet(registration.controlVertices), index);
+	} catch {
+		// Graph capacity and shape are judged by their own checks, not by this bound.
+		return undefined;
+	}
+	if (projection === undefined) return undefined;
+	const machine = base.fork();
+	for (const hash of topologicalOrder(projection.vertices, anchorDigest)) {
+		if (hash === anchorDigest) continue;
+		const vertex = projection.vertices.get(hash);
+		const identity = authors.get(hash);
+		if (vertex === undefined || identity === undefined) return undefined;
+		machine.apply(vertex.operation, ObjectFreeze({ author: identity.author }));
+	}
+	return machine;
+}
+
 /**
  * Pure sizing data from the original prepared issuer, never an admitted vertex.
  * @param registration - Original captured registration facts.
@@ -23304,7 +23969,7 @@ function previewCreatorIssuanceClose(
 	if (projection === undefined || aclPreview === undefined || metadata === undefined)
 		throw new TypeError("creator issuance close preview projection is invalid");
 	const machine = registration.blueprintMachine.fork();
-	foldBlueprintEpoch({
+	try { foldBlueprintEpoch({
 		anchorHash: registration.payload.provenance.anchorDigest,
 		machine,
 		vertices: projection.vertices,
@@ -23321,7 +23986,10 @@ function previewCreatorIssuanceClose(
 			if (identity === undefined) throw new TypeError("creator issuance close preview author is unavailable");
 			return ObjectFreeze({ author: identity.author });
 		},
-	}).adopt();
+	}).adopt(); } catch (error) {
+		const unsound = applicationStateBoundUnsound(registration, error);
+		throw unsound === undefined ? error : new TypeError(unsound, { cause: error });
+	}
 	const exactCanonicalSuccessorAclBytes = encodeCanonical(aclPreview.next, {
 		maxBytes: registration.payload.parameters.maxSnapshotBytes,
 	});
@@ -23441,7 +24109,7 @@ function importCreatorSuccessorInitialMachine(
 			return undefined;
 		}
 		return new BlueprintStateMachine({
-			maxApplicationStateBytes: recovered.prepared.parameters.maxSnapshotBytes,
+			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
 			exactCanonicalInitialStateBytes,
 			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
 			expectedInitialStateDigest: input.expectedApplicationStateDigest,
@@ -23537,7 +24205,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		let machine: BlueprintStateMachine;
 		try {
 			machine = new BlueprintStateMachine({
-				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes,
+				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
 				exactCanonicalInitialStateBytes: initialStateBytes,
 				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
 				expectedInitialStateDigest: initialStateDigest,
@@ -23554,6 +24222,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		});
 		const handle = makeV3BlueprintLiveHandle(registration);
 		registration.blueprintHandle = handle;
+		seedApplicationStateBoundAtInstall(registration);
 		return ObjectFreeze({ handle, ok: true as const });
 	} catch {
 		return activationFailure("internal-invariant", "v3 blueprint binding failed");
@@ -24851,6 +25520,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			};
 			registration.handle = makeV3PlaneHandle(registration);
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
+			seedApplicationStateBoundAtInstall(registration);
 			v3HandleRegistrations.set(registration.handle, registration);
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			if (reusesTransport) {
