@@ -128,8 +128,9 @@ it("does not forecast without the parameters or outside the settlement profile",
 
 it("rolls once when a Writer past half of its forecast falls silent", async () => {
 	const subject = create();
-	// 120 own moves: past half of the Writer's admission, short of the capacity margin.
-	await play(subject, 120);
+	// 150 own moves: past half of the Writer's admission (about 254 in the genesis epoch), short of the
+	// capacity margin (about 40 moves at 10 moves a second).
+	await play(subject, 150);
 	expect(subject.events).toEqual([]);
 	await vi.advanceTimersByTimeAsync(2_500);
 	expect(subject.events.map((event) => event.trigger)).toEqual(["silence"]);
