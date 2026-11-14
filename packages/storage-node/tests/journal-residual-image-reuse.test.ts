@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { expect, test, vi } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { decodeCanonical } from "../../canonical/dist/src/index.js";
@@ -70,6 +70,12 @@ function must<T>(result: Readonly<{ ok: false }> | Readonly<{ ok: true; value: T
 	return result.value;
 }
 const ROWS = 120, EPOCHS = 20;
+type DrainingTemplate = {
+	directory: string;
+	selector: Readonly<{ objectId: string }>;
+	sourceRows: number;
+	items: number;
+};
 
 /**
  * An independent full capture of the object's native rows, straight from SQLite through the original
@@ -91,8 +97,15 @@ function golden(raw: DatabaseSync, objectId: string) {
 	} finally { capture.release(); }
 }
 
-async function drainingJournal() {
-	const directory = await mkdtemp(join(tmpdir(), "ts-drp-residual-image-reuse-"));
+/**
+ * The journal in the middle of its drain: genesis and 19 anchors, ROWS local rows, a committed fence through
+ * epoch 18 and a begun drain of the rows and the retired empty headers. Built once per file through the
+ * store (about 145 durable commits, each a synchronous=FULL fsync); every test drains its own copy of
+ * these exact native bytes, reopened.
+ * @returns The template directory, the object's selector, the source's row count and the drain's item count.
+ */
+async function buildDrainingJournal(): Promise<DrainingTemplate> {
+	const directory = await mkdtemp(join(tmpdir(), "ts-drp-residual-image-reuse-template-"));
 	const filename = join(directory, "journal.sqlite");
 	const store = open(filename);
 	const materials = Array.from({ length: EPOCHS }, (_, epoch) => anchorMaterial(epoch));
@@ -122,10 +135,52 @@ async function drainingJournal() {
 	const plan = { baseControl: source.control, sourceImage: source.image, prefixes: [{ scope: materials[1]!.scope, highWatermark: ROWS, rows }],
 		retiredEmptyHeaders: headers, protectedHeaderScopes: [materials[0]!.scope, materials[18]!.scope, materials[19]!.scope] };
 	const begin = must(await store.acquireRetirementControl(selector)); must(await begin.beginDrain(plan)); await begin.release();
+	await store.close();
+	return { directory, selector, sourceRows: source.canonicalRows.length, items: rows.length + headers.length };
+}
+let template: DrainingTemplate | undefined;
+beforeAll(async () => {
+	template = await buildDrainingJournal();
+});
+afterAll(async () => {
+	if (template !== undefined) await rm(template.directory, { recursive: true, force: true });
+});
+
+/**
+ * The exact frames, in order: the same count and, frame by frame, the same bytes. (Deep equality walks
+ * every byte of every frame as a value: about 100 ms per batch for these four comparisons.)
+ * @param actual The frames the store returned.
+ * @param expected The golden frames.
+ * @param label The assertion label.
+ */
+function expectFrames(actual: readonly Uint8Array[], expected: readonly Uint8Array[], label: string): void {
+	expect(actual.length, `${label}: frame count`).toBe(expected.length);
+	const mismatch = actual.findIndex((frame, index) => {
+		const golden = expected[index];
+		return (
+			!(frame instanceof Uint8Array) ||
+			golden === undefined ||
+			!Buffer.from(frame.buffer, frame.byteOffset, frame.byteLength).equals(golden)
+		);
+	});
+	expect(mismatch, `${label}: first frame whose bytes differ`).toBe(-1);
+}
+
+/**
+ * A copy of the draining journal's native files, opened by a new adapter (initialization "reopen").
+ * @returns The copy's directory and filename, its store, an outside connection and the template's facts.
+ */
+async function drainingJournal(): Promise<DrainingTemplate & { filename: string; store: Store; raw: DatabaseSync }> {
+	const built = template;
+	if (built === undefined) throw new Error("the draining journal template was not built");
+	const directory = await mkdtemp(join(tmpdir(), "ts-drp-residual-image-reuse-"));
+	await cp(built.directory, directory, { recursive: true });
+	const filename = join(directory, "journal.sqlite");
+	const store = open(filename, true);
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	// The journal's triggers call the adapter's retirement predicate; this outside connection allows its edits.
 	raw.function("journal_retirement_allows", (_objectId: unknown, _epoch: unknown, _anchor: unknown) => 1);
-	return { directory, filename, store, raw, selector, sourceRows: source.canonicalRows.length, items: rows.length + headers.length };
+	return { directory, filename, store, raw, selector: built.selector, sourceRows: built.sourceRows, items: built.items };
 }
 
 /** One batch the way the creator's close drains (drainClosedJournalDetails): acquire and drain, then read back. */
@@ -144,6 +199,8 @@ test("a drain verifies its residual image once and returns the exact residual at
 	let { store } = fixture;
 	const { selector, raw } = fixture;
 	try {
+		// The reopened adapter verifies the residual and the plan once, as beginDrain's own adapter had.
+		const warm = must(await store.acquireRetirementControl(selector)); await warm.release();
 		const start = { ...work }, derivedBefore = journalResidualImageCounts().derived;
 		let batches = 0;
 		for (;;) {
@@ -153,9 +210,9 @@ test("a drain verifies its residual image once and returns the exact residual at
 			const expected = golden(raw, selector.objectId);
 			Object.assign(work, pause);
 			expect(image, `batch ${batches} control image`).toEqual(expected.image);
-			expect(rows, `batch ${batches} control rows`).toEqual(expected.frames);
+			expectFrames(rows, expected.frames, `batch ${batches} control rows`);
 			expect(read.image, `batch ${batches} read image`).toEqual(expected.image);
-			expect(read.canonicalRows, `batch ${batches} read rows`).toEqual(expected.frames);
+			expectFrames(read.canonicalRows, expected.frames, `batch ${batches} read rows`);
 			expect(control.drain!.residualImageDigest).toBe(expected.image.imageDigest);
 			if (control.drain!.cursor === fixture.items) break;
 		}
@@ -173,7 +230,7 @@ test("a drain verifies its residual image once and returns the exact residual at
 		await store.close(); store = open(fixture.filename, true);
 		const reopened = must(await store.readRetirementImage(selector));
 		expect(reopened.image).toEqual(last.image);
-		expect(reopened.canonicalRows).toEqual(last.frames);
+		expectFrames(reopened.canonicalRows, last.frames, "reopened rows");
 	} finally { raw.close(); await store.close(); await rm(fixture.directory, { recursive: true, force: true }); }
 });
 
@@ -188,7 +245,10 @@ test("a reused residual never masks another connection's change to a residual ro
 		const { store, selector, raw } = fixture;
 		try {
 			await batch(store, selector);
+			// The edit lands while the residual is reused: the second batch scans no native row.
+			const scanned = work.scanned;
 			await batch(store, selector);
+			expect(work.scanned - scanned, "the second batch reuses its residual").toBe(0);
 			expect(Number(raw.prepare(edit).run().changes), edit).toBe(1);
 			expect((await store.readRetirementImage(selector)).ok, edit).toBe(false);
 			expect((await store.acquireRetirementControl(selector)).ok, edit).toBe(false);
@@ -201,6 +261,9 @@ test("an unrelated commit by another connection makes the next read verify the r
 	const { store, selector, raw } = fixture;
 	try {
 		await batch(store, selector);
+		const reused = work.scanned;
+		must(await store.readRetirementImage(selector));
+		expect(work.scanned - reused, "the residual is reused before the outside commit").toBe(0);
 		raw.exec("CREATE TABLE IF NOT EXISTS outside_marker(x)");
 		raw.prepare("INSERT INTO outside_marker VALUES(1)").run();
 		const before = work.scanned;
@@ -208,7 +271,7 @@ test("an unrelated commit by another connection makes the next read verify the r
 		expect(work.scanned - before, "another connection's commit makes the read scan").toBeGreaterThan(0);
 		const pause = { ...work }, expected = golden(raw, selector.objectId); Object.assign(work, pause);
 		expect(read.image).toEqual(expected.image);
-		expect(read.canonicalRows).toEqual(expected.frames);
+		expectFrames(read.canonicalRows, expected.frames, "re-verified rows");
 		// The drain continues to completion from the re-verified image.
 		for (;;) { const next = await batch(store, selector); if (next.control.drain!.cursor === fixture.items) break; }
 	} finally { raw.close(); await store.close(); await rm(fixture.directory, { recursive: true, force: true }); }
