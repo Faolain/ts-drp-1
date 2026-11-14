@@ -286,7 +286,12 @@ it.runIf(INNER)(
 			return stack
 				.split("\n")
 				.filter((line) => line.includes("/packages/") && !line.includes("node:"))
-				.map((line) => line.trim().replace(/^at /u, "").replace(/\(.*\/packages\//u, "("))
+				.map((line) =>
+					line
+						.trim()
+						.replace(/^at /u, "")
+						.replace(/\(.*\/packages\//u, "(")
+				)
 				.slice(0, 8)
 				.join(" < ");
 		};

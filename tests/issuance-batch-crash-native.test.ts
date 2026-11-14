@@ -7,7 +7,14 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, it } from "vitest";
 
-import { issueBatch, issueOne, replacement, SCOPE, settledStore, snapshot } from "./fixtures/issuance-batch/conformance.js";
+import {
+	issueBatch,
+	issueOne,
+	replacement,
+	SCOPE,
+	settledStore,
+	snapshot,
+} from "./fixtures/issuance-batch/conformance.js";
 import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/issuance.js";
 
 // transactIssueBatch crash atomicity on the SQLite store: the process is SIGKILLed around each of the
@@ -111,8 +118,11 @@ it.runIf(INNER)(
 				pending &&
 				(
 					decodeCanonical(
-						(this.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(SCOPE.author) as { pending_unsigned: Uint8Array })
-							.pending_unsigned
+						(
+							this.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(SCOPE.author) as {
+								pending_unsigned: Uint8Array;
+							}
+						).pending_unsigned
 					) as { phase?: string }
 				).phase === "entered";
 			if (edge === "single-entered" && entered && rows === 0) {
