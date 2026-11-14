@@ -3768,6 +3768,12 @@ export async function bindCreatorLiveClose(
 					if (quote === undefined) {
 						const cold = await prepareCreatorIssuanceMaintenanceQuote(registration, input, unsignedBytes, planEffect, receivedReceipt);
 						quote = cold;
+						// Test seam, like the __warmProofEvent observer: a hook may hold a settlement fence's
+						// quote between its sizing and its charge (the host turns below). Unset in production.
+						if (planEffect?.kind === "fence") {
+							const hold = Reflect.get(globalThis, "__creatorFenceQuoteHold");
+							if (typeof hold === "function") await hold(registration.currentTrust.currentEpoch);
+						}
 						await cooperate();
 						// The required fence already owns a complete authenticated cold
 						// source before its UNKNOWN forecast is charged. Retain only the

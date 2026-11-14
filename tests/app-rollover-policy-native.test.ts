@@ -467,6 +467,60 @@ it("grid with a writer: a creator move refused close-pending and offered again w
 	}
 }, 1_200_000);
 
+// Failed-close follow-on (census): browser Grid with the readiness fix, after a forced role-transfer
+// failure, failed the retried adoption terminally ("v3 room settlement issue failed: ... creator
+// issuance maintenance prefix sizing is unavailable: MAINTENANCE_POST_ADOPTION_CENSUS_UNAVAILABLE",
+// diag 75cebd40: the census resolver's settlement preview was stale). The session's retry adopts
+// without the policy's cut, so the app keeps issuing; each creator move allocates the room's next
+// logical time as it passes the barriers, even when the adoption then holds it. The adoption's epoch
+// fence sizes its post-adoption census with the room's settlement preview, which carries that clock,
+// and re-checks it after host turns. A creator move made inside that window (held open here by the
+// test seam at the first fence quote after the failure) must not fail the adoption.
+it("grid with a writer: a creator move made while the retried adoption sizes its epoch fence leaves the adoption and the move accepted", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	const fault: RoleSourceFault = {
+		skip: 2,
+		fail: 1,
+		refusal: { ok: false, kind: "ahe-rejected", cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" } },
+		injected: [],
+	};
+	roleSourceFault.armed = fault;
+	const seam = globalThis as { __creatorFenceQuoteHold?: (epoch: number) => Promise<void> };
+	const heldEpochs: number[] = [];
+	try {
+		const policy = await playPastCeiling(
+			"grid",
+			"writer",
+			Number(process.env.FAILED_CLOSE_MOVES ?? 60),
+			undefined,
+			undefined,
+			/role transfer source failed|promotion source failed/u,
+			{
+				count: 0,
+				everyMs: 0,
+				arm: (_start, room) => {
+					fault.onFail = () => {
+						// Only the first fence quote after the failure: the retried adoption's epoch fence.
+						seam.__creatorFenceQuoteHold = (epoch) => {
+							delete seam.__creatorFenceQuoteHold;
+							heldEpochs.push(epoch);
+							room.track(300_000, room.issue(300_000));
+							return new Promise((resolve) => setTimeout(resolve, 500));
+						};
+					};
+				},
+			}
+		);
+		process.stdout.write(`FAILED_CLOSE_FENCE ${JSON.stringify({ injected: fault.injected, heldEpochs, errors: policy?.errors })}\n`);
+		expect(fault.injected, "the fault fired in a close").toHaveLength(1);
+		expect(heldEpochs, "the retried adoption's fence quote was held").toHaveLength(1);
+	} finally {
+		roleSourceFault.armed = undefined;
+		delete seam.__creatorFenceQuoteHold;
+		restore();
+	}
+}, 1_200_000);
+
 // The refusal path: with trigger values too high to fire, the creator's move at the native
 // ceiling (Canvas: the 169th since fix/maintenance-image-capacity; the 41st before, when the next
 // two epochs then admitted none) or at Chat's allowance (the 15th short message, for the creator and
