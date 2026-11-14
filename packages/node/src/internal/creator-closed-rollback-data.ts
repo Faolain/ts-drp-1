@@ -398,6 +398,8 @@ export type CreatorProtectedRecoveryRoleFailureKind =
 	| "proof-budget-exceeded"
 	| "aborted"
 	| "release-failed"
+	// A closed-data refusal of the same contention (see CreatorClosedRollbackDataFailureKind).
+	| "source-busy"
 	| "internal-invariant";
 export type CreatorProtectedRecoveryRoleDebt = Readonly<{
 	owner: "floor" | "ahe" | "snapshot";
@@ -472,6 +474,9 @@ export type CreatorClosedRollbackDataFailureKind =
 	| "blueprint-invalid"
 	| "aborted"
 	| "release-failed"
+	// Another holder had the single native read reservation of a source store.
+	// Contention, not a broken law: nothing was read, and the caller may retry.
+	| "source-busy"
 	| "internal-invariant";
 type Failure = Readonly<{
 	ok: false;
@@ -910,6 +915,12 @@ function settlementAdoptionReserveProtections(successorFenceCount: 0 | 1, localW
  * to ignore authentication/currency failures or a failed native join. */
 export function isCreatorOrdinarySourceCapacityRefusal(value: unknown): boolean {
 	return value instanceof Refusal && value.result.kind === "proof-budget-exceeded";
+}
+/** The storage owners' busy refusal of a second native read reservation, bare or as
+ * the primary of a failed acquisition's joined cleanup. Only that exact refusal. */
+function nativeReadReservationBusy(error: unknown): boolean {
+	const busy = (value: unknown): boolean => value instanceof Error && value.message === "NATIVE_READ_RESERVATION_BUSY";
+	return busy(error) || (error instanceof AggregateError && busy(error.cause));
 }
 function requireLaw(value: unknown, kind: CreatorClosedRollbackDataFailureKind = "chain-invalid"): asserts value {
 	if (!value) {
@@ -8478,7 +8489,9 @@ async function acquireClosedData(
 				? error.result
 				: protectedUnion && error instanceof RoleRefusal
 					? failure("chain-invalid", "ahe", error.result.kind)
-					: failure("internal-invariant");
+					: nativeReadReservationBusy(error)
+						? failure("source-busy")
+						: failure("internal-invariant");
 	} finally {
 		try {
 
