@@ -139,9 +139,13 @@ describe("settlement replacement reserve", () => {
 		for (let index = 0; index < 14; index++) {
 			const retained = random(320);
 			const epochRows = random(90);
+			// Uniform rows (as a game's placements are), mixed small rows, and mixed large rows (bytes bind).
+			const uniform = index % 3 === 0;
 			const large = index % 3 === 2;
-			const operationBytes = (): number => (large ? 400 + random(2_200) : random(200));
-			const dependencies = (): number => random(MAX_DEPENDENCIES + 1);
+			const fixedBytes = random(200);
+			const fixedDependencies = random(MAX_DEPENDENCIES + 1);
+			const operationBytes = (): number => (uniform ? fixedBytes : large ? 400 + random(2_200) : random(200));
+			const dependencies = (): number => (uniform ? fixedDependencies : random(MAX_DEPENDENCIES + 1));
 			const issued: IssuanceRetirementRows["issued"][number][] = [];
 			for (let sequence = 0; sequence < retained + epochRows; sequence++) {
 				const canonicalPreimageBytes = preimage(sequence, sequence < retained ? epoch - 1 : epoch,
@@ -183,9 +187,10 @@ describe("settlement replacement reserve", () => {
 			cases.push({retained, epochRows, forecast, admitted});
 			expect(forecast, JSON.stringify(cases.at(-1))).toBeLessThanOrEqual(admitted);
 		}
-		// Conservative, not useless: where rows bind (small moves) the forecast stays close to the Writer's own answer.
-		for (const row of cases.filter((_, index) => index % 3 !== 2 && _.admitted > 8))
-			expect(row.forecast, JSON.stringify(row)).toBeGreaterThanOrEqual(Math.floor(row.admitted * 0.6) - 4);
+		// Conservative, not useless: with uniform rows the forecast stays close to the Writer's own answer (it
+		// charges each row's widest scalars and a plan entry per retained row, so it is a few moves short).
+		for (const row of cases.filter((_, index) => index % 3 === 0 && _.admitted > 8))
+			expect(row.forecast, JSON.stringify(row)).toBeGreaterThanOrEqual(Math.floor(row.admitted * 0.75) - 4);
 		console.log(`RESERVE_FORECAST ${JSON.stringify(cases)}`);
 	}, 120_000);
 });
