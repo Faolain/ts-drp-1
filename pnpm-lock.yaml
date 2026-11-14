@@ -518,6 +518,34 @@ importers:
         specifier: ^1.7.1
         version: 1.7.1
 
+  packages/cli:
+    dependencies:
+      "@grpc/grpc-js":
+        specifier: ^1.12.2
+        version: 1.13.2
+      "@ts-drp/node":
+        specifier: 0.11.0
+        version: link:../node
+      "@ts-drp/storage":
+        specifier: 0.11.0
+        version: link:../storage
+      "@ts-drp/storage-node":
+        specifier: 0.11.0
+        version: link:../storage-node
+      "@ts-drp/types":
+        specifier: 0.11.0
+        version: link:../types
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.0
+    devDependencies:
+      tsx:
+        specifier: 4.19.1
+        version: 4.19.1
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
   packages/compaction:
     dependencies:
       "@noble/hashes":
@@ -1002,9 +1030,6 @@ importers:
       "@ts-drp/storage":
         specifier: 0.11.0
         version: link:../storage
-      "@ts-drp/storage-node":
-        specifier: 0.11.0
-        version: link:../storage-node
       "@ts-drp/tracer":
         specifier: 0.11.0
         version: link:../tracer
@@ -1020,9 +1045,6 @@ importers:
       "@types/node":
         specifier: ^22.5.4
         version: 22.14.0
-      commander:
-        specifier: ^14.0.0
-        version: 14.0.0
       dotenv:
         specifier: ^16.4.5
         version: 16.4.7

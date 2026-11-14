@@ -7,9 +7,6 @@
 		"url": "git+https://github.com/drp-tech/ts-drp.git"
 	},
 	"type": "module",
-	"bin": {
-		"ts-drp-node": "./dist/src/run.js"
-	},
 	"types": "./dist/src/index.d.ts",
 	"files": [
 		"src",
@@ -54,10 +51,6 @@
 			"types": "./dist/src/applications/canvas.d.ts",
 			"import": "./dist/src/applications/canvas.js"
 		},
-		"./cli/v3-canvas": {
-			"types": "./dist/src/cli/v3-canvas.d.ts",
-			"import": "./dist/src/cli/v3-canvas.js"
-		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"
@@ -101,8 +94,6 @@
 		"benchmark:throughput": "tsx tests/node.bench.ts",
 		"build": "tsc -b tsconfig.build.json && node build.mjs",
 		"clean": "rm -rf dist/ node_modules/",
-		"cli": "tsx ./src/run.ts",
-		"prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
 		"prepack": "tsc -b",
 		"test": "pnpm --dir ../.. exec vitest run packages/node/tests",
 		"typecheck": "tsc --noEmit -p tsconfig.typecheck.json && pnpm typecheck:producer-presign-tests",
@@ -151,13 +142,11 @@
 		"@ts-drp/routing-node": "workspace:*",
 		"@ts-drp/seal": "0.11.0",
 		"@ts-drp/storage": "0.11.0",
-		"@ts-drp/storage-node": "0.11.0",
 		"@ts-drp/tracer": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"@ts-drp/utils": "0.11.0",
 		"@ts-drp/validation": "0.11.0",
 		"@types/node": "^22.5.4",
-		"commander": "^14.0.0",
 		"dotenv": "^16.4.5",
 		"esbuild-plugins-node-modules-polyfill": "^1.7.0",
 		"race-event": "^1.3.0",

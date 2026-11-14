@@ -1,11 +1,11 @@
 #!/usr/bin/env node
+import type { V3NodeDaemon } from "@ts-drp/node/rpc/v3-daemon";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createCliProgram } from "./cli/index.js";
-import { startConfiguredV3CanvasDaemon } from "./cli/v3-canvas.js";
-import type { V3NodeDaemon } from "./rpc/v3-daemon.js";
+import { createCliProgram } from "./program.js";
+import { startConfiguredV3CanvasDaemon } from "./v3-canvas.js";
 
 /**
  * Start only the explicit local configured v3 application. No bare-ID/v1 fallback,
