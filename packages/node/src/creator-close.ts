@@ -5021,6 +5021,11 @@ export async function bindCreatorLiveClose(
 						ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 						return Promise.resolve().then(async () => {
 							try {
+								// Test seam, like the __warmProofEvent observer: a test may hold this admitted
+								// job open (it holds the maintenance consumer) to put other work inside it.
+								// Unset in production; once per readiness boundary, never on an ordinary call.
+								const hold = Reflect.get(globalThis, "__creatorOrdinaryReadinessHold");
+								if (typeof hold === "function") await hold(registration.currentTrust.currentEpoch);
 								if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
 								let source: CreatorOrdinaryIssuanceProofSource | undefined;
 								let captured = false, maintenanceRan = false, preparationAttempts = 0;

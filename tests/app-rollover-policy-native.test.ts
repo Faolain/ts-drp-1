@@ -4,9 +4,45 @@ import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfe
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
+
+// Fault injection at the creator close's role-transfer source (failed-close follow-ons): while
+// armed, the sealed source acquisitions after `skip` more return the given primary refusal, as
+// browser Grid's close did ("creator recovery role transfer source failed: ...SUBSTRATE_FAILURE" or
+// "...internal-invariant"). Unarmed, it is the real acquisition.
+// `onFail` runs as the refusal is returned (after `delayMs`), so a test can put concurrent work
+// across the failed close.
+type RoleSourceFault = {
+	skip: number;
+	fail: number;
+	refusal: Readonly<Record<string, unknown>>;
+	injected: number[];
+	delayMs?: number;
+	onFail?: () => void;
+};
+const roleSourceFault: { armed?: RoleSourceFault } = {};
+vi.mock("../packages/node/src/internal/creator-closed-rollback-data.js", async (importOriginal) => {
+	const original = await importOriginal<typeof import("../packages/node/src/internal/creator-closed-rollback-data.js")>();
+	return {
+		...original,
+		acquireCreatorForwardPromotionSource: (async (...args: Parameters<typeof original.acquireCreatorForwardPromotionSource>) => {
+			const fault = roleSourceFault.armed;
+			if (fault !== undefined && args[2]?.sealed === true && fault.fail > 0) {
+				if (fault.skip > 0) fault.skip--;
+				else {
+					fault.fail--;
+					fault.injected.push(args[1]);
+					fault.onFail?.();
+					if (fault.delayMs !== undefined) await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
+					return Object.freeze({ ...fault.refusal });
+				}
+			}
+			return original.acquireCreatorForwardPromotionSource(...args);
+		}) as typeof original.acquireCreatorForwardPromotionSource,
+	};
+});
 import { openRole } from "./fixtures/track-m-apps/long-room-core.js";
 import {
 	type AppKind,
@@ -112,10 +148,43 @@ async function playPastCeiling(
 	recipient: Recipient,
 	moves: number,
 	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>,
-	creatorMoves: (ordinal: number) => boolean = () => true
+	creatorMoves: (ordinal: number) => boolean = () => true,
+	toleratedErrors?: RegExp,
+	// A burst of creator moves outside the sequential loop (as a page's placements and moves keep
+	// coming), started when `arm`'s callback runs: `count` moves, one every `everyMs`, not awaited
+	// one by one. Every one must be accepted.
+	burst?: Readonly<{
+		count: number;
+		everyMs: number;
+		// `room` issues one creator move straight to the room (past the policy, as its own re-offer
+		// does) and `track` counts a move like a burst move: accepted, or a recorded error.
+		arm: (
+			start: () => void,
+			room: Readonly<{ issue: (ordinal: number) => Promise<unknown>; track: (ordinal: number, move: Promise<unknown>) => void }>
+		) => void;
+	}>
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
+	const burstMoves: Promise<void>[] = [];
+	const burstErrors: string[] = [];
+	const track = (ordinal: number, move: Promise<unknown>): void => {
+		burstMoves.push(
+			move.then(
+				() => void accepted.push({ role: 0, ordinal }),
+				(error: unknown) => void burstErrors.push(`${ordinal}: ${error instanceof Error ? error.message : String(error)}`)
+			)
+		);
+	};
+	burst?.arm(
+		() => {
+			for (let index = 0; index < burst.count; index++) {
+				const ordinal = 100_000 + index;
+				track(ordinal, new Promise((resolve) => setTimeout(resolve, index * burst.everyMs)).then(() => creator.issue(0, ordinal)));
+			}
+		},
+		{ issue: (ordinal) => creator.issueRoom(0, ordinal), track }
+	);
 	const writer = recipient === "writer";
 	const delivered: (number | null)[] = [null, null];
 	const wire = successorWire(() => peers);
@@ -192,6 +261,8 @@ async function playPastCeiling(
 			accepted.push({ role: 1, ordinal });
 			await deliver(1);
 		}
+		step = "burst";
+		await Promise.all(burstMoves);
 		// Quiesce: the last rollover joins, its offer is installed, and every row is delivered.
 		step = "quiesce";
 		for (let round = 0; round < 4; round++) {
@@ -213,8 +284,10 @@ async function playPastCeiling(
 	);
 	const delivery = await other.successorDelivery?.();
 	process.stdout.write(`ROLLOVER_DELIVERY ${app}/${recipient} ${JSON.stringify(delivery)}\n`);
+	if (burst !== undefined) process.stdout.write(`ROLLOVER_BURST ${app}/${recipient} ${JSON.stringify({ moves: burstMoves.length, errors: burstErrors })}\n`);
+	expect(burstErrors, "every concurrent creator move is accepted").toEqual([]);
 	expect(delivery?.installed ?? 0, "the member's own delivery installed the successors").toBeGreaterThan(0);
-	expect(policy?.errors ?? ["no creator policy"]).toEqual([]);
+	expect((policy?.errors ?? ["no creator policy"]).filter((error) => toleratedErrors?.test(error) !== true)).toEqual([]);
 	expect(member?.waiting ?? 0).toBe(0);
 	expect(await other.authorityEpoch()).toBe(policy?.epoch);
 	const [left, right] = [await creator.state(), await other.state()];
@@ -256,6 +329,143 @@ it.each(cases)(
 	},
 	1_200_000
 );
+
+// Failed-close follow-ons (browser Grid sg3/sg5, .logs/realtime-resume-2026-11-10/netreuse): one
+// creator close fails at its role-transfer source. The session's own interrupted-close retry must
+// then seal and adopt, and the room must continue with nothing lost: every later move of both roles
+// is accepted (no "creator issuance maintenance authority is unavailable", no
+// MAINTENANCE_POST_ADOPTION_CENSUS_UNAVAILABLE, no "creator recovery dependency hold unavailable"),
+// later closes succeed, and both roles converge on every accepted move. The only tolerated policy
+// error is the injected close failure itself.
+it.each([
+	["SUBSTRATE_FAILURE", { ok: false, kind: "ahe-rejected", cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" } }],
+	["internal-invariant", { ok: false, kind: "internal-invariant" }],
+] as const)(
+	"grid with a writer: a creator close that fails at its role-transfer source (%s) is retried, and play continues with no move lost",
+	async (_name, refusal) => {
+		const restore = await installEnvironment("node", () => undefined);
+		// Two sealed acquisitions pass (the first closes), the next one fails once.
+		const fault: RoleSourceFault = { skip: 2, fail: 1, refusal, injected: [] };
+		roleSourceFault.armed = fault;
+		try {
+			const policy = await playPastCeiling(
+				"grid",
+				"writer",
+				Number(process.env.FAILED_CLOSE_MOVES ?? 100),
+				undefined,
+				undefined,
+				/role transfer source failed|promotion source failed/u
+			);
+			process.stdout.write(`FAILED_CLOSE_FAULT ${JSON.stringify({ injected: fault.injected, errors: policy?.errors })}\n`);
+			expect(fault.injected, "the fault fired in a close").toHaveLength(1);
+			expect(policy?.rollovers ?? 0).toBeGreaterThanOrEqual(3);
+		} finally {
+			roleSourceFault.armed = undefined;
+			restore();
+		}
+	},
+	1_200_000
+);
+
+// The same failed close with creator moves still coming (browser Grid places a block every 400 ms
+// and moves every 100 ms through the policy; sg5-pub-4, sg5b-pub-5 and sf1-base-2 each stopped play
+// on a placement refused with "creator issuance maintenance authority is unavailable" about a second
+// after such a close). A burst of creator moves spans the failure, the session's retry (250 ms
+// later) and its adoption; every move must be accepted.
+it.each([
+	["SUBSTRATE_FAILURE", { ok: false, kind: "ahe-rejected", cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" } }, 25],
+	["internal-invariant", { ok: false, kind: "internal-invariant" }, 10],
+] as const)(
+	"grid with a writer: creator moves that overlap a failed close (%s) and its retry are all accepted",
+	async (_name, refusal, everyMs) => {
+		const restore = await installEnvironment("node", () => undefined);
+		const fault: RoleSourceFault = { skip: 2, fail: 1, refusal, injected: [], delayMs: 30 };
+		roleSourceFault.armed = fault;
+		try {
+			const policy = await playPastCeiling(
+				"grid",
+				"writer",
+				Number(process.env.FAILED_CLOSE_MOVES ?? 60),
+				undefined,
+				undefined,
+				/role transfer source failed|promotion source failed/u,
+				{ count: Number(process.env.FAILED_CLOSE_BURST ?? 60), everyMs, arm: (start) => (fault.onFail = start) }
+			);
+			process.stdout.write(`FAILED_CLOSE_FAULT ${JSON.stringify({ injected: fault.injected, errors: policy?.errors })}\n`);
+			expect(fault.injected, "the fault fired in a close").toHaveLength(1);
+		} finally {
+			roleSourceFault.armed = undefined;
+			restore();
+		}
+	},
+	1_200_000
+);
+
+// The play-stopping follow-on, pinned (browser diag dd250ea4, fcd1 4/4: "creator issuance
+// maintenance authority is unavailable [jobs=1,pending=false,kind=local-issuance]" in the epoch the
+// retry adopted). After a failed close the session's own retry seals and adopts without the policy,
+// whose moves wait only across its own rollover. A creator move made right after the failure is
+// refused close-pending and waits for the epoch; it is offered again as soon as the retried
+// adoption exposes the successor, while that adoption's ordinary readiness job still holds the
+// creator's maintenance consumer (held open here by the test seam for 3 s). It must be accepted.
+it("grid with a writer: a creator move refused close-pending and offered again while the retried adoption prepares readiness is accepted", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	const fault: RoleSourceFault = {
+		skip: 2,
+		fail: 1,
+		refusal: { ok: false, kind: "ahe-rejected", cause: { owner: "ahe", reason: "SUBSTRATE_FAILURE" } },
+		injected: [],
+	};
+	roleSourceFault.armed = fault;
+	const seam = globalThis as { __creatorOrdinaryReadinessHold?: (epoch: number) => Promise<void> };
+	const heldEpochs: number[] = [];
+	let firstOffer = "not made";
+	try {
+		const policy = await playPastCeiling(
+			"grid",
+			"writer",
+			Number(process.env.FAILED_CLOSE_MOVES ?? 60),
+			undefined,
+			undefined,
+			/role transfer source failed|promotion source failed/u,
+			{
+				count: 0,
+				everyMs: 0,
+				// The policy's own re-offer, made straight to the room: natively the policy's next
+				// rollover joins the slower retry and its cut would hold the move, which the browser's
+				// faster retry does not.
+				arm: (_start, room) => {
+					const ordinal = 200_000;
+					fault.onFail = () => {
+						// Once the failed close set its close-pending gate: the first offer is refused.
+						setTimeout(() => {
+							room.issue(ordinal).then(
+								() => (firstOffer = "accepted"),
+								(error: unknown) => (firstOffer = error instanceof Error ? error.message : String(error))
+							);
+						}, 50);
+						// Only the first readiness after the failure: the retried close's adoption. The
+						// move is offered again inside it, with the successor exposed.
+						seam.__creatorOrdinaryReadinessHold = (epoch) => {
+							delete seam.__creatorOrdinaryReadinessHold;
+							heldEpochs.push(epoch);
+							room.track(ordinal, room.issue(ordinal));
+							return new Promise((resolve) => setTimeout(resolve, 3_000));
+						};
+					};
+				},
+			}
+		);
+		process.stdout.write(`FAILED_CLOSE_FAULT ${JSON.stringify({ injected: fault.injected, heldEpochs, firstOffer, errors: policy?.errors })}\n`);
+		expect(fault.injected, "the fault fired in a close").toHaveLength(1);
+		expect(firstOffer, "the first offer met the close-pending gate").toMatch(/close-pending/u);
+		expect(heldEpochs, "the retried adoption's readiness was held").toHaveLength(1);
+	} finally {
+		roleSourceFault.armed = undefined;
+		delete seam.__creatorOrdinaryReadinessHold;
+		restore();
+	}
+}, 1_200_000);
 
 // The refusal path: with trigger values too high to fire, the creator's move at the native
 // ceiling (Canvas: the 169th since fix/maintenance-image-capacity; the 41st before, when the next
