@@ -86,11 +86,12 @@ function moveIds(value: unknown, out = new Set<string>()): Set<string> {
 }
 
 type PlanEntry = { disposition: string; sourceSequence: number; sourceContextDigest?: unknown };
+type HandBack = { sourceSequence: number; intent: number; reissueSequence: number | null; exactCanonicalOperationBytes: Uint8Array };
 /**
- * The Writer's settlement plan entries and issued rows, read straight from its SQLite file.
+ * The Writer's settlement plan entries, hand-back records and issued rows, read straight from its SQLite file.
  * @param file - The Writer's issuance store.
  * @param author - The Writer's author.
- * @returns Its plan entries and its issued rows' move ids by author sequence.
+ * @returns Its plan entries, its hand-back records with their move ids, and its issued rows' move ids by author sequence.
  */
 function writerIssuance(file: string, author: string) {
 	const db = new DatabaseSync(file, { readOnly: true });
@@ -99,12 +100,18 @@ function writerIssuance(file: string, author: string) {
 			| { entries_json: string }
 			| undefined;
 		let entries: PlanEntry[] = [];
+		let handBacks: (HandBack & { ids: Set<string> })[] = [];
 		if (planRow !== undefined) {
 			const decoded = JSON.parse(planRow.entries_json) as unknown;
 			if (Array.isArray(decoded)) entries = decoded as PlanEntry[];
 			else {
 				const bytes = Buffer.from((decoded as { bytes: string }).bytes, "base64");
-				entries = (decodeCanonical(new Uint8Array(bytes)) as { entries: PlanEntry[] }).entries;
+				const plan = decodeCanonical(new Uint8Array(bytes)) as { entries: PlanEntry[]; handBacks?: HandBack[] };
+				entries = plan.entries;
+				handBacks = (plan.handBacks ?? []).map((record) => ({
+					...record,
+					ids: moveIds(decodeCanonical(record.exactCanonicalOperationBytes)),
+				}));
 			}
 		}
 		const issued = new Map<number, Set<string>>();
@@ -114,7 +121,7 @@ function writerIssuance(file: string, author: string) {
 			const preimage = decodeCanonical(new Uint8Array(row.canonical_preimage)) as { operation: unknown };
 			issued.set(Number(row.author_sequence), moveIds(preimage.operation));
 		}
-		return { entries, issued };
+		return { entries, handBacks, issued };
 	} finally {
 		db.close();
 	}
@@ -226,6 +233,8 @@ it.runIf(INNER)(
 			// The author sequences issued before reconnecting (a reissue is a later row).
 			before: -1,
 			inside: false,
+			// "pruned": the durable hand-back record of the target move that armed the edge.
+			arm: undefined as { sourceSequence: number; intent: number } | undefined,
 		};
 		const die = (detail: Record<string, unknown>) => {
 			writeFileSync(deathFile, JSON.stringify({ edge, pid: process.pid, signal: "SIGKILL", ...detail }));
@@ -242,19 +251,37 @@ it.runIf(INNER)(
 			) {
 				watch.inside = true;
 				try {
-					const { entries, issued } = writerIssuance(file, watch.author);
+					const { entries, handBacks, issued } = writerIssuance(file, watch.author);
 					const windowExpired = entries.filter(
 						(entry) => entry.disposition === "expire" && entry.sourceContextDigest === undefined
 					);
 					for (const entry of windowExpired)
 						if (!watch.expired.has(entry.sourceSequence))
 							watch.expired.set(entry.sourceSequence, issued.get(entry.sourceSequence) ?? new Set());
+					// "pruned" arms on the durable record, not on a status poll: the move is given back (its
+					// unconsumed hand-back record, written in the expiry's own plan write) and not yet offered
+					// again. The application offers a given-back move within about an epoch, so a per-epoch poll
+					// of its kept moves may never see it.
+					const target = handBacks.find((record) => record.reissueSequence === null && record.ids.has(TARGET));
+					if (edge === "pruned" && !watch.armed && target !== undefined) {
+						watch.armed = true;
+						watch.arm = { sourceSequence: target.sourceSequence, intent: target.intent };
+						process.stdout.write(`HANDBACK_CRASH_ARMED ${JSON.stringify({ edge, record: watch.arm })}\n`);
+					}
 					if (watch.armed) {
 						if (edge === "resolution" && windowExpired.length > 0)
 							die({ sources: windowExpired.map((entry) => entry.sourceSequence) });
 						if (edge === "pruned")
 							for (const [sequence, ids] of watch.expired)
-								if (ids.has(TARGET) && !issued.has(sequence)) die({ retired: sequence });
+								if (ids.has(TARGET) && !issued.has(sequence))
+									die({
+										retired: sequence,
+										armedBy: watch.arm,
+										// Whether the application had offered the move again before this commit.
+										recordConsumed: handBacks.some(
+											(record) => record.ids.has(TARGET) && record.reissueSequence !== null
+										),
+									});
 						if (edge === "reissue")
 							for (const [sequence, ids] of issued)
 								if (sequence > watch.before && ids.has(TARGET)) die({ reissued: sequence });
@@ -289,6 +316,7 @@ it.runIf(INNER)(
 					JSON.stringify({ writerAuthor: watch.author, ids, epoch, ordinal: ordinal.next, reconnected } satisfies Setup)
 				);
 			watch.armed = edge === "resolution";
+			// "pruned" arms itself in the commit hook, on the target move's durable hand-back record.
 			// Silent: the creator's rows reach the Writer; the Writer's rows reach no one.
 			while (epoch < SILENT[edge]) {
 				epoch = await rollCreator(creator, rows.toWriter, ordinal);
@@ -300,8 +328,6 @@ it.runIf(INNER)(
 				save(false);
 				const status = (await writer.rolloverStatus?.()) as Status;
 				process.stdout.write(`HANDBACK_CRASH_EPOCH ${JSON.stringify({ epoch, state: status.state, kept: status.kept.map((op) => op.id) })}\n`);
-				if (edge === "pruned" && !watch.armed && status.kept.some((operation) => operation.id === TARGET))
-					watch.armed = true;
 			}
 			if (edge === "reissue") {
 				await waitFor(
@@ -356,6 +382,8 @@ it.skipIf(INNER).each(EDGES)(
 		const total = async (role: RoleEndpoint) =>
 			(await acceptedCounts(role, setup.writerAuthor, setup.ids)).map((count, index) => count + (before[index] ?? 0));
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
+		// The pruned edge is reached only after its arm: the target move's durable hand-back record.
+		if (edge === "pruned") expect(death.armedBy, "the pruned edge was armed by the target's hand-back record").toBeDefined();
 
 		const restore = await installEnvironment("node", () => undefined);
 		try {
