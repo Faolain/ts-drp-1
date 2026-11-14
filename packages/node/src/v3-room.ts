@@ -1,3 +1,4 @@
+import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
@@ -120,7 +121,6 @@ import {
 } from "@ts-drp/protocol-v3";
 import { digestReceivedVertexPreimage } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "@ts-drp/keychain/finality";
-import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {

@@ -1,5 +1,6 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { describe, expect, it } from "vitest";
+
 import {
 	applySettlementPlanEffect,
 	assertSettlementPlanProgressTransition,
