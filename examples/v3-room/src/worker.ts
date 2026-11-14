@@ -26,6 +26,7 @@ import {
 	V3RoomAwaitingFence,
 	V3RoomBusy,
 	V3RoomKeptMoveRefused,
+	V3RoomKeptMoveSuperseded,
 	V3RoomNotReachingHost,
 	V3RoomReadOnly,
 	V3RoomSuccessorUnavailable,
@@ -44,6 +45,7 @@ export const V3_ROOM_WORKER_ERROR_CODECS: readonly RoomWorkerErrorCodec[] = Obje
 	errorCodec("V3RoomAwaitingFence", V3RoomAwaitingFence),
 	errorCodec("V3RoomBusy", V3RoomBusy),
 	errorCodec("V3RoomKeptMoveRefused", V3RoomKeptMoveRefused),
+	errorCodec("V3RoomKeptMoveSuperseded", V3RoomKeptMoveSuperseded),
 	errorCodec("V3RoomPlayerDatabaseMigrationUnavailable", V3RoomPlayerDatabaseMigrationUnavailable),
 	// DRPError carries a symbol brand (isDRPError) a data copy cannot restore: rebuild it.
 	errorCodec("DRPError", DRPError, {
