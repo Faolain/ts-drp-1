@@ -1,6 +1,6 @@
 import { Command } from "commander";
 
-import { VERSION } from "../version.js";
+import { VERSION } from "./version.js";
 
 /**
  * Build a fresh parser; importing the CLI never starts a host or parses process arguments.

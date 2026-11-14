@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { createCliProgram } from "../src/cli/index.js";
-import { captureV3CanvasCliConfig } from "../src/cli/v3-canvas.js";
+import { createCliProgram } from "../src/program.js";
 import { run } from "../src/run.js";
+import { captureV3CanvasCliConfig } from "../src/v3-canvas.js";
 
 // The original test imported an auto-starting v1 host and never awaited its bare-ID
 // callback. That retired behavior is not evidence of v3 admission or CLI closure.

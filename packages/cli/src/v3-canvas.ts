@@ -1,13 +1,12 @@
 import * as grpc from "@grpc/grpc-js";
+import { type CanvasProjection, createV3CanvasApplication } from "@ts-drp/node/applications/canvas";
+import { startV3NodeDaemon, type V3NodeDaemon } from "@ts-drp/node/rpc/v3-daemon";
+import type { V3RpcRoomAcquisition } from "@ts-drp/node/rpc/v3-room-registry";
+import type { NodeRuntimeDependencies } from "@ts-drp/node/runtime";
 import { captureRoomHeadScope, roomHeadFields, roomHeadInteger } from "@ts-drp/storage";
 import { createNodeV3RoomStorageHost } from "@ts-drp/storage-node/v3-room-host";
 import type { DRPNodeConfig } from "@ts-drp/types";
 import { resolve } from "node:path";
-
-import { type CanvasProjection, createV3CanvasApplication } from "../applications/canvas.js";
-import { startV3NodeDaemon, type V3NodeDaemon } from "../rpc/v3-daemon.js";
-import type { V3RpcRoomAcquisition } from "../rpc/v3-room-registry.js";
-import type { NodeRuntimeDependencies } from "../runtime.js";
 
 export interface V3CanvasCliRoom {
 	readonly objectId: string;

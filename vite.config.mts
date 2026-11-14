@@ -67,6 +67,7 @@ const config = defineConfig({
 			"@ts-drp/node/v3-room": path.resolve(__dirname, "packages/node/src/v3-room.ts"),
 			"@ts-drp/node/v3-room-host": path.resolve(__dirname, "packages/node/src/v3-room-host.ts"),
 			"@ts-drp/node/applications/canvas": path.resolve(__dirname, "packages/node/src/applications/canvas.ts"),
+			"@ts-drp/node/rpc/v3-daemon": path.resolve(__dirname, "packages/node/src/rpc/v3-daemon.ts"),
 			"@ts-drp/seal/creator": path.resolve(__dirname, "packages/seal/src/creator.ts"),
 			"@ts-drp/seal/internal/creator-close-intent": path.resolve(
 				__dirname,

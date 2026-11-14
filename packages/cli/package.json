@@ -1,0 +1,53 @@
+{
+	"name": "@ts-drp/cli",
+	"version": "0.11.0",
+	"private": true,
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"bin": {
+		"ts-drp-node": "./dist/src/run.js"
+	},
+	"types": "./dist/src/run.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/run.d.ts",
+			"import": "./dist/src/run.js"
+		},
+		"./v3-canvas": {
+			"types": "./dist/src/v3-canvas.d.ts",
+			"import": "./dist/src/v3-canvas.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"cli": "tsx ./src/run.ts",
+		"prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
+		"prepack": "tsc -b",
+		"test": "pnpm --dir ../.. exec vitest run packages/cli/tests",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@grpc/grpc-js": "^1.12.2",
+		"@ts-drp/node": "0.11.0",
+		"@ts-drp/storage": "0.11.0",
+		"@ts-drp/storage-node": "0.11.0",
+		"@ts-drp/types": "0.11.0",
+		"commander": "^14.0.0"
+	},
+	"devDependencies": {
+		"tsx": "4.19.1",
+		"vitest": "^3.0.5"
+	}
+}
