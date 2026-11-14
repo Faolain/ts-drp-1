@@ -115,3 +115,22 @@ obligations, each with its evidence in
 - **G21.** The bridge's queues and depths are bounded, with fixed reviewed limits. A stream value is
   bounded too: a log that grows with the session is read on demand, never streamed.
 - **G28.** Worker hosting needs three-engine evidence, as any native requirement does.
+
+## Rolling for a Writer's own capacity (decision row 92)
+
+The creator's rollover policy forecasts each settlement Writer's own admission from the rows it admitted
+(`examples/v3-room/src/writer-capacity.ts`, arithmetic in issuance-store `issuanceSettlementReserveForecast`)
+and rolls before it ends (`capacity`), or when a Writer past half of it falls silent (`silence`).
+
+- **No new lever (DoS bound).** Each trigger fires at most once per epoch and only from rows the creator
+  admitted; no message, field or member claim feeds it. A Writer moves the room through it only after at
+  least 7 of its own admitted moves in the epoch (the shipped per-author budget), and in practice after about
+  (508 - P)/2 of them (P: its retained own rows): no cheaper than the per-author budget, once per epoch.
+- **Never optimistic.** The forecast charges every unknown at its widest, so it never reports more
+  admissible moves than the Writer's own admission (property test in
+  `packages/issuance-store/tests/settlement-replacement-reserve.test.ts`).
+- **G21.** Per author, one span per retained epoch plus the current one, for at most 256 authors; the least
+  recently active author is dropped first.
+- **Overrides.** Both are capacity triggers: a budget override (tests) does not replace them, as it does not
+  replace the native refusal trigger.
+

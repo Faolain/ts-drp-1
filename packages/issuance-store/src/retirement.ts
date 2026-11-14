@@ -718,6 +718,71 @@ const SETTLEMENT_RESERVE_SIGNATURE_BYTES = encodeCanonical("signature").byteLeng
 // The next settlement's fence: a header-only vertex (small control operation) and its outbox row.
 const SETTLEMENT_RESERVE_FENCE_BYTES = 1_024;
 
+/** One own row's issued and outbox rows, as the Writer's image holds them (the signature once signed). */
+type SettlementReserveOwnRow = Readonly<DurableIssueScope & {
+	authorSequence: number;
+	canonicalPreimageBytes: Uint8Array;
+	digest: Uint8Array;
+	signature?: Uint8Array;
+}>;
+/** Rows and bytes against the issuance bound (an image, a reserve, or their sum). */
+export type IssuanceSettlementReserveWidth = Readonly<{ rowCount: number; logicalBytes: number }>;
+
+/**
+ * The fixed part of a settlement Writer's reserve: the next settlement's fence pair and, when the
+ * Writer has no plan yet, its plan row.
+ * @param hasPlan - Whether the Writer's image holds its settlement plan.
+ * @param maxDependencies - The room's dependency bound (the fence's dependencies).
+ * @returns The fixed reserve width.
+ */
+export function issuanceSettlementReserveFixed(hasPlan: boolean, maxDependencies: number): IssuanceSettlementReserveWidth {
+	return Object.freeze({
+		rowCount: 2 + (hasPlan ? 0 : 1),
+		logicalBytes: 2 * (SETTLEMENT_RESERVE_FENCE_BYTES + maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES) +
+			(hasPlan ? 0 : SETTLEMENT_RESERVE_FENCE_BYTES),
+	});
+}
+
+/**
+ * What one own row of the epoch reserves: its settlement replacement (the row and its outbox row at
+ * their widths, a signature when still unsigned, and the replacement's widening and plan entry).
+ * @param scope - The Writer's lineage.
+ * @param source - The own row.
+ * @param maxDependencies - The room's dependency bound.
+ * @returns The two rows and their reserved bytes.
+ */
+export function issuanceSettlementReserveSource(
+	scope: DurableIssueScope,
+	source: SettlementReserveOwnRow,
+	maxDependencies: number
+): IssuanceSettlementReserveWidth {
+	const outbox = { ...scope, authorSequence: source.authorSequence, digest: source.digest, publishState: "published" };
+	return Object.freeze({
+		rowCount: 2,
+		logicalBytes: encodeCanonical(source, unsignedEncodingLimits).byteLength +
+			(source.signature === undefined ? SETTLEMENT_RESERVE_SIGNATURE_BYTES : 0) +
+			encodeCanonical(outbox, unsignedEncodingLimits).byteLength + SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES +
+			SETTLEMENT_RESERVE_SCALAR_BYTES + maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES + 1 +
+			unsignedVaruintWidth(maxDependencies),
+	});
+}
+
+/**
+ * The one admission decision of a settlement Writer's own new move: its image (with the move) plus its
+ * reserve must fit the issuance row and byte bound.
+ * @param image - The Writer's image with the move.
+ * @param reserve - The reserve of the move's epoch (this move included).
+ * @returns `undefined` when it fits, else which bound refuses.
+ */
+export function issuanceSettlementReserveRefusal(
+	image: IssuanceSettlementReserveWidth,
+	reserve: IssuanceSettlementReserveWidth
+): "row" | "byte" | undefined {
+	if (image.rowCount + reserve.rowCount > ISSUANCE_RETIREMENT_LIMITS.maxRows) return "row";
+	if (image.logicalBytes + reserve.logicalBytes > ISSUANCE_RETIREMENT_LIMITS.maxBytes) return "byte";
+	return undefined;
+}
+
 /**
  * Admission of a settlement-profile Writer's own new move against its later settlement: the
  * eventual postimage of this move, plus one settlement replacement for every own issued row of
@@ -726,7 +791,8 @@ const SETTLEMENT_RESERVE_FENCE_BYTES = 1_024;
  * may close the epoch without any of these rows (it has accepted none of them yet, as far as this
  * Writer knows); the Writer then replaces each one at its successor's install, which must not be
  * refused. Own rows are ordered by author sequence and their epochs never decrease, so the epoch's
- * rows are a suffix found by binary search over memoized preimage headers.
+ * rows are a suffix found by binary search over memoized preimage headers. The arithmetic is the
+ * reserve helpers above, which the creator's forecast (issuanceSettlementReserveForecast) shares.
  * @param rows - Complete normalized native rows before this move.
  * @param scope - The move's lineage.
  * @param pending - The move's exact pending intent.
@@ -758,23 +824,92 @@ export function issuanceSettlementReplacementReserveCharge(
 		else high = middle;
 	}
 	const sources = own.slice(low);
-	const perSourceSlack = SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES + SETTLEMENT_RESERVE_SCALAR_BYTES +
-		maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES + 1 + unsignedVaruintWidth(maxDependencies);
 	const hasPlan = finalRows.plans.some((plan) => plan.scope.author === scope.author && plan.scope.objectId === scope.objectId);
-	const rowCount = 2 * sources.length + 2 + (hasPlan ? 0 : 1);
-	let logicalBytes = 2 * (SETTLEMENT_RESERVE_FENCE_BYTES + maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES) +
-		(hasPlan ? 0 : SETTLEMENT_RESERVE_FENCE_BYTES);
+	const fixed = issuanceSettlementReserveFixed(hasPlan, maxDependencies);
+	let rowCount = fixed.rowCount;
+	let logicalBytes = fixed.logicalBytes;
 	for (const source of sources) {
-		const outbox = { ...scope, authorSequence: source.authorSequence, digest: source.digest, publishState: "published" };
-		logicalBytes += encodeCanonical(source, unsignedEncodingLimits).byteLength +
-			("signature" in source ? 0 : SETTLEMENT_RESERVE_SIGNATURE_BYTES) +
-			encodeCanonical(outbox, unsignedEncodingLimits).byteLength + perSourceSlack;
+		const charge = issuanceSettlementReserveSource(scope, source, maxDependencies);
+		rowCount += charge.rowCount;
+		logicalBytes += charge.logicalBytes;
 	}
-	if (final.rowCount + rowCount > ISSUANCE_RETIREMENT_LIMITS.maxRows)
-		throw issuanceRetirementRefusal("unsigned postimage exceeds row bound with its settlement replacement reserve");
-	if (final.logicalBytes + logicalBytes > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
-		throw issuanceRetirementRefusal("unsigned postimage exceeds byte bound with its settlement replacement reserve");
+	const refused = issuanceSettlementReserveRefusal(final, { rowCount, logicalBytes });
+	if (refused !== undefined)
+		throw issuanceRetirementRefusal(`unsigned postimage exceeds ${refused} bound with its settlement replacement reserve`);
 	return Object.freeze({ rowCount, logicalBytes, sources: sources.length });
+}
+
+// The widest own-row, lineage and plan shapes a forecast charges (every scalar at its widest).
+const forecastDigest = new Uint8Array(32);
+const forecastSignature = new Uint8Array(64);
+const forecastWidths = new Map<number, number>();
+// The image's object and four array headers, each array count at its widest under the row bound.
+const forecastImageFrame = (): number =>
+	encodeCanonical({ issued: [], lineages: [], outbox: [], plans: [] }).byteLength +
+	4 * (unsignedVaruintWidth(ISSUANCE_RETIREMENT_LIMITS.maxRows) - 1) +
+	encodeCanonical("signature").byteLength + 1 + 1 + 64;
+
+/**
+ * Creator-side forecast of a settlement Writer's admission: how many more own moves the Writer can
+ * still admit in the current epoch, from what the creator knows (a count of the Writer's own rows
+ * still in its image, its own rows of the current epoch, and an upper bound on one own row's
+ * canonical preimage length). Every unknown is charged at its widest (each row's sequence and
+ * signature, the lineage row, a plan row holding an entry per retained row, the reserve's absent-plan
+ * row), so with counts and a preimage bound that are not lower than the Writer's own, the answer is
+ * never more than the Writer's own admission (issuanceSettlementReplacementReserveCharge) allows.
+ * @param input - The forecast's inputs.
+ * @param input.scope - The Writer's lineage.
+ * @param input.maxDependencies - The room's dependency bound.
+ * @param input.retainedRows - Own rows of earlier epochs still in the Writer's image (at least).
+ * @param input.epochRows - Own rows of the current epoch (at least).
+ * @param input.rowPreimageBytes - Canonical preimage length bound of every one of those rows and of the next moves.
+ * @returns The moves still admissible this epoch (0 when the next one is refused).
+ */
+export function issuanceSettlementReserveForecast(input: Readonly<{
+	scope: DurableIssueScope;
+	maxDependencies: number;
+	retainedRows: number;
+	epochRows: number;
+	rowPreimageBytes: number;
+}>): number {
+	const { maxDependencies } = captureSettlementReplacementReserve({ maxDependencies: input.maxDependencies });
+	for (const value of [input.retainedRows, input.epochRows, input.rowPreimageBytes])
+		if (!Number.isSafeInteger(value) || value < 0) throw invalid();
+	const preimageBytes = input.rowPreimageBytes;
+	let pair = forecastWidths.get(preimageBytes);
+	if (pair === undefined) {
+		const row = { ...input.scope, authorSequence: Number.MAX_SAFE_INTEGER, canonicalPreimageBytes: new Uint8Array(preimageBytes),
+			digest: forecastDigest, signature: forecastSignature };
+		const outbox = { ...input.scope, authorSequence: Number.MAX_SAFE_INTEGER, digest: forecastDigest, publishState: "published" };
+		pair = encodeCanonical(row, unsignedEncodingLimits).byteLength + encodeCanonical(outbox, unsignedEncodingLimits).byteLength;
+		if (forecastWidths.size > 64) forecastWidths.clear();
+		forecastWidths.set(preimageBytes, pair);
+	}
+	const source = issuanceSettlementReserveSource(input.scope, { ...input.scope, authorSequence: Number.MAX_SAFE_INTEGER,
+		canonicalPreimageBytes: new Uint8Array(preimageBytes), digest: forecastDigest }, maxDependencies);
+	const lineage = encodeCanonical({ ...input.scope, exhausted: false, next: Number.MAX_SAFE_INTEGER,
+		prunedThroughAuthorSequence: Number.MAX_SAFE_INTEGER }).byteLength;
+	const fixed = issuanceSettlementReserveFixed(false, maxDependencies);
+	const frame = forecastImageFrame();
+	// With `more` further moves admitted: the image (lineage, plan, every own row pair) and the epoch's reserve.
+	const refusedAt = (more: number): boolean => {
+		const own = input.retainedRows + input.epochRows + more;
+		const epochRows = input.epochRows + more;
+		const image = { rowCount: 2 + 2 * own,
+			logicalBytes: frame + lineage + SETTLEMENT_RESERVE_FENCE_BYTES + own * (pair + SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES) };
+		const reserve = { rowCount: fixed.rowCount + epochRows * source.rowCount,
+			logicalBytes: fixed.logicalBytes + epochRows * source.logicalBytes };
+		return issuanceSettlementReserveRefusal(image, reserve) !== undefined;
+	};
+	if (refusedAt(1)) return 0;
+	let low = 1;
+	let high = ISSUANCE_RETIREMENT_LIMITS.maxRows;
+	while (low < high) {
+		const middle = (low + high + 1) >>> 1;
+		if (refusedAt(middle)) high = middle - 1;
+		else low = middle;
+	}
+	return low;
 }
 
 /**
