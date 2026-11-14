@@ -8436,6 +8436,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				}
 				continue;
 			}
+			if (
+				!signed &&
+				(lastingLocalRefusal(issued.kind, issued.detail) !== undefined || transientLocalRefusal(issued.kind, issued.detail))
+			) {
+				// Refused before anything was signed, by this Writer's own admission (its policy, or a transient
+				// refusal): the chunk's rows are issued singly, where a lasting refusal hands exactly the refused
+				// row's replay back and a transient one is retried in this install (issueSettlement), instead of
+				// failing the install.
+				logicalTime = firstLogicalTime;
+				noteV3RoomSettlementFallback(`refused: ${issued.detail}`);
+				break;
+			}
 			if (!signed)
 				throw new TypeError(`v3 room settlement batch issue failed: ${issued.kind}: ${issued.detail}`, { cause: issued });
 			// The chunk's marker was entered: it is resumed whole (never re-issued a row at a time) once
