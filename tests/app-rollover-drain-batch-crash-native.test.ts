@@ -46,11 +46,15 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // creator exactly once: no loss, no double apply. No native write, signature or transaction is mocked.
 const INNER = process.env.RUN_DRAIN_BATCH_CRASH === "1";
 type Edge = "fence" | "chunk-marker" | "between-chunks" | "between-journal" | "between-issues" | "single-marker";
-/** The fallback edge: run with DRAIN_BATCH_CRASH_SINGLES=1 against a build whose issuance store has no
- * transactIssueBatch (the drain then issues one replacement per transaction, as before batching). */
+/**
+ * The fallback edge: run with DRAIN_BATCH_CRASH_SINGLES=1 against a build whose issuance store has no
+ * transactIssueBatch (the drain then issues one replacement per transaction, as before batching).
+ */
 const SINGLES_EDGES: readonly Edge[] = ["between-issues", "single-marker"];
 const EDGES: readonly Edge[] =
-	process.env.DRAIN_BATCH_CRASH_SINGLES === "1" ? SINGLES_EDGES : ["fence", "chunk-marker", "between-chunks", "between-journal"];
+	process.env.DRAIN_BATCH_CRASH_SINGLES === "1"
+		? SINGLES_EDGES
+		: ["fence", "chunk-marker", "between-chunks", "between-journal"];
 const MOVES = 10;
 const CHUNK = 8;
 
@@ -92,14 +96,21 @@ const issuanceFile = (directory: string, name: string) =>
 	);
 
 type PlanEntry = { disposition: string; sourceSequence: number; replacementSequence: number | null };
-/** The logical times of the Writer's rows after its latest author fence, and the fence's own. */
+/**
+ * The logical times of the Writer's rows after its latest author fence, and the fence's own.
+ * @param file
+ * @param author
+ */
 function writerTimes(file: string, author: string) {
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
 		const rows = db
 			.prepare("SELECT canonical_preimage FROM issued_records WHERE author=? ORDER BY author_sequence")
 			.all(author)
-			.map((row) => decodeCanonical(new Uint8Array(row.canonical_preimage as Uint8Array)) as RowValue & { logicalTime: number });
+			.map(
+				(row) =>
+					decodeCanonical(new Uint8Array(row.canonical_preimage as Uint8Array)) as RowValue & { logicalTime: number }
+			);
 		const fence = rows.findLastIndex((row) => row.operation.action === "$drp.author-fence.v1");
 		return fence < 0
 			? { fenceTime: null, times: [] as number[] }
@@ -108,7 +119,11 @@ function writerTimes(file: string, author: string) {
 		db.close();
 	}
 }
-/** The plan effect kind and phase of the Writer's pending marker, if any (a single's or a batch's). */
+/**
+ * The plan effect kind and phase of the Writer's pending marker, if any (a single's or a batch's).
+ * @param file
+ * @param author
+ */
 function writerMarkerEffect(file: string, author: string): string | null {
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
@@ -116,13 +131,20 @@ function writerMarkerEffect(file: string, author: string): string | null {
 			| { pending_unsigned: Uint8Array | null }
 			| undefined;
 		if (row?.pending_unsigned == null) return null;
-		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as { phase: string; planEffect?: { kind?: string } };
+		const pending = decodeCanonical(new Uint8Array(row.pending_unsigned)) as {
+			phase: string;
+			planEffect?: { kind?: string };
+		};
 		return `${pending.planEffect?.kind ?? "none"}:${pending.phase}`;
 	} finally {
 		db.close();
 	}
 }
-/** The size of the entered batch marker in the Writer's lineage (null: none, or a single's marker). */
+/**
+ * The size of the entered batch marker in the Writer's lineage (null: none, or a single's marker).
+ * @param file
+ * @param author
+ */
 function writerBatchMarker(file: string, author: string): number | null {
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
@@ -136,7 +158,11 @@ function writerBatchMarker(file: string, author: string): number | null {
 		db.close();
 	}
 }
-/** The Writer's settlement plan, read straight from its SQLite file. */
+/**
+ * The Writer's settlement plan, read straight from its SQLite file.
+ * @param file
+ * @param author
+ */
 function writerPlan(file: string, author: string) {
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
@@ -289,7 +315,11 @@ it.runIf(INNER)(
 					if (edge === "between-chunks" && replaced.length === CHUNK)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });
 					if (edge === "between-journal" && replaced.length === CHUNK) watch.journalCommits ??= 0;
-					if (edge === "single-marker" && replaced.length === 0 && writerMarkerEffect(file, watch.author) === "replacement:entered")
+					if (
+						edge === "single-marker" &&
+						replaced.length === 0 &&
+						writerMarkerEffect(file, watch.author) === "replacement:entered"
+					)
 						die({ marker: 1, rebase: rebase.length });
 					if (edge === "between-issues" && replaced.length === 2)
 						die({ replaced: replaced.map((entry) => entry.sourceSequence), rebase: rebase.length });

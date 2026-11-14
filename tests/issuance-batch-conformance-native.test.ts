@@ -1,9 +1,9 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
+import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+import { createEphemeralDurableIssuanceStore } from "@ts-drp/issuance-store/conformance";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
-import { createEphemeralDurableIssuanceStore } from "@ts-drp/issuance-store/conformance";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runBatchConformance } from "./fixtures/issuance-batch/conformance.js";
@@ -52,7 +52,13 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 		expect(report.commit!.revisionAfter).toBe((report.commit!.revisionBefore as number) + 8);
 		expect(report.commit!.revisionAfter).toBe(report.commit!.revisionSingles);
 		if (native) expect(report.commit!.signed).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
-		expect(report.revisionCas).toEqual({ ok: false, code: "ISSUANCE_RETRY_REQUIRED", signed: 0, unchanged: true, retryOk: true });
+		expect(report.revisionCas).toEqual({
+			ok: false,
+			code: "ISSUANCE_RETRY_REQUIRED",
+			signed: 0,
+			unchanged: true,
+			retryOk: true,
+		});
 		expect(report.validation).toEqual({ ok: false, code: "ISSUANCE_COMMIT_INVALID", unchanged: true });
 		expect(report.duplicate).toMatchObject({
 			duplicateOk: false,
@@ -63,7 +69,12 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 			thenValidOk: true,
 		});
 		if (native) expect(report.duplicate).toMatchObject({ duplicateSigned: 0, mixedSigned: 0 });
-		expect(report.precondition).toMatchObject({ ok: false, code: "ISSUANCE_RETRY_REQUIRED", unchanged: true, restOk: true });
+		expect(report.precondition).toMatchObject({
+			ok: false,
+			code: "ISSUANCE_RETRY_REQUIRED",
+			unchanged: true,
+			restOk: true,
+		});
 		if (native) expect(report.precondition!.signed).toBe(0);
 		expect(report.progress).toEqual({
 			firstOk: true,
@@ -128,14 +139,24 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 			})
 		);
 	const batched = await issuerOf(batchStore).issueBatch(
-		{ anchor, dependencies: [root], epoch: 1, objectId, entries: operations.map((operation, index) => ({ logicalTime: 1 + 2 * index, operation })) },
+		{
+			anchor,
+			dependencies: [root],
+			epoch: 1,
+			objectId,
+			entries: operations.map((operation, index) => ({ logicalTime: 1 + 2 * index, operation })),
+		},
 		(scope, count, build) =>
 			batchStore.transactIssueBatch!({ scope, count, expectedPlanRevision: null }, (first, admission) =>
 				build(
 					first,
 					admission === undefined
 						? undefined
-						: (preimages, sign) => admission(preimages.map((bytes) => ({ exactCanonicalUnsignedVertexBytes: bytes })), sign)
+						: (preimages, sign) =>
+								admission(
+									preimages.map((bytes) => ({ exactCanonicalUnsignedVertexBytes: bytes })),
+									sign
+								)
 				)
 			)
 	);
@@ -148,5 +169,7 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 		}));
 	expect(batched).toHaveLength(8);
 	expect(view(batched)).toEqual(view(singles));
-	expect(await batchStore.readLineage({ objectId, author })).toEqual(await singlesStore.readLineage({ objectId, author }));
+	expect(await batchStore.readLineage({ objectId, author })).toEqual(
+		await singlesStore.readLineage({ objectId, author })
+	);
 }, 60_000);

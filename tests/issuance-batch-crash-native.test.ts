@@ -30,7 +30,10 @@ const storeIn = (directory: string, reopen: boolean) =>
 		...(reopen ? { initialization: "reopen" as const } : {}),
 	});
 
-/** Whether the lineage holds a pending marker, and how many intents it covers. */
+/**
+ * Whether the lineage holds a pending marker, and how many intents it covers.
+ * @param directory
+ */
 function markerIntents(directory: string): number | null {
 	const db = new DatabaseSync(join(directory, "issuance.drp-issuance-v1.sqlite"), { readOnly: true });
 	try {
@@ -66,20 +69,29 @@ it.runIf(INNER)(
 			const commit = sql === "COMMIT" || sql.endsWith("COMMIT");
 			if (!commit || this.location()?.endsWith("issuance.drp-issuance-v1.sqlite") !== true) return exec.call(this, sql);
 			const pending =
-				(this.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(SCOPE.author) as
-					| { pending_unsigned: Uint8Array | null }
-					| undefined)?.pending_unsigned != null;
+				(
+					this.prepare("SELECT pending_unsigned FROM lineages WHERE author=?").get(SCOPE.author) as
+						| { pending_unsigned: Uint8Array | null }
+						| undefined
+				)?.pending_unsigned != null;
 			const rows = Number(
-				(this.prepare("SELECT count(*) AS n FROM issued_records WHERE author=? AND author_sequence>?").get(SCOPE.author, MOVES) as {
-					n: number | bigint;
-				}).n
+				(
+					this.prepare("SELECT count(*) AS n FROM issued_records WHERE author=? AND author_sequence>?").get(
+						SCOPE.author,
+						MOVES
+					) as {
+						n: number | bigint;
+					}
+				).n
 			);
 			const kind = !seen.marker && pending && rows === 0 ? "marker" : !seen.rows && rows === MOVES ? "rows" : undefined;
 			if (kind === "marker") seen.marker = true;
 			if (kind === "rows") seen.rows = true;
-			if ((edge === "before-marker" && kind === "marker") || (edge === "before-commit" && kind === "rows")) die({ kind, rows });
+			if ((edge === "before-marker" && kind === "marker") || (edge === "before-commit" && kind === "rows"))
+				die({ kind, rows });
 			const result = exec.call(this, sql);
-			if ((edge === "after-marker" && kind === "marker") || (edge === "after-commit" && kind === "rows")) die({ kind, rows });
+			if ((edge === "after-marker" && kind === "marker") || (edge === "after-commit" && kind === "rows"))
+				die({ kind, rows });
 			return result;
 		};
 		await issueBatch(
@@ -114,7 +126,9 @@ it.skipIf(INNER).each(EDGES)(
 		child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
 		await new Promise<void>((resolve) => child.on("exit", () => resolve()));
 		if (!existsSync(join(directory, "death.json"))) throw new Error(`no death at ${edge}:\n${output.slice(-4000)}`);
-		const before = JSON.parse(readFileSync(join(directory, "before.json"), "utf8")) as Awaited<ReturnType<typeof snapshot>>;
+		const before = JSON.parse(readFileSync(join(directory, "before.json"), "utf8")) as Awaited<
+			ReturnType<typeof snapshot>
+		>;
 		const marker = markerIntents(directory);
 		const store = storeIn(directory, true);
 		try {
