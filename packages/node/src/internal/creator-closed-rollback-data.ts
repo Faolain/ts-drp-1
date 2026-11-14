@@ -7117,8 +7117,8 @@ function creatorIssuanceMaintenanceObservationCarriers(input: Readonly<{
 function detachClosedCaptureJournal<T extends Readonly<{ control: unknown; drainSource?: unknown;
 	exactCanonicalControlCarriers?: readonly Uint8Array[] }>>(journal: T): T {
 	const { drainSource, exactCanonicalControlCarriers, ...observed } = journal;
-	const detached = decodeCanonical(closedWarmSourceBytes({ ...observed,
-		control: closedJournalObservationControl(observed.control) })) as Record<string, unknown>;
+	const detached = decodeCanonical(closedWarmSourceBytes(Object.hasOwn(observed, "control")
+		? { ...observed, control: closedJournalObservationControl(observed.control) } : observed)) as Record<string, unknown>;
 	return { ...detached,
 		...(exactCanonicalControlCarriers === undefined ? {} : {
 			exactCanonicalControlCarriers: Object.freeze(exactCanonicalControlCarriers.map(bytes => bytes.slice())) }),
