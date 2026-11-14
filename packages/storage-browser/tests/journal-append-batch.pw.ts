@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 // journal meets in tests/journal-append-batch-conformance-native.test.ts, unchanged.
 let server: Server, origin: string;
 test.beforeAll(async () => {
-	const source = (path: string) => new URL(path, import.meta.url).pathname;
+	const source = (path: string): string => new URL(path, import.meta.url).pathname;
 	const bundle = await build({
 		entryPoints: [source("./assets/journal-append-batch-entry.ts")],
 		bundle: true,
@@ -17,10 +17,12 @@ test.beforeAll(async () => {
 		write: false,
 	});
 	server = createServer((request, response) => {
+		const entry = bundle.outputFiles[0];
+		if (entry === undefined) throw new Error("esbuild produced no entry");
 		response.writeHead(200, { "content-type": request.url === "/entry.js" ? "text/javascript" : "text/html" });
 		response.end(
 			request.url === "/entry.js"
-				? Buffer.from(bundle.outputFiles[0]!.contents)
+				? Buffer.from(entry.contents)
 				: '<!doctype html><script type="module" src="/entry.js"></script>'
 		);
 	});
@@ -38,12 +40,12 @@ for (const mode of ["legacy", "room"]) {
 		await page.goto(origin);
 		await page.waitForFunction(() => typeof Reflect.get(globalThis, "runJournalAppendBatch") === "function");
 		const report = (await page.evaluate(
-			async (mode) => Reflect.get(globalThis, "runJournalAppendBatch")(mode),
+			(mode) => Reflect.get(globalThis, "runJournalAppendBatch")(mode),
 			mode
 		)) as Record<string, unknown>;
 		test.info().annotations.push({
 			type: "native-evidence",
-			description: JSON.stringify({ browserName, version: page.context().browser()!.version(), mode, report }),
+			description: JSON.stringify({ browserName, version: page.context().browser()?.version(), mode, report }),
 		});
 		expect(report.shape).toEqual({ batch: "function" });
 		expect(report.commit).toMatchObject({

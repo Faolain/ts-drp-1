@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 // SQLite store meets in tests/issuance-batch-conformance-native.test.ts, unchanged.
 let server: Server, origin: string;
 test.beforeAll(async () => {
-	const source = (path: string) => new URL(path, import.meta.url).pathname;
+	const source = (path: string): string => new URL(path, import.meta.url).pathname;
 	const bundle = await build({
 		entryPoints: [source("./assets/issuance-batch-entry.ts")],
 		bundle: true,
@@ -22,10 +22,12 @@ test.beforeAll(async () => {
 		},
 	});
 	server = createServer((request, response) => {
+		const entry = bundle.outputFiles[0];
+		if (entry === undefined) throw new Error("esbuild produced no entry");
 		response.writeHead(200, { "content-type": request.url === "/entry.js" ? "text/javascript" : "text/html" });
 		response.end(
 			request.url === "/entry.js"
-				? Buffer.from(bundle.outputFiles[0]!.contents)
+				? Buffer.from(entry.contents)
 				: '<!doctype html><script type="module" src="/entry.js"></script>'
 		);
 	});
@@ -43,12 +45,12 @@ for (const mode of ["legacy", "room"]) {
 		await page.goto(origin);
 		await page.waitForFunction(() => typeof Reflect.get(globalThis, "runIssuanceBatch") === "function");
 		const report = (await page.evaluate(
-			async (mode) => Reflect.get(globalThis, "runIssuanceBatch")(mode),
+			(mode) => Reflect.get(globalThis, "runIssuanceBatch")(mode),
 			mode
 		)) as Record<string, Record<string, unknown>>;
 		test.info().annotations.push({
 			type: "native-evidence",
-			description: JSON.stringify({ browserName, version: page.context().browser()!.version(), mode, report }),
+			description: JSON.stringify({ browserName, version: page.context().browser()?.version(), mode, report }),
 		});
 		const all = [9, 10, 11, 12, 13, 14, 15, 16];
 		expect(report.commit).toMatchObject({
@@ -61,8 +63,9 @@ for (const mode of ["legacy", "room"]) {
 			replaced: all,
 			signed: all,
 		});
-		expect(report.commit!.revisionAfter).toBe((report.commit!.revisionBefore as number) + 8);
-		expect(report.commit!.revisionAfter).toBe(report.commit!.revisionSingles);
+		const commit = report.commit ?? {};
+		expect(commit.revisionAfter).toBe((commit.revisionBefore as number) + 8);
+		expect(commit.revisionAfter).toBe(commit.revisionSingles);
 		expect(report.revisionCas).toEqual({
 			ok: false,
 			code: "ISSUANCE_RETRY_REQUIRED",

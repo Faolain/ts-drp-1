@@ -114,9 +114,10 @@ function writerTimes(file: string, author: string) {
 					decodeCanonical(new Uint8Array(row.canonical_preimage as Uint8Array)) as RowValue & { logicalTime: number }
 			);
 		const fence = rows.findLastIndex((row) => row.operation.action === "$drp.author-fence.v1");
-		return fence < 0
+		const fenceRow = fence < 0 ? undefined : rows[fence];
+		return fenceRow === undefined
 			? { fenceTime: null, times: [] as number[] }
-			: { fenceTime: rows[fence]!.logicalTime, times: rows.slice(fence + 1).map((row) => row.logicalTime) };
+			: { fenceTime: fenceRow.logicalTime, times: rows.slice(fence + 1).map((row) => row.logicalTime) };
 	} finally {
 		db.close();
 	}
