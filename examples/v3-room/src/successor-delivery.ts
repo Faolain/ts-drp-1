@@ -17,7 +17,10 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  * - The creator announces each adopted offer to the room peers it knows (its live-topic peers and
  *   every peer that asked), and answers a member's request with its latest offer.
  * - A member asks the creator (the room's creator routing hint) when it binds, whenever the creator
- *   (re)connects, while a move of its waits for the next epoch, and on a slow poll. Catch-up is
+ *   (re)connects, while a move of its waits for the next epoch, and on a slow poll. A pull the
+ *   transport could not deliver (a typed dial or stream error) is retried after 1, 2, 4 and 8 s,
+ *   capped at the poll, and a creator missing from the peer list is pulled all the same (the send
+ *   dials it): a creator that goes idle after a lost announcement sends nothing more. Catch-up is
  *   pull-driven by the party that knows it is behind, so a missed announcement, a late join or a
  *   reconnect needs no creator memory of members. The creator serves only its latest successor,
  *   so a member that missed rollovers installs the latest offer directly (the install fetches the
@@ -33,6 +36,12 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  *   creator's latest offer, the same one included: the member never stops following.
  * - Material comes from the creator only (members never serve successor material), so the
  *   install's peers are the creator.
+ * - A room can adopt a successor its rollover policy never published: its own retry of an
+ *   interrupted close seals and adopts by itself, and a creator reopened from storage starts at an
+ *   epoch no offer of this page announced. A member pulling from behind the room's epoch, with no
+ *   offer for that epoch here, is reported (`onMemberBehind`); the page hands that to its policy's
+ *   `publishCurrent`, which exports the successor and publishes it through `publish`. Only a pull
+ *   reports it, never a move.
  * - Sync before sending (owner decision B): a member already at the creator's epoch gets the
  *   creator's currency statement instead (its current epoch, anchor and admitted frontiers). The
  *   member hands it to its room (`confirmCurrent`) only when it came from the creator's peer, the
@@ -64,6 +73,8 @@ const SEND_DEADLINE_MS = 10_000;
 const KNOWN_PEERS_MAX = 64;
 const FAILED_OFFERS_MAX = 8;
 const RETRY_BACKOFF_MS = [2_000, 5_000, 15_000, 30_000] as const;
+/** A member's pull the transport failed to deliver is retried after these, capped at the slow poll. */
+const PULL_RETRY_MS = [1_000, 2_000, 4_000, 8_000] as const;
 const OFFER_KIND = "ts-drp-v3-successor-offer";
 const REQUEST_KIND = "ts-drp-v3-successor-offer-request";
 const CURRENCY_KIND = "ts-drp-v3-room-currency";
@@ -218,9 +229,16 @@ export type V3RoomSuccessorDeliveryStats = Readonly<{
 	currencyAnswered: number;
 	/** Member: creator statements its room confirmed as current. */
 	currencyConfirmed: number;
+	/** Creator: pulls from a member behind a successor the room adopted with no offer published for it. */
+	behind: number;
 }>;
 
 export interface V3RoomSuccessorDeliveryHooks {
+	/**
+	 * Creator: a member pulled from behind the room's epoch, and no offer for that epoch was published
+	 * (the room adopted outside its policy). The page calls its rollover policy's `publishCurrent`.
+	 */
+	onMemberBehind?(): void;
 	onInstalled?(epoch: number): void;
 	onRefused?(error: unknown): void;
 	onError?(error: unknown): void;
@@ -455,6 +473,7 @@ export function createV3RoomSuccessorDelivery(
 		largestOfferBytes: 0,
 		currencyAnswered: 0,
 		currencyConfirmed: 0,
+		behind: 0,
 		lastError: undefined as string | undefined,
 	};
 	// Creator.
@@ -474,6 +493,8 @@ export function createV3RoomSuccessorDelivery(
 	let installing: Promise<void> | undefined;
 	let requestedAt = 0;
 	let pollTimer: ReturnType<typeof setTimeout> | undefined;
+	let pullRetryTimer: ReturnType<typeof setTimeout> | undefined;
+	let pullFailures = 0;
 	const failed: { bytes: Uint8Array; retryAt: number; failures: number }[] = [];
 	const unsubscribe: (() => void)[] = [];
 
@@ -502,14 +523,37 @@ export function createV3RoomSuccessorDelivery(
 		known.add(peerId);
 	};
 
+	// A pull the transport could not deliver (a typed dial or stream error) is retried on its own
+	// backoff, capped at the slow poll: the member is the party that knows it is behind, and the
+	// creator may stay idle (no later announcement) for good. A creator missing from the channel's
+	// peer list is pulled all the same: the send dials it.
+	const pullRetry = (): void => {
+		if (closed || pullRetryTimer !== undefined) return;
+		const wait = Math.min(pollMs, PULL_RETRY_MS[Math.min(pullFailures, PULL_RETRY_MS.length) - 1] ?? pollMs);
+		pullRetryTimer = setTimeout(() => {
+			pullRetryTimer = undefined;
+			// The backoff is this retry's rate limit.
+			requestedAt = 0;
+			request();
+		}, wait);
+	};
 	const request = (): void => {
 		if (closed || role !== "member" || room === undefined || creatorPeer === undefined) return;
 		const now = Date.now();
 		if (now - requestedAt < REQUEST_MIN_INTERVAL_MS) return;
-		if (!channel.peers().includes(creatorPeer)) return;
 		requestedAt = now;
 		stats.requested++;
-		void send(creatorPeer, encodeCanonical({ kind: REQUEST_KIND, version: 1, epoch: epoch() }, FRAME_LIMITS));
+		void send(creatorPeer, encodeCanonical({ kind: REQUEST_KIND, version: 1, epoch: epoch() }, FRAME_LIMITS)).then(
+			(sent) => {
+				if (closed) return;
+				if (sent) {
+					pullFailures = 0;
+					return;
+				}
+				pullFailures++;
+				pullRetry();
+			}
+		);
 	};
 	const poll = (): void => {
 		if (closed) return;
@@ -663,6 +707,14 @@ export function createV3RoomSuccessorDelivery(
 		if (frame.kind === "request") {
 			if (role !== "creator") return;
 			remember(sender);
+			if (frame.epoch < epoch() && (latest?.successorEpoch ?? 0) < epoch()) {
+				stats.behind++;
+				try {
+					hooks.onMemberBehind?.();
+				} catch (error) {
+					report(error);
+				}
+			}
 			const now = Date.now();
 			const newer = latest !== undefined && latest.successorEpoch > frame.epoch;
 			// Sync before sending: a member at this creator's epoch learns that it is current.
@@ -815,6 +867,7 @@ export function createV3RoomSuccessorDelivery(
 						viewAnsweredAt.delete(peerId);
 						if (peerId === creatorPeer) {
 							requestedAt = 0;
+							pullFailures = 0;
 							request();
 						}
 					})
@@ -852,6 +905,7 @@ export function createV3RoomSuccessorDelivery(
 			closed = true;
 			lifetime.abort(new TypeError("v3 room successor delivery is closed"));
 			if (pollTimer !== undefined) clearTimeout(pollTimer);
+			if (pullRetryTimer !== undefined) clearTimeout(pullRetryTimer);
 			for (const timer of viewDeferred.values()) clearTimeout(timer);
 			viewDeferred.clear();
 			for (const stop of unsubscribe.splice(0)) stop();

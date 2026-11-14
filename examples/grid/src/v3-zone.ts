@@ -736,6 +736,8 @@ export function createV3ZoneApi(
 				openV3RoomSuccessorDelivery(node, objectId, creatorFinalitySigner === undefined ? "member" : "creator", {
 					onError: (error) => console.warn("v3 zone successor delivery failed; it is retried", error),
 					onRefused: (error) => console.warn("v3 zone successor offer was refused", error),
+					// A successor the room adopted outside the policy (its own close retry) is published on a member's pull.
+					onMemberBehind: () => void rollover?.publishCurrent(),
 				});
 			delivery = openDelivery(selectedZoneId);
 			// Only the creator, which holds the finality signer, seals.

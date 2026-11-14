@@ -784,6 +784,8 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 					hooks: {
 						onError: (error) => console.warn("v3 chat successor delivery failed; it is retried", error),
 						onRefused: (error) => console.warn("v3 chat successor offer was refused", error),
+						// A successor the room adopted outside the policy (its own close retry) is published on a member's pull.
+						onMemberBehind: () => void policy?.publishCurrent(),
 					},
 				});
 	const policy =

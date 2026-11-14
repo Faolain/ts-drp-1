@@ -230,6 +230,8 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 			{
 				onError: (error) => console.warn("Canvas successor delivery failed; it is retried", error),
 				onRefused: (error) => console.warn("Canvas successor offer was refused", error),
+				// A successor the room adopted outside the policy (its own close retry) is published on a member's pull.
+				onMemberBehind: () => void rollover?.publishCurrent(),
 			}
 		);
 		delivery = successors;

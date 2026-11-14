@@ -424,6 +424,8 @@ async function openSession(
 		{
 			onError: (error) => console.warn("Chat successor delivery failed; it is retried", error),
 			onRefused: (error) => console.warn("Chat successor offer was refused", error),
+			// A successor the room adopted outside the policy (its own close retry) is published on a member's pull.
+			onMemberBehind: () => void policy?.publishCurrent(),
 		}
 	);
 	// Only the creator's first open holds the finality signer, so only it seals. An observer issues
