@@ -477,7 +477,15 @@ it("grid with a writer: a creator move refused close-pending and offered again w
 // and re-checks it after host turns. A creator move made inside that window (held open here by the
 // test seam at the first fence quote after the failure) must not fail the adoption.
 it("grid with a writer: a creator move made while the retried adoption sizes its epoch fence leaves the adoption and the move accepted", async () => {
-	const restore = await installEnvironment("node", () => undefined);
+	// The successor fence clock each census preview saw, and the clock each fence was issued with.
+	const previews: { key: string; at: number }[] = [];
+	const fences = new Map<string, number>();
+	const restore = await installEnvironment("node", (event) => {
+		if (event.kind === "successor-settlement-preview")
+			previews.push({ key: `${String(event.author)}@${String(event.successorEpoch)}`, at: event.fenceLogicalTime as number });
+		if (event.kind === "author-fence-issued")
+			fences.set(`${String(event.author)}@${String(event.epoch)}`, event.logicalTime as number);
+	});
 	const fault: RoleSourceFault = {
 		skip: 2,
 		fail: 1,
@@ -514,6 +522,14 @@ it("grid with a writer: a creator move made while the retried adoption sizes its
 		process.stdout.write(`FAILED_CLOSE_FENCE ${JSON.stringify({ injected: fault.injected, heldEpochs, errors: policy?.errors })}\n`);
 		expect(fault.injected, "the fault fired in a close").toHaveLength(1);
 		expect(heldEpochs, "the retried adoption's fence quote was held").toHaveLength(1);
+		// No issued fence takes a clock below one previewed for it: the census charges the clock
+		// at full width, and the fence takes the room's current (monotonic) clock.
+		const compared = previews.filter((preview) => fences.has(preview.key));
+		process.stdout.write(`FAILED_CLOSE_FENCE_CLOCKS ${JSON.stringify({ previews: previews.length, compared: compared.length,
+			below: compared.filter((preview) => (fences.get(preview.key) ?? 0) < preview.at) })}\n`);
+		expect(compared.length, "previewed fences that were issued").toBeGreaterThan(0);
+		for (const preview of compared)
+			expect(fences.get(preview.key), `fence clock ${preview.key}`).toBeGreaterThanOrEqual(preview.at);
 	} finally {
 		roleSourceFault.armed = undefined;
 		delete seam.__creatorFenceQuoteHold;

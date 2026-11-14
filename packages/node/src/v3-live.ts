@@ -14286,6 +14286,13 @@ function previewCreatorOrdinarySuccessorSettlement(input: Readonly<{
 	// readout's value), so only the plan is sizing input. The room clock may advance after
 	// this quote: a creator move takes the next logical time as it passes the barriers, even
 	// one an adoption then holds. A re-read plan must be the same; its clock only stays valid.
+	try {
+		// Diagnostic observer only: the previewed successor fence clock, never sizing or authority.
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({kind: "successor-settlement-preview", author: scope.author, successorEpoch: epoch + 1,
+				fenceLogicalTime: readout.fenceLogicalTime});
+	} catch { /* Observation cannot alter the preview. */ }
 	const planBytes = encodeCanonical(readout.plan);
 	return ObjectFreeze({plan, checkPreview: () => {
 		const current = preview(previewInput);
@@ -17293,7 +17300,16 @@ async function issueAuthorFence(
 		false,
 		ObjectFreeze({ kind: "fence" as const })
 	);
-	if (issued.ok) await drainPendingIngress(registration);
+	if (issued.ok) {
+		// Diagnostic observer only: the clock this fence was issued with, never authority.
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({kind: "author-fence-issued", author: registration.issuanceScope.author,
+					epoch: registration.payload.provenance.epoch, logicalTime: fenceLogicalTime});
+		} catch { /* Observation cannot alter the issued fence. */ }
+		await drainPendingIngress(registration);
+	}
 	return issued;
 }
 
