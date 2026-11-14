@@ -13260,6 +13260,9 @@ function closedJournalFenceHorizonCapacityForSizing(
 	});
 }
 
+/** Typed refusal: an admission's journal postimage did not grow over its capture. */
+export const JOURNAL_POSTIMAGE_NOT_GROWN = "MAINTENANCE_JOURNAL_POSTIMAGE_NOT_GROWN";
+
 /**
  * Width of the drain plan that will retire this epoch's own rows (closedJournalDrainPlanCarriers(...).plan), the
  * single-epoch plan bound readiness checks against the close's one encode cap. The install source, the classifier
@@ -13273,13 +13276,17 @@ function closedJournalFenceHorizonCapacityForSizing(
  * @param input - The captured journal, this admission's afterLocal frame widths and appends, and the local author.
  * @returns The plan's canonical width (a width error past the codec's own bounds refuses, as every width does).
  */
-function closedJournalCurrentEpochPlanWidthForSizing(input: Readonly<{
+export function closedJournalCurrentEpochPlanWidthForSizing(input: Readonly<{
 	canonicalRows: readonly Uint8Array[]; currentScope: LiveJournalScope; afterLocalCanonicalRowBytes: readonly number[];
 	appendCount: number; appendReceived: boolean; author: string;
 }>): number {
 	const scope = input.currentScope, key = JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]);
 	const before = input.canonicalRows.reduce((total, raw) => total + raw.byteLength, 0);
 	const after = input.afterLocalCanonicalRowBytes.reduce((total, length) => total + length, 0);
+	// An append only adds rows. A postimage no larger than its capture (an open drain checkpoint
+	// whose plan the postimage applies, or a capture that no longer describes the journal) is not a
+	// width this admission can bound: fail closed, typed, before any frame is read.
+	if (after <= before) throw new TypeError(`${JOURNAL_POSTIMAGE_NOT_GROWN}:${before}:${after}`);
 	const group = creatorOrdinaryJournalDescriptorGroupsForSizing(creatorOrdinaryNativeJournalFrames(input.canonicalRows), key,
 		{count: input.appendCount, frameByteLength: Math.max(0, after - before),
 			sourceKind: input.appendReceived ? "received" : "local-issued"}).get(key)!;

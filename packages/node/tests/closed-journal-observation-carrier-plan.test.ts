@@ -9,6 +9,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { ISSUANCE_RETIREMENT_LIMITS } from "../../issuance-store/src/retirement.js";
+import { JOURNAL_POSTIMAGE_NOT_GROWN } from "../src/internal/creator-closed-rollback-data.js";
 
 // fix/maintenance-image-capacity C1: the journal observation carrier {control, image, canonicalRows} is one encode
 // under the close's 786,432-byte cap (CLOSED_RETIREMENT_BYTES, the one-bound rule). A drain control carries its plan,
@@ -22,7 +23,8 @@ const source = readFileSync(new URL("../src/internal/creator-closed-rollback-dat
 const parsed = ts.createSourceFile("creator-closed-rollback-data.ts", source, ts.ScriptTarget.Latest, true);
 function declaration(name: string): string | undefined {
 	const found = parsed.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name);
-	return found?.getText(parsed);
+	// The owner's declaration is compiled into a function body here, where an `export` modifier cannot stand.
+	return found?.getText(parsed).replace(/^export\s+/u, "");
 }
 // The owner's carrier function and whatever helpers it uses, compiled from the owner's own declarations.
 const OWNERS = ["creatorIssuanceMaintenanceObservationCarriers", "closedJournalObservationControl", "closedJournalDrainPlanCarriers",
@@ -237,8 +239,10 @@ describe("single-epoch plan bound (readiness, same owner as the carrier)", () =>
 		"maintenanceCanonicalWidth", "maintenanceCanonicalCapacityWidth", "maintenanceWidthSum", "maintenanceVarUintWidth", "closedRetirementBytes"], {
 		decodeCanonical, encodeCanonical, CLOSED_RETIREMENT_BYTES: CAP, AHE_BOUNDED_READ_LIMITS, ISSUANCE_RETIREMENT_LIMITS,
 		LIVE_JOURNAL_RETIREMENT_LIMITS, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: LOCAL_WORKLOAD_CAPACITY.maintenanceProofBytes,
-		maintenanceWidthAtom: Symbol("maintenance-width") });
-	const width = (rows: readonly Uint8Array[], scope: (typeof scopes)[number], appendReceived = false, appendFrame = 0) =>
+		maintenanceWidthAtom: Symbol("maintenance-width"), JOURNAL_POSTIMAGE_NOT_GROWN });
+	// An append always adds a row of positive width (a postimage that did not grow refuses typed); a local row is planned by
+	// reference, so its frame width does not change the plan width and the default is just a real row's width.
+	const width = (rows: readonly Uint8Array[], scope: (typeof scopes)[number], appendReceived = false, appendFrame = rows.at(-1)!.byteLength) =>
 		sizing.closedJournalCurrentEpochPlanWidthForSizing({ canonicalRows: rows, currentScope: scope,
 			afterLocalCanonicalRowBytes: [...rows.map(bytes => bytes.byteLength), appendFrame], appendCount: 1, appendReceived,
 			author: "creator" }) as number;
