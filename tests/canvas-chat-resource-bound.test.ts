@@ -26,6 +26,7 @@ import {
 	toCanvasWireOperation,
 } from "../packages/blueprints/src/v3-canvas.js";
 import { createV3CanvasApplication } from "../packages/node/src/applications/canvas.js";
+import { ROOM_APPLICATION_STATE_BYTES } from "../packages/node/src/v3-live.js";
 import type { V3RoomProjectionInput } from "../packages/node/src/v3-room.js";
 
 type V3RoomProjectionInputRow = V3RoomProjectionInput["currentEpochOperations"][number];
@@ -764,4 +765,68 @@ describe("Incremental projection quotes after real admitted operations", () => {
 		},
 		60_000
 	);
+});
+
+// Room state limit (fix/outcome-commit-room-state-bound). Each node's admission refuses a move whose
+// application bound passes the room's limit L, but only when the bound's base quote is within L; a
+// bound above L before any move cannot decide the room's moves and the exact fold judges them instead
+// (v3-live seedApplicationStateBound). Canvas and Chat bounds are constants, so this pins each one on
+// its side of L: a constant within L is used (it then admits every move, sound only because it
+// dominates every state the application's capture accepts, tested above); a constant above L is
+// disabled. A change to either constant, or to L, must land on purpose.
+describe("Canvas and Chat constant bounds against the room's application state limit", () => {
+	it.each([
+		[10, 10, "used"],
+		[32, 32, "used"],
+		[40, 40, "disabled"],
+		[64, 64, "disabled"],
+	] as const)("Canvas %ix%i: the widest-state constant is %s", (width, height, expected) => {
+		const application = createV3CanvasApplication(width, height);
+		const descriptor = createV3CanvasDescriptor(width, height);
+		const initial = descriptor.canonicalStateBytes(descriptor.initialState);
+		const projection = createProjectionOf(application.readOrdinaryApplicationResourceBound!)(
+			roomInput({ catalog: catalogInput(application.catalog), material: projectionMaterial([initial]) } as never)
+		);
+		const quoted = projection?.quoteWithoutApplicationCandidate()?.byteLength;
+		expect(quoted).toBeDefined();
+		const widest = descriptor.canonicalStateBytes(widestCanvas(width, height)).byteLength;
+		console.log(`CANVAS_ROOM_BOUND ${JSON.stringify({ width, height, quoted, widest, limit: ROOM_APPLICATION_STATE_BYTES })}`);
+		if (expected === "used") {
+			expect(quoted!).toBeLessThanOrEqual(ROOM_APPLICATION_STATE_BYTES);
+			// It admits every move: the widest state the capture admits is within it, so within L.
+			expect(widest).toBeLessThanOrEqual(quoted!);
+			expect(projection?.quote({ action: "paint", offset: [0, 0], rgb: [255, 255, 255] })?.byteLength).toBe(quoted);
+		} else {
+			expect(quoted!).toBeGreaterThan(ROOM_APPLICATION_STATE_BYTES);
+		}
+	});
+
+	it("Chat: every format's capture ceiling is within the limit and dominates its full states", async () => {
+		for (const format of ["lifetime", "window", "shares"] as const) {
+			const catalog = SHIPPING_CHAT_CATALOGS[format];
+			const application = await createShippingV3ChatApplication({
+				catalog: catalog.catalog,
+				blueprintDigest: catalog.blueprintDigest,
+				exactCanonicalGenesisLatchedAclBytes: chatAcl(),
+			});
+			const genesis = application.createGenesisApplicationStateBytes({
+				objectId: CHAT_OBJECT,
+				exactCanonicalLatchedAclBytes: chatAcl(),
+			});
+			installChatPolicy(application, chatAcl());
+			const projection = createProjectionOf(application.readOrdinaryApplicationResourceBound!)({
+				catalog: catalogInput(application.catalog),
+				material: projectionMaterial([genesis]),
+			});
+			const quoted = projection?.quoteWithoutApplicationCandidate()?.byteLength;
+			console.log(`CHAT_ROOM_BOUND ${JSON.stringify({ format, quoted, limit: ROOM_APPLICATION_STATE_BYTES })}`);
+			expect(quoted, format).toBe(SHIPPING_CHAT_RETAINED_BYTES);
+			expect(quoted!, format).toBeLessThanOrEqual(ROOM_APPLICATION_STATE_BYTES);
+		}
+		// The lifetime capture refuses any state past the ceiling (so the used constant dominates).
+		const { genesis } = await shippingChat();
+		const full = fullChatStates(genesis, "x".repeat(200));
+		expect(full.length).toBeGreaterThan(0);
+		for (const bytes of full) expect(bytes.byteLength).toBeLessThanOrEqual(SHIPPING_CHAT_RETAINED_BYTES);
+	}, 60_000);
 });

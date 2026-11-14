@@ -799,6 +799,9 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 						publishSuccessor: (offer, epoch): Promise<void> => delivery.publish(offer, epoch),
 						requestSuccessor: () => delivery.request(),
 						creatorReachable: () => delivery.creatorReachable(),
+						// A given-back message the room refused again for good (its state limit or admission policy).
+						onDeclined: (declined) =>
+							console.warn(`v3 chat: a message that did not reach the host was dropped: ${declined.message}`, declined.operation),
 						onError: (error) => console.warn("v3 chat rollover failed; it is retried", error),
 					},
 				});

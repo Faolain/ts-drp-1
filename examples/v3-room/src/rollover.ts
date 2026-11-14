@@ -1,5 +1,10 @@
 import { decodeCanonical } from "@ts-drp/canonical";
-import { isV3RoomClosePendingRefusal, V3RoomAwaitingAuthorFence, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
+import {
+	isV3RoomClosePendingRefusal,
+	V3RoomAwaitingAuthorFence,
+	V3RoomHandBackRefused,
+	V3RoomLocalBacklogFull,
+} from "@ts-drp/node/v3-room";
 import type {
 	V3RoomAcceptedVertex,
 	V3RoomHandBack,
@@ -73,6 +78,13 @@ export interface V3RoomRolloverHooks {
 	 * offered again once the creator is back and the room has installed a later epoch.
 	 */
 	creatorReachable?(): boolean;
+	/**
+	 * Member: a move the room gave back was offered again and refused for a lasting reason (the room's
+	 * application state limit, or its admission policy): the policy declined it (the room drops its
+	 * record, so it holds no backlog slot and is never offered again). The page tells the user the move
+	 * did not happen. Called once per declined move.
+	 */
+	onDeclined?(declined: V3RoomMoveDeclined): void;
 	/**
 	 * An application refusal that a rollover clears (Chat: its allowance is per checkpoint).
 	 * Native capacity refusals are recognised without it.
@@ -286,11 +298,53 @@ export class V3RoomAwaitingFence extends Error {
 	}
 }
 
+/**
+ * A move the room gave back (settlementStatus().undelivered) that this policy offered again and the
+ * room refused for a lasting reason (`reason`: "application-state-limit" or "admission-rejected"; the
+ * room's V3RoomHandBackRefused is the `cause`). Offering it again would be refused again, so the policy
+ * declined it (V3RoomSession.declineHandBack): it is not kept and never sent. The page tells the user
+ * (hooks.onDeclined).
+ */
+export class V3RoomMoveDeclined extends Error {
+	/**
+	 * @param operation - The given-back move that was declined.
+	 * @param epoch - The epoch it was refused in.
+	 * @param reason - Why the room refused it.
+	 * @param options - The room's refusal as `cause`.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly reason: "application-state-limit" | "admission-rejected",
+		options?: ErrorOptions
+	) {
+		super(
+			reason === "application-state-limit"
+				? "the room's state limit refused this given-back move; it was declined and is not sent"
+				: "the room's admission policy refused this given-back move; it was declined and is not sent",
+			options
+		);
+		this.name = "V3RoomMoveDeclined";
+	}
+}
+
+/**
+ * The room's refusal of a given-back move offered with its record, with its lasting reason, if any.
+ * @param error - The refusal.
+ * @returns The refusal, when it is one.
+ */
+function handBackRefusal(error: unknown): V3RoomHandBackRefused | undefined {
+	if (error instanceof V3RoomHandBackRefused) return error;
+	if (error instanceof Error && error.name === "V3RoomHandBackRefused" && typeof Reflect.get(error, "handBack") === "object")
+		return error as V3RoomHandBackRefused;
+	return undefined;
+}
+
 type RolloverRoom = Pick<
 	V3RoomSession,
 	"adoptCreatorSuccessor" | "authority" | "exportCreatorSuccessor" | "issue" | "sealEpoch"
 > &
-	Partial<Pick<V3RoomSession, "settlementStatus" | "onAdopted">>;
+	Partial<Pick<V3RoomSession, "settlementStatus" | "onAdopted" | "declineHandBack">>;
 
 export interface V3RoomRolloverPolicy {
 	/** "creator" seals; a "member" (Writer) never seals and only re-offers refused moves. */
@@ -982,6 +1036,8 @@ export function createV3RoomRolloverPolicy(
 		} catch (error) {
 			if (error instanceof V3RoomNotReachingHost) return "stop-new";
 			if (error instanceof V3RoomBusy) return "stop-all";
+			// A given-back move refused for a lasting reason was declined and told to the page (onDeclined).
+			if (error instanceof V3RoomMoveDeclined) return "next";
 			// A move refused again for want of a successor (or while read-only) is kept again by issue().
 			if (error instanceof V3RoomSuccessorUnavailable) return "next";
 			if (error instanceof V3RoomReadOnly) {
@@ -1101,6 +1157,24 @@ export function createV3RoomRolloverPolicy(
 				return;
 			} catch (error) {
 				if (closed) throw error;
+				const refused = handBackRefusal(error);
+				if (refused?.reason !== undefined) {
+					// A given-back move refused for a lasting reason: offering it again would be refused again,
+					// and its record would hold a backlog slot for good. Decline it and tell the page.
+					handBackOf.delete(operation);
+					try {
+						await selected.declineHandBack?.(refused.handBack);
+					} catch (declineError) {
+						hooks.onError?.(declineError);
+					}
+					const declined = new V3RoomMoveDeclined(operation, attempted, refused.reason, { cause: error });
+					try {
+						hooks.onDeclined?.(declined);
+					} catch (hookError) {
+						hooks.onError?.(hookError);
+					}
+					throw declined;
+				}
 				if (
 					error instanceof V3RoomLocalBacklogFull ||
 					(error instanceof Error && error.name === "V3RoomLocalBacklogFull")

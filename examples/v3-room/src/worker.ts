@@ -14,6 +14,7 @@ import { DRPError } from "@ts-drp/errors";
 import {
 	V3RoomAdoptionHoldExpired,
 	V3RoomAwaitingAuthorFence,
+	V3RoomHandBackRefused,
 	V3RoomLocalBacklogFull,
 	V3RoomNotYetCurrent,
 	V3RoomSuccessorInstallExpired,
@@ -27,6 +28,7 @@ import {
 	V3RoomBusy,
 	V3RoomKeptMoveRefused,
 	V3RoomKeptMoveSuperseded,
+	V3RoomMoveDeclined,
 	V3RoomNotReachingHost,
 	V3RoomReadOnly,
 	V3RoomSuccessorUnavailable,
@@ -46,6 +48,8 @@ export const V3_ROOM_WORKER_ERROR_CODECS: readonly RoomWorkerErrorCodec[] = Obje
 	errorCodec("V3RoomBusy", V3RoomBusy),
 	errorCodec("V3RoomKeptMoveRefused", V3RoomKeptMoveRefused),
 	errorCodec("V3RoomKeptMoveSuperseded", V3RoomKeptMoveSuperseded),
+	errorCodec("V3RoomHandBackRefused", V3RoomHandBackRefused),
+	errorCodec("V3RoomMoveDeclined", V3RoomMoveDeclined),
 	errorCodec("V3RoomPlayerDatabaseMigrationUnavailable", V3RoomPlayerDatabaseMigrationUnavailable),
 	// DRPError carries a symbol brand (isDRPError) a data copy cannot restore: rebuild it.
 	errorCodec("DRPError", DRPError, {

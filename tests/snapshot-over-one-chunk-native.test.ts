@@ -4,12 +4,19 @@ import { closeFixtures } from "./fixtures/track-m/room-retention-fixture.js";
 import { settlementDelivery, type SettlementRoom } from "./fixtures/track-m/settlement-room.js";
 import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
 
-// RED (room state limit, finding C), native: a room whose successor snapshot payload passes one
-// chunk (131,072 bytes) can never seal again, and no member could install it. The creator's own
-// sealEpoch refuses its chunks ("snapshot chunk carrier is invalid"), because the producer cut them
-// with subarray. Here a Grid room grows by eight 1,000-byte blocks per epoch until its state passes
-// 131,072 bytes; then a Writer whose store has never seen the room installs the successor from its
-// snapshot (the cold-join path).
+// Snapshot over one chunk (finding C), native, under the room state limit (finding B).
+//
+// Finding C: a room whose successor snapshot payload passed one chunk (131,072 bytes) could never seal
+// again (the producer cut its chunks with subarray). C's fix makes chunks full-buffer carriers; its unit
+// test keeps covering the multi-chunk carrier (packages/protocol-v3).
+//
+// Under B a room that declares no state limit (every legacy room) has the legacy limit, 32,768 bytes,
+// enforced when a move is admitted. So such a room cannot reach a snapshot over one chunk: here a Grid
+// room grows by eight 1,000-byte blocks per epoch, its creator's crossing move is refused at L, every
+// epoch still seals and adopts, and a cold Writer installs the last successor from its snapshot.
+//
+// The multi-chunk native path returns with the room state tier track: a cold Writer installs a
+// snapshot over 128 KiB in a room declaring a larger tier.
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
@@ -17,41 +24,50 @@ afterEach(async () => {
 
 const PER_EPOCH = 8;
 const ID_BYTES = 1000;
-const STATE_TARGET = 140_000;
+const LIMIT = 32_768;
+const CHUNK_BYTES = 131_072;
+const LIMIT_ERROR = /application state limit/u;
 
-it("a creator seals and adopts successors whose snapshot passes one chunk, and a cold Writer installs one", async () => {
+it("a legacy room is refused at its 32 KiB state limit before any snapshot passes one chunk; a cold Writer installs it", async () => {
 	const fixture = await readinessHoldRoom();
 	const creator = await fixture.open(0);
 	const stateBytes = (): number => new TextEncoder().encode(JSON.stringify(creator.room.projection().blocks)).byteLength;
 	let epoch = 0;
-	let failure: string | undefined;
-	while (failure === undefined && stateBytes() < STATE_TARGET && epoch < 30) {
-		for (let index = 0; index < PER_EPOCH; index++) {
-			const ordinal = epoch * PER_EPOCH + index;
-			const id = `${String(ordinal).padStart(5, "0")}-${"b".repeat(ID_BYTES)}`;
-			await creator.room.issue({ action: "placeBlock", id, kind: "stone", x: ordinal % 16, y: epoch });
+	let placed = 0;
+	let refusal: string | undefined;
+	const failures: string[] = [];
+	while (refusal === undefined && epoch < 30) {
+		for (let index = 0; index < PER_EPOCH && refusal === undefined; index++) {
+			const id = `${String(placed).padStart(5, "0")}-${"b".repeat(ID_BYTES)}`;
+			try {
+				await creator.room.issue({ action: "placeBlock", id, kind: "stone", x: placed % 16, y: epoch });
+				placed++;
+			} catch (error) {
+				refusal = error instanceof Error ? error.message : String(error);
+			}
 		}
 		try {
 			const sealed = await creator.room.sealEpoch();
 			expect((sealed as { ok?: boolean }).ok, JSON.stringify(sealed)).toBe(true);
 			await creator.room.adoptCreatorSuccessor();
 		} catch (error) {
-			failure = `epoch ${epoch} at ${stateBytes()} state bytes: ${error instanceof Error ? error.message : String(error)}`;
+			failures.push(`epoch ${epoch} at ${stateBytes()} state bytes: ${error instanceof Error ? error.message : String(error)}`);
 		}
 		epoch++;
 	}
-	console.log(`SNAPSHOT_OVER_ONE_CHUNK ${JSON.stringify({ epoch, stateBytes: stateBytes(), failure })}`);
-	expect(failure, "every successor is sealed and adopted").toBeUndefined();
-	expect(stateBytes()).toBeGreaterThan(131_072);
+	console.log(`SNAPSHOT_LEGACY_LIMIT ${JSON.stringify({ epoch, placed, stateBytes: stateBytes(), refusal, failures })}`);
+	expect(refusal, "the crossing move is refused at the legacy limit").toMatch(LIMIT_ERROR);
+	expect(failures, "every successor is sealed and adopted").toEqual([]);
 	expect(creator.room.authority()?.epoch).toBe(epoch);
+	// The blocks alone stay within the limit, far below one chunk.
+	expect(stateBytes()).toBeLessThanOrEqual(LIMIT);
+	expect(LIMIT).toBeLessThan(CHUNK_BYTES);
 
 	// The cold Writer opens only now: its store holds nothing of this room past genesis.
 	const writer = await fixture.open(1);
 	const transfer = await settlementDelivery(fixture as unknown as SettlementRoom);
-	// This successor's state is at least the one whose seal refused its chunks before the fix, so its
-	// snapshot spans more than one chunk.
 	Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
 	await writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
 	expect(writer.room.authority()?.epoch).toBe(epoch);
-	expect(writer.room.projection().blocks.length).toBe(epoch * PER_EPOCH);
+	expect(writer.room.projection().blocks.length).toBe(placed);
 }, 900_000);

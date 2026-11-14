@@ -8256,7 +8256,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 			TypedArrayBufferGetter: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), "buffer")!.get,
 			ObjectGetPrototypeOf: Object.getPrototypeOf, ObjectPrototype: Object.prototype, ReflectOwnKeys: Reflect.ownKeys,
 			ObjectCreate: Object.create, ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
-			settlementProfileFor, APPLICATION_BATCH_ACTION: "applicationBatch", APPLICATION_BATCH_LIMITS: {maxBytes: 65536, maxDepth: 8, maxItems: 1024},
+			settlementProfileFor, APPLICATION_BATCH_ACTION: "applicationBatch", APPLICATION_BATCH_LIMITS: {maxBytes: 65536, maxDepth: 8, maxItems: 1024}, ROOM_APPLICATION_STATE_BYTES: 32_768,
 			ordinaryPreviewAppendCandidate: (_registration: unknown, bytes: Uint8Array) => ({bytes: bytes.slice(), digest: new Uint8Array(32),
 				scope: {objectId: "room", epoch: 3, anchorDigest: "a".repeat(64), author: "1".repeat(64)}, sequence: 1}),
 			isDigestHex: (value: string) => /^[a-f0-9]{64}$/u.test(value), detachedCanonicalOperation: (value: unknown) => value,
@@ -8445,7 +8445,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 		expect(readout).toBeDefined(); expect(Object.keys(readout!)).toEqual([]); expect(Object.isFrozen(readout)).toBe(true);
 		const facts = f.resolve(readout, f.proof, f.unsignedBytes)!;
 		expect(facts.current.candidate.exactCanonicalUnsignedVertexBytes).toEqual(f.unsignedBytes);
-		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(268435456); // No fixture-size theorem.
+		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(32_768); // The room's application state limit, never the snapshot bound.
 		expect(facts.current.parameters.snapshotChunkBytes).toBe(65536); // Exact supplied original parameter, never a fixed inferred chunk size.
 		expect(facts.current.successorFenceCount).toBe(0); expect(facts.current.nativeCounts.lineages).toBe(1);
 		expect(facts.current.blueprint.catalog.exactArtifactBytes).toEqual(Uint8Array.of(9));

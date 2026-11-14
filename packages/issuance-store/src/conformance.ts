@@ -275,7 +275,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		if ((current?.revision ?? null) !== captured.expectedRevision) {
 			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 		}
-		assertSettlementPlanProgressTransition(current ?? null, captured.plan);
+		assertSettlementPlanProgressTransition(current ?? null, captured.plan, captured.declineHandBack);
 		assertSettlementExpiryPublicationExclusive(captured.plan, captured.plan.entries.flatMap(entry => {
 			const row = this.#outbox.get(recordKey(captured.scope, entry.sourceSequence));
 			return row === undefined ? [] : [{authorSequence: entry.sourceSequence, publishState: row.publishState}];

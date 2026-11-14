@@ -250,12 +250,24 @@ export type CreatorOrdinaryApplicationResourceProjectionInput = Readonly<{
 	catalog: CreatorOrdinaryApplicationResourceBoundInput["catalog"];
 	material: Omit<CreatorOrdinaryApplicationResourceBoundInput["material"], "candidateOperation">;
 }>;
+/** The resumable form of createIncrementalProjection over the SAME input: step consumes at most about
+ * `byteBudget` more base bytes per call (true once the whole material is captured), and finish returns
+ * exactly the projection createIncrementalProjection returns for that input (undefined where it does).
+ * A seed that throws, or is abandoned, grants nothing. */
+export type CreatorOrdinaryApplicationResourceProjectionSeed = Readonly<{
+	step(byteBudget: number): boolean;
+	finish(): CreatorOrdinaryApplicationResourceProjection | undefined;
+}>;
 export type CreatorOrdinaryApplicationResourceBoundReader =
 	((input: CreatorOrdinaryApplicationResourceBoundInput) => CanonicalResourceFootprint | undefined) & Readonly<{
 		/** Optional SAME catalog-bound resource theorem; absent/unsupported always
 		 * uses the original complete-material callback. No wire/profile change. */
 		createIncrementalProjection?: (input: CreatorOrdinaryApplicationResourceProjectionInput) =>
 			CreatorOrdinaryApplicationResourceProjection | undefined;
+		/** Optional resumable form of createIncrementalProjection (same input, same result), so a room
+		 * seeds its state bound in bounded turns. Absent: the room seeds with createIncrementalProjection. */
+		beginIncrementalProjection?: (input: CreatorOrdinaryApplicationResourceProjectionInput) =>
+			CreatorOrdinaryApplicationResourceProjectionSeed | undefined;
 	}>;
 export type CreatorOrdinaryIssuanceRuntimeLifetime = Readonly<{
 	readonly plane: object;
