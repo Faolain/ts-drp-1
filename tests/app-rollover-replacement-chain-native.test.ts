@@ -61,6 +61,10 @@ afterEach(async () => {
 type RowValue = { epoch: number; author: string; authorSequence: number; operation: Record<string, unknown> };
 const rowValue = (row: WireRow) => decodeCanonical(fromBase64(row.preimage)) as RowValue;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const defined = <T>(value: T | undefined, what: string): T => {
+	if (value === undefined) throw new Error(`replacement-chain model: ${what} is not set up`);
+	return value;
+};
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
 // A batched row (applicationBatch) carries several moves.
 const movesOf = (operation: unknown): string[] => {
@@ -104,7 +108,12 @@ async function openPair(directory: string, member: MemberHooks) {
 	return { creator, writer };
 }
 
-/** The scripted row wire: each side's rows reach the other only in the receiver's current epoch. */
+/**
+ * The scripted row wire: each side's rows reach the other only in the receiver's current epoch.
+ * @param creator - The creator's endpoint.
+ * @param writer - The member's endpoint.
+ * @returns The two carries (creator to member, member to creator).
+ */
 function rowWire(creator: RoleEndpoint, writer: RoleEndpoint) {
 	const cursor = { creator: null as number | null, writer: null as number | null };
 	const carry = async (from: RoleEndpoint, to: RoleEndpoint, key: "creator" | "writer") => {
@@ -123,7 +132,14 @@ function rowWire(creator: RoleEndpoint, writer: RoleEndpoint) {
 	};
 }
 
-/** Creator moves (with the creator's rows carried to the Writer) until its policy rolls the epoch. */
+/**
+ * Creator moves (with the creator's rows carried to the Writer) until its policy rolls the epoch.
+ * @param creator - The creator's endpoint.
+ * @param carry - Carries the creator's rows to the member after each move.
+ * @param ordinal - The creator's move counter.
+ * @param ordinal.next - The next move's ordinal.
+ * @returns The creator's epoch after the roll.
+ */
 async function rollCreator(creator: RoleEndpoint, carry: () => Promise<void>, ordinal: { next: number }) {
 	const before = (await creator.rollover?.())?.epoch ?? 0;
 	for (;;) {
@@ -216,7 +232,7 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 
 	const advance = async (ticks: number, install: number | null) => {
 		clock.tick += ticks;
-		while (clock.tick >= clock.nextRoll) await rollNow!(install);
+		while (clock.tick >= clock.nextRoll) await defined(rollNow, "the creator's roll")(install);
 	};
 
 	try {
@@ -264,7 +280,9 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 							// those the policy has not yet offered again (timer-driven, so this one varies run to run).
 							record.expired = await expiredNow?.();
 							record.givenBack = (await policyIdleNow?.())?.undelivered;
-							process.stdout.write(`SLOW_MEMBER_CHAIN_INSTALL ${JSON.stringify({ ...record, creator: model.creatorEpoch })}\n`);
+							process.stdout.write(
+								`SLOW_MEMBER_CHAIN_INSTALL ${JSON.stringify({ ...record, creator: model.creatorEpoch })}\n`
+							);
 						}
 					},
 				};
@@ -277,7 +295,7 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 				if (drain && !install.baseCharged) {
 					install.baseCharged = true;
 					// The player keeps moving while the install runs; the room holds the moves until it ends.
-					if (install.index < MOVING_INSTALLS) makeMoves!();
+					if (install.index < MOVING_INSTALLS) defined(makeMoves, "the member's moves")();
 					await advance(INSTALL_BASE, install.index);
 				}
 				const order = signOrder++;
@@ -318,9 +336,14 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 				if (page.length === 0) return;
 				for (const row of page) {
 					const value = rowValue(row);
-					own.push({ sequence: value.authorSequence, epoch: value.epoch, digest: row.digest, moves: movesOf(value.operation) });
+					own.push({
+						sequence: value.authorSequence,
+						epoch: value.epoch,
+						digest: row.digest,
+						moves: movesOf(value.operation),
+					});
+					ownCursor = row.authorSequence;
 				}
-				ownCursor = page.at(-1)!.authorSequence;
 			}
 		};
 		readOwnNow = readOwn;
@@ -354,7 +377,8 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 					}
 				});
 				if (offered) return;
-				if (performance.now() > deadline) throw new Error(`the creator's offer for epoch ${epoch} never reached the member`);
+				if (performance.now() > deadline)
+					throw new Error(`the creator's offer for epoch ${epoch} never reached the member`);
 				await sleep(20);
 			}
 		};
@@ -364,7 +388,7 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 				model.violations.push(`creator at ${observed}, model at ${model.creatorEpoch} (tick ${clock.nextRoll})`);
 			// The member's committed rows of the creator's epoch reach it before the seal.
 			if (carry) await rows.toCreator();
-			const epoch = await rollCreator(creator, async () => undefined, ordinal);
+			const epoch = await rollCreator(creator, () => Promise.resolve(), ordinal);
 			model.creatorEpoch = epoch;
 			model.rolls.push({ tick: clock.nextRoll, epoch, install });
 			if (install !== null) installs[install]?.rolls.push(epoch);
@@ -380,7 +404,9 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 			const listed = (((await writer.settlementStatus?.()) as Settlement)?.undelivered ?? []).flatMap((given) =>
 				given.operations.map((operation) => String(operation.id))
 			);
-			const kept = new Set((((await writer.rolloverStatus?.()) as Policy)?.kept ?? []).map((operation) => String(operation.id)));
+			const kept = new Set(
+				(((await writer.rolloverStatus?.()) as Policy)?.kept ?? []).map((operation) => String(operation.id))
+			);
 			return { undelivered: listed.length, kept: kept.size, offering: listed.filter((id) => !kept.has(id)).length };
 		};
 		policyIdleNow = policyIdle;
@@ -405,7 +431,8 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 			await writer.issue(epoch, n);
 			await rows.toCreator();
 		}
-		const writerAuthor = rowValue((await writer.published(null))[0]!).author;
+		const [firstOwn] = await writer.published(null);
+		const writerAuthor = rowValue(defined(firstOwn, "the member's first row")).author;
 		await readOwn();
 		await wire.pause();
 		model.creatorEpoch = (await creator.rollover?.())?.epoch ?? 0;
@@ -427,8 +454,7 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 					}),
 					// Back-to-back installs (the chain) are never idle in between: the bound covers all of them.
 					(state) =>
-						!state.inFlight &&
-						((state.member === state.creator && state.offering === 0) || state.installs >= INSTALLS),
+						!state.inFlight && ((state.member === state.creator && state.offering === 0) || state.installs >= INSTALLS),
 					900_000
 				);
 				await readOwn();
@@ -453,7 +479,7 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 			}
 		} catch (error) {
 			// Observation only, bounded: what the member, its policy and its plan held when the scheduler stalled.
-			const within = <T,>(value: Promise<T> | undefined): Promise<T | string | undefined> =>
+			const within = <T>(value: Promise<T> | undefined): Promise<T | string | undefined> =>
 				Promise.race([Promise.resolve(value), sleep(10_000).then(() => "NO-ANSWER-10S")]);
 			await within(readOwn());
 			process.stdout.write(
@@ -465,7 +491,12 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 					violations: model.violations,
 					notes: model.notes,
 					moves,
-					own: own.map((row) => [row.sequence, row.epoch, row.moves.join("+"), signs.get(row.digest)?.creatorEpoch ?? null]),
+					own: own.map((row) => [
+						row.sequence,
+						row.epoch,
+						row.moves.join("+"),
+						signs.get(row.digest)?.creatorEpoch ?? null,
+					]),
 					status: await within(writer.rolloverStatus?.()),
 					settlement: await within(writer.settlementStatus?.()),
 					plan: await within(writer.settlementAudit()),
@@ -478,7 +509,8 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 			gating = false;
 		}
 		await readOwn();
-		const refusalsGated = (((await writer.successorDelivery?.()) as { refused?: number } | undefined)?.refused ?? 0) - refusalsBefore;
+		const refusalsGated =
+			(((await writer.successorDelivery?.()) as { refused?: number } | undefined)?.refused ?? 0) - refusalsBefore;
 
 		// Landing: rows flow, the member follows, every move lands on the creator exactly once.
 		let pumping = true;
@@ -494,7 +526,9 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 		const admittedRows = async () =>
 			((await creator.acceptedVertices?.()) ?? [])
 				.filter((vertex) => vertex.author === writerAuthor)
-				.flatMap((vertex) => movesOf(JSON.parse(vertex.operation)).map((id) => ({ id, digest: vertex.digest, epoch: vertex.epoch })));
+				.flatMap((vertex) =>
+					movesOf(JSON.parse(vertex.operation)).map((id) => ({ id, digest: vertex.digest, epoch: vertex.epoch }))
+				);
 		const counts = async () => {
 			const admitted = await admittedRows();
 			return ids.map((id) => admitted.filter((row) => row.id === id).length);
@@ -533,7 +567,12 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 			const sign = signs.get(row.digest);
 			const replacement = row.moves.length > 0 && row.moves.every((id) => signed.has(id));
 			for (const id of row.moves) signed.add(id);
-			return { ...row, sign, replacement, intoSealed: replacement && sign !== undefined && sign.gated && sign.creatorEpoch > row.epoch };
+			return {
+				...row,
+				sign,
+				replacement,
+				intoSealed: replacement && sign !== undefined && sign.gated && sign.creatorEpoch > row.epoch,
+			};
 		});
 		const gatedInstalls = installs.map((install) => {
 			const drained = classified.filter((row) => row.sign?.drain === true && row.sign.install === install.index);
@@ -563,7 +602,9 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 			const landed = admittedOf(id);
 			const landedRow = classified.find((row) => row.digest === landed?.digest);
 			const deferrals = installs.filter((install) => {
-				const before = classified.filter((row) => row.moves.includes(id) && (row.sign?.order ?? Infinity) < install.startSign);
+				const before = classified.filter(
+					(row) => row.moves.includes(id) && (row.sign?.order ?? Infinity) < install.startSign
+				);
 				const latest = before.at(-1);
 				if (latest === undefined || latest.digest === landed?.digest) return false;
 				return !classified.some(
@@ -609,7 +650,12 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 
 		// The model held: the creator rolled only on its timer, and every gated install installed.
 		expect.soft(model.violations, "creator rollovers outside the model's timer").toEqual([]);
-		expect.soft(gatedInstalls.filter((install) => install.ok !== true), "gated installs that failed").toEqual([]);
+		expect
+			.soft(
+				gatedInstalls.filter((install) => install.ok !== true),
+				"gated installs that failed"
+			)
+			.toEqual([]);
 		expect.soft(refusalsGated, "delivery refusals during the gated phase").toBe(0);
 		// Each move admitted by the creator exactly once, none lost; equal state.
 		expect.soft(finalCounts, "each move admitted by the creator once").toEqual(ids.map(() => 1));
@@ -619,15 +665,28 @@ it("an install that reaches an epoch the creator already sealed signs no replace
 		const firstRows = moves.map(({ id }) => firstRowOf(id)?.sequence ?? -1);
 		expect.soft(firstRows, "first rows in move order").toEqual([...firstRows].sort((left, right) => left - right));
 		for (const install of installs) {
-			const replaced = classified.filter((row) => row.replacement && row.sign?.drain === true && row.sign.install === install.index);
-			const sources = replaced.map((row) =>
-				Math.max(...row.moves.map((id) => classified.filter((other) => other.sequence < row.sequence && other.moves.includes(id)).at(-1)?.sequence ?? -1))
+			const replaced = classified.filter(
+				(row) => row.replacement && row.sign?.drain === true && row.sign.install === install.index
 			);
-			expect.soft(sources, `install ${install.index}: replacements in source order`).toEqual([...sources].sort((left, right) => left - right));
+			const sources = replaced.map((row) =>
+				Math.max(
+					...row.moves.map(
+						(id) =>
+							classified.filter((other) => other.sequence < row.sequence && other.moves.includes(id)).at(-1)
+								?.sequence ?? -1
+					)
+				)
+			);
+			expect
+				.soft(sources, `install ${install.index}: replacements in source order`)
+				.toEqual([...sources].sort((left, right) => left - right));
 		}
 		// A move waits at most the settlement window's installs while deferred.
 		expect
-			.soft(waits.filter((wait) => wait.deferrals > V3_SETTLEMENT_OWN_WINDOW_EPOCHS), "moves deferred by more installs than the window")
+			.soft(
+				waits.filter((wait) => wait.deferrals > V3_SETTLEMENT_OWN_WINDOW_EPOCHS),
+				"moves deferred by more installs than the window"
+			)
 			.toEqual([]);
 		// The chain: no replacement is signed into an epoch the creator had already sealed.
 		expect(intoSealedPerInstall, "replacements signed into an already-sealed epoch, per install").toEqual(
