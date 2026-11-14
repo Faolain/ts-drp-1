@@ -216,6 +216,9 @@ it.skipIf(INNER).each(EDGES)(
 				const foreign = await issueBatch(store, rows.slice(0, MOVES - 1));
 				expect(foreign.ok).toBe(false);
 				expect((await snapshot(store, MOVES + 1, 2 * MOVES)).issued).toEqual(none);
+				// Nor does a single of the batch's head row: the marker is never read as a single.
+				await expect(issueOne(store, rows[0]!)).rejects.toThrow();
+				expect((await snapshot(store, MOVES + 1, 2 * MOVES)).issued).toEqual(none);
 			}
 			const resumed = await issueBatch(store, rows);
 			expect(resumed.ok).toBe(true);
