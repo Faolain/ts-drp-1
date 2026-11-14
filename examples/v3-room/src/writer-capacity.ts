@@ -42,6 +42,8 @@ export type V3RoomWriterCapacityReading = Readonly<{
 	author: string;
 	/** Further own moves the Writer can surely admit in the current epoch. */
 	moves: number;
+	/** The Writer's own rows of the current epoch (at least those the creator admitted). */
+	epochRows: number;
 	/** Share of the Writer's admission already used, 0..1 (moves left against moves admitted so far). */
 	used: number;
 	/** The Writer's recent gap between own moves (ms), for the trigger's margin and its silence. */
@@ -136,6 +138,7 @@ export function createV3RoomWriterCapacity(input: Readonly<{ objectId: string; m
 			return Object.freeze({
 				author: vertex.author,
 				moves,
+				epochRows,
 				used: epochRows / (epochRows + moves),
 				gapMs: window.gapMs,
 			});

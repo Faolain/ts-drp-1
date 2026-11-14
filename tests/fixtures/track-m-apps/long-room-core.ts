@@ -420,7 +420,12 @@ const OFFER_FIELDS = [
 function appRolloverPolicy(
 	app: AppKind,
 	role: "creator" | "member",
-	context: Readonly<{ objectId: string; chatFormat: ChatFormat; override?: LongRoomOptions["rolloverBudget"] }>,
+	context: Readonly<{
+		objectId: string;
+		chatFormat: ChatFormat;
+		profileId: string;
+		override?: LongRoomOptions["rolloverBudget"];
+	}>,
 	hooks: V3RoomRolloverHooks
 ): V3RoomRolloverPolicy {
 	const chat = app === "chat";
@@ -434,7 +439,10 @@ function appRolloverPolicy(
 		role,
 		budget: context.override ?? shipped,
 		// A capacity trigger, not a budget value: kept under a test override, as the native refusal trigger is.
-		writerCapacity: { maxDependencies: PARAMETERS.maxDependencies },
+		writerCapacity: {
+			maxDependencies: PARAMETERS.maxDependencies,
+			profileId: context.profileId === "creator-trusted-v1" ? "creator-trusted-v1" : "creator-trusted-settlement-v1",
+		},
 		hooks: chat ? { ...hooks, clearedByRollover: shippingChatRefusalClearedByRollover } : hooks,
 	});
 }
@@ -618,7 +626,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		? appRolloverPolicy(
 				options.app,
 				index === 0 ? "creator" : "member",
-				{ objectId, chatFormat, override: options.rolloverBudget },
+				{ objectId, chatFormat, profileId: genesisProfile.profileId, override: options.rolloverBudget },
 				{
 					publishSuccessor: (offer, successorEpoch) => required(delivery).publish(offer, successorEpoch),
 					requestSuccessor: () => required(delivery).request(),

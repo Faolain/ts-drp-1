@@ -1,6 +1,12 @@
 import { decodeCanonical } from "@ts-drp/canonical";
 import { isV3RoomClosePendingRefusal, V3RoomAwaitingAuthorFence, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
-import type { V3RoomAcceptedVertex, V3RoomHandBack, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
+import type {
+	V3RoomAcceptedVertex,
+	V3RoomHandBack,
+	V3RoomSession,
+	V3RoomSettlementStatus,
+	V3RoomSuccessorAuthority,
+} from "@ts-drp/node/v3-room";
 
 import { createV3RoomWriterCapacity, type V3RoomWriterCapacity, type V3RoomWriterCapacityReading } from "./writer-capacity.js";
 
@@ -433,6 +439,11 @@ function offerSuccessorEpoch(offer: V3RoomSuccessorOffer): number | undefined {
  * yields between its native phases and defers to registered foreground issues.
  * @param work - The rollover.
  */
+/**
+ * Own moves a Writer must have in the epoch before its forecast can roll the room (capacity or silence): the
+ * shipped per-author budget (Grid, Canvas, v3-chat: 7), so neither trigger is cheaper than the budget.
+ */
+const CAPACITY_MIN_EPOCH_MOVES = 7;
 /** The capacity trigger's margin floor, in moves. */
 const CAPACITY_MARGIN_MIN_MOVES = 4;
 /** The rollover length the margin assumes before the first rollover is measured. */
@@ -474,11 +485,13 @@ export function createV3RoomRolloverPolicy(
 		 */
 		identity?(operation: Readonly<Record<string, unknown>>): string | undefined;
 		/**
-		 * Creator, settlement profile: the room parameters' dependency bound, which turns on the forecast of
-		 * each Writer's own admission (the capacity and silence triggers). Without it only budget, idle and
-		 * refusal roll the room.
+		 * Creator: the room parameters' dependency bound and the profile its genesis signed, which turn on
+		 * the forecast of each Writer's own admission (the capacity and silence triggers) for the settlement
+		 * profile. The genesis profile is needed because the room's authority is unknown until its first
+		 * successor (a hot Writer can reach its admission in epoch 0); once known, the authority's profile
+		 * decides. Without it only budget, idle and refusal roll the room.
 		 */
-		writerCapacity?: Readonly<{ maxDependencies: number }>;
+		writerCapacity?: Readonly<{ maxDependencies: number; profileId: V3RoomSuccessorAuthority["profileId"] }>;
 	}>
 ): V3RoomRolloverPolicy {
 	const { role, budget } = input;
@@ -762,14 +775,21 @@ export function createV3RoomRolloverPolicy(
 		});
 	};
 	// The forecast exists once the room is bound and only for a settlement-profile creator given its
-	// dependency bound.
-	const capacityOf = (): V3RoomWriterCapacity | undefined => {
+	// dependency bound. The room's authority is null until its first successor, so the genesis epoch is
+	// decided by the profile the application signed into genesis, and the object by the admitted row's.
+	const capacityOf = (objectId: string | undefined): V3RoomWriterCapacity | undefined => {
 		if (writerCapacity !== undefined) return writerCapacity ?? undefined;
-		const authority = room?.authority();
-		if (authority === undefined || authority === null) return undefined;
+		if (role !== "creator" || input.writerCapacity === undefined) {
+			writerCapacity = null;
+			return undefined;
+		}
+		if (room === undefined) return undefined;
+		const authority = room.authority();
+		const object = authority?.objectId ?? objectId;
+		if (object === undefined) return undefined;
 		writerCapacity =
-			role === "creator" && input.writerCapacity !== undefined && authority.profileId === "creator-trusted-settlement-v1"
-				? createV3RoomWriterCapacity({ objectId: authority.objectId, maxDependencies: input.writerCapacity.maxDependencies })
+			(authority?.profileId ?? input.writerCapacity.profileId) === "creator-trusted-settlement-v1"
+				? createV3RoomWriterCapacity({ objectId: object, maxDependencies: input.writerCapacity.maxDependencies })
 				: null;
 		return writerCapacity ?? undefined;
 	};
@@ -778,11 +798,12 @@ export function createV3RoomRolloverPolicy(
 	// (twice the last rollover), at its recent rate, and never less than CAPACITY_MARGIN_MIN_MOVES.
 	const watchCapacity = (vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void => {
 		if (role !== "creator" || vertex.authorSequence === undefined) return;
-		const reading = capacityOf()?.observe(
+		const reading = capacityOf(vertex.objectId)?.observe(
 			vertex as Pick<V3RoomAcceptedVertex, "author" | "epoch" | "authorSequence"> & Partial<V3RoomAcceptedVertex>,
 			epoch
 		);
-		if (reading === undefined) return;
+		// No cheaper than the per-author budget: a Writer moves the room only after this many own moves in the epoch.
+		if (reading === undefined || reading.epochRows < CAPACITY_MIN_EPOCH_MOVES) return;
 		const rate = Number.isFinite(reading.gapMs) && reading.gapMs > 0 ? 1_000 / reading.gapMs : 0;
 		const margin = Math.max(CAPACITY_MARGIN_MIN_MOVES, Math.ceil((2 * lastRollMs * rate) / 1_000));
 		if (reading.moves <= margin && capacityFired !== epoch) {
