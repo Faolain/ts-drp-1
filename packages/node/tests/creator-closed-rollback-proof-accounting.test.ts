@@ -2803,11 +2803,12 @@ const consume = unique((node): node is ts.VariableDeclaration => ts.isVariableDe
 const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpoch", "closedSigningSummaryResidualRows"].map(declaration).join("\n");
 // Transpiling is a pure function of the program text; each call still evaluates a fresh program.
 const transpiled = new Map<string, string>();
-// The owner's own capture-journal detach (its in-memory drainSource never reaches the encoder).
-const detachClosedCaptureJournal = Function("decodeCanonical", "closedRetirementBytes", `"use strict"; ${ts.transpile(
-	declaration("detachClosedCaptureJournal"), { target: ts.ScriptTarget.ES2022 })}; return detachClosedCaptureJournal;`)(decodeCanonical, encodeCanonical);
 // The owner's journal observation projection (C1): a drain control's plan rides in the carrier by digest.
 const { closedJournalObservationControl } = compileClosedJournalObservationOwner();
+// The owner's own capture-journal detach: the charged carrier (plan by digest), its in-memory drainSource never encoded.
+const detachClosedCaptureJournal = Function("decodeCanonical", "closedWarmSourceBytes", "closedJournalObservationControl",
+	`"use strict"; ${ts.transpile(declaration("detachClosedCaptureJournal"), { target: ts.ScriptTarget.ES2022 })}; return detachClosedCaptureJournal;`)(
+	decodeCanonical, encodeCanonical, closedJournalObservationControl);
 function execute<T>(code: string, context: Record<string, unknown>): T {
 	let js = transpiled.get(code);
 	if (js === undefined) {
@@ -2815,7 +2816,8 @@ function execute<T>(code: string, context: Record<string, unknown>): T {
 		transpiled.set(code, js);
 	}
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
-		closedObservationCarrierBytes: encodeCanonical, detachClosedCaptureJournal, closedJournalObservationControl,
+		closedObservationCarrierBytes: encodeCanonical, closedWarmSourceBytes: encodeCanonical, detachClosedCaptureJournal,
+		closedJournalObservationControl,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
 	// Execute in the codec's realm. A separate VM realm would produce foreign

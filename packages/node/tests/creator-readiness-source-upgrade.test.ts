@@ -4,6 +4,7 @@ import { compareBytes, decodeCanonical, encodeCanonical } from "@ts-drp/canonica
 import { openAuthorFenceOperation } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { applySettlementPlanEffect } from "../../issuance-store/src/contract.js";
 import { describe, expect, it } from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 const path = new URL("../src/internal/creator-closed-rollback-data.ts", import.meta.url);
 const ast = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
@@ -60,12 +61,13 @@ function fixture() {
 		CREATOR_ORDINARY_PROOF_MAX_BYTES: maxBytes,
 		requireLaw: (condition: unknown, reason: string) => {if (!condition) throw Error(reason);},
 		proofMaterialOwners: materialOwners,
-		closedRetirementBytes: encodeCanonical, decodeCanonical, compareBytes,
-		// The owner's own capture-journal detach (its in-memory drainSource never reaches the encoder).
-		detachClosedCaptureJournal: Function("decodeCanonical", "closedRetirementBytes", `"use strict"; ${ts.transpile(
+		closedRetirementBytes: encodeCanonical, closedWarmSourceBytes: encodeCanonical, decodeCanonical, compareBytes,
+		closedJournalObservationControl: compileClosedJournalObservationOwner().closedJournalObservationControl,
+		// The owner's own capture-journal detach: the charged carrier (plan by digest), drainSource never encoded.
+		detachClosedCaptureJournal: Function("decodeCanonical", "closedWarmSourceBytes", "closedJournalObservationControl", `"use strict"; ${ts.transpile(
 			ast.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) &&
 				node.name?.text === "detachClosedCaptureJournal")!.getText(ast), {target: ts.ScriptTarget.ES2022})}; return detachClosedCaptureJournal;`)(
-			decodeCanonical, encodeCanonical),
+			decodeCanonical, encodeCanonical, compileClosedJournalObservationOwner().closedJournalObservationControl),
 		creatorIssuanceMaintenanceObservationCarriers: (value: unknown) => [value],
 		createCreatorOrdinaryFinishingMaterialIndex: (bytes: unknown, annotations: unknown) => ({bytes, annotations}),
 		maintenanceTerminalCustody: publishRegistry,
