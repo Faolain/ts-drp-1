@@ -457,6 +457,14 @@ it.skipIf(INNER).each(EDGES)(
 			expect(second.rehandedBack).toBeGreaterThan(second.first);
 			expect(second.records.length).toBeGreaterThan(0);
 			for (const record of second.records) expect(record.originSequence).toBe(second.first);
+			// The same write drops the reissue's origin entry (its job passes to the new record), also when it
+			// was the plan's only entry: an entry left behind holds a backlog slot for a move already counted
+			// by its record.
+			const origins = (death as { reissueOrigins: ReissueOrigin[] }).reissueOrigins;
+			expect(
+				origins.filter((entry) => entry.originSequence === second.first),
+				"the rehanded-back move's origin entry"
+			).toEqual([]);
 		}
 
 		const restore = await installEnvironment("node", () => undefined);
