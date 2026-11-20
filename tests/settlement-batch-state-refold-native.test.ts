@@ -86,6 +86,9 @@ it("a batched drain chunk at the 32 KiB state limit: chain refold cost per chunk
 		expect(writer.room.authority()?.epoch).toBe(epoch);
 	};
 
+	// The Writer's epoch-0 rows (its local bootstrap) reach the creator in epoch 0: delivered after the
+	// first rollover they are of an epoch the creator has left, and the creator never accepts them.
+	await deliver();
 	// Fill: the creator places new blocks until one is refused at the room's state limit.
 	let epoch = 0;
 	let placed = 0;
