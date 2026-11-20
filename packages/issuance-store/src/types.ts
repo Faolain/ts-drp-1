@@ -256,14 +256,24 @@ export interface DurableIssueBatchSignContext {
  * The store's one crypto admission for a whole batch: it makes ONE durable entered marker that binds
  * every intent's exact bytes (and plan effect) to its consecutive author sequence, and only then calls
  * `sign(index)` for each intent, in order. Returns the signatures in intent order. One-use.
+ *
+ * `proceed(index)`, when given, is asked before each signature after the first; false stops the batch
+ * there: only the signatures made are returned, and the builder returns the commits of that signed
+ * prefix, which the store commits alone (the lineage advances past it only, and only its plan effects
+ * apply) and clears the marker. The unsigned rest was never signed, so its sequences are issued again
+ * by a later issuance. A crash before that commit leaves the marker, resumed whole as any entered batch.
  */
 export type DurableUnsignedBatchSignAdmission = (
 	intents: readonly DurableUnsignedBatchIntent[],
 	sign: (index: number) => Promise<Uint8Array>,
-	context?: DurableIssueBatchSignContext
+	context?: DurableIssueBatchSignContext,
+	proceed?: (index: number) => boolean
 ) => Promise<readonly Uint8Array[]>;
 
-/** Builds the batch's `count` commits at firstAuthorSequence, firstAuthorSequence + 1, ... in order. */
+/**
+ * Builds the batch's `count` commits at firstAuthorSequence, firstAuthorSequence + 1, ... in order (or,
+ * when the admission's `proceed` stopped it, the commits of the signed prefix).
+ */
 export type DurableBuildAndSignBatch = (
 	firstAuthorSequence: number,
 	nativeSignAdmission?: DurableUnsignedBatchSignAdmission

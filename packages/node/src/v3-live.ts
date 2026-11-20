@@ -863,7 +863,9 @@ type RebaseSourceOwner = Readonly<{
  * needs a split or a join, a batch the store's sizing refuses). `batch-retry`: the plan moved past
  * the revision the drain re-checked; nothing was written and the drain re-checks the chunk.
  * Any other failure is the singles' failure of the row it stopped at. `journal`: how the accepted rows
- * were journaled (`batch`: one native write for the chunk; `rows`: one append per row).
+ * were journaled (`batch`: one native write for the chunk; `rows`: one append per row). `rows` is the
+ * chunk's leading rows only when the caller's stopBefore stopped the chunk before a later row's signature
+ * (rule R: the epoch was sealed meanwhile); the rest were never signed and stay unreplaced.
  */
 export type V3ReplacementBatchResult =
 	| Readonly<{
@@ -900,7 +902,10 @@ type V3RebaseSource = Readonly<{
 	issueReplacements(
 		peers: readonly V3RebaseSource[],
 		inputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
-		expectedPlanRevision: number
+		expectedPlanRevision: number,
+		/** Asked before each row's signature after the first: true stops the chunk there (rule R); the
+		 * signed rows are committed alone and the rest are never signed. */
+		stopBefore?: () => boolean
 	): Promise<V3ReplacementBatchResult>;
 	/** Explicit creator selection; this never grants authority merely from the local source capability. */
 	authorizeReplacement(
@@ -17514,7 +17519,8 @@ async function issueReplacementBatch(
 	registration: V3PlaneRegistration,
 	inputs: readonly CapturedLocalIssueInput[],
 	custody: LocalReplacementCustody,
-	expectedPlanRevision: number
+	expectedPlanRevision: number,
+	stopBefore?: () => boolean
 ): Promise<V3ReplacementBatchResult> {
 	const unavailable = (detail: string): V3ReplacementBatchResult =>
 		ObjectFreeze({ ok: false as const, kind: "batch-unavailable" as const, detail });
@@ -17627,6 +17633,22 @@ async function issueReplacementBatch(
 	let signerResolved = false;
 	let capacityRejected = false;
 	let signingRow: (typeof rows)[number] | undefined;
+	// Rule R: the row before whose signature the caller stopped the chunk (the store commits the signed
+	// prefix alone). An observation that cannot answer never stops a chunk.
+	let stoppedAt: number | undefined;
+	const proceed =
+		stopBefore === undefined
+			? undefined
+			: (index: number): boolean => {
+					let stop = false;
+					try {
+						stop = stopBefore() === true;
+					} catch {
+						stop = false;
+					}
+					if (stop) stoppedAt = index;
+					return !stop;
+				};
 	try {
 		const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
 		if (maintenance?.readBoundedRecoveryCensus === undefined)
@@ -17697,7 +17719,8 @@ async function issueReplacementBatch(
 								signingRow = undefined;
 							}
 						},
-						context
+						context,
+						proceed
 					);
 				});
 				return built.map((commit, index) => ObjectFreeze({ ...commit, planEffect: batchElement(rows, index, "row").planEffect }));
@@ -17739,10 +17762,13 @@ async function issueReplacementBatch(
 							(error instanceof Error ? error.message : String(error))}`
 					);
 	}
-	if (commits.length !== rows.length) {
+	// A chunk the caller stopped committed exactly the rows signed before the stop; their reservations are
+	// kept and the rest released (those rows were never signed and stay unreplaced).
+	if (commits.length !== rows.length && (stoppedAt === undefined || commits.length !== stoppedAt || commits.length < 1)) {
 		registration.operationAdmissionHalted = true;
 		return localIssueFailure("issuance-rejected", "v3 replacement batch commit is incomplete");
 	}
+	for (const reservation of reservations.slice(commits.length)) releaseOperationReservation(reservation);
 	const accepted: Readonly<{ authorSequence: number; digest: string }>[] = [];
 	const committedRecord = (index: number) => {
 		const committed = batchElement(commits, index, "commit");
@@ -17757,7 +17783,7 @@ async function issueReplacementBatch(
 	// row admitted in sequence order exactly as admitCommittedLocalVertex admits it after its own append.
 	const journaled = await journalReplacementBatch(
 		registration,
-		rows.map((row) => row.input),
+		rows.slice(0, commits.length).map((row) => row.input),
 		scope,
 		commits.map((_, index) => committedRecord(index)),
 		custody
@@ -19652,7 +19678,8 @@ async function readRebaseOutbox(
 		this: V3RebaseSource,
 		peers: readonly V3RebaseSource[],
 		rawInputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
-		expectedPlanRevision: number
+		expectedPlanRevision: number,
+		stopBefore?: () => boolean
 	): Promise<V3ReplacementBatchResult> {
 		if (this !== resultSource)
 			return Promise.resolve(localIssueFailure("authorization-rejected", "active replacement source is foreign"));
@@ -19665,7 +19692,8 @@ async function readRebaseOutbox(
 			peers.length !== rawInputs.length ||
 			peers.length > V3_SETTLEMENT_DRAIN_TURN_ROWS ||
 			!NumberIsSafeInteger(expectedPlanRevision) ||
-			expectedPlanRevision < 0
+			expectedPlanRevision < 0 ||
+			(stopBefore !== undefined && typeof stopBefore !== "function")
 		)
 			return Promise.resolve(localIssueFailure("malformed-input", "replacement batch is malformed"));
 		const owners: RebaseSourceOwner[] = [];
@@ -19733,7 +19761,8 @@ async function readRebaseOutbox(
 							registration,
 							captured.map((input) => ObjectFreeze({ ...input, settlementCustody: held, settlementAuthorization: undefined })),
 							held,
-							expectedPlanRevision
+							expectedPlanRevision,
+							stopBefore
 						);
 					} catch (error) {
 						outcome = localIssueFailure(

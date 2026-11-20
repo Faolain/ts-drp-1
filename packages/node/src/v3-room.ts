@@ -224,7 +224,8 @@ export function readV3RoomCarryCounts(): Readonly<{ carried: number; expired: nu
 // `retries`: a chunk refused by a moved plan and re-checked; `recoveries`: an entered chunk resumed whole;
 // `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted");
 // `deferredDrains`: install drains that left their remaining replacements to the next install (rule R: the
-// caller already held a newer offer, so the epoch installed was sealed).
+// caller already held a newer offer, so the epoch installed was sealed); `stoppedChunks`: chunks that offer
+// stopped while they signed (only the rows signed before it were committed).
 const v3RoomSettlementBatchCounts = {
 	batches: 0,
 	rowsBatched: 0,
@@ -233,6 +234,7 @@ const v3RoomSettlementBatchCounts = {
 	retries: 0,
 	recoveries: 0,
 	deferredDrains: 0,
+	stoppedChunks: 0,
 	fallbacks: new Map<string, number>(),
 };
 /** The settlement batch counters of this process (see v3RoomSettlementBatchCounts). */
@@ -244,6 +246,7 @@ export interface V3RoomSettlementBatchCounts {
 	readonly retries: number;
 	readonly recoveries: number;
 	readonly deferredDrains: number;
+	readonly stoppedChunks: number;
 	readonly fallbacks: Readonly<Record<string, number>>;
 }
 /**
@@ -8087,14 +8090,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					signRegisteredVertexDigest,
 				})
 			);
+			// Rule R inside the chunk: a newer offer that arrives while the chunk signs stops it before the next
+			// row's signature; the rows signed commit alone and the rest stay eligible (the check above defers them).
 			const issued = await head.issueReplacements(
 				chunk.map((row) => row.source),
 				inputs,
-				current.revision
+				current.revision,
+				newerOfferQueued
 			);
 			if (issued.ok) {
 				v3RoomSettlementBatchCounts.batches += 1;
 				v3RoomSettlementBatchCounts.rowsBatched += issued.rows.length;
+				if (issued.rows.length < chunk.length) v3RoomSettlementBatchCounts.stoppedChunks += 1;
 				if (issued.journal === "batch") v3RoomSettlementBatchCounts.journalBatches += 1;
 				if (settlementDrainPublication === "immediate") await publishAccepted();
 				continue;

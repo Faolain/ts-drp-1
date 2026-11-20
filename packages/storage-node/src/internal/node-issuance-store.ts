@@ -2429,12 +2429,18 @@ class NodeIssuanceImplementation {
 			const admit = async (
 				intents: readonly DurableUnsignedBatchIntent[],
 				sign: (index: number) => Promise<Uint8Array>,
-				context: DurableIssueBatchSignContext | undefined
+				context: DurableIssueBatchSignContext | undefined,
+				proceed: ((index: number) => boolean) | undefined
 			): Promise<readonly Uint8Array[]> => {
 				this.#assertAvailable();
 				if (admissionUsed) throw invalid("native batch sign admission is one-use");
 				admissionUsed = true;
-				if (typeof sign !== "function" || !Array.isArray(intents) || intents.length !== count)
+				if (
+					typeof sign !== "function" ||
+					(proceed !== undefined && typeof proceed !== "function") ||
+					!Array.isArray(intents) ||
+					intents.length !== count
+				)
 					throw invalid("native batch sign input changed");
 				const capturedContext =
 					context === undefined
@@ -2604,6 +2610,8 @@ class NodeIssuanceImplementation {
 					const signatures: Uint8Array[] = [];
 					for (let index = 0; index < capturedIntents.length; index += 1) {
 						this.#assertAvailable();
+						// The caller may stop the batch before a later signature: the signed prefix commits alone.
+						if (index > 0 && proceed !== undefined && proceed(index) !== true) break;
 						const digest = capturedIntents[index]!.digest;
 						const signature = await (this.session
 							? this.session.withOwnedOperationSigning(digest, () => sign(index))
@@ -2618,11 +2626,16 @@ class NodeIssuanceImplementation {
 				void signing.catch(() => undefined);
 				return signing;
 			};
-			const built = await buildAndSign(first, (intents, sign, context) => admit(intents, sign, context));
-			if (signing !== undefined) await signing;
-			const candidates = copyAndValidateDurableIssueBatch(built, scope, first, count);
+			const built = await buildAndSign(first, (intents, sign, context, proceed) => admit(intents, sign, context, proceed));
+			// A stopped batch commits exactly the prefix it signed, matching the marker's first intents.
+			const signed = signing === undefined ? undefined : await signing;
+			const committed = signed === undefined ? count : signed.length;
+			const candidates = copyAndValidateDurableIssueBatch(built, scope, first, committed);
 			this.#assertAvailable();
-			if (marker !== undefined && !durableIssueBatchMatchesIntents(issuancePendingIntents(marker), candidates))
+			if (
+				marker !== undefined &&
+				!durableIssueBatchMatchesIntents(issuancePendingIntents(marker).slice(0, committed), candidates)
+			)
 				throw invalid("native batch candidates differ from admitted unsigned bytes");
 			if (database === undefined) {
 				const contended = this.#writerFree("issuance batch write failed");
