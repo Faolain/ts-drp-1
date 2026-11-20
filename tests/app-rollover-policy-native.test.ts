@@ -141,6 +141,12 @@ async function openApp(
  * @param rolloverBudget - Test-only trigger values replacing the application's.
  * @param creatorMoves - Which ordinals the creator moves at (default every one); a sparser creator makes a
  * Writer the hot author. Its rows carry admission evidence of the Writer's moves (their causal past).
+ * @param toleratedErrors - Creator policy errors the case tolerates.
+ * @param burst - Concurrent creator moves (see below).
+ * @param stateLimitRefusals - When given, a move the room refuses at its application state limit with the
+ * typed refusal (V3RoomStateLimitRefused) is not admitted: it is recorded here (role, ordinal and the
+ * refusal's name, kind and limit) instead of failing the run, and is not counted as accepted. Any other
+ * refusal still fails the run. Without it, every move must be accepted.
  * @returns The creator's policy observation.
  */
 async function playPastCeiling(
@@ -162,7 +168,8 @@ async function playPastCeiling(
 			start: () => void,
 			room: Readonly<{ issue: (ordinal: number) => Promise<unknown>; track: (ordinal: number, move: Promise<unknown>) => void }>
 		) => void;
-	}>
+	}>,
+	stateLimitRefusals?: { role: number; ordinal: number; name: string; kind: unknown; limitBytes: unknown }[]
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
@@ -244,22 +251,36 @@ async function playPastCeiling(
 			)
 		);
 	}, 30_000);
+	// A move is admitted, or (with stateLimitRefusals) refused typed at the room's state limit.
+	const play = async (role: 0 | 1, ordinal: number): Promise<boolean> => {
+		try {
+			await peers[role].issue(0, ordinal);
+		} catch (error) {
+			if (stateLimitRefusals === undefined || !(error instanceof Error) || error.name !== "V3RoomStateLimitRefused") throw error;
+			stateLimitRefusals.push({
+				role,
+				ordinal,
+				name: error.name,
+				kind: Reflect.get(error, "kind"),
+				limitBytes: Reflect.get(error, "limitBytes"),
+			});
+			return false;
+		}
+		accepted.push({ role, ordinal });
+		return true;
+	};
 	try {
 		for (let ordinal = 0; ordinal < moves; ordinal++) {
 			if (creatorMoves(ordinal)) {
 				step = `creator#${ordinal}`;
-				await creator.issue(0, ordinal);
-				accepted.push({ role: 0, ordinal });
-				await deliver(0);
+				if (await play(0, ordinal)) await deliver(0);
 			}
 			// The member's own rows go to the creator even when it makes no move: each install
 			// publishes the member's settlement of the epoch it leaves.
 			await deliver(1);
 			if (!writer) continue;
 			step = `writer#${ordinal}`;
-			await other.issue(0, ordinal);
-			accepted.push({ role: 1, ordinal });
-			await deliver(1);
+			if (await play(1, ordinal)) await deliver(1);
 		}
 		step = "burst";
 		await Promise.all(burstMoves);
@@ -574,15 +595,25 @@ it.each([
 it("grid with a hot writer: no admitted move's settlement is refused by the Writer's own store", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	try {
-		// 700: past the deadlock (about writer move 505 without the reserve) and under the grid
-		// state's canonical bound (each move adds a block; about 900 blocks exceed it).
+		// 700: past the deadlock (about writer move 505 without the reserve), and past the room's
+		// application state limit (row 96, 32,768 canonical bytes): each move adds a Grid block that is
+		// never removed, and with the creator's block every 8 Writer moves the state passes the limit at
+		// about the 686th Writer move (700 moves would be 788 blocks, 33,461 B). A move refused at the limit
+		// is not admitted: it gets the typed refusal (V3RoomStateLimitRefused) and the player keeps playing.
+		// Every admitted move still settles, and the state holds exactly the admitted moves.
 		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 700);
 		// The creator moves every 8 Writer moves (admission evidence, as an online room has).
 		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 8);
+		const refusals: { role: number; ordinal: number; name: string; kind: unknown; limitBytes: unknown }[] = [];
 		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 },
-			(ordinal) => ordinal % creatorEvery === 0);
+			(ordinal) => ordinal % creatorEvery === 0, undefined, undefined, refusals);
 		process.stdout.write(`HOT_WRITER_SETTLEMENT ${JSON.stringify({ writerMoves, creatorEvery, rollovers: policy?.rollovers,
-			triggers: policy?.events.map((event) => event.trigger) })}\n`);
+			triggers: policy?.events.map((event) => event.trigger), stateLimitRefusals: refusals.length,
+			firstRefusal: refusals[0] })}\n`);
+		// The run reaches the limit (it proves the limit path, not avoids it), and every refusal is the typed one.
+		expect(refusals.length, "moves past the room's state limit are refused").toBeGreaterThan(0);
+		for (const refusal of refusals)
+			expect(refusal).toMatchObject({ name: "V3RoomStateLimitRefused", kind: "application-state-limit", limitBytes: 32_768 });
 	} finally {
 		restore();
 	}
