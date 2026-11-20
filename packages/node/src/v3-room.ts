@@ -7987,7 +7987,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			| RoomReplacementEffect
 		>,
 		source?: DisplacedSource,
-		mayRecover = true
+		mayRecover = true,
+		// The batched chunk's transient refusal of this very replay (nothing signed): it is this replay's
+		// first attempt, so the singles path goes straight to the retries instead of attempting again.
+		firstTransientRefusal?: Extract<Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>>, { readonly ok: false }>
 	): Promise<RoomSettlementIssueResult> => {
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 		const prior = await issuanceStore.readSettlementPlan(settlementScope);
@@ -8012,7 +8015,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				? (source as DisplacedSource).issueReplacement(localInput)
 				: // The settlement lane: received rows and caller moves can never refuse this mandatory fence.
 					(handle.issueSettlementLocal ?? handle.issueLocal)(localInput);
-		let issued = await attemptIssue();
+		let issued =
+			firstTransientRefusal !== undefined &&
+			effect.kind === "replacement" &&
+			transientLocalRefusal(firstTransientRefusal.kind, firstTransientRefusal.detail)
+				? firstTransientRefusal
+				: await attemptIssue();
 		// A replay refused before signing for a transient reason (input capacity, snapshot readiness,
 		// admission halted or awaiting recovery) is retried in this install, with backoff
 		// (SETTLEMENT_TRANSIENT_RETRY_MS, doubling, SETTLEMENT_TRANSIENT_RETRIES times, about 1.3 s in
@@ -8371,6 +8379,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// another writer moved meanwhile refuses the chunk with nothing written and the chunk is
 		// re-checked; a chunk the batch cannot carry (see V3ReplacementBatchResult) and every row the
 		// batches leave are issued singly by the loop below, which skips each row already replaced.
+		// A chunk refused transiently before signing: that refusal was its head row's first attempt.
+		let batchTransientRefusal:
+			| Readonly<{ sourceSequence: number; issued: Extract<Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>>, { readonly ok: false }> }>
+			| undefined;
 		for (let retries = 0, recoveries = 0; ; ) {
 			await checkpoint();
 			assertSessionOpen();
@@ -8444,9 +8456,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				// Refused before anything was signed, by this Writer's own admission (its policy, or a transient
 				// refusal): the chunk's rows are issued singly, where a lasting refusal hands exactly the refused
 				// row's replay back and a transient one is retried in this install (issueSettlement), instead of
-				// failing the install.
+				// failing the install. A transient refusal is the plane's, not one row's: it counts as the head
+				// row's first attempt, so that row's single goes straight to its retries (one attempt and
+				// SETTLEMENT_TRANSIENT_RETRIES retries in all, never one more).
 				logicalTime = firstLogicalTime;
 				noteV3RoomSettlementFallback(`refused: ${issued.detail}`);
+				const headSequence = chunk[0]?.entry.sourceSequence;
+				if (headSequence !== undefined && issued.kind === "admission-rejected" && transientLocalRefusal(issued.kind, issued.detail))
+					batchTransientRefusal = Object.freeze({
+						sourceSequence: headSequence,
+						issued: Object.freeze({ ok: false as const, kind: issued.kind, detail: issued.detail }),
+					});
 				break;
 			}
 			if (!signed)
@@ -8506,10 +8526,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const operations = allocateOperations(consumed);
 			let initialPrefixLength: number | undefined;
 			if (durableProgress === undefined) {
+				// Only the chunk's head row, and only as the first single this drain issues.
+				const firstTransientRefusal =
+					batchTransientRefusal?.sourceSequence === entry.sourceSequence ? batchTransientRefusal.issued : undefined;
+				batchTransientRefusal = undefined;
 				const legacy = await issueSettlement(
 					operations,
 					Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence }),
-					source
+					source,
+					true,
+					firstTransientRefusal
 				);
 				if (legacy === null || legacy.ok || legacy === SETTLEMENT_REPLAY_SETTLED) continue;
 				if (legacy.kind !== "split-required") throw new TypeError("v3 room settlement split result is invalid");
