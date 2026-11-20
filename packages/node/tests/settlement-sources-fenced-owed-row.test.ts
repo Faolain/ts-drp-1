@@ -28,16 +28,22 @@ function declaration(name: string): string {
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	if (found.length !== 1) throw Error(`PRIVATE_FUNCTION_NOT_UNIQUE:${name}:${found.length}`);
-	return found[0]!.getText(parsed);
+	const [only] = found;
+	if (found.length !== 1 || only === undefined) throw Error(`PRIVATE_FUNCTION_NOT_UNIQUE:${name}:${found.length}`);
+	return only.getText(parsed);
 }
 
 type Entry = Readonly<Record<string, unknown>>;
 let scanned: ReadonlySet<number> | undefined;
 const context = {
 	ObjectFreeze: Object.freeze,
-	copySettlementPlan: (plan: unknown) => plan,
-	readRebaseOutbox: (_registration: unknown, _published: boolean, _frontier: unknown, open?: ReadonlySet<number>) => {
+	copySettlementPlan: (plan: unknown): unknown => plan,
+	readRebaseOutbox: (
+		_registration: unknown,
+		_published: boolean,
+		_frontier: unknown,
+		open?: ReadonlySet<number>
+	): Promise<unknown> => {
 		scanned = open;
 		return Promise.resolve({ ok: true, kind: "empty" });
 	},
@@ -64,7 +70,7 @@ async function open(entries: readonly Entry[]): Promise<number[]> {
 	scanned = undefined;
 	const registration = {
 		issuanceScope: { objectId: "room", author: "writer" },
-		issuanceStore: { readSettlementPlan: () => Promise.resolve({ entries }) },
+		issuanceStore: { readSettlementPlan: (): Promise<unknown> => Promise.resolve({ entries }) },
 	};
 	await functions.readSettlementSources(registration, { admissionEpoch: 0, currentEpoch: 4, terminalThrough: 10 });
 	return [...(scanned ?? [])].sort((left, right) => left - right);
