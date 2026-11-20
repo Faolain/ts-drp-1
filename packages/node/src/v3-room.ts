@@ -484,7 +484,9 @@ export type V3RoomSettlementStatus = Readonly<{
 		 * author's newest own issued move of the same identity with a later origin, when one exists. Offered
 		 * again as a new move, this older move would land after it, so the policy offers that newer move again
 		 * right after this one. Durable: recomputed from the plan and the issued rows at each plan write (and
-		 * after own issues), so it survives a reload.
+		 * after own issues), so it survives a reload. Advisory: after a move is given back three times it can
+		 * name an older carrier row of this same move (its operation equals this move's own); treat that as
+		 * no supersession (docs/realtime-latency/tracks/46-given-back-author-order/DESIGN.md, known issue).
 		 */
 		supersededBy?: Readonly<{ authorSequence: number; operation: Readonly<Record<string, unknown>> }>;
 	}>[];

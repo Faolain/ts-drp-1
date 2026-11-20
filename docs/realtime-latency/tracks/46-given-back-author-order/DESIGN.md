@@ -246,3 +246,44 @@ Branch `feat/given-back-reissue-origins`.
   with no entry stays counted, because no creator row reaches it.
 - **Chat C1** applies to the window and shares formats, which keep admitted order. The lifetime format
   sorts messages by identity, so it keeps its existing order.
+
+## Known issue: a pruned carrier's origin (integration int7-wo, 2026-11-20)
+
+**What happens.** A reissued move given back again keeps its origin only on its new record, because the same
+write drops its `reissueOrigins` entry. The supersession scan reads a row's origin through
+`settlementOwnRowOrigin` (issuance-store contract), which walks the replacement links and entries and falls
+back to that record (fix efb13cd8). An older carrier row of a move is not resolved once its consumed record
+has been pruned by a later merge. The sequence that shows it: given back, reissued at r1, given back from r1,
+reissued at r2 (record {r1} consumed, then pruned by the next merge), given back from r2. Row r1 then reads as
+a move of its own, with a later origin than the move. Issued rows do not keep their plan effect (`readIssued`
+returns the envelope only), so nothing durable links r1 back to the move. The listing's `supersededBy` can then
+name r1, which carries the same operation as the given-back move.
+
+**No move is lost (G3 holds).** The room never offers or drops a given-back move by itself; `supersededBy` is
+advisory. The shipped policy, `createV3RoomRolloverPolicy` in examples/v3-room/src/rollover.ts, is used by
+Grid (examples/grid/src/v3-zone.ts:744), Chat (examples/chat/src/index.ts:445, examples/v3-chat/src/index.ts:794)
+and Canvas. In it:
+- `offerKept` (rollover.ts ~1026-1052) treats a move as superseded only when `!sameMove(newer, operation)`.
+  A `supersededBy` whose operation is the move's own is therefore no supersession, and the move is offered
+  once with its record.
+- A superseded given-back move is still offered with its record (`offerOne` before the supersession branch).
+  Only a kept move that was never accepted is skipped (`superseded && !givenBack`), and it never comes from
+  the room's `supersededBy`.
+- A given-back move refused again stays listed by the room until a row consumes its record (`offerOne`,
+  refused branch).
+
+**Residual order effect (not loss).** The stale carrier can mask a genuine newer move. If the author made a
+different move D of the same identity between the move's origin and r1, the scan's newest row by origin is
+r1 (same operation), not D. The policy then lands the older move after D, overwriting the author's newer
+placement in every replica. This needs a third hand-back of one move, a newer different move of the same
+identity, and a page reload before the re-offer. Without the reload, the session's `latest` (read before the
+room's answer) names D.
+
+**Bounded fix (follow-up, not in int7-wo).** Keep one scalar per move instead of the chain of older rows:
+the newest genuine row of the move's identity whose origin is later than the move's origin, up to its latest
+carrier. Write it on the reissue entry in the reissue transaction, where the consumed record still knows the
+previous carrier, and carry it to the record that takes over the entry. Then the scan only reads rows after the
+latest carrier. This adds fields to closed records, so it needs G22 charging (sized == written), transition
+rules and a `settlement-window.qnt` witness (`handedBackThriceKeepsOrigin`). Until then, an application on the
+raw room API should treat a `supersededBy` whose operation equals the given-back move's own as no
+supersession, as the shipped policy does.
