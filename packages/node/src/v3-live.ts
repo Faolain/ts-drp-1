@@ -26536,10 +26536,19 @@ async function readSettlementSources(
 			ok: false as const,
 		});
 	}
+	// Open work keeps its source in the scan even where the frontier calls the row terminal or an old
+	// incarnation: a split replacement, a retained source, and a row the plan still owes a replacement
+	// (rebase or transform, not replaced). The drain issues its fence before its replacements, so a row
+	// rule R deferred (a newer offer queued, or a chunk stopped mid-signing) stays below that fence; once
+	// the creator admits the fence its frontier calls the row terminal. That boundary only records the
+	// author's own fence: the row's epoch closed without it when its entry was written, so it can never be
+	// admitted, and its move is carried by the replacement issued above the fence.
 	const openProgressSources = new Set(
 		plan?.entries
-			.filter((entry) => (entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
-				entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.replacementSequence === null)
+			.filter((entry) => entry.replacementSequence === null && (
+				(entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
+					entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" ||
+				entry.disposition === "rebase" || entry.disposition === "transform"))
 			.map((entry) => entry.sourceSequence) ?? []
 	);
 	return readRebaseOutbox(registration, true, settlementFrontier, openProgressSources);
