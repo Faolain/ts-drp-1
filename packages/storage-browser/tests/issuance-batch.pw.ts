@@ -108,6 +108,20 @@ for (const mode of ["legacy", "room"]) {
 			after: [5, 6, 7, 8],
 			lineageAfter: { exhausted: false, next: 9 },
 		});
+		expect(report.prefix).toEqual({
+			stoppedOk: true,
+			stoppedCode: null,
+			sequences: [9, 10, 11],
+			signed: [9, 10, 11],
+			lineageBetween: { exhausted: false, next: 12 },
+			issuedBetween: [9, 10, 11, null, null, null, null, null],
+			replacedBetween: [9, 10, 11, null, null, null, null, null],
+			revisionStep: 3,
+			restOk: true,
+			restSequences: [12, 13, 14, 15, 16],
+			issuedAfter: [9, 10, 11, 12, 13, 14, 15, 16],
+			planEqualsSingles: true,
+		});
 		expect(report.sizing).toMatchObject({
 			overOk: false,
 			overSigned: 0,
