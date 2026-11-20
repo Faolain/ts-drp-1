@@ -6857,6 +6857,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			await issueOwned(owned.slice(prefixLength));
 			return;
 		}
+		// A batch whose FIRST move already passes the room's application state limit (the plane splits
+		// off any admitted prefix as split-required): that move is refused typed, and the rest are judged
+		// on their own (a later move that does not grow the state may still fit).
+		if (!issued.ok && issued.kind === "application-state-limit" && owned.length > 1) {
+			owned[0]?.reject(new V3RoomStateLimitRefused(issued.detail));
+			await issueOwned(owned.slice(1));
+			return;
+		}
 		if (!issued.ok && issued.kind === "malformed-input" && owned.length > 1) {
 			owned[0]?.reject(new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`));
 			await issueOwned(owned.slice(1));

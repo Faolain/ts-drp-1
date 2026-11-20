@@ -16630,6 +16630,47 @@ function applicationBatchOperation(
 	});
 }
 
+/**
+ * The longest proper prefix of a refused batch of new moves that the room's application state check
+ * admits, judged as that prefix's own vertex would be (applicationStateAdmits, depending on every tip,
+ * so it sorts last), or 0 when not even the first move fits. Advisory for the split only: the prefix
+ * is then issued as its own vertex and judged again on its exact bytes before signing.
+ * @param registration - The current plane.
+ * @param operations - The refused batch's moves, in order.
+ * @returns The prefix length, from 0 to operations.length - 1.
+ */
+function applicationStateAdmittedPrefix(
+	registration: V3PlaneRegistration,
+	operations: readonly Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[]
+): number {
+	const dependencies = registration.index.tips();
+	for (let length = operations.length - 1; length >= 1; length -= 1) {
+		const operation =
+			length === 1 ? batchElement(operations, 0, "operation").operation : applicationBatchOperation(operations.slice(0, length));
+		let bytes: Uint8Array;
+		try {
+			bytes = encodeCanonical(operation, APPLICATION_BATCH_LIMITS);
+		} catch {
+			continue;
+		}
+		if (
+			applicationStateAdmits(
+				registration,
+				ObjectFreeze({
+					digest: bytesToLowerHex(hashDomain("ts-drp/v3-local-state-prefix-probe/v1", bytes)),
+					author: registration.issuanceScope.author,
+					dependencies,
+					operation,
+					byteCharge: bytes.byteLength,
+				}),
+				"local"
+			)
+		)
+			return length;
+	}
+	return 0;
+}
+
 function applicationBatchFits(operation: Readonly<Record<string, unknown>>): boolean {
 	try {
 		const bytes = encodeCanonical(operation, APPLICATION_BATCH_LIMITS);
@@ -18221,6 +18262,19 @@ async function issueLocal(
 				input.planEffect
 			);
 			if (issued.ok) await drainPendingIngress(registration);
+			// A batch of new moves whose later moves would pass the room's application state limit: like
+			// the batch budget's split above, the caller issues the moves that fit and then the rest, so
+			// only the crossing moves are refused (settlement replays keep their own hand-back path).
+			if (
+				!issued.ok &&
+				issued.kind === "application-state-limit" &&
+				input.operations.length > 1 &&
+				input.planEffect === undefined &&
+				input.settlementSource === undefined
+			) {
+				const prefixLength = applicationStateAdmittedPrefix(registration, input.operations);
+				if (prefixLength > 0) return localIssueSplit(prefixLength);
+			}
 			return issued;
 		}
 		const joined = await issueOneVertex(
