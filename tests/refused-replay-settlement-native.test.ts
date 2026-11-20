@@ -37,8 +37,12 @@ afterEach(async () => {
 const DOOM_EPOCH = 2;
 // A test lifts the rule to let a given-back move's reissue be admitted (and consume its record).
 let doomLifted = false;
+// Or lifts it for one epoch only. A policy is a function of its context: the epoch's journal is replayed
+// under the same epoch (creator predecessor recovery), so a rule lifted for an epoch stays lifted there.
+let liftedEpoch: number | null = null;
 afterEach(() => {
 	doomLifted = false;
+	liftedEpoch = null;
 });
 const fresh = Object.freeze({ kind: "fresh" as const, commit: () => "committed" as const, release: () => undefined });
 
@@ -46,7 +50,10 @@ const fresh = Object.freeze({ kind: "fresh" as const, commit: () => "committed" 
 const doomingPolicy = (context: Readonly<{ epoch: number }>) =>
 	Object.freeze({
 		reserve: (operation: Readonly<Record<string, unknown>>) =>
-			!doomLifted && context.epoch >= DOOM_EPOCH && String(operation.id ?? "").startsWith("doomed")
+			!doomLifted &&
+			context.epoch !== liftedEpoch &&
+			context.epoch >= DOOM_EPOCH &&
+			String(operation.id ?? "").startsWith("doomed")
 				? Object.freeze({ kind: "rejected" as const })
 				: fresh,
 	});
@@ -394,23 +401,27 @@ it("a reissued move whose reissue's replay is refused again is given back at its
 	expect(first.operations[0]?.id).toBe("doomed-1");
 	const origin = first.handBack.sourceSequence;
 	expect(first.originSequence, "the first hand-back is the move's own row").toBe(origin);
-	// Offered again while the rule is lifted: admitted, the record consumed, the entry written.
-	doomLifted = true;
+	// The record waits across an epoch; epoch 3 lifts the rule.
+	await room.deliver();
+	await room.adopt();
+	await room.install(3);
+	expect(room.listed()).toEqual(["doomed-1"]);
+	// Offered again in epoch 3 (lifted): admitted, the record consumed, the entry written.
+	liftedEpoch = 3;
 	await room.deliver();
 	await room.writer.room.issue(required(first.operations[0]), { handBack: first.handBack });
-	doomLifted = false;
 	const reissuedPlan = required(await readPlan());
 	expect(reissuedPlan.reissueOrigins?.length, "the reissue's origin entry").toBe(1);
 	const reissue = required(reissuedPlan.reissueOrigins?.[0]);
 	expect(reissue.originSequence).toBe(origin);
-	// The reissued row is lost; the next install replays it and the rule refuses it again.
+	// The reissued row is lost; the next install replays it in epoch 4 and the rule refuses it again.
 	expect(await room.lose()).toBe(1);
 	await room.adopt();
 	const failures: string[] = [];
 	try {
-		await room.install(3);
+		await room.install(4);
 	} catch (error) {
-		failures.push(`install 3: ${explain(error)}`);
+		failures.push(`install 4: ${explain(error)}`);
 	}
 	const status = room.status();
 	const plan = required(await readPlan());
@@ -426,6 +437,7 @@ it("a reissued move whose reissue's replay is refused again is given back at its
 	expect(second.handBack.sourceSequence, "the record is the reissued row's").toBe(reissue.reissueSequence);
 	expect(Reflect.get(second, "reason"), "typed with the refusal reason").toBe("admission-rejected");
 	expect(second.originSequence, "the move's origin, not the reissued row").toBe(origin);
+	expect(second.supersededBy, "never superseded by its own reissued row").toBeUndefined();
 	const records = (plan.handBacks ?? []).filter((record) => record.reissueSequence === null);
 	expect(records.map((record) => [record.sourceSequence, record.originSequence, record.reason])).toEqual([
 		[reissue.reissueSequence, origin, "admission-rejected"],
@@ -433,10 +445,10 @@ it("a reissued move whose reissue's replay is refused again is given back at its
 	expect(plan.reissueOrigins, "the reissue's entry passed to the new record").toBeUndefined();
 	// The Writer keeps playing; the given-back move is not replayed.
 	await room.deliver();
-	await room.writer.room.issue(block("w-3", 3));
+	await room.writer.room.issue(block("w-4", 4));
 	await room.deliver();
 	await room.adopt();
-	await room.install(4);
-	expect(room.ids(room.creator)).toEqual(["w-0", "w-3"]);
+	await room.install(5);
+	expect(room.ids(room.creator)).toEqual(["w-0", "w-4"]);
 	expect(room.listed()).toEqual(["doomed-1"]);
 }, 600_000);

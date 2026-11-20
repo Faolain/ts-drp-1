@@ -811,6 +811,28 @@ export function settlementMoveOrigin(
 }
 
 /**
+ * The origin of the move an own row carried, for a row read back from the author's history (the
+ * given-back moves' supersession): settlementMoveOrigin, and, when the chain ends at a row the plan holds
+ * a hand-back record of with an origin, that record's origin. A reissued move given back again keeps its
+ * origin only on its new record: the same write drops its reissueOrigins entry, so the reissued row
+ * alone would read as a move of its own (and as a newer move of its own identity). Plan data only.
+ * @param plan - The durable plan (absent when none).
+ * @param sequence - The own row.
+ * @returns The move's origin.
+ */
+export function settlementOwnRowOrigin(
+	plan: Pick<SettlementPlan, "entries" | "handBacks" | "reissueOrigins"> | null | undefined,
+	sequence: number
+): number {
+	const { originSequence, reissue } = settlementMoveOrigin(plan, sequence);
+	if (reissue !== undefined) return originSequence;
+	return (
+		plan?.handBacks?.find((record) => record.sourceSequence === originSequence && record.originSequence !== undefined)
+			?.originSequence ?? originSequence
+	);
+}
+
+/**
  * The hand-back records of one expired or frontier-resolved own row, each carrying its move's origin
  * (settlementMoveOrigin) when it differs from the row, merged into the plan's records; and the plan's
  * reissue origins without the entry that origin was read from (the move is settled: the entry's job

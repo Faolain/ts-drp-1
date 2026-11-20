@@ -18,6 +18,7 @@ import {
 	settlementHandBacksAtOrigin,
 	settlementHandBacksWith,
 	settlementMoveOrigin,
+	settlementOwnRowOrigin,
 	settlementPlanHasExactEffectLink,
 	settlementReissueLastCarrier,
 	settlementReissueOriginsUnsettled,
@@ -488,6 +489,12 @@ describe("settlement reissue origins: codec", () => {
 		// The move is counted once, by its record (the entry no longer counts it).
 		expect(settlementBacklogMoves(after, new Map()).fixed).toBe(1);
 		expect(settlementBacklogMoves(after, new Map()).pending).toEqual([]);
+		// Read back from history, row 20 is still the move that began at 3: its origin now lives on its record
+		// alone (the links-and-entries walk alone reads 20), so the move never supersedes itself.
+		expect(settlementMoveOrigin(after, 20)).toEqual({ originSequence: 20 });
+		expect(settlementOwnRowOrigin(after, 20)).toBe(3);
+		expect(settlementOwnRowOrigin(before, 20)).toBe(3);
+		expect(settlementOwnRowOrigin(after, 21)).toBe(21);
 	});
 
 	it("a plan write keeps or drops an entry, never adds or alters one", () => {

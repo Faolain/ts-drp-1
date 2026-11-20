@@ -11,7 +11,7 @@ import {
 	settlementBacklogMoves,
 	type SettlementHandBackReason,
 	settlementHandBacksAtOrigin,
-	settlementMoveOrigin,
+	settlementOwnRowOrigin,
 	settlementReissueOriginsUnsettled,
 	settlementSourceContextsForEntries,
 	settlementWindowHandBacks,
@@ -7200,7 +7200,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// Durable author order per identity (track 46): for each unconsumed hand-back record of a move with a
 	// displacement identity, the newest own issued row of that identity with a later ORIGIN (a reissue of
 	// another given-back move has a high sequence but an older origin, so a row's origin is read through
-	// reissueOrigins and the replacement links). Computed before a plan write's listing is published and
+	// reissueOrigins, the replacement links and, for a reissued move given back again, its record:
+	// settlementOwnRowOrigin; else that move would supersede itself). Computed before a plan write's listing is published and
 	// after own issues, memoized by plan revision and lineage head; the issued rows' identity keys are kept
 	// (rowIdentities) so a refresh reads only rows it has not seen. settlementStatus() is polled every
 	// second and never reads issued rows.
@@ -7295,7 +7296,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		>();
 		for (const [sequence, identities] of rowIdentities) {
 			if (sequence >= head) continue;
-			const origin = settlementMoveOrigin(plan, sequence).originSequence;
+			const origin = settlementOwnRowOrigin(plan, sequence);
 			for (const { key, operation } of identities) {
 				if (!keys.has(key)) continue;
 				const prior = newest.get(key);
