@@ -343,8 +343,12 @@ function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boo
 }
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
-	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
-		plan.completedSourceCustody === undefined && !plan.entries.some(entry => entry.handedBack !== undefined)
+	return plan.sourceContexts === undefined &&
+		plan.handBacks === undefined &&
+		plan.memberFrontier === undefined &&
+		plan.completedSourceCustody === undefined &&
+		plan.reissueOrigins === undefined &&
+		!plan.entries.some((entry) => entry.handedBack !== undefined)
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -360,7 +364,9 @@ export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): n
  *   for each potential row.
  * - one displaced-source context and the completed-source custody marker when a completed replacement
  *   still lacks its context.
- * - the hand-back reserve (HB), and the last-member frontier when the geometry gives one.
+ * - the hand-back reserve (HB), each record with its origin, and the reissue-origin reserve (one entry per
+ *   record slot that could still yield one, consumed records included, within the entry bound), and the
+ *   last-member frontier when the geometry gives one.
  * Pinned by tests/source-custody-sizing-dispositions.test.ts. */
 export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
 	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry,
@@ -486,39 +492,110 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const freeHandBacks = either === 0 ? 0 : Math.min(operationBudget,
 		Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingHandBacks.length));
 	const recordOperation = Math.min(operationBudget, maxHandBackOperationByteLength);
-	const handBackFields = {sourceSequence: integer, sourceDigest: digest, sourceEpoch: integer, intent: integer,
-		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer,
-		reason: encodeCanonical(WIDEST_HAND_BACK_REASON).byteLength};
+	// Every record is charged as if it carries its move's origin (originSequence, written when the move
+	// began before the record's row; track 46) and, being possibly a refused replay's hand-back, the widest
+	// reason (row 97). A refused replay of a reissued move's row writes both on one record.
+	const handBackFields = {
+		sourceSequence: integer,
+		sourceDigest: digest,
+		sourceEpoch: integer,
+		intent: integer,
+		exactCanonicalOperationBytes: bytesWidth(recordOperation),
+		reissueSequence: integer,
+		originSequence: integer,
+		reason: encodeCanonical(WIDEST_HAND_BACK_REASON).byteLength,
+	};
 	const handBackOverhead = unsignedRecordWidth({}, handBackFields) - recordOperation;
 	const reservedOperation = Math.min(operationBudget, freeHandBacks * recordOperation);
 	const handBackShape = unsignedRecordShape({}, Object.fromEntries(Object.keys(handBackFields).map(key => [key, leaf])));
-	const widestHandBacks = existingHandBacks.map(record =>
-		record.reissueSequence === null ? {...record, reissueSequence: Number.MAX_SAFE_INTEGER} : record);
-	const handBacks = existingHandBacks.length + freeHandBacks === 0 ? undefined : {
-		width: unsignedArrayWidth([...widestHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
-			...Array.from({length: freeHandBacks}, (_, index) => handBackOverhead +
-				Math.floor(reservedOperation / freeHandBacks) + Number(index < reservedOperation % freeHandBacks))]),
-		shape: unsignedArrayShape([...widestHandBacks.map(unsignedCanonicalShape),
-			...Array.from({length: freeHandBacks}, () => handBackShape)]),
-	};
+	// The widest each existing record can be written: an unconsumed record at its consumed width (a maximum
+	// reissueSequence, bb6455fe), and a record without an origin with a maximum originSequence (track 46).
+	// Both apply to the same record when it is unconsumed and has no origin.
+	const widestHandBacks = existingHandBacks.map((record) => ({
+		...record,
+		...(record.reissueSequence === null ? { reissueSequence: Number.MAX_SAFE_INTEGER } : {}),
+		...(record.originSequence === undefined ? { originSequence: Number.MAX_SAFE_INTEGER } : {}),
+	}));
+	const handBacks =
+		existingHandBacks.length + freeHandBacks === 0
+			? undefined
+			: {
+					width: unsignedArrayWidth([
+						...widestHandBacks.map((record) => encodeCanonical(record, unsignedEncodingLimits).byteLength),
+						...Array.from(
+							{ length: freeHandBacks },
+							(_, index) =>
+								handBackOverhead +
+								Math.floor(reservedOperation / freeHandBacks) +
+								Number(index < reservedOperation % freeHandBacks)
+						),
+					]),
+					shape: unsignedArrayShape([
+						...widestHandBacks.map(unsignedCanonicalShape),
+						...Array.from({ length: freeHandBacks }, () => handBackShape),
+					]),
+				};
+	// Reissue origins (a separate bound from the records): existing entries exactly, and one more entry for
+	// every record slot that could still yield one, up to the entry bound: each unconsumed record, each
+	// reserved free record, and each consumed record (a window write drops it and frees its slot for a new
+	// record; counting it only once dropped would let that maintenance write raise the forecast: model
+	// issuance-image-capacity.qnt, O, mutant originReserveIgnoresConsumed). A reissue writes its entry in its
+	// own issuance transaction; its admission sizes the plan after that effect, so the reserve here is what
+	// covers it.
+	const existingOrigins = captured?.reissueOrigins ?? [];
+	const freeOrigins = Math.min(
+		Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingOrigins.length),
+		existingHandBacks.length + freeHandBacks
+	);
+	const originWidth = unsignedRecordWidth({}, { originSequence: integer, reissueSequence: integer });
+	const originShape = unsignedRecordShape({}, { originSequence: leaf, reissueSequence: leaf });
+	const reissueOrigins =
+		existingOrigins.length + freeOrigins === 0
+			? undefined
+			: {
+					width: unsignedArrayWidth([
+						...existingOrigins.map((entry) => encodeCanonical(entry, unsignedEncodingLimits).byteLength),
+						...Array.from({ length: freeOrigins }, () => originWidth),
+					]),
+					shape: unsignedArrayShape([
+						...existingOrigins.map(unsignedCanonicalShape),
+						...Array.from({ length: freeOrigins }, () => originShape),
+					]),
+				};
 	// The last-member frontier: the stored record exactly, or the one a removing close may persist.
 	const memberFrontierLength = captured?.memberFrontier?.exactCanonicalContextBytes.byteLength ??
 		(hasMemberFrontierGeometry ? Number(geometry.maxMemberFrontierByteLength) : undefined);
 	const memberFrontier = memberFrontierLength === undefined ? undefined
 		: unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(memberFrontierLength)});
 	// The completed-source custody marker: stored, or the one this close's completed-entry custody may write.
-	const completedSourceCustody = captured?.completedSourceCustody === true || completedWithoutContext
-		? encodeCanonical(true).byteLength : undefined;
-	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
-		entries: unsignedArrayWidth(entryWidths), sourceContexts: sourceContextsWidth,
-		...(handBacks === undefined ? {} : {handBacks: handBacks.width}),
-		...(memberFrontier === undefined ? {} : {memberFrontier}),
-		...(completedSourceCustody === undefined ? {} : {completedSourceCustody})});
-	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
-		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes),
-		...(handBacks === undefined ? {} : {handBacks: handBacks.shape}),
-		...(memberFrontier === undefined ? {} : {memberFrontier: contextShape}),
-		...(completedSourceCustody === undefined ? {} : {completedSourceCustody: leaf})});
+	const completedSourceCustody =
+		captured?.completedSourceCustody === true || completedWithoutContext ? encodeCanonical(true).byteLength : undefined;
+	const byteLength = unsignedRecordWidth(
+		{ scope },
+		{
+			revision: integer,
+			fenceSequence: integer,
+			entries: unsignedArrayWidth(entryWidths),
+			sourceContexts: sourceContextsWidth,
+			...(handBacks === undefined ? {} : { handBacks: handBacks.width }),
+			...(memberFrontier === undefined ? {} : { memberFrontier }),
+			...(completedSourceCustody === undefined ? {} : { completedSourceCustody }),
+			...(reissueOrigins === undefined ? {} : { reissueOrigins: reissueOrigins.width }),
+		}
+	);
+	const shape = unsignedRecordShape(
+		{ scope },
+		{
+			revision: leaf,
+			fenceSequence: leaf,
+			entries: unsignedArrayShape(entryShapes),
+			sourceContexts: unsignedArrayShape(contextShapes),
+			...(handBacks === undefined ? {} : { handBacks: handBacks.shape }),
+			...(memberFrontier === undefined ? {} : { memberFrontier: contextShape }),
+			...(completedSourceCustody === undefined ? {} : { completedSourceCustody: leaf }),
+			...(reissueOrigins === undefined ? {} : { reissueOrigins: reissueOrigins.shape }),
+		}
+	);
 	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
 	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
 		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
@@ -2097,10 +2174,21 @@ function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan
 		const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 		const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 		const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
-		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries",
-			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
-			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])])) throw invalid();
+		const hasReissueOrigins = typeof value === "object" && value !== null && Object.hasOwn(value, "reissueOrigins");
+		if (
+			!isClosedDurableIssuanceRecord(value, [
+				"scope",
+				"revision",
+				"fenceSequence",
+				"entries",
+				...(hasContexts ? ["sourceContexts"] : []),
+				...(hasHandBacks ? ["handBacks"] : []),
+				...(hasMemberFrontier ? ["memberFrontier"] : []),
+				...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+				...(hasReissueOrigins ? ["reissueOrigins"] : []),
+			])
+		)
+			throw invalid();
 		assertDurableIssueScope(value.scope);
 		const verified = copySettlementPlan(value, value.scope);
 		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();

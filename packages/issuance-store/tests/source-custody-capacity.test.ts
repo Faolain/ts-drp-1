@@ -161,6 +161,80 @@ describe("accepted source custody numerical reserve", () => {
 		expect(sizedPrior.maxDepth).toBeGreaterThanOrEqual(sizedAfter.maxDepth);
 		expect(sizedPrior.byteLength).toBeGreaterThanOrEqual(encodeCanonical(after).byteLength);
 	});
+	// G22 (sized >= written), refused replay x track 46: the refused row is a reissued move's row (it has a
+	// reissueOrigins entry). The ONE hand-back write expires it with the widest handedBack, writes records
+	// carrying BOTH the widest reason and the move's origin, and drops that entry (its job passes to the
+	// records). With the entry bound full the origin reserve has no free entry left, so only the records'
+	// own charge can hold their origins. Sequences near the safe-integer maximum: every integer at its
+	// widest encoding.
+	it.each([
+		["one reissue-origin entry", 1],
+		["the reissue-origin entry bound full", SETTLEMENT_HAND_BACK_LIMITS.maxRecords],
+	] as const)(
+		"charges a refused replay's hand-back of a reissued move (reason and origin on every record): %s",
+		(_label, origins) => {
+			const base = Number.MAX_SAFE_INTEGER - 1_000;
+			const reissued = base + 500;
+			const origin = base + 1;
+			const others = Array.from({ length: origins - 1 }, (_, index) => ({
+				originSequence: base + 2 + index,
+				reissueSequence: base + 600 + index,
+			}));
+			const entry = (disposition: "rebase" | "expire"): Record<string, unknown> => ({
+				sourceSequence: reissued,
+				sourceDigest: new Uint8Array(32).fill(7),
+				disposition,
+				replacementSequence: null,
+				...(disposition === "expire" ? { handedBack: { fromIntent: 0, reason: widestReason } } : {}),
+			});
+			const prior = copySettlementPlan(
+				{
+					scope,
+					revision: base,
+					fenceSequence: null,
+					entries: [entry("rebase")],
+					reissueOrigins: [{ originSequence: origin, reissueSequence: reissued }, ...others],
+				},
+				scope
+			);
+			const after = copySettlementPlan(
+				{
+					scope,
+					revision: base + 1,
+					fenceSequence: null,
+					entries: [entry("expire")],
+					handBacks: Array.from({ length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords }, (_, intent) => ({
+						reason: widestReason,
+						sourceSequence: reissued,
+						sourceDigest: new Uint8Array(32).fill(7),
+						sourceEpoch: Number.MAX_SAFE_INTEGER,
+						intent,
+						originSequence: origin,
+						exactCanonicalOperationBytes: new Uint8Array(RECORD_OPERATION).fill(9),
+						reissueSequence: null,
+					})),
+					...(others.length === 0 ? {} : { reissueOrigins: others }),
+				},
+				scope
+			);
+			if (prior === undefined || after === undefined) throw new Error("both plans are well formed");
+			expect(
+				after.handBacks?.every((record) => record.reason === widestReason && record.originSequence === origin)
+			).toBe(true);
+			expect(() => assertSettlementPlanProgressTransition(prior, after)).not.toThrow();
+			for (const count of [0, 4]) {
+				const sizedPrior = issuanceSourceCustodyPlanResourceForSizing(scope, prior, count, geometry, RECORD_OPERATION);
+				const sizedAfter = issuanceSourceCustodyPlanResourceForSizing(scope, after, count, geometry, RECORD_OPERATION);
+				expect(sizedPrior.byteLength, `${count} potential sources`).toBeGreaterThanOrEqual(
+					encodeCanonical(after).byteLength
+				);
+				expect(sizedPrior.byteLength).toBeGreaterThanOrEqual(sizedAfter.byteLength);
+				expect(sizedPrior.nativeStorageByteLength).toBeGreaterThanOrEqual(sizedAfter.nativeStorageByteLength);
+				expect(sizedPrior.items).toBeGreaterThanOrEqual(sizedAfter.items);
+				expect(sizedPrior.maxDepth).toBeGreaterThanOrEqual(sizedAfter.maxDepth);
+			}
+		}
+	);
 	it("charges the same custody alternative in exact and warmed native forecasts", () => {
 		const commit = d109bCommit(scope, 0, 0);
 		const intent = {kind: "v3-issuance-pending-unsigned-1" as const, authorSequence: 0,

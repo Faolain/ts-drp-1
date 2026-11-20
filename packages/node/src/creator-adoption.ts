@@ -1115,13 +1115,26 @@ const reconciledReceivedTurnovers = new WeakMap<object, ReceivedTurnoverBoundary
  * sizing the lull's turnover did already holds the reissued plan (G22, sized >= written;
  * pinned in source-custody-capacity.test.ts). So a member whose lull's turnover gave a move back, and
  * whose application offered it again before the next install, keeps that install's skip.
+ * The same transaction also adds the reissue's origin entry (reissueOrigins, track 46): an
+ * entry whose reissueSequence is a record's consumption mark is that mark's companion and is
+ * read the same way (only when that reissued row is later given back, which no turnover in the
+ * boundary does: the row is newer than the turnover's Cut); the sizing's origin reserve already
+ * holds it (one entry per record that can still be consumed). An entry no record names (a
+ * record pruned while its entry stays) is compared as it is.
  * Every other plan change (an entry, a source context, the fence, a record added, pruned or
  * changed in any other field) still ends the boundary. */
 function receivedTurnoverPlanInput(plan: Awaited<ReturnType<DurableIssuanceStore["readSettlementPlan"]>>): unknown {
 	if (plan === null) return null;
-	const { revision: _revision, handBacks, ...read } = plan;
-	return handBacks === undefined ? read
-		: { ...read, handBacks: handBacks.map(({ reissueSequence: _reissueSequence, ...record }) => record) };
+	const { revision: _revision, handBacks, reissueOrigins, ...read } = plan;
+	const marks = new Set((handBacks ?? []).map((record) => record.reissueSequence));
+	const origins = reissueOrigins?.filter((entry) => !marks.has(entry.reissueSequence));
+	return {
+		...read,
+		...(handBacks === undefined
+			? {}
+			: { handBacks: handBacks.map(({ reissueSequence: _reissueSequence, ...record }) => record) }),
+		...(origins === undefined || origins.length === 0 ? {} : { reissueOrigins: origins }),
+	};
 }
 
 async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,

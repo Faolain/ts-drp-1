@@ -1,8 +1,12 @@
 import { encodeCanonical } from "@ts-drp/canonical";
+import {
+	type DurableIssuanceOutboxRecord,
+	SETTLEMENT_HAND_BACK_LIMITS,
+	type SettlementPlan,
+} from "@ts-drp/issuance-store";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type DurableIssuanceOutboxRecord, SETTLEMENT_HAND_BACK_LIMITS } from "@ts-drp/issuance-store";
 import { afterEach, expect, it } from "vitest";
 
 import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
@@ -354,4 +358,85 @@ it("with all 64 hand-back records taken, a refused replay stays live and the ins
 	expect(room.listed().length).toBe(SETTLEMENT_HAND_BACK_LIMITS.maxRecords);
 	expect(status.deferred, "the live move is reported deferred").toBe(1);
 	expect(room.ids(room.creator)).toEqual(["w-0"]);
+}, 600_000);
+
+// Refused replay x track 46 (integration int7-wo): the move a refused replay gave back is offered again
+// (its reissue consumes the record and maps the reissued row to the move's origin, reissueOrigins), and
+// that reissued row is displaced and its replay refused too. The second hand-back keeps the move's
+// origin (the row the author first made it in), carries the refusal reason, and takes over the reissue's
+// entry in the same plan write: the entry is dropped (it was the plan's only one), so the move holds
+// exactly one backlog slot, by its record.
+it("a reissued move whose reissue's replay is refused again is given back at its origin, and its entry is dropped", async () => {
+	const directory = mkdtempSync(join(tmpdir(), "refused-replay-reissued-"));
+	const room = await doomingRoom(directory);
+	const author = required(room.fixture.identities[1]).author;
+	const scope = { author, objectId: room.fixture.objectId };
+	const readPlan = async (): Promise<SettlementPlan | null> => {
+		const issuance = await createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" }).openIssuance(
+			"peer-1"
+		);
+		try {
+			return await issuance.readSettlementPlan(scope);
+		} finally {
+			await issuance.close();
+		}
+	};
+	await room.writer.room.issue(block("w-0", 0));
+	await room.deliver();
+	await room.adopt();
+	await room.install(1);
+	await room.deliver();
+	await room.writer.room.issue(block("doomed-1", 1));
+	expect(await room.lose()).toBe(1);
+	await room.adopt();
+	await room.install(2); // the replay is refused: given back (reason admission-rejected)
+	const first = required(room.status().undelivered[0]);
+	expect(first.operations[0]?.id).toBe("doomed-1");
+	const origin = first.handBack.sourceSequence;
+	expect(first.originSequence, "the first hand-back is the move's own row").toBe(origin);
+	// Offered again while the rule is lifted: admitted, the record consumed, the entry written.
+	doomLifted = true;
+	await room.deliver();
+	await room.writer.room.issue(required(first.operations[0]), { handBack: first.handBack });
+	doomLifted = false;
+	const reissuedPlan = required(await readPlan());
+	expect(reissuedPlan.reissueOrigins?.length, "the reissue's origin entry").toBe(1);
+	const reissue = required(reissuedPlan.reissueOrigins?.[0]);
+	expect(reissue.originSequence).toBe(origin);
+	// The reissued row is lost; the next install replays it and the rule refuses it again.
+	expect(await room.lose()).toBe(1);
+	await room.adopt();
+	const failures: string[] = [];
+	try {
+		await room.install(3);
+	} catch (error) {
+		failures.push(`install 3: ${explain(error)}`);
+	}
+	const status = room.status();
+	const plan = required(await readPlan());
+	console.log(
+		`REFUSED_REPLAY_REISSUED ${JSON.stringify({ failures, origin, reissue, undelivered: status.undelivered, reissueOrigins: plan.reissueOrigins ?? null, records: (plan.handBacks ?? []).map(({ sourceSequence, intent, originSequence, reissueSequence, reason }) => ({ sourceSequence, intent, originSequence, reissueSequence, reason })) })}`
+	);
+	expect(failures, "the install completes").toEqual([]);
+	expect(
+		status.undelivered.map((move) => move.operations[0]?.id),
+		"given back once more"
+	).toEqual(["doomed-1"]);
+	const second = required(status.undelivered[0]);
+	expect(second.handBack.sourceSequence, "the record is the reissued row's").toBe(reissue.reissueSequence);
+	expect(Reflect.get(second, "reason"), "typed with the refusal reason").toBe("admission-rejected");
+	expect(second.originSequence, "the move's origin, not the reissued row").toBe(origin);
+	const records = (plan.handBacks ?? []).filter((record) => record.reissueSequence === null);
+	expect(records.map((record) => [record.sourceSequence, record.originSequence, record.reason])).toEqual([
+		[reissue.reissueSequence, origin, "admission-rejected"],
+	]);
+	expect(plan.reissueOrigins, "the reissue's entry passed to the new record").toBeUndefined();
+	// The Writer keeps playing; the given-back move is not replayed.
+	await room.deliver();
+	await room.writer.room.issue(block("w-3", 3));
+	await room.deliver();
+	await room.adopt();
+	await room.install(4);
+	expect(room.ids(room.creator)).toEqual(["w-0", "w-3"]);
+	expect(room.listed()).toEqual(["doomed-1"]);
 }, 600_000);

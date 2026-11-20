@@ -608,6 +608,10 @@ export function createV3RoomRolloverPolicy(
 	let settlement: V3RoomSettlementStatus | undefined;
 	const takenBack = new Set<string>();
 	const handBackOf = new WeakMap<object, V3RoomHandBack>();
+	// The room's durable author order for a given-back move (its listing's supersededBy): the author's
+	// newer move of the same identity, recomputed by the room from its plan and issued rows, so it
+	// survives a reload that empties this policy's history.
+	const supersededByOf = new WeakMap<object, Readonly<Record<string, unknown>>>();
 	const handBackKey = (handBack: V3RoomHandBack): string => `${handBack.sourceSequence}:${handBack.intent}`;
 	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
 	// Author order (input.identity): each new move's place in the order the page asked for moves, and the
@@ -1013,28 +1017,36 @@ export function createV3RoomRolloverPolicy(
 	// move offered again is a kept re-offer like any other: it takes what the epoch's budget leaves, and
 	// with none left (or while it is kept already) it waits, kept, for a later epoch, still after the
 	// older move.
+	//
+	// The newer move is this session's last accepted move of the identity when there is one (every move
+	// accepted in this session is newer than any row issued before it, and at least as new as the room's
+	// answer), else, for a given-back move, the room's durable supersededBy (author order by origin, from
+	// the plan and the issued rows): after a reload this policy has no history, and the room's answer
+	// still keeps the older move from landing last.
 	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<"next" | "stop-new" | "stop-all"> => {
 		const identity = identityOf(operation);
 		const newest = identity === undefined ? undefined : latest.get(identity);
 		const givenBack = handBackOf.has(operation);
+		const newer = newest?.operation ?? (givenBack ? supersededByOf.get(operation) : undefined);
 		const superseded =
-			newest !== undefined &&
-			!sameMove(newest.operation, operation) &&
-			(givenBack || (requestOrder.get(operation) ?? 0) < newest.order);
+			newer !== undefined &&
+			!sameMove(newer, operation) &&
+			(givenBack || (requestOrder.get(operation) ?? 0) < (newest?.order ?? 0));
 		if (superseded && !givenBack) {
-			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), false));
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newer, currentEpoch(), false));
 			return "next";
 		}
 		const answer = await offerOne(operation);
 		if (answer !== "issued") return answer;
 		if (superseded) {
-			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newest.operation, currentEpoch(), true));
-			if (kept.includes(newest.operation)) return "next";
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newer, currentEpoch(), true));
+			// The room's answer is a copy of the operation, so "kept already" compares the move itself.
+			if (kept.some((candidate) => sameMove(candidate, newer))) return "next";
 			if (!keptRoomLeft()) {
-				keep(newest.operation, currentEpoch());
+				keep(newer, currentEpoch());
 				return "next";
 			}
-			const again = await offerOne(newest.operation);
+			const again = await offerOne(newer);
 			return again === "issued" ? "next" : again;
 		}
 		return "next";
@@ -1124,6 +1136,7 @@ export function createV3RoomRolloverPolicy(
 						// good waits to be past that epoch.
 						for (const operation of given.operations) {
 							handBackOf.set(operation, given.handBack);
+							if (given.supersededBy !== undefined) supersededByOf.set(operation, given.supersededBy.operation);
 							keep(operation, refusedGivenBack.get(key) ?? next.epoch - 1);
 						}
 					}

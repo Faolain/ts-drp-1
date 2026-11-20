@@ -44,14 +44,33 @@ const expired = Object.freeze({
 	sourceDigest: new Uint8Array(32).fill(0xd1),
 	sourceSequence: 7,
 });
-const plan = (revision: number, handBacks: readonly unknown[] | undefined, fenceSequence: number | null = 4) =>
+type PlanFixture = Readonly<{
+	entries: readonly (typeof expired)[];
+	fenceSequence: number | null;
+	handBacks?: readonly unknown[];
+	reissueOrigins?: readonly unknown[];
+	revision: number;
+	scope: typeof SCOPE;
+}>;
+const plan = (
+	revision: number,
+	handBacks: readonly unknown[] | undefined,
+	fenceSequence: number | null = 4,
+	reissueOrigins?: readonly unknown[]
+): PlanFixture =>
 	Object.freeze({
 		entries: Object.freeze([expired]),
 		fenceSequence,
 		...(handBacks === undefined ? {} : { handBacks: Object.freeze([...handBacks]) }),
+		...(reissueOrigins === undefined ? {} : { reissueOrigins: Object.freeze([...reissueOrigins]) }),
 		revision,
 		scope: SCOPE,
 	});
+// The reissue's own issuance transaction also maps the reissued row to its move's origin (track 46).
+const origin = (
+	reissueSequence: number,
+	originSequence = 7
+): Readonly<{ originSequence: number; reissueSequence: number }> => Object.freeze({ originSequence, reissueSequence });
 const effect = (intent = 0) => Object.freeze({ intent, kind: "hand-back", sourceSequence: 7 });
 
 function commit(authorSequence: number, planEffect: unknown) {
@@ -129,7 +148,7 @@ describe("settlement hand-back record contract", () => {
 		expect(snapshot(copied)).toEqual(snapshot(plan(0, [record()])));
 		expect(snapshot(copySettlementPlanEffect(effect()))).toEqual(snapshot(effect()));
 		const linked = applySettlementPlanEffect(copied!, copySettlementPlanEffect(effect())!, 9);
-		expect(snapshot(linked)).toEqual(snapshot(plan(1, [record({ reissueSequence: 9 })])));
+		expect(snapshot(linked)).toEqual(snapshot(plan(1, [record({ reissueSequence: 9 })], 4, [origin(9)])));
 		expect(settlementPlanHasExactEffectLink(linked, copySettlementPlanEffect(effect())!, 9)).toBe(true);
 		expect(settlementPlanHasExactEffectLink(copied, copySettlementPlanEffect(effect())!, 9)).toBe(false);
 		// One consumption per record.
@@ -200,7 +219,7 @@ describe("settlement hand-back record contract", () => {
 				// The reissued row consumes it in its own issuance transaction.
 				await store.transactIssue(SCOPE, (sequence) => Promise.resolve(commit(sequence, effect())));
 				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(
-					snapshot(plan(1, [record({ reissueSequence: 8 })]))
+					snapshot(plan(1, [record({ reissueSequence: 8 })], 4, [origin(8)]))
 				);
 				// A second row cannot consume it again; nothing is issued.
 				expect(
@@ -264,7 +283,8 @@ describe("settlement hand-back record contract", () => {
 					code(await failure(decline(2, plan(3, undefined), Object.freeze({ intent: 0, sourceSequence: 7 }))))
 				).toBe("ISSUANCE_RETRY_REQUIRED");
 				expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(
-					snapshot(plan(2, [record({ reissueSequence: 8 })]))
+					// The reissue's own transaction consumed the record and mapped row 8 to the move's origin.
+					snapshot(plan(2, [record({ reissueSequence: 8 })], 4, [origin(8)]))
 				);
 			} finally {
 				await store.close();
@@ -288,7 +308,7 @@ describe("settlement hand-back record contract", () => {
 			expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(snapshot(plan(0, [record(), record({ intent: 1 })])));
 			await store.transactIssue(SCOPE, (sequence) => Promise.resolve(commit(sequence, effect(1))));
 			expect(snapshot(await store.readSettlementPlan(SCOPE))).toEqual(
-				snapshot(plan(1, [record(), record({ intent: 1, reissueSequence: 8 })]))
+				snapshot(plan(1, [record(), record({ intent: 1, reissueSequence: 8 })], 4, [origin(8)]))
 			);
 		} finally {
 			await store.close();
