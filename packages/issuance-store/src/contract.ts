@@ -910,7 +910,8 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 				prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
 				prior.disposition !== "expire" && prior.disposition !== "committed" && prior.disposition !== "inherited" &&
 				prior.replacementSequence === null && prior.replacementProgress === undefined &&
-				(candidate.disposition === "committed" || candidate.disposition === "expire"))) ||
+				(candidate.disposition === "committed" || candidate.disposition === "expire")) &&
+				!settlementWindowExpiryGivesBack(prior, candidate, next)) ||
 			candidate.sourceObjectId !== prior.sourceObjectId ||
 			(prior.sourceContextDigest !== undefined && (candidate.sourceContextDigest === undefined ||
 				!durableIssuanceBytesEqual(prior.sourceContextDigest, candidate.sourceContextDigest))) ||
@@ -985,6 +986,49 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			}
 		}
 	}
+}
+
+/**
+ * The settlement window's expiry of a deferred replacement decision (rule R): an own, unreplaced
+ * rebase/transform entry with no source context, resolution, progress, refusal, inheritance or portable
+ * source may become `expire`, and only in the plan write that gives its move back (at least one
+ * unconsumed hand-back record of that exact source in the next plan). Every other field is checked
+ * unchanged by the caller. The decision itself (the window, the creator's signed frontier classifying
+ * the row displaced) is the node merge's; the store keeps the shape: no unreplaced move ends without
+ * being given back, and nothing replaced, partly replaced, refused or retained ever expires this way.
+ * @param prior - The entry as currently stored.
+ * @param candidate - The entry as proposed.
+ * @param next - The proposed plan (its hand-back records).
+ * @returns Whether the disposition change is that expiry.
+ */
+function settlementWindowExpiryGivesBack(
+	prior: SettlementPlanEntry,
+	candidate: SettlementPlanEntry,
+	next: SettlementPlan
+): boolean {
+	return (
+		(prior.disposition === "rebase" || prior.disposition === "transform") &&
+		candidate.disposition === "expire" &&
+		prior.replacementSequence === null &&
+		prior.replacementProgress === undefined &&
+		prior.transformRefusal === undefined &&
+		prior.sourceContextDigest === undefined &&
+		prior.sourceResolutionDigest === undefined &&
+		prior.sourceResolutionKind === undefined &&
+		prior.inheritance === undefined &&
+		prior.sourceObjectId === undefined &&
+		candidate.sourceContextDigest === undefined &&
+		candidate.sourceResolutionDigest === undefined &&
+		candidate.sourceResolutionKind === undefined &&
+		candidate.replacementProgress === undefined &&
+		candidate.transformRefusal === undefined &&
+		(next.handBacks ?? []).some(
+			(record) =>
+				record.reissueSequence === null &&
+				record.sourceSequence === prior.sourceSequence &&
+				durableIssuanceBytesEqual(record.sourceDigest, prior.sourceDigest)
+		)
+	);
 }
 
 /**
