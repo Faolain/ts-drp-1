@@ -106,3 +106,40 @@ it("a new move past the room's state limit is refused typed (V3RoomStateLimitRef
 	expect(projection().blocks.find((value) => value.id === block("big", 0, 1000).id)?.kind).toBe("gold");
 	expect(stateBytesWith(projection(), [])).toBeLessThanOrEqual(ROOM_APPLICATION_STATE_BYTES);
 }, 600_000);
+
+// A batch of new moves (moves issued together are drained as one applicationBatch vertex) whose last
+// moves would pass the limit: like the existing split-required path, the moves that fit are admitted
+// and only the crossing ones get the typed refusal. Refusing the whole batch would refuse moves the
+// state has room for.
+it("a batch of new moves crossing the limit admits the moves that fit; only the crossing ones are refused typed", async () => {
+	const { creator, projection, roll } = await creatorRoom();
+	const LIMIT = ROOM_APPLICATION_STATE_BYTES;
+	// Fill below the limit with exact headroom for some but not all of the batch: big blocks while the
+	// state with the next one stays under LIMIT - 1,600, then medium ones while it stays under LIMIT - 300.
+	let placed = 0;
+	for (const [prefix, idBytes, margin] of [["big", 1000, 1600], ["mid", 100, 300]] as const) {
+		for (let count = 0; stateBytesWith(projection(), [block(prefix, placed, idBytes)]) <= LIMIT - margin; count++) {
+			await creator.room.issue(block(prefix, placed, idBytes));
+			placed++;
+			if (count % 8 === 7) await roll();
+		}
+		await roll();
+	}
+	const batch = Array.from({ length: 16 }, (_, index) => block("tiny", placed + index, 20));
+	// The moves that fit, in order: the longest prefix whose state stays within the limit.
+	let fits = 0;
+	while (fits < batch.length && stateBytesWith(projection(), batch.slice(0, fits + 1)) <= LIMIT) fits++;
+	const headroom = LIMIT - stateBytesWith(projection(), []);
+	expect(fits, `some but not all of the batch fit (headroom ${headroom} B)`).toBeGreaterThan(0);
+	expect(fits).toBeLessThan(batch.length);
+	// Issued together, in one turn: the room drains them as one batch.
+	const results = await Promise.allSettled(batch.map((operation) => creator.room.issue(operation)));
+	const outcome = results.map((result) => (result.status === "fulfilled" ? "admitted" : refusalOf(result.reason)));
+	console.log(`STATE_LIMIT_BATCH ${JSON.stringify({ placed, headroom, fits, outcome })}`);
+	expect(outcome.slice(0, fits), "every move that fits is admitted").toEqual(Array(fits).fill("admitted"));
+	expect(outcome.slice(fits), "each crossing move is refused typed").toEqual(Array(batch.length - fits).fill(TYPED));
+	const ids = new Set(projection().blocks.map((value) => value.id));
+	expect(batch.map((operation) => ids.has(operation.id))).toEqual(batch.map((_, index) => index < fits));
+	expect(stateBytesWith(projection(), [])).toBeLessThanOrEqual(LIMIT);
+	await roll();
+}, 600_000);
