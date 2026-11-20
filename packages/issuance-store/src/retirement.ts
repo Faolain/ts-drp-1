@@ -15,6 +15,7 @@ import {
 	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
+	normalizeSettlementSourceAuthorities,
 	settlementReplacementLastLogicalTimeFromPreimage,
 } from "./contract.js";
 import { durablePreimageHeader } from "./preimage-header.js";
@@ -27,6 +28,7 @@ import {
 	SETTLEMENT_HAND_BACK_LIMITS,
 	SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
+	SETTLEMENT_SOURCE_AUTHORITY_LIMITS,
 	type SettlementPlan,
 } from "./types.js";
 import {
@@ -327,7 +329,7 @@ function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boo
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
 	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
-		plan.completedSourceCustody === undefined
+		plan.completedSourceCustody === undefined && plan.sourceAuthorities === undefined
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -485,16 +487,48 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	// The completed-source custody marker: stored, or the one this close's completed-entry custody may write.
 	const completedSourceCustody = captured?.completedSourceCustody === true || completedWithoutContext
 		? encodeCanonical(true).byteLength : undefined;
+	// Source-authority records (rule R's source epochs). A stored record is charged exactly. A custody
+	// write only narrows or drops records (a resolved row leaves its record); the room's merge at the next
+	// install writes one, with the owed entries it adds, and only for the epoch it just closed: the
+	// potential sources' epoch (geometry.minSourceEpoch). Each potential source may join that epoch's
+	// record, so its record is charged with one more source per potential source, and when absent (and a
+	// record slot is free) as a new record of the open context width (the record's bytes are that epoch's
+	// source context: its anchor, signature, ACL and parameters).
+	const storedAuthorities = captured?.sourceAuthorities ?? [];
+	const authorityEpoch = maxSourceCount > 0 ? geometry.minSourceEpoch : undefined;
+	const growingAuthority = authorityEpoch === undefined ? undefined
+		: storedAuthorities.find(record => record.sourceEpoch === authorityEpoch);
+	const newAuthority = authorityEpoch !== undefined && growingAuthority === undefined &&
+		storedAuthorities.length < SETTLEMENT_SOURCE_AUTHORITY_LIMITS.maxRecords;
+	const potentialAuthoritySources = Array.from({length: maxSourceCount}, () => integer);
+	const authorityWidths = storedAuthorities.map(record => record !== growingAuthority
+		? encodeCanonical(record, unsignedEncodingLimits).byteLength
+		: unsignedRecordWidth({sourceEpoch: record.sourceEpoch}, {digest,
+			exactCanonicalAuthorityBytes: bytesWidth(record.exactCanonicalAuthorityBytes.byteLength),
+			sources: unsignedArrayWidth([...record.sources.map(source => encodeCanonical(source).byteLength),
+				...potentialAuthoritySources])}));
+	const authorityShapes = storedAuthorities.map(record => record !== growingAuthority ? unsignedCanonicalShape(record)
+		: unsignedRecordShape({sourceEpoch: record.sourceEpoch}, {digest: leaf, exactCanonicalAuthorityBytes: leaf,
+			sources: unsignedArrayShape([...record.sources, ...potentialAuthoritySources].map(() => leaf))}));
+	if (newAuthority) {
+		authorityWidths.push(unsignedRecordWidth({}, {digest, exactCanonicalAuthorityBytes: bytesWidth(geometry.maxContextByteLength),
+			sourceEpoch: integer, sources: unsignedArrayWidth(potentialAuthoritySources)}));
+		authorityShapes.push(unsignedRecordShape({}, {digest: leaf, exactCanonicalAuthorityBytes: leaf, sourceEpoch: leaf,
+			sources: unsignedArrayShape(potentialAuthoritySources.map(() => leaf))}));
+	}
+	const sourceAuthorities = authorityWidths.length === 0 ? undefined : unsignedArrayWidth(authorityWidths);
 	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
 		entries: unsignedArrayWidth(entryWidths), sourceContexts: sourceContextsWidth,
 		...(handBacks === undefined ? {} : {handBacks: handBacks.width}),
 		...(memberFrontier === undefined ? {} : {memberFrontier}),
-		...(completedSourceCustody === undefined ? {} : {completedSourceCustody})});
+		...(completedSourceCustody === undefined ? {} : {completedSourceCustody}),
+		...(sourceAuthorities === undefined ? {} : {sourceAuthorities})});
 	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
 		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes),
 		...(handBacks === undefined ? {} : {handBacks: handBacks.shape}),
 		...(memberFrontier === undefined ? {} : {memberFrontier: contextShape}),
-		...(completedSourceCustody === undefined ? {} : {completedSourceCustody: leaf})});
+		...(completedSourceCustody === undefined ? {} : {completedSourceCustody: leaf}),
+		...(authorityShapes.length === 0 ? {} : {sourceAuthorities: unsignedArrayShape(authorityShapes)})});
 	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
 	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
 		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
@@ -2073,10 +2107,12 @@ function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan
 		const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 		const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 		const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
+		const hasSourceAuthorities = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceAuthorities");
 		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])])) throw invalid();
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+			...(hasSourceAuthorities ? ["sourceAuthorities"] : [])])) throw invalid();
 		assertDurableIssueScope(value.scope);
 		const verified = copySettlementPlan(value, value.scope);
 		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();
@@ -2833,7 +2869,9 @@ function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl 
 		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
 		const {sourceContexts: _contexts, ...plain} = plan;
 		const sourceContexts = settlementSourceContextsForEntries(plan, entries);
-		return {...plain, revision: plan.revision + 1, entries, ...(sourceContexts === undefined ? {} : {sourceContexts})};
+		// A record names only owed entries: one whose entry leaves narrows (normalize) in this same rewrite.
+		return normalizeSettlementSourceAuthorities({...plain, revision: plan.revision + 1, entries,
+			...(sourceContexts === undefined ? {} : {sourceContexts})});
 	});
 	return {...rows, plans};
 }

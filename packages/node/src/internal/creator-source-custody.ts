@@ -228,6 +228,27 @@ export function captureCreatorSourceContext(trust: CurrentAnchorTrust, exactCano
 	return identity.context;
 }
 
+/**
+ * Opens a settlement source-authority record's bytes (SettlementSourceAuthority): exactly one creator
+ * source context of a closed source epoch, re-authenticated here on every use (G5) against the plane's
+ * current trust: its anchor by the fixed creator signer, its ACL by that anchor's aclDigest.
+ * @param currentTrust - The plane's authenticated current trust.
+ * @param exactCanonicalAuthorityBytes - The record's exact bytes.
+ * @param expectedBlueprintDigest - The plane's blueprint (the record's source must share it).
+ * @returns The source epoch's trust and ACL, and the bytes as that epoch's source context (custody of an
+ * unresolved row of that epoch takes it, as captureCreatorSourceContext would), or undefined.
+ */
+export function openCreatorSourceAuthority(currentTrust: CurrentAnchorTrust, exactCanonicalAuthorityBytes: Uint8Array,
+	expectedBlueprintDigest: string): Readonly<{trust: CurrentAnchorTrust; acl: LatchedAclSnapshot;
+		context: SettlementSourceContext}> | undefined {
+	if (!(exactCanonicalAuthorityBytes instanceof Uint8Array)) return undefined;
+	const capability = openCreatorSourceCustody({currentTrust, expectedBlueprintDigest, context: {
+		digest: hashDomain(DOMAIN, exactCanonicalAuthorityBytes), exactCanonicalContextBytes: exactCanonicalAuthorityBytes}});
+	const identity = capability === undefined ? undefined : verified.get(capability);
+	return identity === undefined ? undefined : Object.freeze({trust: identity.trust, acl: identity.acl, context: Object.freeze({
+		digest: new Uint8Array(identity.context.digest), exactCanonicalContextBytes: new Uint8Array(identity.context.exactCanonicalContextBytes)})});
+}
+
 /** Exact inclusion is immutable historical DATA. It grants no current role,
  * native currency, or permission to collect a source with remaining consumers. */
 export async function openCreatorSourceCompletion(source: VerifiedCreatorSourceCustody,

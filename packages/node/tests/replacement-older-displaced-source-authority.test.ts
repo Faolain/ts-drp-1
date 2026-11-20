@@ -46,7 +46,7 @@ const names = [
 	"derivePolicyReplacement",
 	"derivePolicySettlement",
 	"settlementOwnRowWindowExpired",
-	...["displacedSourceFor", "keptDisplacedSources"].filter(present),
+	...["displacedSourceFor", "keptDisplacedSources", "settlementSourceAuthorityFor", "settlementSourceAuthorityRecordFor", "refreshSettlementSourceAuthorities"].filter(present),
 ];
 const code = names.map(declaration).join("\n");
 
@@ -61,8 +61,8 @@ const context = {
 	sameBytes: (a: Uint8Array, b: Uint8Array): boolean => Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0,
 	currentRegistration: () => true,
 	// Premise: an authorization is a Writer list (the real check is authorizeLatchedApplicationWrite).
-	isV3ApplicationAuthorAuthorized: (authorization: { writers: string[] }, author: string) =>
-		authorization.writers.includes(author),
+	isV3ApplicationAuthorAuthorized: (authorization: { writers?: string[]; value?: { writers: string[] } }, author: string) =>
+		(authorization.writers ?? authorization.value?.writers ?? []).includes(author),
 	verifiedNestedNativeSources: new WeakSet(),
 	// No verified historical owner names a source older than the immediately closed epoch.
 	resolveVerifiedHistoricalSourceAcl: () => undefined,
@@ -84,13 +84,25 @@ const context = {
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS: 64,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS: { maxBytes: 1 << 20, maxDepth: 16, maxItems: 65536 },
 	V3_SETTLEMENT_OWN_WINDOW_EPOCHS: 4,
+	lowerHexDigest: (bytes: Uint8Array) => Buffer.from(bytes).toString("hex"),
+	// Premise (tests/creator-source-authority-record.test.ts authenticates the real bytes): a record's
+	// bytes name its epoch, anchor and Writers; "forged" bytes do not open.
+	openCreatorSourceAuthority: (_trust: unknown, bytes: Uint8Array) => {
+		const value = JSON.parse(Buffer.from(bytes).toString("utf8")) as { epoch: number; anchor: string; writers: string[]; forged?: true };
+		return value.forged === true ? undefined : {
+			trust: { currentEpoch: value.epoch, currentAnchorDigest: value.anchor },
+			acl: { permissionless: false, members: value.writers.map((author) => ({ author, groups: ["writer"] })), writers: value.writers },
+			context: { digest: Uint8Array.of(value.epoch), exactCanonicalContextBytes: bytes },
+		};
+	},
 };
 const functions = Function(
 	...Object.keys(context),
 	`"use strict";${
 		ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } })
 			.outputText
-	}return { deriveOwnedReplacement, keptDisplacedSources: typeof keptDisplacedSources === "function" ? keptDisplacedSources : undefined };`
+	}return { deriveOwnedReplacement, keptDisplacedSources: typeof keptDisplacedSources === "function" ? keptDisplacedSources : undefined,
+		refreshSettlementSourceAuthorities: typeof refreshSettlementSourceAuthorities === "function" ? refreshSettlementSourceAuthorities : undefined };`
 )(...Object.values(context)) as {
 	deriveOwnedReplacement(
 		registration: unknown,
@@ -98,6 +110,7 @@ const functions = Function(
 		input: unknown
 	): { disposition: string; operations: unknown[] };
 	keptDisplacedSources?: (predecessor: unknown, successorEpoch: number) => readonly unknown[];
+	refreshSettlementSourceAuthorities?: (registration: unknown, plan: unknown) => void;
 };
 
 const writer = "writer";
@@ -201,5 +214,46 @@ describe("rule R blocker (c): the source authority of a row displaced more than 
 			keep!({ payload: prepared(5), displacedSource: { ...authority(4), activationVertexDigest: "ab".repeat(32) } }, 6)
 		).toEqual([]);
 		expect(keep!({ payload: prepared(5) }, 6)).toEqual([]);
+	});
+
+	// Cold reopen (RED 134ea30e): a plane that reopens cold keeps no authority from a live predecessor
+	// (olderDisplacedSources). The row's source epoch authority is the plan's durable source-authority
+	// record, written with the row's entry at the install that closed its epoch, authenticated on this
+	// plane (refreshSettlementSourceAuthorities) and found by the row's signed epoch and anchor.
+	const recordBytes = (epoch: number, writers: string[] = [writer], extra: Record<string, unknown> = {}) =>
+		new Uint8Array(Buffer.from(JSON.stringify({ epoch, anchor: `anchor-${epoch}`, writers, ...extra })));
+	const sourceRecord = (epoch: number, writers?: string[], extra?: Record<string, unknown>) => ({
+		sourceEpoch: epoch, sources: [7], digest: Uint8Array.of(epoch, ...(extra === undefined ? [] : [0xee])),
+		exactCanonicalAuthorityBytes: recordBytes(epoch, writers, extra) });
+	const coldReopened = (records: readonly unknown[]) => {
+		const value: Record<string, unknown> = registration();
+		const refresh = functions.refreshSettlementSourceAuthorities;
+		expect(refresh, "refreshSettlementSourceAuthorities (the plane authenticates the plan's records)").toBeTypeOf("function");
+		refresh!(value, { sourceAuthorities: records });
+		return value;
+	};
+
+	it("a cold-reopened plane derives a deferred row's replacement from the plan's source-authority record", () => {
+		expect(derive(coldReopened([sourceRecord(4)]), displaced(4))).toMatchObject({
+			disposition: "rebase",
+			operations: [{ ...move, rebased: true }],
+		});
+		expect(derive(coldReopened([sourceRecord(3), sourceRecord(4)]), displaced(3))).toMatchObject({ disposition: "rebase" });
+		// The plane's own displaced epoch still uses its displaced source.
+		expect(derive(coldReopened([sourceRecord(4)]), displaced(5))).toMatchObject({ disposition: "rebase" });
+	});
+
+	it("a record keeps the original check and is refused when it does not authenticate", () => {
+		// The author was not a Writer in the source epoch.
+		expect(() => derive(coldReopened([sourceRecord(4, ["someone-else"])]), displaced(4))).toThrow(UNAVAILABLE);
+		// Bytes that do not open, a record of another epoch, a row signed on another anchor.
+		expect(() => derive(coldReopened([sourceRecord(4, [writer], { forged: true })]), displaced(4))).toThrow(UNAVAILABLE);
+		expect(() => derive(coldReopened([sourceRecord(3)]), displaced(4))).toThrow(UNAVAILABLE);
+		expect(() => derive(coldReopened([sourceRecord(4)]), displaced(4, "anchor-forked"))).toThrow(UNAVAILABLE);
+		// A record whose bytes name another epoch than its sourceEpoch, or the plane's own epoch: ignored.
+		expect(() => derive(coldReopened([{ ...sourceRecord(4), sourceEpoch: 3 }]), displaced(4))).toThrow(UNAVAILABLE);
+		expect(() => derive(coldReopened([sourceRecord(6)]), displaced(6))).toThrow();
+		// No records: the cold reopen's original refusal.
+		expect(() => derive(coldReopened([]), displaced(4))).toThrow(UNAVAILABLE);
 	});
 });

@@ -1,7 +1,7 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { durablePreimageHeader } from "./preimage-header.js";
-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
+import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_SOURCE_AUTHORITY_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
 import type {
 	DurableIssuanceError,
 	DurableIssuanceErrorCode,
@@ -15,6 +15,7 @@ import type {
 	SettlementInheritance,
 	SettlementPlan,
 	SettlementPlanEntry,
+	SettlementSourceAuthority,
 	SettlementSourceContext,
 	SettlementReplacementChunk,
 	SettlementReplacementProgress,
@@ -702,11 +703,13 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
+	const hasSourceAuthorities = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceAuthorities");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])]) ||
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+			...(hasSourceAuthorities ? ["sourceAuthorities"] : [])]) ||
 		(hasCompletedSourceCustody && value.completedSourceCustody !== true) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
@@ -760,6 +763,8 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	}
 	if (entries.some(entry => [entry.sourceContextDigest, entry.sourceResolutionDigest].some(reference =>
 		reference !== undefined && !sourceContexts.some(context => durableIssuanceBytesEqual(reference, context.digest))))) return undefined;
+	const sourceAuthorities = hasSourceAuthorities ? copySettlementSourceAuthorities(value.sourceAuthorities, entries) : undefined;
+	if (hasSourceAuthorities && sourceAuthorities === undefined) return undefined;
 	return {
 		entries,
 		...(hasContexts ? { sourceContexts } : {}),
@@ -767,9 +772,78 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		...(handBacks === undefined ? {} : { handBacks }),
 		...(memberFrontier === undefined ? {} : { memberFrontier }),
 		...(hasCompletedSourceCustody ? { completedSourceCustody: true as const } : {}),
+		...(sourceAuthorities === undefined ? {} : { sourceAuthorities }),
 		revision: value.revision,
 		scope: copyDurableIssueScope(scope),
 	};
+}
+
+/**
+ * Whether a plan entry still owes its source a replacement: a rebase/transform decision with no
+ * (complete) replacement yet. Such a row needs its source epoch's authority when it is replaced.
+ * @param entry - A validated plan entry.
+ * @returns Whether the entry is owed.
+ */
+export function settlementEntryOwesReplacement(entry: SettlementPlanEntry): boolean {
+	return (entry.disposition === "rebase" || entry.disposition === "transform") && entry.replacementSequence === null;
+}
+
+/**
+ * Validates and detaches a plan's source-authority records (SettlementSourceAuthority): present only
+ * when non-empty, ascending by source epoch without duplicates, within SETTLEMENT_SOURCE_AUTHORITY_LIMITS,
+ * each digest the source-authority-domain hash of its exact bytes, and each source an owed entry of
+ * this plan named by exactly one record.
+ * @param value - Untrusted records.
+ * @param entries - The plan's validated entries.
+ * @returns The detached records, or undefined when invalid.
+ */
+function copySettlementSourceAuthorities(value: unknown, entries: readonly SettlementPlanEntry[]):
+	SettlementSourceAuthority[] | undefined {
+	if (!Array.isArray(value) || value.length === 0 || value.length > SETTLEMENT_SOURCE_AUTHORITY_LIMITS.maxRecords) return undefined;
+	const owed = new Set(entries.filter(settlementEntryOwesReplacement).map(entry => entry.sourceSequence));
+	const named = new Set<number>();
+	const records: SettlementSourceAuthority[] = [];
+	for (const raw of value) {
+		if (!isClosedDurableIssuanceRecord(raw, ["digest", "exactCanonicalAuthorityBytes", "sourceEpoch", "sources"]) ||
+			!isValidDurableAuthorSequence(raw.sourceEpoch) || !Array.isArray(raw.sources) || raw.sources.length === 0 ||
+			(records.at(-1)?.sourceEpoch ?? -1) >= raw.sourceEpoch) return undefined;
+		const digest = copyDurableIssuanceBytes(raw.digest);
+		const bytes = copyDurableIssuanceBytes(raw.exactCanonicalAuthorityBytes);
+		if (digest?.byteLength !== 32 || bytes === undefined || bytes.byteLength === 0 ||
+			bytes.byteLength > SETTLEMENT_SOURCE_AUTHORITY_LIMITS.maxBytes ||
+			!durableIssuanceBytesEqual(digest, hashDomain(SETTLEMENT_SOURCE_AUTHORITY_DOMAIN, bytes))) return undefined;
+		const sources: number[] = [];
+		for (const source of raw.sources as unknown[]) {
+			if (!isValidDurableAuthorSequence(source) || (sources.at(-1) ?? -1) >= source || !owed.has(source) || named.has(source))
+				return undefined;
+			named.add(source);
+			sources.push(source);
+		}
+		records.push({ digest, exactCanonicalAuthorityBytes: bytes, sourceEpoch: raw.sourceEpoch, sources });
+	}
+	return records;
+}
+
+/** Hash domain of a source-authority record's exact bytes (SettlementSourceAuthority.digest). */
+export const SETTLEMENT_SOURCE_AUTHORITY_DOMAIN = "ts-drp/settlement-source-authority/v1";
+
+/**
+ * The plan with each source-authority record narrowed to the sources it still owes, and a record that
+ * owes none dropped (the field too when none is left). Every write that replaces or gives back an owed
+ * row applies it, so a record leaves in the same write as its last owed row.
+ * @param plan - A validated plan whose entries are already the next ones.
+ * @returns The normalized plan (the same object when nothing changes).
+ */
+export function normalizeSettlementSourceAuthorities<T extends SettlementPlan>(plan: T): T {
+	if (plan.sourceAuthorities === undefined) return plan;
+	const owed = new Set(plan.entries.filter(settlementEntryOwesReplacement).map(entry => entry.sourceSequence));
+	const records = plan.sourceAuthorities
+		.map(record => ({ ...record, sources: record.sources.filter(source => owed.has(source)) }))
+		.filter(record => record.sources.length > 0);
+	if (records.length === plan.sourceAuthorities.length &&
+		records.every((record, index) => record.sources.length === plan.sourceAuthorities![index]!.sources.length)) return plan;
+	const { sourceAuthorities: _dropped, ...rest } = plan;
+	return (records.length === 0 ? rest : { ...rest, sourceAuthorities: records }) as T;
 }
 
 /**
@@ -861,6 +935,10 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 		...(plan.memberFrontier === undefined ? {} : {memberFrontier: {digest: new Uint8Array(plan.memberFrontier.digest),
 			exactCanonicalContextBytes: new Uint8Array(plan.memberFrontier.exactCanonicalContextBytes)}}),
 		...(plan.completedSourceCustody === true ? {completedSourceCustody: true as const} : {}),
+		...(plan.sourceAuthorities === undefined ? {} : {sourceAuthorities: plan.sourceAuthorities.map(record => ({
+			digest: new Uint8Array(record.digest), exactCanonicalAuthorityBytes: new Uint8Array(record.exactCanonicalAuthorityBytes),
+			sourceEpoch: record.sourceEpoch, sources: [...record.sources],
+		}))}),
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};
@@ -897,6 +975,19 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 	// The completed-source custody marker is written once and never cleared.
 	if (current.completedSourceCustody === true && next.completedSourceCustody !== true)
 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement completed-source custody changed");
+	// A source-authority record never changes its bytes, and never leaves (nor loses a source) while that
+	// source is still owed: only the write that replaces or gives back the row drops it.
+	for (const prior of current.sourceAuthorities ?? []) {
+		const candidate = next.sourceAuthorities?.find((record) => record.sourceEpoch === prior.sourceEpoch);
+		const stillOwed = prior.sources.filter((source) =>
+			next.entries.some((entry) => entry.sourceSequence === source && settlementEntryOwesReplacement(entry)));
+		if (
+			(candidate !== undefined && (!durableIssuanceBytesEqual(candidate.digest, prior.digest) ||
+				!durableIssuanceBytesEqual(candidate.exactCanonicalAuthorityBytes, prior.exactCanonicalAuthorityBytes))) ||
+			(stillOwed.length > 0 && (candidate === undefined || stillOwed.some((source) => !candidate.sources.includes(source))))
+		)
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement source authority changed");
+	}
 	for (const prior of current.entries) {
 		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
 		if (candidate === undefined) {
@@ -1170,7 +1261,7 @@ export function applySettlementPlanEffect(
 					}
 				: candidate
 		);
-		return { ...detached, entries, revision: plan.revision + 1 };
+		return normalizeSettlementSourceAuthorities({ ...detached, entries, revision: plan.revision + 1 });
 	}
 	if (entry.replacementProgress !== undefined) {
 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement effect form changed");
@@ -1178,7 +1269,8 @@ export function applySettlementPlanEffect(
 	const entries = detached.entries.map((candidate, candidateIndex) =>
 		candidateIndex === index ? { ...candidate, replacementSequence: authorSequence } : candidate
 	);
-	return { ...detached, entries, revision: plan.revision + 1 };
+	// The record of the replaced row's source epoch loses it here, and leaves with its last owed row.
+	return normalizeSettlementSourceAuthorities({ ...detached, entries, revision: plan.revision + 1 });
 }
 
 /**

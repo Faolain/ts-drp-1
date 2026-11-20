@@ -245,6 +245,7 @@ interface NativeSettlementPlan extends DurableIssueScope {
 	readonly handBacks?: SettlementPlan["handBacks"];
 	readonly memberFrontier?: SettlementPlan["memberFrontier"];
 	readonly completedSourceCustody?: SettlementPlan["completedSourceCustody"];
+	readonly sourceAuthorities?: SettlementPlan["sourceAuthorities"];
 	readonly entries: readonly (SettlementPlanEntry & {
 		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
 	})[];
@@ -493,11 +494,13 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
+	const hasSourceAuthorities = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceAuthorities");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
-			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : [])]) ||
+			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
+			...(hasSourceAuthorities ? ["sourceAuthorities"] : [])]) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId
 	) {
@@ -510,6 +513,7 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 			...(hasHandBacks ? {handBacks: value.handBacks} : {}),
 			...(hasMemberFrontier ? {memberFrontier: value.memberFrontier} : {}),
 			...(hasCompletedSourceCustody ? {completedSourceCustody: value.completedSourceCustody} : {}),
+			...(hasSourceAuthorities ? {sourceAuthorities: value.sourceAuthorities} : {}),
 			fenceSequence: value.fenceSequence,
 			revision: value.revision,
 			scope,
@@ -527,6 +531,7 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 		...(detached.handBacks === undefined ? {} : {handBacks: detached.handBacks}),
 		...(detached.memberFrontier === undefined ? {} : {memberFrontier: detached.memberFrontier}),
 		...(detached.completedSourceCustody === undefined ? {} : {completedSourceCustody: detached.completedSourceCustody}),
+		...(detached.sourceAuthorities === undefined ? {} : {sourceAuthorities: detached.sourceAuthorities}),
 		fenceSequence: detached.fenceSequence,
 		revision: detached.revision,
 	};

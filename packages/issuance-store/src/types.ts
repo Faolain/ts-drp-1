@@ -154,6 +154,38 @@ export interface SettlementHandBack {
 	readonly reissueSequence: number | null;
 }
 
+/**
+ * Bounds on a plan's source-authority records. A record holds one source epoch's authority while the
+ * plan still owes a replacement of a row of that epoch: exactly that epoch's creator source context
+ * (its signed anchor, the creator's signature, latched ACL and parameters; the bytes creator custody
+ * captures). At most the settlement window's replaceable source epochs below the plane are owed at
+ * once: the plane's displaced epoch (written with its entries, durable before the next install's head
+ * swap) and the two older epochs rule R may defer into (V3_SETTLEMENT_OWN_WINDOW_EPOCHS - 1 = 3). One
+ * record's bytes: an anchor (8,192), its signature, a settlement-profile latched ACL (65,536) and the
+ * registered parameters, with canonical overhead (under 81,920).
+ */
+export const SETTLEMENT_SOURCE_AUTHORITY_LIMITS = Object.freeze({
+	maxRecords: 3,
+	maxBytes: 81_920,
+});
+
+/**
+ * The source authority of one source epoch, kept while the plan owes a replacement of a row of that
+ * epoch: `sources` lists exactly those owed rows (unreplaced rebase/transform entries), ascending and
+ * non-empty. Written in the same plan write that adds the epoch's owed entries; it loses a source in
+ * the same write (or issue effect) that replaces or gives back that row, and leaves with the last one.
+ * Its bytes never change while it is present. The store checks shape only (digest, bounds, that every
+ * source is owed); Node authenticates the bytes on every open (G5). A source with a record is not
+ * retained work: it is no source context and no entry refers to it. Older readers refuse the field
+ * (closed record).
+ */
+export interface SettlementSourceAuthority {
+	readonly sourceEpoch: number;
+	readonly sources: readonly number[];
+	readonly digest: Uint8Array;
+	readonly exactCanonicalAuthorityBytes: Uint8Array;
+}
+
 export interface SettlementPlan {
 	readonly scope: DurableIssueScope;
 	readonly revision: number;
@@ -177,6 +209,8 @@ export interface SettlementPlan {
 	 * Written once; never changed or cleared.
 	 */
 	readonly completedSourceCustody?: true;
+	/** Source authorities of epochs with owed replacements, ascending by epoch; absent when none. */
+	readonly sourceAuthorities?: readonly SettlementSourceAuthority[];
 }
 
 /** Byte ceiling of a plan's last-member frontier record (anchor, settlement record, Cut, commit QC). */

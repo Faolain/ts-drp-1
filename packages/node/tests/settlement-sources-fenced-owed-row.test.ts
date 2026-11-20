@@ -38,6 +38,8 @@ let scanned: ReadonlySet<number> | undefined;
 const context = {
 	ObjectFreeze: Object.freeze,
 	copySettlementPlan: (plan: unknown): unknown => plan,
+	// The scan also refreshes the plan's source-authority records (cold reopen fix); a premise here.
+	refreshSettlementSourceAuthorities: (): void => undefined,
 	readRebaseOutbox: (
 		_registration: unknown,
 		_published: boolean,

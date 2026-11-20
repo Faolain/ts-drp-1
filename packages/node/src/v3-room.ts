@@ -4,7 +4,8 @@ import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
-import { SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
+import { normalizeSettlementSourceAuthorities, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	SETTLEMENT_SOURCE_AUTHORITY_LIMITS, settlementEntryOwesReplacement, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
 import { nativeIssuanceSignAdmissionForStore } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { createSnapshotChunkProtocolPort, CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
@@ -7247,7 +7248,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (unchanged) return current;
 			const expectedRevision = current?.revision ?? null;
 			const sourceContexts = current === null ? undefined : settlementSourceContextsForEntries(current, entries);
-			const plan = Object.freeze({
+			const plan = normalizeSettlementSourceAuthorities({
 				entries: Object.freeze(entries),
 				...(sourceContexts === undefined ? {} : {sourceContexts}),
 				fenceSequence,
@@ -7256,9 +7257,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...(current?.memberFrontier === undefined ? {} : { memberFrontier: current.memberFrontier }),
 				// So is the completed-source custody marker.
 				...(current?.completedSourceCustody === true ? { completedSourceCustody: true as const } : {}),
+				// Source-authority records stay while their rows are owed (pruned with the last one).
+				...(current?.sourceAuthorities === undefined ? {} : { sourceAuthorities: current.sourceAuthorities }),
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,
-			});
+			} as RoomSettlementPlan);
 			return plan;
 		};
 	};
@@ -7350,6 +7353,54 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		return expired;
 	};
+	/**
+	 * Rule R's source authority (SettlementSourceAuthority): the owed entries this merge adds for rows of
+	 * the epoch the active plane just closed join that epoch's record, written in this same plan write
+	 * (a new record holds the plane's displaced source authority, settlementSourceAuthority). A row rule R
+	 * defers past the next install is then replaced from the record, by a live plane or one that reopens
+	 * cold, which holds no authority kept from a live predecessor. The record leaves with its last owed
+	 * row (normalizeSettlementSourceAuthorities in every replacing or give-back write). Only rows new in
+	 * this merge: the issuance sizing of their epoch charged their record (minSourceEpoch).
+	 * @param plan - The merged plan.
+	 * @param current - The durable plan before this merge.
+	 * @param sources - The current rebase scan.
+	 * @returns The plan with its records.
+	 */
+	const withSettlementSourceAuthorities = (
+		plan: RoomSettlementPlan,
+		current: RoomSettlementPlan | null,
+		sources: readonly DisplacedSource[]
+	): RoomSettlementPlan => {
+		const handle = activeHandle;
+		const closed = handle === undefined ? undefined : handle.epoch - 1;
+		if (handle?.settlementSourceAuthority === undefined || closed === undefined || closed < 0) return plan;
+		const records = [...(plan.sourceAuthorities ?? [])];
+		const named = new Set(records.flatMap((record) => record.sources));
+		const prior = new Set(current?.entries.map((entry) => entry.sourceSequence));
+		const closedSources = new Set(sources.filter((source) => source.epoch === closed).map((source) => source.authorSequence));
+		const fresh = plan.entries
+			.filter((entry) => settlementEntryOwesReplacement(entry) && entry.sourceObjectId === undefined &&
+				entry.inheritance === undefined && entry.sourceContextDigest === undefined && !named.has(entry.sourceSequence) &&
+				!prior.has(entry.sourceSequence) && closedSources.has(entry.sourceSequence))
+			.map((entry) => entry.sourceSequence);
+		if (fresh.length === 0) return plan;
+		const index = records.findIndex((record) => record.sourceEpoch === closed);
+		if (index >= 0) {
+			const record = records[index]!;
+			records[index] = Object.freeze({ ...record, sources: Object.freeze([...record.sources, ...fresh].sort((left, right) => left - right)) });
+		} else {
+			if (records.length >= SETTLEMENT_SOURCE_AUTHORITY_LIMITS.maxRecords) return plan;
+			const authority = handle.settlementSourceAuthority(closed);
+			if (authority === undefined) return plan;
+			records.push(Object.freeze({ sourceEpoch: closed, sources: Object.freeze(fresh), ...authority }));
+			records.sort((left, right) => left.sourceEpoch - right.sourceEpoch);
+		}
+		return Object.freeze({
+			...plan,
+			sourceAuthorities: Object.freeze(records),
+			revision: current !== null && plan === current ? current.revision + 1 : plan.revision,
+		});
+	};
 	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
 		const windowExpired = await settlementWindowExpired(current, sources);
@@ -7407,7 +7458,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			priorFence == null
 				? undefined
 				: Reflect.get(decodeCanonical(priorFence.envelope.canonicalPreimageBytes) as object, "epoch");
-		const plan = completePlan(priorFenceEpoch, activeHandle?.epoch);
+		const plan = withSettlementSourceAuthorities(completePlan(priorFenceEpoch, activeHandle?.epoch), current, sources);
 		const written =
 			current !== null && plan === current
 				? current
