@@ -7206,6 +7206,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	 * Original plan field constructor shared by native write and prospective sizing.
 	 * @param sources - Original displaced sources, or a proven empty future source list.
 	 * @param current - Original prior native settlement plan.
+	 * @param inheritances - Authenticated inheritances by source sequence.
+	 * @param prunedSources - Completed entries whose own source pruning removed.
+	 * @param windowExpired - Sources the settlement window resolves as expired in this write.
+	 * @param records - This write's hand-back records and reissue origins, exactly (undefined in a
+	 * field: none, so a write that drops the last entry writes no entry). Omitted: the current plan's
+	 * unconsumed records and entries (prospective sizing).
 	 * @returns Completer for original fence fields, after the original source validation/read ordering.
 	 */
 	const mergedSettlementPlan = (
@@ -7214,11 +7220,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
 		prunedSources: ReadonlySet<number> = new Set(),
 		windowExpired: ReadonlySet<number> = new Set(),
-		handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter(
-			(record) => record.reissueSequence === null
-		),
-		reissueOrigins: RoomSettlementPlan["reissueOrigins"] = current?.reissueOrigins
+		records: Readonly<{
+			handBacks: readonly RoomHandBack[] | undefined;
+			reissueOrigins: RoomSettlementPlan["reissueOrigins"];
+		}> = {
+			handBacks: current?.handBacks?.filter((record) => record.reissueSequence === null),
+			reissueOrigins: current?.reissueOrigins,
+		}
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
+		const { handBacks, reissueOrigins } = records;
 		const selectedHandBacks = handBacks === undefined || handBacks.length === 0 ? undefined : handBacks;
 		const selectedOrigins = reissueOrigins === undefined || reissueOrigins.length === 0 ? undefined : reissueOrigins;
 		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
@@ -7453,14 +7463,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						admittedThrough ?? null,
 						new Set(sources.map((source) => source.authorSequence))
 					);
+		// Exactly these records and entries: undefined is "none" (every entry dropped), never "as before".
 		const completePlan = mergedSettlementPlan(
 			sources,
 			current,
 			await authenticatedSettlementInheritance(sources),
 			await completedSettlementSourcesPruned(current, sources),
 			expired,
-			windowRecords.handBacks,
-			reissueOrigins
+			{ handBacks: windowRecords.handBacks, reissueOrigins }
 		);
 		const priorFence =
 			current?.fenceSequence == null
