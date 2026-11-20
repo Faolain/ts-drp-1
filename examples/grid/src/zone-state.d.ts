@@ -29,6 +29,14 @@ export interface ZonePlacementGrowthProjection {
 		CanonicalResourceFootprint | undefined;
 }
 
+/** The resumable seed of a {@link ZonePlacementGrowthProjection}: step walks at most about
+ * `byteBudget` more base bytes (true once every base is captured); finish returns exactly what
+ * createPlacementGrowthProjection returns for the same material. */
+export interface ZonePlacementGrowthSeed {
+	step(byteBudget: number): boolean;
+	finish(): ZonePlacementGrowthProjection | undefined;
+}
+
 export interface ZoneState {
 	readonly version: 2;
 	readonly creatorAuthor: string;
@@ -56,6 +64,9 @@ export interface ZoneStateKernel {
 	readPlacementGrowthBound(material: ZonePlacementGrowthMaterial): ZonePlacementGrowthBound | undefined;
 	createPlacementGrowthProjection(material: Omit<ZonePlacementGrowthMaterial, "candidateOperation">):
 		ZonePlacementGrowthProjection | undefined;
+	/** The same projection, seeded in bounded byte steps; step throws on a refused base. */
+	beginPlacementGrowthProjection(material: Omit<ZonePlacementGrowthMaterial, "candidateOperation">):
+		ZonePlacementGrowthSeed | undefined;
 	readonly reducers: Readonly<
 		Record<
 			string,

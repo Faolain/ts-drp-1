@@ -27,6 +27,7 @@ import {
 	SETTLEMENT_HAND_BACK_LIMITS,
 	SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
+	type SettlementHandBackReason,
 	type SettlementPlan,
 } from "./types.js";
 import {
@@ -318,6 +319,22 @@ export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): s
 	);
 }
 
+// Every refused-replay hand-back reason (types.ts SettlementHandBackReason; `satisfies` keeps the list
+// complete). G22: a reserve charges a hand-back field at the widest reason's encoding.
+const SETTLEMENT_HAND_BACK_REASONS = {"application-state-limit": true, "admission-rejected": true,
+	"transient-exhausted": true} satisfies Record<SettlementHandBackReason, true>;
+const WIDEST_HAND_BACK_REASON = (Object.keys(SETTLEMENT_HAND_BACK_REASONS) as SettlementHandBackReason[]).reduce((widest, reason) =>
+	encodeCanonical(reason).byteLength > encodeCanonical(widest).byteLength ? reason : widest);
+/** The widest `handedBack` a refused replay's hand-back can write on an entry (its fromIntent at most a safe integer). */
+const WIDEST_HANDED_BACK = Object.freeze({fromIntent: Number.MAX_SAFE_INTEGER, reason: WIDEST_HAND_BACK_REASON});
+
+/** An entry a refused replay may still hand back: an unreplaced, unresolved rebase/transform decision
+ * (the contract's one-way hand-back arrival, assertSettlementPlanProgressTransition). */
+function refusedReplayHandBackPossible(entry: SettlementPlan["entries"][number]): boolean {
+	return entry.handedBack === undefined && (entry.disposition === "rebase" || entry.disposition === "transform") &&
+		entry.replacementSequence === null && entry.sourceContextDigest === undefined && entry.sourceResolutionDigest === undefined;
+}
+
 /** A completed single replacement that may still gain a replaced-source resolution (contract law). */
 function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boolean {
 	return entry.sourceResolutionDigest === undefined && (entry.disposition === "rebase" || entry.disposition === "transform") &&
@@ -327,7 +344,7 @@ function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boo
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
 	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
-		plan.completedSourceCustody === undefined
+		plan.completedSourceCustody === undefined && !plan.entries.some(entry => entry.handedBack !== undefined)
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -382,8 +399,10 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		const {sourceContextDigest: _context, sourceResolutionDigest: _resolution, ...fields} = entry;
 		// The wider of the two replaced-source kinds ("replacement") is charged.
 		if (replacedSourceResolvable(entry)) return [fields, {...fields, sourceResolutionKind: "replacement", sourceResolutionScope: "replaced-source"}];
-		return entry.sourceResolutionDigest !== undefined || entry.sourceContextDigest === undefined ? [fields]
-			: [fields, {...fields, disposition: "expire", sourceResolutionKind: "frontier"}];
+		// A refused replay may still hand the entry back (G22): `expire` with the widest `handedBack`.
+		const handedBack = refusedReplayHandBackPossible(entry) ? [{...fields, disposition: "expire", handedBack: WIDEST_HANDED_BACK}] : [];
+		return entry.sourceResolutionDigest !== undefined || entry.sourceContextDigest === undefined ? [fields, ...handedBack]
+			: [fields, {...fields, disposition: "expire", sourceResolutionKind: "frontier"}, ...handedBack];
 	};
 	const entryWidths = originalEntries.map(entry => Math.max(...originalEntryForms(entry).map(fields =>
 		unsignedRecordWidth(fields, {sourceContextDigest: digest, sourceResolutionDigest: digest}))));
@@ -392,9 +411,11 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		return Object.freeze({items: Math.max(...shapes.map(shape => shape.items)), maxDepth: Math.max(...shapes.map(shape => shape.maxDepth))});
 	});
 	// A potential row ends in manual review, resolved from the settlement frontier (expire plus the
-	// frontier kind), or replaced with its source resolved as a replaced source; the widest is charged.
+	// frontier kind), handed back by a refused replay (expire plus the widest handedBack), or replaced
+	// with its source resolved as a replaced source; the widest is charged.
 	const entryAlternatives = [{disposition: "manual-review", replacementSequence: null},
 		{disposition: "expire", replacementSequence: null, sourceResolutionKind: "frontier"},
+		{disposition: "expire", replacementSequence: null, handedBack: WIDEST_HANDED_BACK},
 		{disposition: "transform", replacementSequence: Number.MAX_SAFE_INTEGER, sourceResolutionKind: "replacement",
 			sourceResolutionScope: "replaced-source"}];
 	const entryWidth = Math.max(...entryAlternatives.map(entryFields => unsignedRecordWidth(entryFields,
@@ -456,7 +477,9 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	// while any such source exists, every free record slot is reserved. A record's operation is at
 	// most the widest own source preimage (an intent's operation is part of its row's operation), and
 	// the plan codec bounds all records' operations together by maxOperationBytes: the reserve takes
-	// each free record's fixed fields at the widest length header plus the shared operation budget.
+	// each free record's fixed fields at the widest length header plus the shared operation budget. A free
+	// record may be written by a refused replay's hand-back, which carries `reason` (G22): it is charged at
+	// the widest reason. An existing record keeps its own reason, or none, for good (written once).
 	const existingHandBacks = captured?.handBacks ?? [];
 	const operationBudget = Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes -
 		existingHandBacks.reduce((sum, record) => sum + record.exactCanonicalOperationBytes.byteLength, 0));
@@ -464,7 +487,8 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingHandBacks.length));
 	const recordOperation = Math.min(operationBudget, maxHandBackOperationByteLength);
 	const handBackFields = {sourceSequence: integer, sourceDigest: digest, sourceEpoch: integer, intent: integer,
-		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer};
+		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer,
+		reason: encodeCanonical(WIDEST_HAND_BACK_REASON).byteLength};
 	const handBackOverhead = unsignedRecordWidth({}, handBackFields) - recordOperation;
 	const reservedOperation = Math.min(operationBudget, freeHandBacks * recordOperation);
 	const handBackShape = unsignedRecordShape({}, Object.fromEntries(Object.keys(handBackFields).map(key => [key, leaf])));

@@ -1,6 +1,7 @@
 import {encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import {describe, expect, it} from "vitest";
-import {copySettlementPlan} from "../src/contract.js";
+import {assertSettlementPlanProgressTransition, copySettlementPlan} from "../src/contract.js";
+import {SETTLEMENT_HAND_BACK_LIMITS} from "../src/types.js";
 import {issuanceCanonicalSettlementPlanStorageByteLength, issuanceSourceCustodyPlanResourceForSizing,
 	issuanceUnsignedPostimageWidths, issuanceOrdinaryFinishingCapacityWidths, type IssuanceRetirementRows} from "../src/retirement.js";
 import {d109bCommit} from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
@@ -121,6 +122,44 @@ describe("accepted source custody numerical reserve", () => {
 		expect(sizedUnconsumed.items).toBeGreaterThanOrEqual(sizedConsumed.items);
 		expect(sizedUnconsumed.maxDepth).toBeGreaterThanOrEqual(sizedConsumed.maxDepth);
 		expect(sizedUnconsumed.byteLength).toBeGreaterThanOrEqual(encodeCanonical(consumed).byteLength);
+	});
+	// G22 (sized >= written): a refused replay's hand-back (fix/refused-replay-settlement, decision row 97)
+	// is a legal plan write from any plan holding, or about to hold, an unreplaced and unresolved
+	// rebase/transform entry. In ONE write the entry becomes `expire` with `handedBack {fromIntent, reason}`,
+	// and its intents become hand-back records that carry `reason`. The plan reserved before that write
+	// must charge both fields at their widest encoding, as an unconsumed record's reissueSequence is charged.
+	// Widest: 64 records (SETTLEMENT_HAND_BACK_LIMITS.maxRecords) sharing the whole operation budget.
+	const REASONS = ["application-state-limit", "admission-rejected", "transient-exhausted"] as const;
+	const widestReason = REASONS.reduce((a, b) => (encodeCanonical(b).byteLength > encodeCanonical(a).byteLength ? b : a));
+	const RECORD_OPERATION = SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes / SETTLEMENT_HAND_BACK_LIMITS.maxRecords;
+	const sourceEntry = (disposition: "rebase" | "expire") => ({sourceSequence: 5, sourceDigest: new Uint8Array(32).fill(7),
+		disposition, replacementSequence: null,
+		...(disposition === "expire" ? {handedBack: {fromIntent: 0, reason: widestReason}} : {})});
+	const handedBackPlan = () => copySettlementPlan({scope, revision: 2, fenceSequence: null, entries: [sourceEntry("expire")],
+		handBacks: Array.from({length: SETTLEMENT_HAND_BACK_LIMITS.maxRecords}, (_, intent) => ({reason: widestReason,
+			sourceSequence: 5, sourceDigest: new Uint8Array(32).fill(7), sourceEpoch: 3, intent,
+			exactCanonicalOperationBytes: new Uint8Array(RECORD_OPERATION).fill(9), reissueSequence: null}))}, scope)!;
+	it.each([
+		["an existing unreplaced rebase entry", 0],
+		["an existing unreplaced rebase entry", 4],
+		["a potential source", 1],
+		["a potential source", 4],
+	] as const)("charges a refused replay's hand-back (handedBack entry, records with reason) at its widest width: %s, %i potential sources", (from, count) => {
+		const planned = copySettlementPlan({scope, revision: 1, fenceSequence: null, entries: [sourceEntry("rebase")]}, scope)!;
+		const prior = from === "a potential source" ? copySettlementPlan({scope, revision: 1, fenceSequence: null, entries: []}, scope)! : planned;
+		const after = handedBackPlan();
+		expect(prior).toBeDefined();
+		expect(after).toBeDefined();
+		// The hand-back write is legal from the planned entry (for a potential source, once its entry is planned).
+		expect(() => assertSettlementPlanProgressTransition(planned, after)).not.toThrow();
+		const remaining = from === "a potential source" ? count - 1 : count;
+		const sizedPrior = issuanceSourceCustodyPlanResourceForSizing(scope, prior, count, geometry, RECORD_OPERATION);
+		const sizedAfter = issuanceSourceCustodyPlanResourceForSizing(scope, after, remaining, geometry, RECORD_OPERATION);
+		expect(sizedPrior.byteLength).toBeGreaterThanOrEqual(sizedAfter.byteLength);
+		expect(sizedPrior.nativeStorageByteLength).toBeGreaterThanOrEqual(sizedAfter.nativeStorageByteLength);
+		expect(sizedPrior.items).toBeGreaterThanOrEqual(sizedAfter.items);
+		expect(sizedPrior.maxDepth).toBeGreaterThanOrEqual(sizedAfter.maxDepth);
+		expect(sizedPrior.byteLength).toBeGreaterThanOrEqual(encodeCanonical(after).byteLength);
 	});
 	it("charges the same custody alternative in exact and warmed native forecasts", () => {
 		const commit = d109bCommit(scope, 0, 0);

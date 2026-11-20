@@ -35,6 +35,7 @@ export {
 	V3_ROOM_LOCAL_BACKLOG_LIMIT,
 	V3RoomLocalBacklogFull,
 	V3RoomNotYetCurrent,
+	V3RoomStateLimitRefused,
 	waitForV3RoomStartupForDiagnostics,
 } from "@ts-drp/node/v3-room";
 export type {
@@ -82,6 +83,7 @@ export {
 	V3RoomBusy,
 	V3RoomKeptMoveRefused,
 	V3RoomKeptMoveSuperseded,
+	V3RoomMoveDeclined,
 	V3RoomSuccessorUnavailable,
 	type V3RoomSuccessorOffer,
 } from "./rollover.js";

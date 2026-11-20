@@ -1365,7 +1365,7 @@ class BrowserIssuanceImplementation {
 				transaction.abort();
 			} else {
 				try {
-					assertSettlementPlanProgressTransition(current ?? null, captured.plan);
+					assertSettlementPlanProgressTransition(current ?? null, captured.plan, captured.declineHandBack);
 				} catch (error) {
 					reason =
 						error instanceof Error
