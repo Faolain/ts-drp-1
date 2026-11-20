@@ -73,7 +73,9 @@ const context = {
 	],
 	detachedCanonicalOperation: (operation: unknown) => plain(operation),
 	canonicalRecord: (value: unknown, keys: readonly string[]) =>
-		value !== null && typeof value === "object" && Object.keys(value).length === keys.length &&
+		value !== null &&
+		typeof value === "object" &&
+		Object.keys(value).length === keys.length &&
 		keys.every((key) => key in value)
 			? (value as Record<string, unknown>)
 			: undefined,
@@ -90,7 +92,11 @@ const functions = Function(
 			.outputText
 	}return { deriveOwnedReplacement, keptDisplacedSources: typeof keptDisplacedSources === "function" ? keptDisplacedSources : undefined };`
 )(...Object.values(context)) as {
-	deriveOwnedReplacement(registration: unknown, selected: unknown, input: unknown): { disposition: string; operations: unknown[] };
+	deriveOwnedReplacement(
+		registration: unknown,
+		selected: unknown,
+		input: unknown
+	): { disposition: string; operations: unknown[] };
 	keptDisplacedSources?: (predecessor: unknown, successorEpoch: number) => readonly unknown[];
 };
 
@@ -134,13 +140,19 @@ const registration = (older?: readonly unknown[]) => ({
 	displacedSource: authority(5),
 	...(older === undefined ? {} : { olderDisplacedSources: older }),
 });
-const input = { operations: [{ operation: { ...move, rebased: true } }], planEffect: { kind: "replacement", sourceSequence: 7 } };
+const input = {
+	operations: [{ operation: { ...move, rebased: true } }],
+	planEffect: { kind: "replacement", sourceSequence: 7 },
+};
 const derive = (value: unknown, selected: unknown) => functions.deriveOwnedReplacement(value, selected, input);
 const UNAVAILABLE = "original replacement source Writer authority is unavailable";
 
 describe("rule R blocker (c): the source authority of a row displaced more than one epoch back", () => {
 	it("still derives a replacement of a row of the immediately closed epoch", () => {
-		expect(derive(registration(), displaced(5))).toMatchObject({ disposition: "rebase", operations: [{ ...move, rebased: true }] });
+		expect(derive(registration(), displaced(5))).toMatchObject({
+			disposition: "rebase",
+			operations: [{ ...move, rebased: true }],
+		});
 	});
 
 	it("derives a deferred row's replacement two epochs back from the authority the successor kept", () => {
@@ -164,7 +176,9 @@ describe("rule R blocker (c): the source authority of a row displaced more than 
 
 	it("the successor keeps its predecessor's earlier authorities, inside the settlement window only", () => {
 		const keep = functions.keptDisplacedSources;
-		expect(keep, "keptDisplacedSources (the successor keeps the predecessor's displaced source)").toBeTypeOf("function");
+		expect(keep, "keptDisplacedSources (the successor keeps the predecessor's displaced source)").toBeTypeOf(
+			"function"
+		);
 		// The install to 6 from the epoch-5 plane, whose displaced source is 4 and which kept 3 and 2.
 		const predecessor = {
 			payload: prepared(5),
@@ -178,10 +192,10 @@ describe("rule R blocker (c): the source authority of a row displaced more than 
 		expect(kept[0]!.prepared).toBe(predecessor.displacedSource.prepared);
 		expect(kept[0]!.authorization).toBe(predecessor.displacedSource.authorization);
 		// Never another object's (a migration source), another genesis (a native branch) or a later epoch.
+		expect(keep!({ payload: prepared(5), displacedSource: authority(4, [writer], "other-room") }, 6)).toEqual([]);
 		expect(
-			keep!({ payload: prepared(5), displacedSource: authority(4, [writer], "other-room") }, 6)
+			keep!({ payload: prepared(5), displacedSource: authority(4, [writer], "room", "other-genesis") }, 6)
 		).toEqual([]);
-		expect(keep!({ payload: prepared(5), displacedSource: authority(4, [writer], "room", "other-genesis") }, 6)).toEqual([]);
 		expect(keep!({ payload: prepared(5), displacedSource: authority(5) }, 6)).toEqual([]);
 		expect(
 			keep!({ payload: prepared(5), displacedSource: { ...authority(4), activationVertexDigest: "ab".repeat(32) } }, 6)

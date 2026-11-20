@@ -83,7 +83,10 @@ describe("store law: the settlement window expires a deferred (unreplaced) repla
 		const progress = {
 			replacementProgress: { chunks: [], intentCount: 2, intentDigest: bytes(9, 32), version: 1 },
 		};
-		const refusal = { disposition: "transform", transformRefusal: { reason: "refused", proposedIntentDigest: bytes(11, 32) } };
+		const refusal = {
+			disposition: "transform",
+			transformRefusal: { reason: "refused", proposedIntentDigest: bytes(11, 32) },
+		};
 		for (const extra of [{ replacementSequence: 3 }, progress, refusal, { disposition: "manual-review" }]) {
 			const before = plan([entry(extra)], 4);
 			const after = plan([entry({ ...extra, disposition: "expire" })], 5, [handBack()]);
@@ -97,7 +100,9 @@ describe("store law: the settlement window expires a deferred (unreplaced) repla
 		expect(() =>
 			assertSettlementPlanProgressTransition(
 				plan([entry()], 4),
-				plan([entry({ disposition: "expire", sourceDigest: bytes(40, 32) })], 5, [handBack({ sourceDigest: bytes(40, 32) })])
+				plan([entry({ disposition: "expire", sourceDigest: bytes(40, 32) })], 5, [
+					handBack({ sourceDigest: bytes(40, 32) }),
+				])
 			)
 		).toThrow();
 	});

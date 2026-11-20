@@ -3366,6 +3366,12 @@ interface V3PlaneRegistration {
 	readonly controlVertices: Set<string>;
 	displacedIssuanceBoundary?: number;
 	displacedSource?: V3DisplacedSourceAuthority;
+	/**
+	 * Source authorities of epochs before displacedSource that this plane's predecessor held
+	 * (keptDisplacedSources), inside the own-row settlement window. A replacement rule R deferred is
+	 * signed by a later install, when its source epoch is more than one epoch back (displacedSourceFor).
+	 */
+	olderDisplacedSources?: readonly V3DisplacedSourceAuthority[];
 	epochBytes: number;
 	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	graphVersion: number;
@@ -6154,6 +6160,7 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 					predecessor.rebaseSnapshot = undefined;
 				}
 				initial.displacedSource = undefined;
+				initial.olderDisplacedSources = undefined;
 				initial.displacedIssuanceBoundary = undefined;
 				initial.rebaseCursor = undefined;
 				initial.rebaseSnapshot = undefined;
@@ -10742,8 +10749,9 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 			existing.replacementSequence === null;
 		if (classified.kind !== "current" && !unresolved) continue;
 		const source = classified.authenticated;
-		const original = knownCommitted || classified.kind === "current" ? payload : registration.displacedSource?.prepared;
-		const originalAuthorization = knownCommitted || classified.kind === "current" ? authorization : registration.displacedSource?.authorization;
+		const displaced = displacedSourceFor(registration, source.admitted);
+		const original = knownCommitted || classified.kind === "current" ? payload : displaced?.prepared;
+		const originalAuthorization = knownCommitted || classified.kind === "current" ? authorization : displaced?.authorization;
 		if (original === undefined || originalAuthorization?.kind !== "latched-acl" ||
 			source.vertex.epoch !== original.provenance.epoch || source.vertex.anchor !== original.provenance.anchorDigest)
 			throw new TypeError("creator unresolved source contract is unavailable");
@@ -14380,6 +14388,70 @@ export const V3_SETTLEMENT_OWN_WINDOW_EPOCHS = 4;
 function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boolean {
 	return NumberIsSafeInteger(epoch) && NumberIsSafeInteger(currentEpoch) &&
 		epoch <= currentEpoch - V3_SETTLEMENT_OWN_WINDOW_EPOCHS;
+}
+
+/**
+ * The source authorities a successor plane keeps from its live predecessor: the predecessor's displaced
+ * source and those it kept itself, the same authenticated objects (prepared payload and ACL), nothing
+ * reauthorized. Rule R defers an install's replacements while the creator's next offer is queued, so a
+ * displaced row of epoch E-1 is replaced by the install to E+1 or later, whose displaced source is E:
+ * without these, the authority of E-1 left with the predecessor registration. Only this object's own
+ * earlier epochs of the same genesis, before the predecessor's epoch (a migration source or a native
+ * branch has its own owners), and only inside the own-row settlement window: a row at or past it expires
+ * and its move is given back, so it is never replaced (at most V3_SETTLEMENT_OWN_WINDOW_EPOCHS - 2 kept).
+ * @param predecessor - The live predecessor registration (the transport handoff).
+ * @param successorEpoch - The successor plane's epoch.
+ * @returns The kept authorities, newest first.
+ */
+function keptDisplacedSources(
+	predecessor: Pick<V3PlaneRegistration, "payload" | "displacedSource" | "olderDisplacedSources">,
+	successorEpoch: number
+): readonly V3DisplacedSourceAuthority[] {
+	const provenance = predecessor.payload.provenance;
+	const kept: V3DisplacedSourceAuthority[] = [];
+	for (const source of [predecessor.displacedSource, ...(predecessor.olderDisplacedSources ?? [])]) {
+		if (
+			source === undefined ||
+			source.activationVertexDigest !== undefined ||
+			source.migrationTarget !== undefined ||
+			source.prepared.provenance.objectId !== provenance.objectId ||
+			source.prepared.provenance.blueprintDigest !== provenance.blueprintDigest ||
+			source.prepared.trust.trust.genesisAnchorDigest !== predecessor.payload.trust.trust.genesisAnchorDigest ||
+			!NumberIsSafeInteger(source.prepared.provenance.epoch) ||
+			source.prepared.provenance.epoch >= provenance.epoch ||
+			settlementOwnRowWindowExpired(source.prepared.provenance.epoch, successorEpoch) ||
+			kept.some((other) => other.prepared.provenance.epoch === source.prepared.provenance.epoch)
+		)
+			continue;
+		kept.push(
+			ObjectFreeze({
+				authorization: source.authorization,
+				pinnedGenesisAnchorDigest: source.pinnedGenesisAnchorDigest,
+				prepared: source.prepared,
+			})
+		);
+	}
+	return ObjectFreeze(kept);
+}
+
+/**
+ * The displaced-source authority of a displaced own row, selected by the row's own signed epoch and
+ * anchor: the plane's displaced source (the epoch it closed), or an authority it kept for an earlier
+ * epoch (keptDisplacedSources). Otherwise the displaced source, which the caller's own epoch/anchor
+ * check refuses exactly as before.
+ * @param registration - The plane.
+ * @param admitted - The row's signed epoch and anchor.
+ * @returns The authority, or undefined when the plane has no displaced source.
+ */
+function displacedSourceFor(
+	registration: Pick<V3PlaneRegistration, "displacedSource" | "olderDisplacedSources">,
+	admitted: Readonly<{ epoch: number; anchor: string }>
+): V3DisplacedSourceAuthority | undefined {
+	const source = registration.displacedSource;
+	const matches = (candidate: V3DisplacedSourceAuthority): boolean =>
+		candidate.prepared.provenance.epoch === admitted.epoch && candidate.prepared.provenance.anchorDigest === admitted.anchor;
+	if (source === undefined || matches(source)) return source;
+	return registration.olderDisplacedSources?.find(matches) ?? source;
 }
 
 /**
@@ -18945,7 +19017,7 @@ function deriveOwnedReplacement(
 		selected.authenticated.author !== registration.issuanceScope.author
 	)
 		throw new TypeError("local replacement owning source/policy is unavailable");
-	const source = registration.displacedSource;
+	const source = selected.kind === "current" ? undefined : displacedSourceFor(registration, selected.authenticated.admitted);
 	let original = selected.kind === "current" ? registration.payload : source?.prepared;
 	let authority = selected.kind === "current" ? registration.authorization : source?.authorization;
 	if (
@@ -24798,6 +24870,11 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				controlVertices: recovered.controlVertices,
 				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
 				displacedSource: recovered.displacedSource,
+				// A successor keeps the source authorities its live predecessor held for earlier epochs, for
+				// the replacements rule R deferred past them.
+				...(transportHandoff === undefined || recovered.displacedSource === undefined
+					? {}
+					: { olderDisplacedSources: keptDisplacedSources(transportHandoff, payload.provenance.epoch) }),
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
 				exactCanonicalPinnedGenesisBootstrapOperationBytes:
