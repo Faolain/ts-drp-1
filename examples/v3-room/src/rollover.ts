@@ -595,6 +595,10 @@ export function createV3RoomRolloverPolicy(
 	let keptTimer: ReturnType<typeof setTimeout> | undefined;
 	// The kept moves' re-offer runs one batch at a time, each move after the previous one's answer.
 	let reoffering = false;
+	// The batch moves not yet answered: still kept for the page (status().kept) while they are offered
+	// again, until the room admits, supersedes or declines one, or it is kept again.
+	let reofferPending: Readonly<Record<string, unknown>>[] = [];
+	const listedKept = (): Readonly<Record<string, unknown>>[] => [...reofferPending, ...kept];
 	// This session's own moves accepted in the current epoch (the page may not observe them yet).
 	let acceptedThisEpoch = 0;
 	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
@@ -647,24 +651,26 @@ export function createV3RoomRolloverPolicy(
 	let awaitingFenceEpoch: number | undefined;
 	const awaitingFence = (): boolean =>
 		role === "member" && awaitingFenceEpoch !== undefined && currentEpoch() <= awaitingFenceEpoch;
-	const status = (): V3RoomRolloverStatus =>
-		Object.freeze({
+	const status = (): V3RoomRolloverStatus => {
+		const listed = listedKept();
+		return Object.freeze({
 			state: readOnly()
 				? "read-only"
 				: notReachingHost()
 					? "not-reaching-host"
 					: awaitingFence()
 						? "awaiting-fence"
-						: kept.length > 0
+						: listed.length > 0
 							? "successor-unavailable"
 							: successorWaits > 0
 								? "waiting"
 								: "ready",
 			epoch: currentEpoch(),
-			kept: Object.freeze([...kept]),
+			kept: Object.freeze(listed),
 			unsettledEpochs: role === "member" ? (settlement?.unsettledEpochs ?? 0) : 0,
 			window: settlement?.window ?? 0,
 		});
+	};
 	const reportStatus = (): void => {
 		const next = status();
 		const key = `${next.state}:${next.kept.length}:${next.unsettledEpochs}`;
@@ -955,11 +961,12 @@ export function createV3RoomRolloverPolicy(
 			const offered = new Set<object>([...givenBack, ...fresh]);
 			const waiting = kept.filter((operation) => !offered.has(operation));
 			kept.splice(0, kept.length, ...waiting);
+			const batch = [...givenBack, ...fresh];
+			reofferPending = [...batch];
 			reportStatus();
 			watchKept();
 			reoffering = true;
 			void (async (): Promise<void> => {
-				const batch = [...givenBack, ...fresh];
 				try {
 					for (const [index, operation] of batch.entries()) {
 						if (!keptRoomLeft()) {
@@ -968,6 +975,9 @@ export function createV3RoomRolloverPolicy(
 							break;
 						}
 						const answer = await offerKept(operation);
+						// Answered: admitted, superseded or declined (no longer kept), or kept again by keep().
+						answered(operation);
+						reportStatus();
 						if (answer === "next" || (answer === "stop-new" && index < givenBack.length)) continue;
 						// Refused at the bound (new moves) or busy (every move), and kept by issue(): the rest of
 						// the batch stays kept, unoffered.
@@ -980,6 +990,8 @@ export function createV3RoomRolloverPolicy(
 					}
 				} finally {
 					reoffering = false;
+					reofferPending = [];
+					reportStatus();
 					// A batch move kept again goes back ahead of the moves kept since, in its order.
 					const again = batch.filter((operation) => kept.includes(operation));
 					if (again.length > 0)
@@ -1059,9 +1071,14 @@ export function createV3RoomRolloverPolicy(
 		}
 		return "next";
 	};
+	// A batch move the re-offer answered leaves the moves listed as pending.
+	const answered = (operation: Readonly<Record<string, unknown>>): void => {
+		if (reofferPending.includes(operation)) reofferPending = reofferPending.filter((pending) => pending !== operation);
+	};
 	// A kept move waits for the room to be past `waitPast` (the epoch that refused it; one before it for
 	// a move that may be offered again in the same epoch).
 	const keep = (operation: Readonly<Record<string, unknown>>, waitPast: number): void => {
+		answered(operation);
 		kept.push(operation);
 		if (handBackOf.has(operation)) givenBackWait.set(operation, waitPast);
 		else keptEpoch = Math.max(keptEpoch, waitPast);
