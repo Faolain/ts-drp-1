@@ -2110,6 +2110,29 @@ export class V3RoomHandBackRefused extends TypeError {
 }
 
 /**
+ * A new move the room refused because it would pass the room's application state limit (row 96):
+ * nothing was signed or written, and the move is not admitted. The state only shrinks when the app
+ * changes it (a move that does not grow it is still admitted), so offering the same move again is
+ * refused again; the app tells its user. The message is the room's ordinary issue failure ("v3 room
+ * issue failed: application-state-limit: <detail>"). A given-back move refused at the limit is
+ * V3RoomHandBackRefused instead (it carries the hand-back record).
+ */
+export class V3RoomStateLimitRefused extends TypeError {
+	readonly kind = "application-state-limit" as const;
+	/**
+	 * @param detail - The local issue failure detail.
+	 * @param limitBytes - The room's application state limit, in canonical bytes.
+	 */
+	constructor(
+		readonly detail: string,
+		readonly limitBytes: number = ROOM_APPLICATION_STATE_BYTES
+	) {
+		super(`v3 room issue failed: application-state-limit: ${detail}`);
+		this.name = "V3RoomStateLimitRefused";
+	}
+}
+
+/**
  * Whether a local issue failure is this Writer's own lasting refusal of the operation: the room's
  * application state limit, or the admission policy's rejection (V3_LOCAL_POLICY_REFUSAL_DETAIL). Other
  * "admission-rejected" failures are capacity, readiness or recovery refusals a retry can clear.
@@ -6843,9 +6866,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const handBack = owned.length === 1 ? owned[0]?.handBack : undefined;
 			rejectOwned(
 				owned,
-				handBack === undefined
-					? new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`)
-					: new V3RoomHandBackRefused(handBack, issued.kind, issued.detail)
+				handBack !== undefined
+					? new V3RoomHandBackRefused(handBack, issued.kind, issued.detail)
+					: issued.kind === "application-state-limit"
+						? new V3RoomStateLimitRefused(issued.detail)
+						: new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`)
 			);
 			return;
 		}

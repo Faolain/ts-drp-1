@@ -35,6 +35,7 @@ export {
 	V3_ROOM_LOCAL_BACKLOG_LIMIT,
 	V3RoomLocalBacklogFull,
 	V3RoomNotYetCurrent,
+	V3RoomStateLimitRefused,
 	waitForV3RoomStartupForDiagnostics,
 } from "@ts-drp/node/v3-room";
 export type {

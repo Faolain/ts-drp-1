@@ -71,6 +71,12 @@ describe("v3 room errors across the room worker boundary", () => {
 				{ handBack: { sourceSequence: 7, intent: 0 }, kind: "application-state-limit", reason: "application-state-limit" },
 			],
 			[
+				new nodeRoom.V3RoomStateLimitRefused(
+					"v3 local operation would pass the room's application state limit (32768 bytes)"
+				),
+				{ kind: "application-state-limit", limitBytes: 32_768 },
+			],
+			[
 				new room.V3RoomMoveDeclined({ action: "m" }, 8, "admission-rejected"),
 				{ operation: { action: "m" }, epoch: 8, reason: "admission-rejected" },
 			],
