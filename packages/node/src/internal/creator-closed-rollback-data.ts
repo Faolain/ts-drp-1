@@ -7266,7 +7266,17 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 		reservations.push(terminalFloor);
 		for (const reservation of reservations) await reservation.check();
 	};
+	// Observation only: brackets ONE complete acquisition so a test can attribute its
+	// native/snapshot reads. Diagnostics never grant, extend or replace custody.
+	const acquisitionPurpose = mandatoryAdoptionFence ? "adoption-fence" : terminalWithdrawal ? "terminal-withdrawal" :
+		maintenancePurpose ?? "issuance";
+	const reportAcquisition = (kind: string): void => {
+		try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind, epoch: currentTrust.currentEpoch, purpose: acquisitionPurpose});
+		} catch { /* Diagnostics cannot alter acquisition or cleanup. */ }
+	};
 	try {
+		reportAcquisition("closed-maintenance-acquisition-start");
 		await acquireReservations();
 		const snapshotInventoryRead = bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
 			input.snapshotStore, "captureRecoveryRoleInventory");
@@ -7566,6 +7576,7 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				reservations.splice(index, 1); terminalFloor = undefined;
 			},
 		}));
+		reportAcquisition("closed-maintenance-acquisition-end");
 		return proof;
 	} catch (primary) {
 		try {
