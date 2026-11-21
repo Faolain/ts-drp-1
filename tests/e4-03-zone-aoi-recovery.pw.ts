@@ -214,7 +214,14 @@ test("three real clients recover targeted AOI state after raw loss without durab
 	const creatorContext = await browser.newContext();
 	const observerContext = await browser.newContext();
 	const excludedContext = await browser.newContext();
-	await installGridRoomHeadAuthority([creatorContext, observerContext, excludedContext]);
+	// Three distinct players, each with its own external account (Track X's and d9346's setup): one
+	// account shared by three devices advances its floor with whichever device installs a successor
+	// first, and the product rightly refuses the other devices behind that floor. The observer
+	// leaves and joins again, so a join reopens the floor its own account created.
+	const HEAD_FACTORY = "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__";
+	await installGridRoomHeadAuthority([creatorContext], HEAD_FACTORY);
+	await installGridRoomHeadAuthority([observerContext], HEAD_FACTORY, "create-then-reopen");
+	await installGridRoomHeadAuthority([excludedContext], HEAD_FACTORY, "create-then-reopen");
 	await Promise.all([
 		creatorContext.addInitScript(installRtcObserver),
 		observerContext.addInitScript(installRtcObserver),
