@@ -7716,7 +7716,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// The settlement window resolves an unreplaced displaced move as expired (settlementWindowExpired).
 			const expired = windowExpired.has(source.authorSequence);
 			// A refused replay's hand-back is terminal: the source keeps its `expire` (it is never replaced).
-			const disposition = prior?.sourceContextDigest !== undefined || prior?.handedBack !== undefined ? prior.disposition :
+			// So is any `expire` the plan holds. The window's expiry gave the move back in its own write and
+			// `expire` is never replayed, while the evidence the window read (the chain's older links) is
+			// retired and pruned (row 60 R5) once the chain ends: re-deriving it from the row's own younger
+			// epoch would turn the expiry back into a replacement decision (cand/int7-c3 "source differs").
+			const disposition = prior?.sourceContextDigest !== undefined || prior?.handedBack !== undefined ||
+				prior?.disposition === "expire" ? prior.disposition :
 				inheritance === undefined ? (expired ? "expire" : settlementDisposition(source)) : "inherited";
 			if (disposition === undefined) continue;
 			const sourceDigest = bytes(source.vertexDigest);
