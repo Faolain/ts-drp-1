@@ -463,6 +463,48 @@
 			]
 		},
 		{
+			"file": "packages/node/formal/cold-reopen-source-authority.qnt",
+			"modules": [
+				{
+					"main": "coldReopenSourceAuthority",
+					"step": "step",
+					"tests": [
+						"fixColdReopenAfterDeferralTest",
+						"fixWindowGivesBackTest",
+						"fixRefusedReplayHandBackTest",
+						"mergeRefusedReplayStuckTest",
+						"mergeOwnInstallHandBackStuckTest",
+						"fixOwnInstallHandBackTest",
+						"preFixLiveInstallReplacesTest",
+						"preFixColdReopenStuckTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initPreFix",
+							"invariants": [
+								"neverStuck"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initMerge",
+							"invariants": [
+								"neverStuck"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
 			"file": "packages/node/formal/creator-adoption-fence-admission.qnt",
 			"modules": [
 				{

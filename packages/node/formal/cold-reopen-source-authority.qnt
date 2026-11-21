@@ -16,23 +16,32 @@
 //     resolves the last owed row of e (replaced, or given back). Records survive a cold reopen.
 // Settlement window W = 4: at the install to plane P, owed rows of epochs <= P-4 are given back (expired,
 // handed back to the app), which needs no authority.
+// Refused replay (int7 decision row 97): the drain's replay of an owed row may be refused by the Writer's
+// own admission (the room's application state limit, the policy, a persisting transient refusal). The row
+// is handed back in ONE plan write (`expire` + `handedBack`): it is no longer owed. The store accepts a
+// plan only when every record names owed rows alone (copySettlementSourceAuthorities), so that write must
+// narrow the record (normalizeSettlementSourceAuthorities) exactly like a replacement does.
 //
 // The defect (PRE-FIX): a deferral at plane P+1 leaves epoch-P rows owed at plane P+2, where only kept
 // covers epoch P; a cold reopen clears kept, and the reopen's drain throws.
+// The merge defect (MERGE, cand/int7-c3 before its fix): the records of FIX, but the refused-replay
+// hand-back writes the prior plan's records unchanged; when the handed-back row's epoch is recorded the
+// record names a row no longer owed, the store refuses the write, the install fails (STUCK).
 //
 // Invariants:
 //   neverStuck               - the drain never throws;
 //   coldReopenKeepsAuthority - every owed epoch e has authority: e == P-1, or e in kept, or e in records;
 //   noReclaimWhileOwed (FIX) - every owed epoch below P-1 is recorded, and every record still has owed rows;
 //   recordsBounded           - at most W - 1 = 3 records (the store's maxRecords).
-// PRE-FIX must violate neverStuck (and coldReopenKeepsAuthority); FIX must satisfy all three.
+// PRE-FIX must violate neverStuck (and coldReopenKeepsAuthority); MERGE must violate neverStuck; FIX must
+// satisfy all of them.
 module coldReopenSourceAuthority {
   pure val W = 4
   pure val MAX_P = 8
   pure val MAX_ROWS = 2
   pure val EPOCHS = 2.to(MAX_P)
 
-  var mode: str                 // "fix" | "prefix", fixed at init
+  var mode: str                 // "fix" | "prefix" | "merge", fixed at init
   var plane: int                // P
   var owed: int -> int          // epoch -> owed rows of that epoch still in the plan (durable)
   var kept: Set[int]            // in-memory predecessor authority (cleared by a cold reopen)
@@ -46,6 +55,9 @@ module coldReopenSourceAuthority {
   }
   action init = initWith("fix")
   action initPreFix = initWith("prefix")
+  action initMerge = initWith("merge")
+  // Records are kept by FIX and by MERGE (MERGE differs only in the refused-replay hand-back write).
+  val recordsKept = mode != "prefix"
 
   def owedOf(o: int -> int): Set[int] = EPOCHS.filter(e => o.get(e) > 0)
   val owedEpochs = owedOf(owed)
@@ -60,7 +72,7 @@ module coldReopenSourceAuthority {
     val owed2 = EPOCHS.mapBy(e => if (e == plane) n else if (e <= p2 - W) 0 else owed.get(e))
     all {
       plane' = p2, kept' = kept2, owed' = owed2,
-      records' = if (mode == "fix") owedOf(owed2).intersect(records.union(if (n > 0) Set(plane) else Set()))
+      records' = if (recordsKept) owedOf(owed2).intersect(records.union(if (n > 0) Set(plane) else Set()))
                  else records,
       drainDue' = true, stuck' = false, mode' = mode,
     },
@@ -100,6 +112,24 @@ module coldReopenSourceAuthority {
     },
   }
 
+  // A refused replay: the drain replays a row of the oldest owed epoch, the Writer's own admission refuses
+  // it, and it is handed back in ONE plan write (the row leaves the owed set). FIX narrows the records in
+  // that write; MERGE writes them unchanged, and the store refuses a record naming the handed-back row:
+  // nothing is written, the install fails, the member never advances again.
+  action drainHandBack = all {
+    not(stuck), drainDue, allCovered, owedEpochs != Set(),
+    nondet e = owedEpochs.oneOf()
+    val owed2 = owed.set(e, owed.get(e) - 1)
+    val refusedByStore = mode == "merge" and records.contains(e)
+    all {
+      owedEpochs.forall(x => x >= e),
+      owed' = if (refusedByStore) owed else owed2,
+      records' = if (refusedByStore) records else records.intersect(owedOf(owed2)),
+      stuck' = refusedByStore, drainDue' = false,
+      mode' = mode, plane' = plane, kept' = kept,
+    },
+  }
+
   // Crash and cold reopen: kept is lost; the plan and the records survive; the reopen drains.
   action crashReopen = all {
     not(stuck),
@@ -112,11 +142,11 @@ module coldReopenSourceAuthority {
     drainDue' = drainDue, stuck' = stuck,
   }
 
-  action step = any { install, drainDefer, drainThrow, drainAll, drainSome, crashReopen, stutter }
+  action step = any { install, drainDefer, drainThrow, drainAll, drainSome, drainHandBack, crashReopen, stutter }
 
   val neverStuck = not(stuck)
   val coldReopenKeepsAuthority = allCovered
-  val noReclaimWhileOwed = mode == "fix" implies
+  val noReclaimWhileOwed = recordsKept implies
     (owedEpochs.forall(e => e < plane - 1 implies records.contains(e)) and records.subseteq(owedEpochs))
   // The store's record bound (SETTLEMENT_SOURCE_AUTHORITY_LIMITS.maxRecords = W - 1): the window leaves at
   // most the epochs P-1, P-2, P-3 owed, so the merge always finds a free slot for the epoch it closed.
@@ -137,6 +167,34 @@ module coldReopenSourceAuthority {
       .then(all { assert(owed.get(2) == 1 and records == Set(2) and safety), installWith(0) })
       .then(drainDefer).then(installWith(0))
       .then(all { assert(plane == 6 and owedEpochs == Set() and records == Set() and safety), stutter })
+
+  // FIX: a row deferred past its install is replayed at the next and refused; its hand-back narrows its
+  // epoch's record, which keeps the other owed row, and the last hand-back drops the record.
+  run fixRefusedReplayHandBackTest =
+    init.then(installWith(2)).then(drainDefer).then(installWith(0))
+      .then(all { assert(owed.get(2) == 2 and records == Set(2)), drainHandBack })
+      .then(all { assert(owed.get(2) == 1 and records == Set(2) and safety), crashReopen })
+      .then(drainHandBack)
+      .then(all { assert(owedEpochs == Set() and records == Set() and safety), stutter })
+
+  // MERGE: the same refused replay; the hand-back keeps the record naming the handed-back row, the store
+  // refuses the write and the install fails.
+  run mergeRefusedReplayStuckTest =
+    initMerge.then(installWith(1)).then(drainDefer).then(installWith(0))
+      .then(all { assert(records == Set(2)), drainHandBack })
+      .then(all { assert(stuck and not(neverStuck) and owed.get(2) == 1), stutter })
+
+  // MERGE without any deferral: the merge that adds an owed row records its epoch in the same write, so
+  // even a replay refused in its own install's drain is a hand-back of a recorded row: the store refuses.
+  run mergeOwnInstallHandBackStuckTest =
+    initMerge.then(installWith(1))
+      .then(all { assert(records == Set(2)), drainHandBack })
+      .then(all { assert(stuck), stutter })
+
+  // FIX: the same hand-back in its own install's drain writes, and the record leaves with the row.
+  run fixOwnInstallHandBackTest =
+    init.then(installWith(1)).then(drainHandBack)
+      .then(all { assert(not(stuck) and owedEpochs == Set() and records == Set() and safety), stutter })
 
   // PRE-FIX without a crash: kept carries epoch 2's authority across the live install.
   run preFixLiveInstallReplacesTest =
