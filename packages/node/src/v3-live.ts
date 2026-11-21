@@ -24203,6 +24203,8 @@ function importLiveSnapshotMachine(
 			expectedPayloadDigest: input.expectedPayloadDigest as string,
 			expectedSchemaVersion: SNAPSHOT_SCHEMA_VERSION,
 			maxSnapshotBytes: payload.parameters.maxSnapshotBytes,
+			// The room's authenticated limit bounds the imported state, as it bounds a successor install.
+			maxApplicationStateBytes: payload.parameters.maxApplicationStateBytes,
 			preparedBlueprintRuntime: payload.runtime,
 		});
 		return imported.machine;
