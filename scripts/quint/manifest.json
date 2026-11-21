@@ -3072,6 +3072,39 @@
 			]
 		},
 		{
+			"file": "packages/node/formal/settlement-window-expiry-terminal.qnt",
+			"modules": [
+				{
+					"main": "settlementWindowExpiryTerminal",
+					"step": "step",
+					"tests": [
+						"fixKeepsExpiryTest",
+						"preFixAdjacentChainTest",
+						"preFixRefusesTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"neverGivenBack"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initPreFix",
+							"invariants": [
+								"neverRefused"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
 			"file": "packages/node/formal/settlement-window.qnt",
 			"modules": [
 				{
