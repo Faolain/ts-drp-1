@@ -23245,6 +23245,21 @@ async function authenticateRoomRetentionRetainedCuts(context: Readonly<{
 	collector: RoomRetentionLedgerCollector;
 }>): Promise<void> {
 	const { input, reader, forward, frame: work, parsing, prior, collector } = context;
+	// The same retained-cut law as stage 1's acquisition (acquireClosedData, since 1515daab): a
+	// native publication's checkpoint cuts name remote proof epochs and are not proved against
+	// local generations; each native current row's carrier must be an authenticated recovery trust
+	// of this frame instead. (A repeat pass at one boundary can find a cut's carrier demoted from
+	// a required to an excluded generation by the previous pass's retirement; stage 1 accepts it.)
+	if (forward.nativePublication === true) {
+		for (const row of forward.rows) {
+			const carrier = parsing.record(parsing.unique(view(reader, reader.generations.indexOf(row)), "drp-anchor-trust-state").bytes);
+			requireLaw([...work.recoveryTrusts].some(trust => trust.objectId === input.objectId &&
+				trust.currentEpoch === carrier.currentEpoch && trust.currentAnchorDigest === carrier.currentAnchorDigest &&
+				trust.profileId === forward.currentTrust.profileId && trust.genesisAnchorDigest === input.pinnedGenesisAnchorDigest),
+			"chain-invalid");
+		}
+		return;
+	}
 	const retainedCuts = context.summary.cuts.filter((cut) => cut.epoch > 0);
 	if (retainedCuts.length === 0) return;
 	const minimumEpoch = Math.min(...retainedCuts.map((cut) => cut.epoch - 1));
