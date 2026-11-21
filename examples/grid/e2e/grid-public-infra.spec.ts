@@ -69,7 +69,10 @@ test("two browsers discover public relay and Nostr readiness with no HTTP regist
 });
 
 async function openGrid(page: Page): Promise<void> {
-	await page.goto("/");
+	// Grid hosts its zone in a room worker by default; this suite drives the main-thread zone it was
+	// written against (its synchronous snapshot and the page's own node), so it opts out with
+	// `?mainThread`. The worker default is covered by tests/room-worker-grid.pw.ts and the FPS gate.
+	await page.goto("/?mainThread");
 	await page.waitForFunction(() =>
 		Boolean((window as typeof window & { __TS_DRP_GRID_SESSION__?: unknown }).__TS_DRP_GRID_SESSION__)
 	);

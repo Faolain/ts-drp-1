@@ -3,9 +3,10 @@ import { type Browser, type BrowserContext, expect, type Page, test } from "@pla
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 
 /**
- * Grid as the opt-in room worker's first adopter (`?roomWorker`): crash ambiguity resolved exactly
- * once (condition A), the fallback to the main thread, and an engine smoke. The two-client parity
- * scenario is d9346's, run with D9346_ROOM_WORKER=both|creator|joiner.
+ * Grid hosts its zone in a room worker by default (`?mainThread` opts out): the default and the
+ * opt-out, crash ambiguity resolved exactly once (condition A), the fallback to the main thread, and
+ * an engine smoke. The two-client parity scenario is d9346's, run with
+ * D9346_ROOM_WORKER=both|creator|joiner.
  */
 
 interface Block {
@@ -66,7 +67,8 @@ async function zone(page: Page): Promise<ZoneSnapshot> {
 }
 
 /**
- * A creator (main thread) and a member (room worker) sharing one zone, both converged.
+ * A creator (main thread, `?mainThread`) and a member (room worker, the default) sharing one zone,
+ * both converged.
  * @param browser
  */
 async function sharedZone(
@@ -77,7 +79,7 @@ async function sharedZone(
 	await installGridRoomHeadAuthority([creatorContext, memberContext]);
 	const creator = await creatorContext.newPage();
 	const member = await memberContext.newPage();
-	await Promise.all([openGrid(creator, ""), openGrid(member, "?roomWorker")]);
+	await Promise.all([openGrid(creator, "?mainThread"), openGrid(member, "")]);
 	expect(await member.evaluate(() => window.__TS_DRP_GRID_ROOM_WORKER__ !== undefined)).toBe(true);
 	const memberEnrollment = (await zone(member)).enrollment;
 	await creator.evaluate((enrollment) => window.__TS_DRP_V3_ZONE__?.create([enrollment]), memberEnrollment);
@@ -218,6 +220,27 @@ test("A control: a placement lost to a crash before the worker admitted it is of
 	}
 });
 
+// The product default changed (owner decision 2026-11-20): the page hosts its zone in a room worker
+// unless `?mainThread` opts out, and the former opt-in `?roomWorker` names the default.
+test("the default page hosts the zone in a room worker; ?mainThread opts out", async ({ browser }) => {
+	test.setTimeout(120_000);
+	// One context per page: each page holds its own browser identity.
+	const contexts = [await browser.newContext(), await browser.newContext(), await browser.newContext()];
+	await installGridRoomHeadAuthority(contexts);
+	const pages = await Promise.all(contexts.map((context) => context.newPage()));
+	try {
+		const [byDefault, optedOut, legacy] = pages as [Page, Page, Page];
+		await Promise.all([openGrid(byDefault, ""), openGrid(optedOut, "?mainThread"), openGrid(legacy, "?roomWorker")]);
+		expect(await byDefault.evaluate(() => window.__TS_DRP_GRID_ROOM_WORKER__ !== undefined)).toBe(true);
+		expect(byDefault.workers().length).toBeGreaterThan(0);
+		expect(await legacy.evaluate(() => window.__TS_DRP_GRID_ROOM_WORKER__ !== undefined)).toBe(true);
+		expect(await optedOut.evaluate(() => window.__TS_DRP_GRID_ROOM_WORKER__ === undefined)).toBe(true);
+		for (const page of pages) expect((await zone(page)).enrollment.length).toBeGreaterThan(0);
+	} finally {
+		await closeAll(pages, contexts);
+	}
+});
+
 test("a browser that cannot host the room in a worker opens the zone on the main thread", async ({ browser }) => {
 	test.setTimeout(120_000);
 	const context = await browser.newContext();
@@ -229,7 +252,7 @@ test("a browser that cannot host the room in a worker opens the zone on the main
 		if (message.type() === "warning") warnings.push(message.text());
 	});
 	try {
-		await openGrid(page, "?roomWorker");
+		await openGrid(page, "");
 		expect(await page.evaluate(() => window.__TS_DRP_GRID_ROOM_WORKER__ === undefined)).toBe(true);
 		expect(warnings.some((text) => text.includes("Grid room worker unsupported"))).toBe(true);
 		expect((await zone(page)).enrollment.length).toBeGreaterThan(0);
@@ -246,7 +269,7 @@ test("@engines a worker-hosted zone opens, creates and places a block", async ({
 	const creator = await creatorContext.newPage();
 	const member = await memberContext.newPage();
 	try {
-		await Promise.all([openGrid(creator, "?roomWorker"), openGrid(member, "?roomWorker")]);
+		await Promise.all([openGrid(creator, ""), openGrid(member, "")]);
 		const memberEnrollment = (await zone(member)).enrollment;
 		await creator.evaluate((enrollment) => window.__TS_DRP_V3_ZONE__?.create([enrollment]), memberEnrollment);
 		const created = await zone(creator);

@@ -15,7 +15,9 @@ import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-pa
 //   the creator then fills the window: the departed member's messages stay until the window needs
 //   their space, then leave first, oldest first, before any of the creator's own.
 // The pages expose no rollover control and no room handle, so the harness appends one read-only
-// accessor, `globalThis.__TRACK_W2_ROOM__ = () => room`, to the page's entry module as served, and
+// accessor, `globalThis.__TRACK_W2_ROOM__ = () => room`, to the page's room module (src/chat-room.ts) as served, on the main-thread page (`?mainThread`:
+// the page hosts the room in a room worker by default, and this suite reads it through the module's
+// binding), and
 // drives seal, export and adopt on the creator and install on the joiner through it, as Track X's
 // harness does. Each checkpoint prints a TRACK_W2_EPOCH line (timings and the window's bytes).
 
@@ -61,7 +63,7 @@ const windowTotal = (seen: Seen): number => seen.messages.reduce((sum, row) => s
 
 async function exposeRoom(context: BrowserContext): Promise<void> {
 	await context.route(
-		(url) => url.origin === ORIGIN && url.pathname === "/src/index.ts",
+		(url) => url.origin === ORIGIN && url.pathname === "/src/chat-room.ts",
 		async (route) => {
 			const response = await route.fetch();
 			const body = await response.text();
@@ -74,7 +76,7 @@ async function exposeRoom(context: BrowserContext): Promise<void> {
 }
 
 async function openPage(page: Page): Promise<void> {
-	await page.goto(`${ORIGIN}/`);
+	await page.goto(`${ORIGIN}/?mainThread`);
 	await page.waitForFunction(() => {
 		const session = Reflect.get(window, "__TS_DRP_CHAT_SESSION__") as
 			| { snapshot(): { relayReservations: readonly unknown[] } }

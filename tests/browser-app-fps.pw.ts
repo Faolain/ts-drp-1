@@ -7,6 +7,13 @@ import { join } from "node:path";
 
 import { APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS } from "./fixtures/active-endurance/driver.js";
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority.js";
+import {
+	applyCpuThrottle,
+	type CpuThrottle,
+	installWorkerTimelines,
+	type ThrottleMode,
+	type WorkerTimelines,
+} from "./fixtures/realtime-probe/cpu-throttle.js";
 import { FixedHistogram, installRealtimeProbe } from "./fixtures/realtime-probe/page-probe.js";
 import {
 	MovementDirection,
@@ -64,15 +71,31 @@ const PLACE_MS = 400;
 const PAINT_MS = 350;
 const CHAT_MS = 300;
 const ROLLOVER_TAIL_MS = 1_000;
-// Measurement only. BROWSER_FPS_CPU_THROTTLE=<rate>: Chromium DevTools CPU throttling (Emulation.setCPUThrottlingRate)
-// on both pages; other engines have no equivalent and record "unsupported". BROWSER_FPS_TRACE_EPOCHS="<a>-<b>":
+// Measurement only. BROWSER_FPS_CPU_THROTTLE=<rate>: a CPU <rate> times slower for both pages AND their dedicated
+// workers (tests/fixtures/realtime-probe/cpu-throttle.ts). BROWSER_FPS_CPU_THROTTLE_MODE: "process" (default:
+// every renderer process duty-cycled, so the room worker is slowed too) or "cdp" (DevTools
+// Emulation.setCPUThrottlingRate per page, which never reaches a worker). Chromium only: another engine with a
+// throttle fails the run rather than report unthrottled numbers as throttled ones. The run's summary carries the
+// throttle self-check (cpuThrottle.selfCheck): every page and every worker timed on a fixed loop against an
+// unthrottled reference; a target that is not slowed fails the run. BROWSER_FPS_TRACE_EPOCHS="<a>-<b>":
 // a Chromium performance trace (both renderers, JS sampling) from creator epoch a to b, written to OUT.
 const CPU_THROTTLE = Number(process.env.BROWSER_FPS_CPU_THROTTLE ?? 1);
-// BROWSER_FPS_ROOM_WORKER=1: Grid opens with its zone in the opt-in room worker (`?roomWorker`) and the
-// page's bridge meter (`roomWorkerMeter`): each frame's bridge cost (library) and Grid rendering (app),
-// and the worker's data-channel counts and attach latency, are reported under summary.roomWorker.
-const ROOM_WORKER = process.env.BROWSER_FPS_ROOM_WORKER === "1";
-const TRACE_EPOCHS = (process.env.BROWSER_FPS_TRACE_EPOCHS ?? "").split("-").filter((value) => value !== "").map(Number);
+const CPU_THROTTLE_MODE = (process.env.BROWSER_FPS_CPU_THROTTLE_MODE ?? "process") as ThrottleMode;
+const CPU_THROTTLE_QUANTUM_MS = Number(process.env.BROWSER_FPS_CPU_THROTTLE_QUANTUM_MS ?? 4);
+// The room runtime. An app with a room worker hosts its room there by default, as its shipped page does, and
+// opens here with the page's bridge meter (`?roomWorkerMeter`): each frame's bridge cost (library) and the app's
+// rendering, and the worker's data-channel counts and attach latency, are reported under summary.roomWorker.
+// BROWSER_FPS_ROOM_WORKER=0 opens every app with `?mainThread` (the room on the page's main thread).
+const ROOM_WORKER = process.env.BROWSER_FPS_ROOM_WORKER !== "0";
+/** The apps whose shipped page hosts the room in a room worker by default. */
+const ROOM_WORKER_APPS: ReadonlySet<string> = new Set(["grid", "canvas", "chat"]);
+const roomWorkerFor = (app: string): boolean => ROOM_WORKER && ROOM_WORKER_APPS.has(app);
+/** The page query that selects the run's runtime for an app. */
+const runtimeQuery = (app: string): string => (roomWorkerFor(app) ? "?roomWorkerMeter" : "?mainThread");
+const TRACE_EPOCHS = (process.env.BROWSER_FPS_TRACE_EPOCHS ?? "")
+	.split("-")
+	.filter((value) => value !== "")
+	.map(Number);
 const TRACE_CATEGORIES = [
 	"devtools.timeline",
 	"disabled-by-default-devtools.timeline",
@@ -83,6 +106,9 @@ const TRACE_CATEGORIES = [
 	"toplevel",
 ];
 if (!(Number.isFinite(CPU_THROTTLE) && CPU_THROTTLE >= 1)) throw new Error("BROWSER_FPS_CPU_THROTTLE");
+if (CPU_THROTTLE_MODE !== "process" && CPU_THROTTLE_MODE !== "cdp") throw new Error("BROWSER_FPS_CPU_THROTTLE_MODE");
+if (!(Number.isFinite(CPU_THROTTLE_QUANTUM_MS) && CPU_THROTTLE_QUANTUM_MS >= 1))
+	throw new Error("BROWSER_FPS_CPU_THROTTLE_QUANTUM_MS");
 for (const app of APPS) if (!["grid", "canvas", "chat"].includes(app)) throw new Error(`BROWSER_FPS_APP ${app}`);
 if (!Number.isSafeInteger(EPOCHS) || EPOCHS < 1) throw new Error("BROWSER_FPS_EPOCHS");
 if (INJECT !== "" && !(Number.isFinite(INJECT_MS) && (INJECT_MS as number) > 0 && Number.isSafeInteger(INJECT_EVERY)))
@@ -226,7 +252,7 @@ function gridDriver(): AppDriver {
 	let keyMismatch = 0;
 
 	const open = async (page: Page): Promise<void> => {
-		await page.goto(ROOM_WORKER ? `${origin}/?roomWorker&roomWorkerMeter` : `${origin}/`);
+		await page.goto(`${origin}/${runtimeQuery("grid")}`);
 		await page.waitForFunction(() => Reflect.get(window, "__TS_DRP_GRID_SESSION__") !== undefined, undefined, {
 			timeout: 60_000,
 		});
@@ -478,7 +504,7 @@ function gridDriver(): AppDriver {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The opt-in room worker (BROWSER_FPS_ROOM_WORKER=1, Grid only)
+// The room worker (the default runtime of the apps in ROOM_WORKER_APPS; BROWSER_FPS_ROOM_WORKER=0 opts out)
 
 interface RoomWorkerMeterReading {
 	readonly library: readonly number[];
@@ -502,22 +528,27 @@ interface RoomWorkerRtcReading {
 
 function roomWorkerReading(
 	page: Page,
+	app: string,
 	action: "reset" | "read"
 ): Promise<Readonly<{ meter: RoomWorkerMeterReading; rtc: RoomWorkerRtcReading }> | null> {
-	return page.evaluate(async (selected) => {
-		const meter = Reflect.get(window, "__TS_DRP_GRID_ROOM_WORKER_METER__") as
-			| { read(): RoomWorkerMeterReading; reset(): void }
-			| undefined;
-		const control = Reflect.get(window, "__TS_DRP_GRID_ROOM_WORKER__") as
-			| { rtcStats(): Promise<RoomWorkerRtcReading> }
-			| undefined;
-		if (meter === undefined || control === undefined) throw new Error("BROWSER_FPS_ROOM_WORKER_ABSENT");
-		if (selected === "reset") {
-			meter.reset();
-			return null;
-		}
-		return { meter: meter.read(), rtc: await control.rtcStats() };
-	}, action);
+	return page.evaluate(
+		async ({ selected, prefix }) => {
+			const meter = Reflect.get(window, `__TS_DRP_${prefix}_ROOM_WORKER_METER__`) as
+				| { read(): RoomWorkerMeterReading; reset(): void }
+				| undefined;
+			const control = Reflect.get(window, `__TS_DRP_${prefix}_ROOM_WORKER__`) as
+				| { rtcStats(): Promise<RoomWorkerRtcReading> }
+				| undefined;
+			// The page fell back to the main thread (or never opened its worker): this run is not the worker run.
+			if (meter === undefined || control === undefined) throw new Error(`BROWSER_FPS_ROOM_WORKER_ABSENT ${prefix}`);
+			if (selected === "reset") {
+				meter.reset();
+				return null;
+			}
+			return { meter: meter.read(), rtc: await control.rtcStats() };
+		},
+		{ selected: action, prefix: app.toUpperCase() }
+	);
 }
 
 function distribution(
@@ -536,18 +567,28 @@ function distribution(
 	};
 }
 
-/** Library share (bridge, messages, posts) and app share (Grid's DOM rendering) per page frame. */
-async function roomWorkerSummary(pages: ReadonlyMap<Role, Page>, playMs: number): Promise<Record<string, unknown>> {
+/**
+ * Library share (bridge, messages, posts) and app share (Grid's DOM rendering) per page frame.
+ * @param pages
+ * @param playMs
+ */
+async function roomWorkerSummary(
+	pages: ReadonlyMap<Role, Page>,
+	app: string,
+	playMs: number
+): Promise<Record<string, unknown>> {
 	const roles: Record<string, unknown> = {};
 	for (const [role, page] of pages) {
-		const reading = await roomWorkerReading(page, "read");
+		const reading = await roomWorkerReading(page, app, "read");
 		if (reading === null) continue;
 		const { meter, rtc } = reading;
 		const channels = rtc.channelsCreated + rtc.channelsReceived;
 		roles[role] = {
 			libraryMsPerFrame: distribution(meter.library),
 			renderMsPerFrame: distribution(meter.render),
-			libraryPlusRenderMsPerFrame: distribution(meter.library.map((value, index) => value + (meter.render[index] ?? 0))),
+			libraryPlusRenderMsPerFrame: distribution(
+				meter.library.map((value, index) => value + (meter.render[index] ?? 0))
+			),
 			framesDropped: meter.dropped,
 			// Where the library cost goes, heaviest first: per message kind, and in frames over 0.5 ms.
 			kinds: Object.entries(meter.kinds ?? {})
@@ -581,6 +622,58 @@ async function roomWorkerSummary(pages: ReadonlyMap<Role, Page>, playMs: number)
 		qualification:
 			"per page frame from play start: library = the room worker bridge's main-thread work (worker message handling, less the Grid rendering it ran, plus posts); render = Grid's DOM rendering (projection, network panel, the transient frame). The page probe's RTC entry counts see no data channels in this mode (they are transferred to the worker).",
 		roles,
+	};
+}
+
+/**
+ * Each dedicated worker's own lag over play (report only: the gate's thresholds are the pages'): its
+ * stalls of 50 ms or more, in and outside rollover windows, and its total heartbeat lateness.
+ * @param readings - The workers' timelines.
+ * @param meter - The run's meter (clock and rollover windows).
+ * @param playMs - How long play lasted.
+ * @returns The report.
+ */
+function workerTimelineSummary(
+	readings: Awaited<ReturnType<WorkerTimelines["read"]>>,
+	meter: RolloverMeter,
+	playMs: number
+): Readonly<Record<string, unknown>> {
+	const round = (value: number): number => Math.round(value * 10) / 10;
+	const total = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0);
+	const workers = readings.map(({ role, reading }) => {
+		if (reading === null) return { role, reading: null };
+		const inside: number[] = [];
+		const outside: number[] = [];
+		for (const [at, duration] of reading.stalls) {
+			const from = meter.toHarness(role as Role, at);
+			(meter.overlapsWindow(from, from + duration) ? inside : outside).push(duration);
+		}
+		return {
+			role,
+			url: reading.url,
+			ticks: reading.ticks,
+			lagMs: round(reading.lagMs),
+			lagMsPerSecond: round(reading.lagMs / Math.max(1, reading.elapsedMs / 1_000)),
+			stallsOver50: reading.over50,
+			stallsOver100: reading.over100,
+			longestStallMs: round(reading.longestMs),
+			inRolloverWindow: {
+				stalls: inside.length,
+				longestMs: round(Math.max(0, ...inside)),
+				totalMs: round(total(inside)),
+			},
+			outsideRolloverWindow: {
+				stalls: outside.length,
+				longestMs: round(Math.max(0, ...outside)),
+				totalMs: round(total(outside)),
+			},
+			droppedStalls: reading.droppedStalls,
+		};
+	});
+	return {
+		qualification: `a 10 ms heartbeat in each dedicated worker, from play start: lateness of 50 ms or more is a worker long task (workers have no longtask entries) and the sum of lateness is the worker's lag. Report only; play lasted ${playMs} ms.`,
+		count: readings.length,
+		workers,
 	};
 }
 
@@ -629,7 +722,8 @@ function canvasDriver(): AppDriver {
 			);
 		},
 		open: async (creator, member) => {
-			await Promise.all([creator.goto(`${origin}/`), member.goto(`${origin}/`)]);
+			const url = `${origin}/${runtimeQuery("canvas")}`;
+			await Promise.all([creator.goto(url), member.goto(url)]);
 			await Promise.all([waitForRelay(creator), waitForRelay(member)]);
 			await expect(creator.locator("#create")).toBeEnabled({ timeout: 60_000 });
 			await creator.locator("#create").click();
@@ -782,7 +876,8 @@ function chatDriver(): AppDriver {
 			);
 		},
 		open: async (creator, member) => {
-			await Promise.all([creator.goto(`${origin}/`), member.goto(`${origin}/`)]);
+			const url = `${origin}/${runtimeQuery("chat")}`;
+			await Promise.all([creator.goto(url), member.goto(url)]);
 			await Promise.all([waitForRelay(creator), waitForRelay(member)]);
 			await expect(creator.locator("#createRoom")).toBeEnabled({ timeout: 60_000 });
 			await creator.locator("#createRoom").click();
@@ -1017,7 +1112,11 @@ function describeConsoleValue(value: unknown): string {
 	return walk(value, 0);
 }
 
-/** Per-rollover issue latency: the worst issue of each role overlapping each window plus its tail. */
+/**
+ * Per-rollover issue latency: the worst issue of each role overlapping each window plus its tail.
+ * @param meter
+ * @param driver
+ */
 function issueLatency(meter: RolloverMeter, driver: AppDriver) {
 	const windows = meter.rolloverWindows();
 	const issues = driver.issues();
@@ -1066,7 +1165,7 @@ for (const app of APPS)
 	test(`${app}: the shipped page keeps rendering through its own rollovers`, async ({ browser, browserName }) => {
 		mkdirSync(OUT, { recursive: true });
 		const driver = (DRIVERS[app] as () => AppDriver)();
-		const base = `${browserName}-${app}${ROOM_WORKER ? "-worker" : ""}${CONTROL ? "-control" : ""}`;
+		const base = `${browserName}-${app}${roomWorkerFor(app) ? "-worker" : "-main"}${CONTROL ? "-control" : ""}`;
 		const epochLog = join(OUT, `${base}-epochs.jsonl`);
 		writeFileSync(epochLog, "");
 		const sourceDiff = execFileSync("git", ["diff", "--no-ext-diff", "HEAD"], {
@@ -1084,13 +1183,24 @@ for (const app of APPS)
 			dirtyTracked: sourceDiff.length !== 0,
 			sourceDiffSha256: createHash("sha256").update(sourceDiff).digest("hex"),
 			control: CONTROL,
-			roomWorker: ROOM_WORKER && app === "grid",
+			roomWorker: roomWorkerFor(app),
+			runtimeQuery: runtimeQuery(app),
 			injectBlock: INJECT === "" ? null : { ms: INJECT_MS, everyFrames: INJECT_EVERY },
 			cadenceMs: { drain: DRAIN_MS, move: MOVE_MS, place: PLACE_MS, paint: PAINT_MS, chat: CHAT_MS },
 			memberRolloverIssueBoundMs: APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS,
 			rolloverWindowTailMs: ROLLOVER_TAIL_MS,
 			thresholdsStatus: FPS_THRESHOLDS_STATUS,
-			cpuThrottle: CPU_THROTTLE === 1 ? null : { rate: CPU_THROTTLE, applied: browserName === "chromium" ? "chromium Emulation.setCPUThrottlingRate" : "unsupported on this engine" },
+			cpuThrottle:
+				CPU_THROTTLE === 1
+					? null
+					: {
+							rate: CPU_THROTTLE,
+							mode: CPU_THROTTLE_MODE,
+							applied:
+								CPU_THROTTLE_MODE === "process"
+									? `every renderer process duty-cycled (SIGSTOP/SIGCONT, ${CPU_THROTTLE_QUANTUM_MS} ms quantum): page main threads and dedicated workers`
+									: "chromium Emulation.setCPUThrottlingRate on each page target (does not reach dedicated workers)",
+						},
 			traceEpochs: TRACE_EPOCHS.length === 2 ? TRACE_EPOCHS : null,
 			hostLoadAverageAtStart: loadavg(),
 			startedAt: new Date().toISOString(),
@@ -1110,12 +1220,28 @@ for (const app of APPS)
 		}
 		const creator = await contexts[0].newPage();
 		const member = await contexts[1].newPage();
-		if (CPU_THROTTLE > 1 && browserName === "chromium")
-			for (const [page, context] of [
-				[creator, contexts[0]],
-				[member, contexts[1]],
-			] as const)
-				await (await context.newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: CPU_THROTTLE });
+		const rolePages = new Map<string, Page>([
+			["creator", creator],
+			["member", member],
+		]);
+		// Before the pages navigate, so the room worker is slowed from its first instruction.
+		const throttle: CpuThrottle | undefined =
+			CPU_THROTTLE > 1
+				? await applyCpuThrottle(
+						browser,
+						browserName,
+						rolePages,
+						new Map<string, BrowserContext>([
+							["creator", contexts[0]],
+							["member", contexts[1]],
+						]),
+						CPU_THROTTLE,
+						CPU_THROTTLE_MODE,
+						CPU_THROTTLE_QUANTUM_MS
+					)
+				: undefined;
+		let workerTimelines: WorkerTimelines | undefined;
+		let throttleSelfCheck: ReturnType<CpuThrottle["report"]> | undefined;
 		let tracing: "idle" | "on" | "done" = "idle";
 		const pageErrors: string[] = [];
 		const consoleTail: string[] = [];
@@ -1127,7 +1253,9 @@ for (const app of APPS)
 			page.on("pageerror", (error) => pageErrors.push(`${name}: ${String(error).slice(0, 600)}`));
 			page.on("response", (response) => {
 				if (response.status() >= 400)
-					consoleTail.push(`${new Date().toISOString()} ${name} http ${response.status()} ${response.url().slice(0, 300)}`);
+					consoleTail.push(
+						`${new Date().toISOString()} ${name} http ${response.status()} ${response.url().slice(0, 300)}`
+					);
 			});
 			page.on("console", (message) => {
 				if (message.type() !== "warning" && message.type() !== "error") return;
@@ -1163,13 +1291,23 @@ for (const app of APPS)
 			const openStarted = Date.now();
 			await driver.open(creator, member);
 			const openMs = Date.now() - openStarted;
-			const roomWorker = ROOM_WORKER && app === "grid";
-			if (roomWorker) await Promise.all([creator, member].map((page) => roomWorkerReading(page, "reset")));
+			const roomWorker = roomWorkerFor(app);
+			// The throttle self-check: every page and every worker it runs is slowed, or the run fails here.
+			if (throttle !== undefined) {
+				await throttle.measure(rolePages);
+				throttleSelfCheck = throttle.report();
+				summary.cpuThrottleSelfCheck = throttleSelfCheck;
+				if (!throttleSelfCheck.passed)
+					throw new Error(`BROWSER_FPS_THROTTLE_SELF_CHECK ${throttleSelfCheck.failures.join("; ")}`);
+			}
+			workerTimelines = installWorkerTimelines(rolePages);
+			if (roomWorker) await Promise.all([creator, member].map((page) => roomWorkerReading(page, app, "reset")));
 			await Promise.all(
 				[creator, member].map((page) =>
 					page.evaluate(() => (Reflect.get(globalThis, "__TS_DRP_REALTIME_PROBE__") as { start(): void }).start())
 				)
 			);
+			await workerTimelines.start();
 			const playStarted = Date.now();
 			await meter.calibrate();
 			play = driver.play(creator, member, meter);
@@ -1232,9 +1370,11 @@ for (const app of APPS)
 							["creator", creator],
 							["member", member],
 						]),
+						app,
 						playMs
 					)
 				: null;
+			const workerReadings = await workerTimelines.read();
 			await meter.drain();
 			driver.consume(meter);
 			const conservation = await driver.conserve(creator, member, meter);
@@ -1293,6 +1433,11 @@ for (const app of APPS)
 			const delivery = { creator: pages.creator.delivery, member: pages.member.delivery };
 			if (Number((delivery.member as { installed?: number } | null)?.installed ?? 0) < 1)
 				instrument.push("the member's own delivery installed no offer");
+			// Workers that appeared during play are measured as they appear: the self-check is re-read.
+			if (throttle !== undefined) {
+				throttleSelfCheck = throttle.report();
+				if (!throttleSelfCheck.passed) instrument.push(`throttle self-check: ${throttleSelfCheck.failures.join("; ")}`);
+			}
 			const thresholds = fpsThresholds(browserName, app);
 			const verdict = evaluateGate(pages, thresholds, memberOverBound, instrument);
 			summary = {
@@ -1300,6 +1445,8 @@ for (const app of APPS)
 				playMs,
 				openMs,
 				roomWorker: roomWorkerReport,
+				cpuThrottleSelfCheck: throttleSelfCheck ?? null,
+				workers: workerTimelineSummary(workerReadings, meter, playMs),
 				adoptedEpochs: { creator: meter.epoch("creator"), member: meter.epoch("member") },
 				rolloversObserved: windows.length,
 				stageCounts,
@@ -1327,11 +1474,15 @@ for (const app of APPS)
 			} else if (GATE) {
 				expect(verdict.failures, "browser FPS gate").toEqual([]);
 			}
+			// Measurement validity, whatever BROWSER_FPS_GATE says: a throttled run whose worker was not slowed
+			// measured something else.
+			if (throttleSelfCheck !== undefined) expect(throttleSelfCheck.failures, "CPU throttle self-check").toEqual([]);
 		} catch (error) {
 			failure = error;
 			throw error;
 		} finally {
 			await play?.stop().catch(() => undefined);
+			await throttle?.stop().catch(() => undefined);
 			if (tracing === "on") await browser.stopTracing().catch(() => undefined);
 			if (failure !== undefined)
 				summary = {

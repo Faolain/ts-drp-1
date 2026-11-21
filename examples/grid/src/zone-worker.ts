@@ -1,5 +1,5 @@
 /**
- * The Grid zone's dedicated worker (opt-in, `?roomWorker`). It imports only light modules
+ * The Grid zone's dedicated worker (the default; `?mainThread` opts out). It imports only light modules
  * statically: the room worker installs its RTC globals, and the harness observation is installed,
  * before zone-worker-app.ts (the node, the room, the network) is loaded.
  */
