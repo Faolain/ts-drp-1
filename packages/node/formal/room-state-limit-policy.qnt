@@ -27,7 +27,14 @@
 //   admitUnavailable     the creator admits a move unchecked while its state check is unavailable;
 //   untyped              a refusal is a plain error (the application cannot tell it from a failure);
 //   memberSnapshotBound  a member's snapshot-closed import bounds the state by the snapshot bound, not the
-//                        room's limit (before f85588820), so it takes a faulty creator's oversized state.
+//                        room's limit (before f85588820), so it takes a faulty creator's oversized state;
+//   custodyRegistryOnly  the creator's settlement source custody (creator-source-custody) validates the
+//                        parameters record against the registry's own fields only, and bounds/reserves its
+//                        width by the registry-only domain (before the custody fix): it refuses the source
+//                        of every Writer move in a room that declares a limit;
+//   custodyBoundRegistryOnly the custody accepts the extension's key but still bounds/reserves the record by
+//                        the registry-only width (MAX_PARAMETERS without the extension; a half fix): a room
+//                        whose other fields are at their widest refuses the source of every Writer move.
 // Invariants:
 //   joinedOnlyValid   no member joins a room whose declared limit is invalid;
 //   limitsAgree       every joined member enforces the room's authenticated limit (so all agree);
@@ -38,6 +45,9 @@
 //   noOverRefusal     a move is refused only when it does not fit the room's limit;
 //   memberStateWithinLimit no member imports a signed snapshot state past the room's limit (G5: even one a
 //                     faulty creator signed).
+//   writerSourceAccepted under creator-trusted-settlement-v1 the creator captures the source context of every
+//                     Writer move it admits (the context carries the room's exact parameters record, whose
+//                     width G22 reserves); a valid room's record is never refused there.
 //   safety = all. signedWithinLimit (the seal's fold as backstop) holds even under admitUnavailable.
 //
 // Commands (packages/node/formal; JAVA_HOME=/opt/homebrew/opt/openjdk@17, PATH=$JAVA_HOME/bin:$PATH):
@@ -55,6 +65,8 @@
 //   $V --init initAdmitUnavailable --invariants signedWithinLimit         # [ok]: the seal is the backstop
 //   $V --init initUntyped --invariants safety                             # violation (writerKeepsPlaying)
 //   $V --init initMemberSnapshotBound --invariants safety                 # violation (memberStateWithinLimit)
+//   $V --init initCustodyRegistryOnly --invariants writerSourceAccepted    # violation (pre-fix custody)
+//   $V --init initCustodyBoundRegistryOnly --invariants writerSourceAccepted # violation (half fix)
 //   Outcomes are recorded in .logs/realtime-resume-2026-11-10/agent-status/room-state-policy.md.
 module roomStateLimitPolicy {
   pure val DEFAULT = 2
@@ -66,13 +78,18 @@ module roomStateLimitPolicy {
   pure val MAX_MOVES = 4
   pure val MAX_SEALS = 2
   pure val SNAPSHOT_BOUND = CEILING + 2   // maxSnapshotBytes: far above any room's limit
+  // The parameters record's width (abstract): the registry fields take 0..REG_MAX (a creator chooses
+  // them within their registered ranges), the declared limit adds EXT when present.
+  pure val REG_MAX = 2
+  pure val EXT = 1
+  pure val REG_WIDTHS = 0.to(REG_MAX)
   type Mutants = {
     memberLocalDefault: bool, creatorLocalDefault: bool, uncheckedCeiling: bool, admitUnavailable: bool, untyped: bool,
-    memberSnapshotBound: bool,
+    memberSnapshotBound: bool, custodyRegistryOnly: bool, custodyBoundRegistryOnly: bool,
   }
   pure val SOUND: Mutants = {
     memberLocalDefault: false, creatorLocalDefault: false, uncheckedCeiling: false, admitUnavailable: false, untyped: false,
-    memberSnapshotBound: false,
+    memberSnapshotBound: false, custodyRegistryOnly: false, custodyBoundRegistryOnly: false,
   }
 
   // protocol-v3 room-parameters: isRegisteredRoomParameterExtension / roomApplicationStateLimit.
@@ -93,6 +110,8 @@ module roomStateLimitPolicy {
   var wedged: bool
   var frozen: bool
   var refusedFitting: bool          // ghost: a move refused although it fit the room's limit
+  var regWidth: int                 // the width of the record's registry fields, chosen by the creator
+  var custodyRefused: bool          // ghost: the creator refused to capture an admitted Writer move's source
   var mutants: Mutants
 
   def roomLimit: int = effective(declared)
@@ -103,11 +122,18 @@ module roomStateLimitPolicy {
     else effective(declared)
   def accepts: bool = valid(declared) or mutants.uncheckedCeiling
   def refusal: bool = mutants.untyped
+  // creator-source-custody: openCreatorSourceCustody accepts the record when its keys are registry fields
+  // or the registered extension (roomApplicationStateLimit), and its width is within MAX_PARAMETERS (the
+  // registered complete domain), the same width G22 reserves (maxContextByteLength).
+  def recordWidth: int = regWidth + (if (declared == 0) 0 else EXT)
+  def custodyBound: int = REG_MAX + (if (mutants.custodyRegistryOnly or mutants.custodyBoundRegistryOnly) 0 else EXT)
+  def custodyAccepts: bool = (declared == 0 or not(mutants.custodyRegistryOnly)) and recordWidth <= custodyBound
 
   action initWith(mu: Mutants): bool = all {
     declared' = -1, joined' = MEMBERS.mapBy(m => false), limitOf' = MEMBERS.mapBy(m => 0), stateBytes' = 0,
     signed' = 0, installedAt' = MEMBERS.mapBy(m => -1), unavailable' = false, moves' = 0, seals' = 0,
     wedged' = false, frozen' = false, refusedFitting' = false, mutants' = mu, snapshotAt' = MEMBERS.mapBy(m => -1),
+    regWidth' = 0, custodyRefused' = false,
   }
   action init = initWith(SOUND)
   action initMemberLocalDefault = initWith({ ...SOUND, memberLocalDefault: true })
@@ -116,12 +142,14 @@ module roomStateLimitPolicy {
   action initAdmitUnavailable = initWith({ ...SOUND, admitUnavailable: true })
   action initUntyped = initWith({ ...SOUND, untyped: true })
   action initMemberSnapshotBound = initWith({ ...SOUND, memberSnapshotBound: true })
+  action initCustodyRegistryOnly = initWith({ ...SOUND, custodyRegistryOnly: true })
+  action initCustodyBoundRegistryOnly = initWith({ ...SOUND, custodyBoundRegistryOnly: true })
 
   // The creator signs an invite declaring d (any d: a faulty creator may sign an invalid one). The
   // creator's own room opens only when its check accepts d (createV3RoomCreatorInviteMaterial).
-  action createWith(d: int): bool = all {
+  action createFull(d: int, w: int): bool = all {
     declared == -1,
-    declared' = d,
+    declared' = d, regWidth' = w,
     val ok = valid(d) or mutants.uncheckedCeiling
     all {
       joined' = joined.set(0, ok),
@@ -130,8 +158,10 @@ module roomStateLimitPolicy {
     },
     stateBytes' = stateBytes, signed' = signed, unavailable' = unavailable, moves' = moves, seals' = seals,
     wedged' = wedged, frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
+    custodyRefused' = custodyRefused,
   }
-  action create = { nondet d = DECLARED.oneOf() createWith(d) }
+  action createWith(d: int): bool = createFull(d, 0)
+  action create = { nondet d = DECLARED.oneOf() nondet w = REG_WIDTHS.oneOf() createFull(d, w) }
 
   // A Writer authenticates the invite (decodeCreatorInvite): it joins only when the declared limit is valid.
   action joinWith(m: int): bool = all {
@@ -140,6 +170,7 @@ module roomStateLimitPolicy {
     installedAt' = installedAt.set(m, signed),
     declared' = declared, stateBytes' = stateBytes, signed' = signed, unavailable' = unavailable, moves' = moves,
     seals' = seals, wedged' = wedged, frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
+    regWidth' = regWidth, custodyRefused' = custodyRefused,
   }
   action join = { nondet m = WRITERS.oneOf() joinWith(m) }
 
@@ -150,19 +181,24 @@ module roomStateLimitPolicy {
     val proposed = clamp(stateBytes + d)
     val fitsRoom = proposed <= roomLimit
     if (unavailable and mutants.admitUnavailable) all {
-      stateBytes' = proposed, frozen' = frozen, refusedFitting' = refusedFitting,
+      stateBytes' = proposed, frozen' = frozen, refusedFitting' = refusedFitting, custodyRefused' = custodyRefused,
     } else if (unavailable) all {
       // Deferred: local issue answers not-active, ingress collects the row for after the install.
-      stateBytes' = stateBytes, frozen' = frozen, refusedFitting' = refusedFitting,
+      stateBytes' = stateBytes, frozen' = frozen, refusedFitting' = refusedFitting, custodyRefused' = custodyRefused,
+    } else if (proposed <= limitOf.get(m) and proposed <= limitOf.get(0) and m != 0 and not(custodyAccepts)) all {
+      // Admitted by the limit, but the creator cannot capture the Writer move's settlement source: the move
+      // is refused (an untyped failure: "creator source context is not authenticated").
+      stateBytes' = stateBytes, frozen' = frozen, refusedFitting' = refusedFitting, custodyRefused' = true,
     } else if (proposed <= limitOf.get(m) and proposed <= limitOf.get(0)) all {
-      stateBytes' = proposed, frozen' = frozen, refusedFitting' = refusedFitting,
+      stateBytes' = proposed, frozen' = frozen, refusedFitting' = refusedFitting, custodyRefused' = custodyRefused,
     } else all {
       // Refused (V3RoomStateLimitRefused naming the limit; untyped under the variant).
       stateBytes' = stateBytes, frozen' = if (refusal) true else frozen,
-      refusedFitting' = if (fitsRoom) true else refusedFitting,
+      refusedFitting' = if (fitsRoom) true else refusedFitting, custodyRefused' = custodyRefused,
     },
     declared' = declared, joined' = joined, limitOf' = limitOf, signed' = signed, installedAt' = installedAt,
     unavailable' = unavailable, seals' = seals, wedged' = wedged, mutants' = mutants, snapshotAt' = snapshotAt,
+    regWidth' = regWidth,
   }
   action issue = { nondet m = MEMBERS.oneOf() nondet d = DELTAS.oneOf() issueWith(m, d) }
 
@@ -173,6 +209,7 @@ module roomStateLimitPolicy {
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, signed' = signed,
     installedAt' = installedAt, moves' = moves, seals' = seals, wedged' = wedged, frozen' = frozen,
     refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
+    regWidth' = regWidth, custodyRefused' = custodyRefused,
   }
   // The seal folds the epoch on the creator's machine: past its limit the fold refuses and the room wedges.
   action seal = all {
@@ -185,6 +222,7 @@ module roomStateLimitPolicy {
     },
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, moves' = moves,
     frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
+    regWidth' = regWidth, custodyRefused' = custodyRefused,
   }
   // A Writer installs the signed successor state on a machine with its own limit.
   action installWith(m: int): bool = all {
@@ -193,7 +231,7 @@ module roomStateLimitPolicy {
     else all { installedAt' = installedAt, wedged' = true },
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, signed' = signed,
     unavailable' = unavailable, moves' = moves, seals' = seals, frozen' = frozen, refusedFitting' = refusedFitting,
-    mutants' = mutants, snapshotAt' = snapshotAt,
+    mutants' = mutants, snapshotAt' = snapshotAt, regWidth' = regWidth, custodyRefused' = custodyRefused,
   }
   action install = { nondet m = WRITERS.oneOf() installWith(m) }
 
@@ -207,6 +245,7 @@ module roomStateLimitPolicy {
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, signed' = signed,
     installedAt' = installedAt, unavailable' = unavailable, moves' = moves, seals' = seals, wedged' = wedged,
     frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants,
+    regWidth' = regWidth, custodyRefused' = custodyRefused,
   }
   action snapshotImport = { nondet m = WRITERS.oneOf() nondet s = 0.to(SNAPSHOT_BOUND).oneOf() snapshotImportWith(m, s) }
 
@@ -221,8 +260,9 @@ module roomStateLimitPolicy {
   val writerKeepsPlaying = not(frozen)
   val noOverRefusal = not(refusedFitting)
   val memberStateWithinLimit = MEMBERS.forall(m => snapshotAt.get(m) <= roomLimit)
+  val writerSourceAccepted = not(custodyRefused)
   val safety = joinedOnlyValid and limitsAgree and stateWithinLimit and stateWithinCeiling and noWedge and
-    writerKeepsPlaying and noOverRefusal and memberStateWithinLimit
+    writerKeepsPlaying and noOverRefusal and memberStateWithinLimit and writerSourceAccepted
 
   // Tests (deterministic traces).
   // A room created without the setting enforces the default; one created with 4 admits past the default.
@@ -271,6 +311,18 @@ module roomStateLimitPolicy {
     .then(all { assert(snapshotAt.get(1) == 3 and safety), snapshotImportWith(1, 0) })
   run memberSnapshotBoundTest = initMemberSnapshotBound.then(createWith(3)).then(joinWith(1)).then(snapshotImportWith(1, 5))
     .then(all { assert(snapshotAt.get(1) == 5 and not(memberStateWithinLimit)), snapshotImportWith(1, 0) })
+  // A Writer's move in a room that declares a limit (Grid's) settles: its source is captured, whatever
+  // widths the creator chose for the other fields.
+  run writerSourceTest = init.then(createFull(3, REG_MAX)).then(joinWith(1)).then(issueWith(1, 2))
+    .then(all { assert(stateBytes == 2 and writerSourceAccepted and safety), issueWith(1, 1) })
+    .then(all { assert(stateBytes == 3 and safety), closeBegin })
+  run custodyRegistryOnlyTest = initCustodyRegistryOnly.then(createWith(3)).then(joinWith(1)).then(issueWith(1, 2))
+    .then(all { assert(stateBytes == 0 and not(writerSourceAccepted)), issueWith(0, 2) })
+    .then(all { assert(stateBytes == 2), closeBegin })
+  run custodyRegistryOnlyDefaultTest = initCustodyRegistryOnly.then(createFull(0, REG_MAX)).then(joinWith(1))
+    .then(issueWith(1, 2)).then(all { assert(stateBytes == 2 and safety), closeBegin })
+  run custodyBoundRegistryOnlyTest = initCustodyBoundRegistryOnly.then(createFull(3, REG_MAX)).then(joinWith(1))
+    .then(issueWith(1, 2)).then(all { assert(stateBytes == 0 and not(writerSourceAccepted)), closeBegin })
   run untypedTest = initUntyped.then(createWith(0)).then(issueWith(0, 2)).then(issueWith(0, 1))
     .then(all { assert(frozen and not(writerKeepsPlaying)), closeBegin })
 }
