@@ -100,6 +100,21 @@ describe.each(Object.keys(factories) as (keyof typeof factories)[])("transactIss
 				lineageAfter: { exhausted: false, next: 9 },
 			});
 		if (native)
+			expect(report.prefix).toEqual({
+				stoppedOk: true,
+				stoppedCode: null,
+				sequences: [9, 10, 11],
+				signed: [9, 10, 11],
+				lineageBetween: { exhausted: false, next: 12 },
+				issuedBetween: [9, 10, 11, null, null, null, null, null],
+				replacedBetween: [9, 10, 11, null, null, null, null, null],
+				revisionStep: 3,
+				restOk: true,
+				restSequences: [12, 13, 14, 15, 16],
+				issuedAfter: [9, 10, 11, 12, 13, 14, 15, 16],
+				planEqualsSingles: true,
+			});
+		if (native)
 			expect(report.sizing).toMatchObject({
 				overOk: false,
 				overSigned: 0,
@@ -183,4 +198,85 @@ it("issueBatch signs exactly the vertices the same sequential singles sign", asy
 	expect(await batchStore.readLineage({ objectId, author })).toEqual(
 		await singlesStore.readLineage({ objectId, author })
 	);
+}, 60_000);
+
+// Rule R (fix/browser-rollover-member-stall, blocker (a)): a caller that stops a batch before a row's
+// signature (the creator sealed the epoch mid-chunk) gets the signed prefix committed alone: the issuer
+// builds commits for the rows signed, the same vertices as the first singles, and the lineage advances
+// past them only.
+it("issueBatch stopped before its 4th signature commits the 3 signed vertices, the same as the first singles", async () => {
+	const seed = new Uint8Array(32).fill(9);
+	const publicKey = ed25519.getPublicKey(seed);
+	const author = Buffer.from(publicKey).toString("hex");
+	const objectId = "issuance-batch-prefix";
+	const anchor = "a".repeat(64);
+	const root = "b".repeat(64);
+	const operations = Array.from({ length: 8 }, (_, index) => ({ action: "place", id: `m-${index}`, x: index, y: 2 }));
+	const singlesStore = await factories.sqlite("prefix-singles");
+	const batchStore = await factories.sqlite("prefix-batch");
+	const issuerOf = (store: DurableIssuanceStore): TransactionalVertexIssuer =>
+		createTransactionalVertexIssuer({
+			author,
+			privateKeySeed: seed,
+			publicKey: { bytes: publicKey, format: "raw" },
+			transactIssue: (scope, build) => store.transactIssue(scope, build),
+		});
+	const singles: IssueCommit[] = [];
+	for (const operation of operations.slice(0, 3)) {
+		const previous = singles.at(-1);
+		singles.push(
+			await issuerOf(singlesStore).issue({
+				anchor,
+				dependencies: previous === undefined ? [root] : [Buffer.from(previous.envelope.digest).toString("hex")],
+				epoch: 1,
+				logicalTime: 1 + 2 * singles.length,
+				objectId,
+				operation,
+			})
+		);
+	}
+	const transactIssueBatch = batchStore.transactIssueBatch;
+	if (transactIssueBatch === undefined) throw new Error("the SQLite store has no transactIssueBatch");
+	const asked: number[] = [];
+	const batched = await issuerOf(batchStore).issueBatch(
+		{
+			anchor,
+			dependencies: [root],
+			epoch: 1,
+			objectId,
+			entries: operations.map((operation, index) => ({ logicalTime: 1 + 2 * index, operation })),
+		},
+		(scope, count, build) =>
+			transactIssueBatch({ scope, count, expectedPlanRevision: null }, (first, admission) =>
+				build(
+					first,
+					admission === undefined
+						? undefined
+						: (preimages, sign): Promise<readonly Uint8Array[]> =>
+								admission(
+									preimages.map((bytes) => ({ exactCanonicalUnsignedVertexBytes: bytes })),
+									sign,
+									undefined,
+									(index) => {
+										asked.push(index);
+										return index < 3;
+									}
+								)
+				)
+			)
+	);
+	const view = (
+		commits: readonly IssueCommit[]
+	): { authorSequence: number; preimage: string; digest: string; signature: string }[] =>
+		commits.map((commit) => ({
+			authorSequence: commit.authorSequence,
+			preimage: Buffer.from(commit.envelope.canonicalPreimageBytes).toString("hex"),
+			digest: Buffer.from(commit.envelope.digest).toString("hex"),
+			signature: Buffer.from(commit.envelope.signature).toString("hex"),
+		}));
+	// Asked before each signature after the first, until it says stop.
+	expect(asked).toEqual([1, 2, 3]);
+	expect(view(batched)).toEqual(view(singles));
+	expect(await batchStore.readLineage({ objectId, author })).toEqual({ exhausted: false, next: 3 });
+	expect(await batchStore.readIssued({ objectId, author }, 3)).toBeNull();
 }, 60_000);

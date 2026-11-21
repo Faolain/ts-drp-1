@@ -32,6 +32,10 @@ import {
 //                  the batch charge sized before the marker is at least the bytes the commit wrote;
 // - resume (native stores only): a batch that fails after its entered marker reports
 //                  ISSUANCE_OUTCOME_UNKNOWN, writes no row, and the same whole batch then commits.
+// - prefix (native stores only): a batch whose caller stops it before signing its 4th row (rule R: the
+//                  creator sealed the epoch mid-chunk) commits its 3 signed rows alone: lineage +3, the 3
+//                  plan effects, no marker left; the 5 unsigned rows' sequences are issued by the next
+//                  batch, and the end state equals the same 8 singles.
 
 export type BatchStoreFactory = (name: string) => Promise<DurableIssuanceStore>;
 
@@ -115,6 +119,8 @@ type BatchOptions = Readonly<{
 	tamper?(commits: DurableIssueCommit[]): DurableIssueCommit[];
 	/** Skip the native admission even when offered (raw builder). */
 	raw?: boolean;
+	/** Ask the native admission to stop before signing this row (its `proceed`): the signed prefix commits. */
+	stopAt?: number;
 }>;
 
 /**
@@ -146,18 +152,26 @@ export async function issueBatch(store: DurableIssuanceStore, rows: readonly Row
 								signed.push(first + index);
 								return signatureFor(first + index);
 							})
-						: await admission(intents, (index) => {
-								signed.push(first + index);
-								return Promise.resolve(signatureFor(first + index));
-							});
-				const commits = intents.map((intent, index) =>
-					commitOf(
-						first + index,
-						intent.exactCanonicalUnsignedVertexBytes,
-						at(signatures, index),
-						at(rows, index).effect
-					)
-				);
+						: await admission(
+								intents,
+								(index) => {
+									signed.push(first + index);
+									return Promise.resolve(signatureFor(first + index));
+								},
+								undefined,
+								options.stopAt === undefined ? undefined : (index) => index < (options.stopAt ?? 0)
+							);
+				// The commits of the rows signed (all of them, or the prefix a stop left).
+				const commits = intents
+					.slice(0, signatures.length)
+					.map((intent, index) =>
+						commitOf(
+							first + index,
+							intent.exactCanonicalUnsignedVertexBytes,
+							at(signatures, index),
+							at(rows, index).effect
+						)
+					);
 				return options.tamper === undefined ? commits : options.tamper(commits);
 			}
 		);
@@ -446,6 +460,34 @@ export async function runBatchConformance(factory: BatchStoreFactory, native: bo
 			resumedOk: resumed.ok,
 			after: after.issued,
 			lineageAfter: after.lineage,
+		};
+	}
+	if (native) {
+		// A stop before the 4th signature: the 3 signed rows commit alone, the rest are issued by the next batch.
+		const { store, sources } = await settledStore(factory, "prefix", 8);
+		const singles = await settledStore(factory, "prefix-singles", 8);
+		const rows = sources.map((source) => replacement(source.authorSequence));
+		const before = await snapshot(store, 9, 16);
+		const stopped = await issueBatch(store, rows, { stopAt: 3 });
+		const between = await snapshot(store, 9, 16);
+		const replacedBetween = (await store.readSettlementPlan(SCOPE))?.entries.map((entry) => entry.replacementSequence);
+		const rest = await issueBatch(store, rows.slice(3));
+		const after = await snapshot(store, 9, 16);
+		for (const row of rows) await issueOne(singles.store, row);
+		const twin = await snapshot(singles.store, 9, 16);
+		report.prefix = {
+			stoppedOk: stopped.ok,
+			stoppedCode: stopped.ok ? null : stopped.code,
+			sequences: stopped.ok ? stopped.commits.map((commit) => commit.authorSequence) : [],
+			signed: stopped.signed,
+			lineageBetween: between.lineage,
+			issuedBetween: between.issued,
+			replacedBetween,
+			revisionStep: (between.planRevision ?? 0) - (before.planRevision ?? 0),
+			restOk: rest.ok,
+			restSequences: rest.ok ? rest.commits.map((commit) => commit.authorSequence) : [],
+			issuedAfter: after.issued,
+			planEqualsSingles: sameBytes(after.planBytes, twin.planBytes) && after.planRevision === twin.planRevision,
 		};
 	}
 	if (native) {

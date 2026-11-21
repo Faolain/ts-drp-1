@@ -246,6 +246,7 @@ interface NativeSettlementPlan extends DurableIssueScope {
 	readonly memberFrontier?: SettlementPlan["memberFrontier"];
 	readonly completedSourceCustody?: SettlementPlan["completedSourceCustody"];
 	readonly reissueOrigins?: SettlementPlan["reissueOrigins"];
+	readonly sourceAuthorities?: SettlementPlan["sourceAuthorities"];
 	readonly entries: readonly (SettlementPlanEntry & {
 		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
 	})[];
@@ -495,12 +496,14 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	const hasCompletedSourceCustody = typeof value === "object" && value !== null && Object.hasOwn(value, "completedSourceCustody");
 	const hasReissueOrigins = typeof value === "object" && value !== null && Object.hasOwn(value, "reissueOrigins");
+	const hasSourceAuthorities = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceAuthorities");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision",
 			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
 			...(hasMemberFrontier ? ["memberFrontier"] : []),
 			...(hasCompletedSourceCustody ? ["completedSourceCustody"] : []),
 			...(hasReissueOrigins ? ["reissueOrigins"] : []),
+			...(hasSourceAuthorities ? ["sourceAuthorities"] : []),
 		]) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId
@@ -515,6 +518,7 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 			...(hasMemberFrontier ? { memberFrontier: value.memberFrontier } : {}),
 			...(hasCompletedSourceCustody ? { completedSourceCustody: value.completedSourceCustody } : {}),
 			...(hasReissueOrigins ? { reissueOrigins: value.reissueOrigins } : {}),
+			...(hasSourceAuthorities ? { sourceAuthorities: value.sourceAuthorities } : {}),
 			fenceSequence: value.fenceSequence,
 			revision: value.revision,
 			scope,
@@ -535,6 +539,7 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 			? {}
 			: { completedSourceCustody: detached.completedSourceCustody }),
 		...(detached.reissueOrigins === undefined ? {} : { reissueOrigins: detached.reissueOrigins }),
+		...(detached.sourceAuthorities === undefined ? {} : { sourceAuthorities: detached.sourceAuthorities }),
 		fenceSequence: detached.fenceSequence,
 		revision: detached.revision,
 	};
@@ -2116,12 +2121,18 @@ class BrowserIssuanceImplementation {
 		const admit = async (
 			intents: readonly DurableUnsignedBatchIntent[],
 			sign: (index: number) => Promise<Uint8Array>,
-			context: DurableIssueBatchSignContext | undefined
+			context: DurableIssueBatchSignContext | undefined,
+			proceed: ((index: number) => boolean) | undefined
 		): Promise<readonly Uint8Array[]> => {
 			this.#assertAvailable();
 			if (admissionUsed) throw issuanceRetirementRefusal("issuance native batch job already entered");
 			admissionUsed = true;
-			if (typeof sign !== "function" || !Array.isArray(intents) || intents.length !== count)
+			if (
+				typeof sign !== "function" ||
+				(proceed !== undefined && typeof proceed !== "function") ||
+				!Array.isArray(intents) ||
+				intents.length !== count
+			)
 				throw invalid("native batch sign input changed");
 			if (this.#readReservations.view()) throw issuanceRetirementRefusal("join issuance native read view before signing");
 			const capturedContext =
@@ -2266,6 +2277,8 @@ class BrowserIssuanceImplementation {
 				const signatures: Uint8Array[] = [];
 				for (let index = 0; index < count; index += 1) {
 					this.#assertAvailable();
+					// The caller may stop the batch before a later signature: the signed prefix commits alone.
+					if (index > 0 && proceed !== undefined && proceed(index) !== true) break;
 					const signature = await sign(index);
 					this.#assertAvailable();
 					if (!(signature instanceof Uint8Array) || signature.byteLength !== 64)
@@ -2282,11 +2295,16 @@ class BrowserIssuanceImplementation {
 		});
 		void this.#trackRetirement(joined);
 		try {
-			const built = await buildAndSign(first, (intents, sign, context) => admit(intents, sign, context));
-			if (signing !== undefined) await signing;
-			const candidates = copyAndValidateDurableIssueBatch(built, scope, first, count);
+			const built = await buildAndSign(first, (intents, sign, context, proceed) => admit(intents, sign, context, proceed));
+			// A stopped batch commits exactly the prefix it signed, matching the marker's first intents.
+			const signed = signing === undefined ? undefined : await signing;
+			const committed = signed === undefined ? count : signed.length;
+			const candidates = copyAndValidateDurableIssueBatch(built, scope, first, committed);
 			this.#assertAvailable();
-			if (marker !== undefined && !durableIssueBatchMatchesIntents(issuancePendingIntents(marker), candidates))
+			if (
+				marker !== undefined &&
+				!durableIssueBatchMatchesIntents(issuancePendingIntents(marker).slice(0, committed), candidates)
+			)
 				throw invalid("native batch candidates differ from admitted unsigned bytes");
 			return await this.#commitBatch(scope, prior, first, candidates, marker, expectedPlanRevision, job);
 		} catch (error) {

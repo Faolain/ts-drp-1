@@ -31,6 +31,8 @@ import {
 	type DurableIssueSignContext,
 	type DurableOutboxPageInput,
 	MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS,
+	normalizeSettlementSourceAuthorities,
+	SETTLEMENT_SOURCE_AUTHORITY_DOMAIN,
 	type DurableOutboxPublicationTransitionInput,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
@@ -212,7 +214,7 @@ import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyRecei
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
 	captureCreatorSourceCompletion, openCreatorSourceCompletion, captureCreatorSourceExpiry, openCreatorSourceExpiry,
-	captureCreatorReplacedSourceResolution, openCreatorReplacedSourceResolution,
+	captureCreatorReplacedSourceResolution, openCreatorReplacedSourceResolution, openCreatorSourceAuthority,
 	type VerifiedCreatorSourceCustody, type CreatorSourceCustodyIdentity } from "./internal/creator-source-custody.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -682,6 +684,14 @@ export interface V3PlaneHandle {
 			}>
 	): Promise<Uint8Array>;
 	readRebaseOutbox(): Promise<V3RebaseOutboxResult>;
+	/**
+	 * The source-authority record (SettlementSourceAuthority bytes) of this plane's displaced source
+	 * epoch, which the room writes into its plan with that epoch's owed entries; undefined for any
+	 * other epoch or when the plane holds no such authority.
+	 */
+	settlementSourceAuthority?(
+		sourceEpoch: number
+	): Readonly<{ digest: Uint8Array; exactCanonicalAuthorityBytes: Uint8Array }> | undefined;
 	completeRebaseSource(
 		input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 	): Promise<V3EgressResult>;
@@ -880,7 +890,9 @@ type RebaseSourceOwner = Readonly<{
  * needs a split or a join, a batch the store's sizing refuses). `batch-retry`: the plan moved past
  * the revision the drain re-checked; nothing was written and the drain re-checks the chunk.
  * Any other failure is the singles' failure of the row it stopped at. `journal`: how the accepted rows
- * were journaled (`batch`: one native write for the chunk; `rows`: one append per row).
+ * were journaled (`batch`: one native write for the chunk; `rows`: one append per row). `rows` is the
+ * chunk's leading rows only when the caller's stopBefore stopped the chunk before a later row's signature
+ * (rule R: the epoch was sealed meanwhile); the rest were never signed and stay unreplaced.
  */
 export type V3ReplacementBatchResult =
 	| Readonly<{
@@ -917,7 +929,10 @@ type V3RebaseSource = Readonly<{
 	issueReplacements(
 		peers: readonly V3RebaseSource[],
 		inputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
-		expectedPlanRevision: number
+		expectedPlanRevision: number,
+		/** Asked before each row's signature after the first: true stops the chunk there (rule R); the
+		 * signed rows are committed alone and the rest are never signed. */
+		stopBefore?: () => boolean
 	): Promise<V3ReplacementBatchResult>;
 	/** Explicit creator selection; this never grants authority merely from the local source capability. */
 	authorizeReplacement(
@@ -3293,6 +3308,26 @@ interface V3PlaneRegistration {
 	readonly controlVertices: Set<string>;
 	displacedIssuanceBoundary?: number;
 	displacedSource?: V3DisplacedSourceAuthority;
+	/**
+	 * Source authorities of epochs before displacedSource that this plane's predecessor held
+	 * (keptDisplacedSources), inside the own-row settlement window. A replacement rule R deferred is
+	 * signed by a later install, when its source epoch is more than one epoch back (displacedSourceFor).
+	 */
+	olderDisplacedSources?: readonly V3DisplacedSourceAuthority[];
+	/**
+	 * The plan's source-authority records (SettlementSourceAuthority) this plane authenticated, by source
+	 * epoch and anchor: the authority of an owed row's source epoch, durable from the install that closed
+	 * that epoch until the row is replaced or given back. A plane that reopens cold has no kept
+	 * authorities (olderDisplacedSources); this is the one it shares with a live plane
+	 * (settlementSourceAuthorityFor). Refreshed from each settlement scan's plan read.
+	 */
+	settlementSourceAuthorities?: ReadonlyMap<string, Readonly<{
+		digest: string; authorization: V3LiveAuthorization; context: SettlementSourceContext;
+	}>>;
+	/** The record this plane captured for its displaced source epoch (settlementSourceAuthorityRecord). */
+	displacedSourceAuthorityRecord?: Readonly<{
+		source: V3DisplacedSourceAuthority; digest: Uint8Array; exactCanonicalAuthorityBytes: Uint8Array;
+	}>;
 	epochBytes: number;
 	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	graphVersion: number;
@@ -6081,6 +6116,7 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 					predecessor.rebaseSnapshot = undefined;
 				}
 				initial.displacedSource = undefined;
+				initial.olderDisplacedSources = undefined;
 				initial.displacedIssuanceBoundary = undefined;
 				initial.rebaseCursor = undefined;
 				initial.rebaseSnapshot = undefined;
@@ -10600,6 +10636,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 	};
 	const entries = [...(prior?.entries ?? [])];
 	const contexts = [...(prior?.sourceContexts ?? [])];
+	// Custody of an owed row of an older epoch reads that epoch's record from this same plan.
+	refreshSettlementSourceAuthorities(registration, prior);
 	const retained = await prepareCreatorRetainedSourceContracts(prior, payload.trust.trust, payload.input.catalog);
 	if (!current()) throw new TypeError("creator source custody changed during contract preparation");
 	let added = false;
@@ -10691,16 +10729,24 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 			existing.replacementSequence === null;
 		if (classified.kind !== "current" && !unresolved) continue;
 		const source = classified.authenticated;
-		const original = knownCommitted || classified.kind === "current" ? payload : registration.displacedSource?.prepared;
-		const originalAuthorization = knownCommitted || classified.kind === "current" ? authorization : registration.displacedSource?.authorization;
-		if (original === undefined || originalAuthorization?.kind !== "latched-acl" ||
-			source.vertex.epoch !== original.provenance.epoch || source.vertex.anchor !== original.provenance.anchorDigest)
+		const displaced = displacedSourceFor(registration, source.admitted);
+		// A plane that reopened cold keeps no older authority: the row's source epoch is then the plan's
+		// source-authority record, whose bytes are that epoch's source context (deriveOwnedReplacement).
+		const recorded = knownCommitted || classified.kind === "current" || (displaced !== undefined &&
+			source.vertex.epoch === displaced.prepared.provenance.epoch && source.vertex.anchor === displaced.prepared.provenance.anchorDigest)
+			? undefined : settlementSourceAuthorityRecordFor(registration, source.admitted);
+		const original = knownCommitted || classified.kind === "current" || recorded !== undefined ? payload : displaced?.prepared;
+		const originalAuthorization = knownCommitted || classified.kind === "current" ? authorization
+			: recorded?.authorization ?? displaced?.authorization;
+		if (original === undefined || originalAuthorization?.kind !== "latched-acl" || recorded === undefined &&
+			(source.vertex.epoch !== original.provenance.epoch || source.vertex.anchor !== original.provenance.anchorDigest))
 			throw new TypeError("creator unresolved source contract is unavailable");
 		const intents = rebaseIntents(original, source);
 		if (intents === undefined) throw new TypeError("creator source custody application contract is unavailable");
 		if (!currentFence && (intents.length === 0 || Reflect.get(source.vertex.operation as object, "action") === "acl")) continue;
 		if (existing !== undefined && !unresolved) continue;
-		const selectedContext = knownCommitted || classified.kind === "current" ? context : captureCreatorSourceContext(original.trust.trust,
+		const selectedContext = knownCommitted || classified.kind === "current" ? context : recorded !== undefined ? recorded.context :
+			captureCreatorSourceContext(original.trust.trust,
 			encodeCanonical(originalAuthorization.value), original.provenance.blueprintDigest, original.input.exactCanonicalParametersCarrierBytes);
 		if (!contexts.some(value => sameBytes(value.digest, selectedContext.digest))) contexts.push(selectedContext);
 		const resolution = knownCommitted ? await completion() : undefined;
@@ -10720,7 +10766,7 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 		const persistedFrontier = memberFrontier ?? prior?.memberFrontier;
 		const plan = copySettlementPlan(
-			{
+			normalizeSettlementSourceAuthorities({
 				scope,
 				revision: prior === null ? 0 : prior.revision + 1,
 				fenceSequence: prior?.fenceSequence ?? null,
@@ -10730,7 +10776,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 				...(persistedFrontier === undefined ? {} : { memberFrontier: persistedFrontier }),
 				...(completedSourceCustody ? { completedSourceCustody: true } : {}),
 				...(prior?.reissueOrigins === undefined ? {} : { reissueOrigins: prior.reissueOrigins }),
-			},
+				...(prior?.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+			} as SettlementPlan),
 			scope
 		);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
@@ -14341,6 +14388,70 @@ function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boo
 }
 
 /**
+ * The source authorities a successor plane keeps from its live predecessor: the predecessor's displaced
+ * source and those it kept itself, the same authenticated objects (prepared payload and ACL), nothing
+ * reauthorized. Rule R defers an install's replacements while the creator's next offer is queued, so a
+ * displaced row of epoch E-1 is replaced by the install to E+1 or later, whose displaced source is E:
+ * without these, the authority of E-1 left with the predecessor registration. Only this object's own
+ * earlier epochs of the same genesis, before the predecessor's epoch (a migration source or a native
+ * branch has its own owners), and only inside the own-row settlement window: a row at or past it expires
+ * and its move is given back, so it is never replaced (at most V3_SETTLEMENT_OWN_WINDOW_EPOCHS - 2 kept).
+ * @param predecessor - The live predecessor registration (the transport handoff).
+ * @param successorEpoch - The successor plane's epoch.
+ * @returns The kept authorities, newest first.
+ */
+function keptDisplacedSources(
+	predecessor: Pick<V3PlaneRegistration, "payload" | "displacedSource" | "olderDisplacedSources">,
+	successorEpoch: number
+): readonly V3DisplacedSourceAuthority[] {
+	const provenance = predecessor.payload.provenance;
+	const kept: V3DisplacedSourceAuthority[] = [];
+	for (const source of [predecessor.displacedSource, ...(predecessor.olderDisplacedSources ?? [])]) {
+		if (
+			source === undefined ||
+			source.activationVertexDigest !== undefined ||
+			source.migrationTarget !== undefined ||
+			source.prepared.provenance.objectId !== provenance.objectId ||
+			source.prepared.provenance.blueprintDigest !== provenance.blueprintDigest ||
+			source.prepared.trust.trust.genesisAnchorDigest !== predecessor.payload.trust.trust.genesisAnchorDigest ||
+			!NumberIsSafeInteger(source.prepared.provenance.epoch) ||
+			source.prepared.provenance.epoch >= provenance.epoch ||
+			settlementOwnRowWindowExpired(source.prepared.provenance.epoch, successorEpoch) ||
+			kept.some((other) => other.prepared.provenance.epoch === source.prepared.provenance.epoch)
+		)
+			continue;
+		kept.push(
+			ObjectFreeze({
+				authorization: source.authorization,
+				pinnedGenesisAnchorDigest: source.pinnedGenesisAnchorDigest,
+				prepared: source.prepared,
+			})
+		);
+	}
+	return ObjectFreeze(kept);
+}
+
+/**
+ * The displaced-source authority of a displaced own row, selected by the row's own signed epoch and
+ * anchor: the plane's displaced source (the epoch it closed), or an authority it kept for an earlier
+ * epoch (keptDisplacedSources). Otherwise the displaced source, which the caller's own epoch/anchor
+ * check refuses exactly as before.
+ * @param registration - The plane.
+ * @param admitted - The row's signed epoch and anchor.
+ * @returns The authority, or undefined when the plane has no displaced source.
+ */
+function displacedSourceFor(
+	registration: Pick<V3PlaneRegistration, "displacedSource" | "olderDisplacedSources">,
+	admitted: Readonly<{ epoch: number; anchor: string }>
+): V3DisplacedSourceAuthority | undefined {
+	const source = registration.displacedSource;
+	const matches = (candidate: V3DisplacedSourceAuthority): boolean =>
+		candidate.prepared.provenance.epoch === admitted.epoch && candidate.prepared.provenance.anchorDigest === admitted.anchor;
+	if (source === undefined || matches(source)) return source;
+	return registration.olderDisplacedSources?.find(matches) ?? source;
+}
+
+/**
  * The lowest own author fence (fenceSequence = its own sequence) of each epoch among the author's
  * retained own rows. A local issue's dependencies are the plane's tips, so an author's admitted rows
  * of one epoch are causally closed: when the author's fence of an epoch precedes a row of that epoch
@@ -17471,7 +17582,8 @@ async function issueReplacementBatch(
 	registration: V3PlaneRegistration,
 	inputs: readonly CapturedLocalIssueInput[],
 	custody: LocalReplacementCustody,
-	expectedPlanRevision: number
+	expectedPlanRevision: number,
+	stopBefore?: () => boolean
 ): Promise<V3ReplacementBatchResult> {
 	const unavailable = (detail: string): V3ReplacementBatchResult =>
 		ObjectFreeze({ ok: false as const, kind: "batch-unavailable" as const, detail });
@@ -17585,6 +17697,22 @@ async function issueReplacementBatch(
 	let capacityRejected = false;
 	let stateLimitRejected = false;
 	let signingRow: (typeof rows)[number] | undefined;
+	// Rule R: the row before whose signature the caller stopped the chunk (the store commits the signed
+	// prefix alone). An observation that cannot answer never stops a chunk.
+	let stoppedAt: number | undefined;
+	const proceed =
+		stopBefore === undefined
+			? undefined
+			: (index: number): boolean => {
+					let stop = false;
+					try {
+						stop = stopBefore() === true;
+					} catch {
+						stop = false;
+					}
+					if (stop) stoppedAt = index;
+					return !stop;
+				};
 	try {
 		const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
 		if (maintenance?.readBoundedRecoveryCensus === undefined)
@@ -17677,7 +17805,8 @@ async function issueReplacementBatch(
 								signingRow = undefined;
 							}
 						},
-						context
+						context,
+						proceed
 					);
 				});
 				return built.map((commit, index) => ObjectFreeze({ ...commit, planEffect: batchElement(rows, index, "row").planEffect }));
@@ -17721,10 +17850,13 @@ async function issueReplacementBatch(
 							(error instanceof Error ? error.message : String(error))}`
 					);
 	}
-	if (commits.length !== rows.length) {
+	// A chunk the caller stopped committed exactly the rows signed before the stop; their reservations are
+	// kept and the rest released (those rows were never signed and stay unreplaced).
+	if (commits.length !== rows.length && (stoppedAt === undefined || commits.length !== stoppedAt || commits.length < 1)) {
 		registration.operationAdmissionHalted = true;
 		return localIssueFailure("issuance-rejected", "v3 replacement batch commit is incomplete");
 	}
+	for (const reservation of reservations.slice(commits.length)) releaseOperationReservation(reservation);
 	const accepted: Readonly<{ authorSequence: number; digest: string }>[] = [];
 	const committedRecord = (index: number) => {
 		const committed = batchElement(commits, index, "commit");
@@ -17739,7 +17871,7 @@ async function issueReplacementBatch(
 	// row admitted in sequence order exactly as admitCommittedLocalVertex admits it after its own append.
 	const journaled = await journalReplacementBatch(
 		registration,
-		rows.map((row) => row.input),
+		rows.slice(0, commits.length).map((row) => row.input),
 		scope,
 		commits.map((_, index) => committedRecord(index)),
 		custody
@@ -19022,13 +19154,24 @@ function deriveOwnedReplacement(
 		selected.authenticated.author !== registration.issuanceScope.author
 	)
 		throw new TypeError("local replacement owning source/policy is unavailable");
-	const source = registration.displacedSource;
-	let original = selected.kind === "current" ? registration.payload : source?.prepared;
-	let authority = selected.kind === "current" ? registration.authorization : source?.authorization;
+	// The source epoch's authority: the plane's displaced source (the epoch it closed); else the plan's
+	// durable source-authority record of that epoch (the same on a live and a cold-reopened plane: a row
+	// rule R deferred past one install); else an authority kept from a live predecessor; else the
+	// historical issuance ACL (immediately closed epoch only). The original semantics with a record
+	// are the plane's own (one blueprint, as for the historical ACL).
+	const admitted = selected.authenticated.admitted;
+	const displaced = registration.displacedSource;
+	const displacedMatches = displaced !== undefined && displaced.prepared.provenance.epoch === admitted.epoch &&
+		displaced.prepared.provenance.anchorDigest === admitted.anchor;
+	const recorded = selected.kind === "current" || displacedMatches ? undefined : settlementSourceAuthorityFor(registration, admitted);
+	const source = selected.kind === "current" || recorded !== undefined ? undefined : displacedSourceFor(registration, admitted);
+	let original = selected.kind === "current" || recorded !== undefined ? registration.payload : source?.prepared;
+	let authority = selected.kind === "current" ? registration.authorization : recorded ?? source?.authorization;
 	if (
 		original === undefined ||
-		selected.authenticated.admitted.epoch !== original.provenance.epoch ||
-		selected.authenticated.admitted.anchor !== original.provenance.anchorDigest
+		(recorded === undefined && (
+			selected.authenticated.admitted.epoch !== original.provenance.epoch ||
+			selected.authenticated.admitted.anchor !== original.provenance.anchorDigest))
 	) {
 		const historical = registration.historicalIssuance;
 		const acl =
@@ -19657,7 +19800,8 @@ async function readRebaseOutbox(
 		this: V3RebaseSource,
 		peers: readonly V3RebaseSource[],
 		rawInputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
-		expectedPlanRevision: number
+		expectedPlanRevision: number,
+		stopBefore?: () => boolean
 	): Promise<V3ReplacementBatchResult> {
 		if (this !== resultSource)
 			return Promise.resolve(localIssueFailure("authorization-rejected", "active replacement source is foreign"));
@@ -19670,7 +19814,8 @@ async function readRebaseOutbox(
 			peers.length !== rawInputs.length ||
 			peers.length > V3_SETTLEMENT_DRAIN_TURN_ROWS ||
 			!NumberIsSafeInteger(expectedPlanRevision) ||
-			expectedPlanRevision < 0
+			expectedPlanRevision < 0 ||
+			(stopBefore !== undefined && typeof stopBefore !== "function")
 		)
 			return Promise.resolve(localIssueFailure("malformed-input", "replacement batch is malformed"));
 		const owners: RebaseSourceOwner[] = [];
@@ -19738,7 +19883,8 @@ async function readRebaseOutbox(
 							registration,
 							captured.map((input) => ObjectFreeze({ ...input, settlementCustody: held, settlementAuthorization: undefined })),
 							held,
-							expectedPlanRevision
+							expectedPlanRevision,
+							stopBefore
 						);
 					} catch (error) {
 						outcome = localIssueFailure(
@@ -25228,6 +25374,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 							refuse: () => ObjectFreeze({ kind: "admission-rejected" as const, ok: false as const }),
 						}
 					),
+		settlementSourceAuthority: (sourceEpoch: number) => settlementSourceAuthorityRecord(registration, sourceEpoch),
 		completeRebaseSource: (
 			input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 		): Promise<V3EgressResult> =>
@@ -25434,6 +25581,11 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				controlVertices: recovered.controlVertices,
 				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
 				displacedSource: recovered.displacedSource,
+				// A successor keeps the source authorities its live predecessor held for earlier epochs, for
+				// the replacements rule R deferred past them.
+				...(transportHandoff === undefined || recovered.displacedSource === undefined
+					? {}
+					: { olderDisplacedSources: keptDisplacedSources(transportHandoff, payload.provenance.epoch) }),
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
 				exactCanonicalPinnedGenesisBootstrapOperationBytes:
@@ -27053,7 +27205,6 @@ async function readSettlementSources(
 	registration: V3PlaneRegistration,
 	settlementFrontier?: SettlementFrontierContext
 ): Promise<V3RebaseOutboxResult> {
-	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
 	let plan;
 	try {
 		plan = copySettlementPlan(
@@ -27061,19 +27212,120 @@ async function readSettlementSources(
 			registration.issuanceScope
 		);
 	} catch {
+		if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
 		return ObjectFreeze({
 			detail: "v3 settlement plan read failed",
 			kind: "store-failed" as const,
 			ok: false as const,
 		});
 	}
+	// The replacements this scan leads to take an owed row's source authority from the plan's records.
+	refreshSettlementSourceAuthorities(registration, plan ?? null);
+	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
+	// Open work keeps its source in the scan even where the frontier calls the row terminal or an old
+	// incarnation: a split replacement, a retained source, and a row the plan still owes a replacement
+	// (rebase or transform, not replaced). The drain issues its fence before its replacements, so a row
+	// rule R deferred (a newer offer queued, or a chunk stopped mid-signing) stays below that fence; once
+	// the creator admits the fence its frontier calls the row terminal. That boundary only records the
+	// author's own fence: the row's epoch closed without it when its entry was written, so it can never be
+	// admitted, and its move is carried by the replacement issued above the fence.
 	const openProgressSources = new Set(
 		plan?.entries
-			.filter((entry) => (entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
-				entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.replacementSequence === null)
+			.filter((entry) => entry.replacementSequence === null && (
+				(entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
+					entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" ||
+				entry.disposition === "rebase" || entry.disposition === "transform"))
 			.map((entry) => entry.sourceSequence) ?? []
 	);
 	return readRebaseOutbox(registration, true, settlementFrontier, openProgressSources);
+}
+
+/** Store domain of a source-authority record's digest (SETTLEMENT_SOURCE_AUTHORITY_DOMAIN). */
+function settlementSourceAuthorityDigest(bytes: Uint8Array): Uint8Array {
+	return hashDomain(SETTLEMENT_SOURCE_AUTHORITY_DOMAIN, bytes);
+}
+
+/**
+ * The source-authority record of the plane's displaced source epoch: that epoch's creator source
+ * context (anchor, signature, ACL, parameters), the same bytes creator custody captures. Only the
+ * displaced epoch: it is the epoch whose owed entries the room's merge at this install adds, and the
+ * one the issuance sizing charged a record for (minSourceEpoch at that epoch). Captured once per plane.
+ * @param registration - The plane.
+ * @param sourceEpoch - The epoch the room asks for.
+ * @returns The record bytes and digest, or undefined.
+ */
+function settlementSourceAuthorityRecord(registration: V3PlaneRegistration, sourceEpoch: number):
+	Readonly<{ digest: Uint8Array; exactCanonicalAuthorityBytes: Uint8Array }> | undefined {
+	const source = registration.displacedSource;
+	if (source === undefined || source.prepared.provenance.epoch !== sourceEpoch ||
+		source.prepared.provenance.objectId !== registration.payload.provenance.objectId ||
+		source.authorization.kind !== "latched-acl" ||
+		settlementProfileFor(source.prepared.trust.trust.profileId) !== "v1" ||
+		source.prepared.provenance.blueprintDigest !== registration.payload.provenance.blueprintDigest) return undefined;
+	if (registration.displacedSourceAuthorityRecord?.source !== source) {
+		const context = captureCreatorSourceContext(source.prepared.trust.trust, encodeCanonical(source.authorization.value),
+			source.prepared.provenance.blueprintDigest, source.prepared.input.exactCanonicalParametersCarrierBytes);
+		const bytes = new Uint8ArrayConstructor(context.exactCanonicalContextBytes);
+		registration.displacedSourceAuthorityRecord = ObjectFreeze({
+			source, digest: settlementSourceAuthorityDigest(bytes), exactCanonicalAuthorityBytes: bytes });
+	}
+	const record = registration.displacedSourceAuthorityRecord!;
+	return ObjectFreeze({ digest: new Uint8ArrayConstructor(record.digest),
+		exactCanonicalAuthorityBytes: new Uint8ArrayConstructor(record.exactCanonicalAuthorityBytes) });
+}
+
+/**
+ * Authenticates the plan's source-authority records against this plane's current trust (G5: bytes
+ * are carriers, opened on every plane) and keeps them by source epoch and anchor. A record already
+ * opened by this plane (same digest) is kept without reopening; a record that does not open is
+ * ignored (its row then has no authority, as before the record existed).
+ * @param registration - The plane.
+ * @param plan - The plan just read.
+ */
+function refreshSettlementSourceAuthorities(registration: V3PlaneRegistration, plan: SettlementPlan | null): void {
+	const records = plan?.sourceAuthorities;
+	if (records === undefined) {
+		registration.settlementSourceAuthorities = undefined;
+		return;
+	}
+	const prior = registration.settlementSourceAuthorities;
+	const opened = new Map<string, Readonly<{ digest: string; authorization: V3LiveAuthorization; context: SettlementSourceContext }>>();
+	for (const record of records) {
+		const digest = lowerHexDigest(record.digest)!;
+		const kept = prior === undefined ? undefined : [...prior].find(([, value]) => value.digest === digest);
+		if (kept !== undefined) {
+			opened.set(kept[0], kept[1]);
+			continue;
+		}
+		const source = openCreatorSourceAuthority(registration.payload.trust.trust, record.exactCanonicalAuthorityBytes,
+			registration.payload.provenance.blueprintDigest);
+		if (source === undefined || source.trust.currentEpoch !== record.sourceEpoch ||
+			source.trust.currentEpoch >= registration.payload.provenance.epoch) continue;
+		let writerCount = 0;
+		for (const member of source.acl.members)
+			if (source.acl.permissionless || member.groups.includes("writer")) writerCount += 1;
+		opened.set(`${source.trust.currentEpoch}\n${source.trust.currentAnchorDigest}`, ObjectFreeze({ digest, context: source.context,
+			authorization: ObjectFreeze({ kind: "latched-acl" as const, value: source.acl, writerCount }) }));
+	}
+	registration.settlementSourceAuthorities = opened;
+}
+
+/**
+ * The authenticated source-authority record of an owed row's signed source epoch and anchor.
+ * @param registration - The plane.
+ * @param admitted - The row's signed epoch and anchor.
+ * @returns The source epoch's ACL authority, or undefined.
+ */
+function settlementSourceAuthorityFor(registration: Pick<V3PlaneRegistration, "settlementSourceAuthorities">,
+	admitted: Readonly<{ epoch: number; anchor: string }>): V3LiveAuthorization | undefined {
+	return settlementSourceAuthorityRecordFor(registration, admitted)?.authorization;
+}
+
+/** The authenticated record (authority and source context) of a row's signed source epoch and anchor. */
+function settlementSourceAuthorityRecordFor(registration: Pick<V3PlaneRegistration, "settlementSourceAuthorities">,
+	admitted: Readonly<{ epoch: number; anchor: string }>):
+	Readonly<{ authorization: V3LiveAuthorization; context: SettlementSourceContext }> | undefined {
+	return registration.settlementSourceAuthorities?.get(`${admitted.epoch}\n${admitted.anchor}`);
 }
 
 export { prepareV3LiveGeneration };
@@ -27642,7 +27894,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan(
-		{
+		normalizeSettlementSourceAuthorities({
 			scope,
 			revision: prior.revision + 1,
 			fenceSequence: prior.fenceSequence,
@@ -27652,7 +27904,8 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
 			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
 			...(reissueOrigins === undefined ? {} : { reissueOrigins }),
-		},
+			...(prior.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+		} as SettlementPlan),
 		scope
 	);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
@@ -27925,7 +28178,7 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 		if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan(
-		{
+		normalizeSettlementSourceAuthorities({
 			scope,
 			revision: prior.revision + 1,
 			fenceSequence: prior.fenceSequence,
@@ -27935,7 +28188,8 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
 			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
 			...(reissueOrigins === undefined ? {} : { reissueOrigins }),
-		},
+			...(prior.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+		} as SettlementPlan),
 		scope
 	);
 	if (plan == null) throw new TypeError("creator source frontier resolution plan is invalid");
@@ -28224,7 +28478,7 @@ async function resolveCreatorReplacedSources(registration: V3PlaneRegistration, 
 		if (!contexts.some(value => sameBytes(value.digest, resolution.digest))) contexts.push(resolution);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan(
-		{
+		normalizeSettlementSourceAuthorities({
 			scope,
 			revision: prior.revision + 1,
 			fenceSequence: prior.fenceSequence,
@@ -28234,7 +28488,8 @@ async function resolveCreatorReplacedSources(registration: V3PlaneRegistration, 
 			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
 			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
 			...(prior.reissueOrigins === undefined ? {} : { reissueOrigins: prior.reissueOrigins }),
-		},
+			...(prior.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+		} as SettlementPlan),
 		scope
 	);
 	if (plan == null) throw new TypeError("creator replaced source resolution plan is invalid");

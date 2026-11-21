@@ -2155,6 +2155,10 @@ export interface LocalVertexBatchInput {
 	readonly entries: readonly LocalVertexBatchEntry[];
 }
 
+/**
+ * The store's batch crypto admission. It may return fewer signatures than vertices, in order: its caller
+ * stopped the batch before a later signature, and only the signed prefix is built and committed.
+ */
 export type UnsignedVertexBatchSignAdmission = (
 	exactCanonicalUnsignedVertexBytes: readonly Uint8Array[],
 	sign: (index: number) => Promise<Uint8Array>
@@ -3676,8 +3680,14 @@ function createTransactionalVertexIssuerCore(
 				} else {
 					signatures = await nativeSignAdmission(preimages.map((bytes) => new intrinsicUint8Array(bytes)), sign);
 				}
-				if (signatures.length !== entries.length) throw new TypeError("batch signatures do not match its vertices");
-				return preimages.map((canonicalPreimageBytes, index) => {
+				// A native admission may stop the batch: the commits of its signed prefix (at least one row).
+				if (
+					signatures.length > entries.length ||
+					signatures.length < 1 ||
+					(nativeSignAdmission === undefined && signatures.length !== entries.length)
+				)
+					throw new TypeError("batch signatures do not match its vertices");
+				return preimages.slice(0, signatures.length).map((canonicalPreimageBytes, index) => {
 					const authorSequence = firstAuthorSequence + index;
 					const envelope: SignedVertexEnvelope = { canonicalPreimageBytes, digest: digests[index]!, signature: signatures[index]! };
 					return {

@@ -5,10 +5,13 @@ import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
 import {
+	normalizeSettlementSourceAuthorities,
 	SETTLEMENT_HAND_BACK_LIMITS,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	SETTLEMENT_SOURCE_AUTHORITY_LIMITS,
 	settlementBacklogMoves,
+	settlementEntryOwesReplacement,
 	type SettlementHandBackReason,
 	settlementHandBacksAtOrigin,
 	settlementOwnRowOrigin,
@@ -229,12 +232,25 @@ const noteV3RoomStage = (stage: string, started: number): void => {
 		row.count += 1;
 	}
 };
+// Diagnostics (measurement only): moves a member's install carried to the next install, and carries
+// that went out because no install started within V3_ROOM_ADOPTION_CARRY_START_MS.
+const v3RoomCarryCounts = { carried: 0, expired: 0 };
+/**
+ * Reads the carry diagnostics (since the process started).
+ * @returns A snapshot.
+ */
+export function readV3RoomCarryCounts(): Readonly<{ carried: number; expired: number }> {
+	return Object.freeze({ ...v3RoomCarryCounts });
+}
 // Diagnostics (measurement only): how this process's settlement drains issued their replacement rows, summed
 // over its rooms. `batches`/`rowsBatched`: chunks issued as one batched issuance and their rows;
 // `journalBatches`: of those chunks, the ones journaled in one native write (appendAcceptedLocalBatch); `rowsSingly`:
 // rows the per-row loop issued (a chunk the batch could not carry, a split row, rows the batches left);
 // `retries`: a chunk refused by a moved plan and re-checked; `recoveries`: an entered chunk resumed whole;
-// `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted").
+// `fallbacks`: why a drain stopped batching (the batch's typed detail, or "retry-exhausted");
+// `deferredDrains`: install drains that left their remaining replacements to the next install (rule R: the
+// caller already held a newer offer, so the epoch installed was sealed); `stoppedChunks`: chunks that offer
+// stopped while they signed (only the rows signed before it were committed).
 const v3RoomSettlementBatchCounts = {
 	batches: 0,
 	rowsBatched: 0,
@@ -242,6 +258,8 @@ const v3RoomSettlementBatchCounts = {
 	rowsSingly: 0,
 	retries: 0,
 	recoveries: 0,
+	deferredDrains: 0,
+	stoppedChunks: 0,
 	fallbacks: new Map<string, number>(),
 };
 /** The settlement batch counters of this process (see v3RoomSettlementBatchCounts). */
@@ -252,6 +270,8 @@ export interface V3RoomSettlementBatchCounts {
 	readonly rowsSingly: number;
 	readonly retries: number;
 	readonly recoveries: number;
+	readonly deferredDrains: number;
+	readonly stoppedChunks: number;
 	readonly fallbacks: Readonly<Record<string, number>>;
 }
 /**
@@ -1956,6 +1976,17 @@ export type V3RoomCreatorSuccessorInstallRequest = Readonly<{
 	newest?: () =>
 		| Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
 		| undefined;
+	/**
+	 * Asked without consuming anything: whether the caller already holds a newer offer it will install next.
+	 * The creator has then sealed the epoch this install reaches, and ingress admits only the current anchor.
+	 * Asked by the install's settlement drain before each replacement batch (each row when issued singly): a
+	 * replacement signed into that epoch could never be admitted, so the drain still merges the plan, expires
+	 * the window, resolves retained work and signs the author fence, and leaves the remaining rows eligible for
+	 * the next install's drain (rule R). Asked once more when the install has succeeded: the moves held for it
+	 * would only be displaced there, so they wait for that next install instead, once
+	 * (V3_ROOM_ADOPTION_CARRY_START_MS; rule C). Model: packages/node/formal/slow-member-follow.qnt.
+	 */
+	queued?: () => boolean;
 }>;
 
 /**
@@ -1992,6 +2023,13 @@ function selectNewestCreatorSuccessorOffer(
  * up to ~60 s in a loaded browser.
  */
 export const V3_ROOM_ADOPTION_ISSUE_HOLD_MS = 120_000;
+/**
+ * Moves held for a member's install whose epoch the creator has already closed (a newer offer is
+ * queued: `queued`) wait for the next install, once; they go out as before if no install starts
+ * within this bound. Each move is carried at most once and stays under its
+ * V3_ROOM_ADOPTION_ISSUE_HOLD_MS bound.
+ */
+export const V3_ROOM_ADOPTION_CARRY_START_MS = 1_000;
 
 /**
  * How many closed epochs' departed-scope carriers a creator keeps in memory (fix/skip-scope-carrier).
@@ -6593,20 +6631,37 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// it (installPreDrain), so back-to-back installs never starve them. Held at most
 	// V3_ROOM_ADOPTION_ISSUE_HOLD_MS. A creator's own adoption still refuses (its moves are its own
 	// policy's, issued between its short adoptions).
+	//
+	// Carry: an install that succeeded while its caller already queued a newer offer reached an epoch
+	// the creator has closed, so its held moves would be displaced there and replaced by the next
+	// install. They wait for that next install instead (carryHolds), at most once per move
+	// (carriedIssues); moves made in between wait behind them (author order). They go out when the
+	// next install settles, or as before if none starts within V3_ROOM_ADOPTION_CARRY_START_MS; the
+	// hold bound is not reset.
 	let heldIssues: PendingIssue[] = [];
 	const heldIssueTimers = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
+	const carriedIssues = new Set<PendingIssue>();
+	let carryHolds = false;
+	let carryTimer: ReturnType<typeof setTimeout> | undefined;
 	let installPreDrain = false;
 	let recipientInstallTask: Promise<void> | undefined;
 	const adoptionHoldsIssues = (): boolean =>
 		settlementProfile === "v1" &&
 		creatorSuccessorAdoptionTask !== undefined &&
 		creatorSuccessorAdoptionTask === recipientInstallTask;
+	const issuesHeld = (): boolean => adoptionHoldsIssues() || carryHolds;
+	const endCarry = (): void => {
+		carryHolds = false;
+		if (carryTimer !== undefined) clearTimeout(carryTimer);
+		carryTimer = undefined;
+	};
 	const holdIssue = (request: PendingIssue): void => {
 		heldIssues.push(request);
 		heldIssueTimers.set(
 			request,
 			setTimeout(() => {
 				heldIssueTimers.delete(request);
+				carriedIssues.delete(request);
 				const index = heldIssues.indexOf(request);
 				if (index < 0) return;
 				heldIssues.splice(index, 1);
@@ -6616,15 +6671,38 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		);
 	};
 	const releaseHeldIssues = (): void => {
+		endCarry();
 		if (heldIssues.length === 0) return;
 		const released = heldIssues.sort((left, right) => left.logicalTime - right.logicalTime);
 		heldIssues = [];
 		for (const request of released) {
 			clearTimeout(heldIssueTimers.get(request));
 			heldIssueTimers.delete(request);
+			carriedIssues.delete(request);
 		}
 		pendingIssues = [...released, ...pendingIssues];
 		scheduleDrain();
+	};
+	// The moves already carried once go out now (they are the oldest: held an install earlier); the
+	// others wait for the next install.
+	const carryHeldIssues = (): void => {
+		const carried = heldIssues.filter((request) => !carriedIssues.has(request));
+		heldIssues = heldIssues.filter((request) => carriedIssues.has(request));
+		releaseHeldIssues();
+		if (carried.length === 0) return;
+		heldIssues = carried;
+		for (const request of carried) carriedIssues.add(request);
+		carryHolds = true;
+		v3RoomCarryCounts.carried += carried.length;
+		carryTimer = setTimeout(() => {
+			carryTimer = undefined;
+			// A closed session issues nothing more (its close released a carry for its drain).
+			if (closed) return;
+			if (carryHolds && recipientInstallTask === undefined) {
+				v3RoomCarryCounts.expired += 1;
+				releaseHeldIssues();
+			}
+		}, V3_ROOM_ADOPTION_CARRY_START_MS);
 	};
 	let drainScheduled = false;
 	let draining = false;
@@ -6900,7 +6978,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
 		if (owned.length === 0) return;
-		if (activeHandle !== undefined && adoptionHoldsIssues() && !installPreDrain && owned.every(({ source }) => source === "public-new")) {
+		if (activeHandle !== undefined && issuesHeld() && !installPreDrain && owned.every(({ source }) => source === "public-new")) {
 			for (const request of owned) holdIssue(request);
 			return;
 		}
@@ -7710,7 +7788,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (unchanged) return current;
 			const expectedRevision = current?.revision ?? null;
 			const sourceContexts = current === null ? undefined : settlementSourceContextsForEntries(current, entries);
-			const plan = Object.freeze({
+			const plan = normalizeSettlementSourceAuthorities({
 				entries: Object.freeze(entries),
 				...(sourceContexts === undefined ? {} : {sourceContexts}),
 				fenceSequence,
@@ -7721,9 +7799,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...(current?.completedSourceCustody === true ? { completedSourceCustody: true as const } : {}),
 				// Reissue origins: kept until the move settles (writeMergedSettlementPlan drops them).
 				...(selectedOrigins === undefined ? {} : { reissueOrigins: Object.freeze([...selectedOrigins]) }),
+				// Source-authority records stay while their rows are owed (pruned with the last one).
+				...(current?.sourceAuthorities === undefined ? {} : { sourceAuthorities: current.sourceAuthorities }),
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,
-			});
+			} as RoomSettlementPlan);
 			return plan;
 		};
 	};
@@ -7818,6 +7898,54 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		return expired;
 	};
+	/**
+	 * Rule R's source authority (SettlementSourceAuthority): the owed entries this merge adds for rows of
+	 * the epoch the active plane just closed join that epoch's record, written in this same plan write
+	 * (a new record holds the plane's displaced source authority, settlementSourceAuthority). A row rule R
+	 * defers past the next install is then replaced from the record, by a live plane or one that reopens
+	 * cold, which holds no authority kept from a live predecessor. The record leaves with its last owed
+	 * row (normalizeSettlementSourceAuthorities in every replacing or give-back write). Only rows new in
+	 * this merge: the issuance sizing of their epoch charged their record (minSourceEpoch).
+	 * @param plan - The merged plan.
+	 * @param current - The durable plan before this merge.
+	 * @param sources - The current rebase scan.
+	 * @returns The plan with its records.
+	 */
+	const withSettlementSourceAuthorities = (
+		plan: RoomSettlementPlan,
+		current: RoomSettlementPlan | null,
+		sources: readonly DisplacedSource[]
+	): RoomSettlementPlan => {
+		const handle = activeHandle;
+		const closed = handle === undefined ? undefined : handle.epoch - 1;
+		if (handle?.settlementSourceAuthority === undefined || closed === undefined || closed < 0) return plan;
+		const records = [...(plan.sourceAuthorities ?? [])];
+		const named = new Set(records.flatMap((record) => record.sources));
+		const prior = new Set(current?.entries.map((entry) => entry.sourceSequence));
+		const closedSources = new Set(sources.filter((source) => source.epoch === closed).map((source) => source.authorSequence));
+		const fresh = plan.entries
+			.filter((entry) => settlementEntryOwesReplacement(entry) && entry.sourceObjectId === undefined &&
+				entry.inheritance === undefined && entry.sourceContextDigest === undefined && !named.has(entry.sourceSequence) &&
+				!prior.has(entry.sourceSequence) && closedSources.has(entry.sourceSequence))
+			.map((entry) => entry.sourceSequence);
+		if (fresh.length === 0) return plan;
+		const index = records.findIndex((record) => record.sourceEpoch === closed);
+		if (index >= 0) {
+			const record = records[index]!;
+			records[index] = Object.freeze({ ...record, sources: Object.freeze([...record.sources, ...fresh].sort((left, right) => left - right)) });
+		} else {
+			if (records.length >= SETTLEMENT_SOURCE_AUTHORITY_LIMITS.maxRecords) return plan;
+			const authority = handle.settlementSourceAuthority(closed);
+			if (authority === undefined) return plan;
+			records.push(Object.freeze({ sourceEpoch: closed, sources: Object.freeze(fresh), ...authority }));
+			records.sort((left, right) => left.sourceEpoch - right.sourceEpoch);
+		}
+		return Object.freeze({
+			...plan,
+			sourceAuthorities: Object.freeze(records),
+			revision: current !== null && plan === current ? current.revision + 1 : plan.revision,
+		});
+	};
 	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
 		const windowExpired = await settlementWindowExpired(current, sources);
@@ -7881,7 +8009,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			priorFence == null
 				? undefined
 				: Reflect.get(decodeCanonical(priorFence.envelope.canonicalPreimageBytes) as object, "epoch");
-		const plan = completePlan(priorFenceEpoch, activeHandle?.epoch);
+		const plan = withSettlementSourceAuthorities(completePlan(priorFenceEpoch, activeHandle?.epoch), current, sources);
 		const written =
 			current !== null && plan === current
 				? current
@@ -8258,6 +8386,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}),
 		});
 		await refreshHandBackListing();
+	};
+	// Rule R: set only while an install adopts (installCreatorSuccessor's `queued`). True once the caller
+	// holds a newer offer, so the epoch being installed is sealed and the drain's remaining replacements
+	// wait for the next install's drain (never signed into an epoch whose ingress no longer admits them).
+	let installNewerQueued: (() => unknown) | undefined;
+	const newerOfferQueued = (): boolean => {
+		const ask = installNewerQueued;
+		if (ask === undefined) return false;
+		try {
+			return ask() === true;
+		} catch {
+			return false;
+		}
 	};
 	const issueSettlement = async (
 		operations: readonly Readonly<{
@@ -8666,9 +8807,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let batchTransientRefusal:
 			| Readonly<{ sourceSequence: number; issued: Extract<Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>>, { readonly ok: false }> }>
 			| undefined;
+		// Rule R: before each chunk (and each row issued singly below), an install whose caller already holds a
+		// newer offer stops here. That epoch is sealed and admits no replacement; the rows stay eligible
+		// (replacementSequence null, the window counted from their origin as before) and the next install's
+		// drain replaces them, in sequence order, into the epoch it reaches. The plan, expiries, retained
+		// resolution and the author fence above are done either way. A row with replacement progress (a split
+		// replacement already partly issued) is always finished.
 		for (let retries = 0, recoveries = 0; ; ) {
 			await checkpoint();
 			assertSessionOpen();
+			if (newerOfferQueued()) {
+				v3RoomSettlementBatchCounts.deferredDrains += 1;
+				return;
+			}
 			const current = await issuanceStore.readSettlementPlan(settlementScope);
 			if (current === null) throw new TypeError("v3 room settlement plan is unavailable");
 			const chunk: Readonly<{ entry: RoomSettlementPlanEntry; source: DisplacedSource; ordered: readonly Readonly<Record<string, unknown>>[] }>[] = [];
@@ -8706,14 +8857,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					signRegisteredVertexDigest,
 				})
 			);
+			// Rule R inside the chunk: a newer offer that arrives while the chunk signs stops it before the next
+			// row's signature; the rows signed commit alone and the rest stay eligible (the check above defers them).
 			const issued = await head.issueReplacements(
 				chunk.map((row) => row.source),
 				inputs,
-				current.revision
+				current.revision,
+				newerOfferQueued
 			);
 			if (issued.ok) {
 				v3RoomSettlementBatchCounts.batches += 1;
 				v3RoomSettlementBatchCounts.rowsBatched += issued.rows.length;
+				if (issued.rows.length < chunk.length) v3RoomSettlementBatchCounts.stoppedChunks += 1;
 				if (issued.journal === "batch") v3RoomSettlementBatchCounts.journalBatches += 1;
 				if (settlementDrainPublication === "immediate") await publishAccepted();
 				continue;
@@ -8775,6 +8930,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				(row) => row.sourceSequence === entry.sourceSequence
 			);
 			if (now === undefined || !eligible(now) || !sameBytes(now.sourceDigest, entry.sourceDigest)) continue;
+			if (now.replacementProgress === undefined && newerOfferQueued()) {
+				v3RoomSettlementBatchCounts.deferredDrains += 1;
+				return;
+			}
 			v3RoomSettlementBatchCounts.rowsSingly += 1;
 			await refreshSourceOwner();
 			const ordered = orderedBySequence.get(entry.sourceSequence);
@@ -10558,35 +10717,47 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let peers: readonly string[];
 		let currency: V3RoomCurrencyStatement | undefined;
 		let newest: (() => unknown) | undefined;
+		let queued: (() => unknown) | undefined;
 		try {
 			const withCurrency = request !== null && typeof request === "object" && Object.hasOwn(request, "currency");
 			const withNewest = request !== null && typeof request === "object" && Object.hasOwn(request, "newest");
+			const withQueued = request !== null && typeof request === "object" && Object.hasOwn(request, "queued");
 			const fields = exactRecord(request, [
 				...(withCurrency ? ["currency"] : []),
 				...(withNewest ? ["newest"] : []),
 				"offer",
 				"peers",
+				...(withQueued ? ["queued"] : []),
 			]);
-			if (fields === undefined || (withNewest && typeof fields.newest !== "function"))
+			if (
+				fields === undefined ||
+				(withNewest && typeof fields.newest !== "function") ||
+				(withQueued && typeof fields.queued !== "function")
+			)
 				throw new TypeError("creator recipient request is invalid");
 			offer = captureCreatorSuccessorOffer(fields.offer);
 			peers = captureCreatorSuccessorPeers(fields.peers);
 			currency = withCurrency ? captureCurrencyStatement(fields.currency) : undefined;
 			newest = withNewest ? (fields.newest as () => unknown) : undefined;
+			queued = withQueued ? (fields.queued as () => unknown) : undefined;
 		} catch (error) {
 			return Promise.reject(error);
 		}
 		if (creatorSuccessorAdoptionTask !== undefined)
 			return Promise.reject(new TypeError("creator recipient installation is already owned"));
 		let installFromEpoch: number | undefined;
+		// Moves carried from the install before wait for this one (it holds them from here on).
+		const carriedIn = carryHolds;
+		endCarry();
 		const attempt = enqueueLifetimeTransition(async () => {
 			assertSessionOpen();
 			// The moves held by the adoption before this one (and any issue in flight) go out first, on
 			// the plane that adoption left, so back-to-back installs never starve them. Moves made from
-			// here on are held for this install.
+			// here on are held for this install. Moves carried to this install (that plane is closed)
+			// stay held for it.
 			installPreDrain = true;
 			try {
-				releaseHeldIssues();
+				if (!carriedIn) releaseHeldIssues();
 				await drainPendingIssues();
 			} finally {
 				installPreDrain = false;
@@ -10734,7 +10905,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				await timedStage("install.adopt", () =>
 					withCreatorReceivedPromotionDependencies(received, async () => {
 						assertSessionOpen();
-						await performCreatorSuccessorAdoption(received);
+						installNewerQueued = queued;
+						try {
+							await performCreatorSuccessorAdoption(received);
+						} finally {
+							installNewerQueued = undefined;
+						}
 					})
 				);
 			} catch (error) {
@@ -10768,8 +10944,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 			if (recipientInstallTask === shared) recipientInstallTask = undefined;
 			// Moves held for this install were made while current; moves held until current are older
-			// still, so they are released last and go out first.
-			releaseHeldIssues();
+			// still, so they are released last and go out first. An install that advanced while its
+			// caller already queued a newer offer reached a closed epoch: its moves wait for that one.
+			const advanced = installFromEpoch !== undefined && currentEpoch() > installFromEpoch;
+			let newerQueued = false;
+			if (advanced && queued !== undefined && !closed) {
+				try {
+					newerQueued = queued() === true;
+				} catch {
+					newerQueued = false;
+				}
+			}
+			if (newerQueued) carryHeldIssues();
+			else releaseHeldIssues();
 			// Sync before sending: the adopted plane holds this author's closed frontier, and the
 			// statement checked before adoption (checkInstallCurrency) its live frontier.
 			if (installFromEpoch !== undefined && currentEpoch() > installFromEpoch) becomeLocalIssueCurrent();
@@ -10827,6 +11014,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (sessionCloseTask !== undefined) return sessionCloseTask;
 		closed = true;
 		endSessionWaits();
+		// Moves carried to an install that will not come now go out with the close's drain.
+		if (carryHolds) releaseHeldIssues();
 		autoPoolMaintenance?.stop();
 		scheduledLulls?.cancel();
 		if (lullRetry !== undefined) clearTimeout(lullRetry);
@@ -11247,7 +11436,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 					// An adoption owns the plane: the move waits for it and is authorized against the plane
 					// it leaves when its drain issues it (issueOwned), never refused for the adoption.
-					const held = adoptionHoldsIssues();
+					const held = issuesHeld();
 					if (!held) {
 						const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
 						if (!authorized.ok) {

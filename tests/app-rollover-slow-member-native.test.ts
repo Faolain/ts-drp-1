@@ -682,3 +682,224 @@ it("a move made straight to the room while the member's install runs lands after
 		restore();
 	}
 }, 600_000);
+
+// The lag loop (fix/member-carry-held-moves; Firefox Grid FPS, .logs/realtime-resume-2026-11-10/
+// agent-status/firefox-lag-loop-design.md): once a member's install outlasts the creator's epoch, the
+// creator closes the epoch the install reaches while it runs. The moves held for that install were
+// then issued into the closed epoch, displaced, and replaced by the next install, which made that
+// install outlast the creator's epoch too: the displaced count never fell. Deterministic model: the
+// first install outlasts the creator's epoch (the trigger: a slow first seal); after it, an install
+// outlasts the creator's epoch exactly when it has displaced rows to replace (a loaded install), and
+// otherwise the creator rolls between installs once the member's moves reached it.
+it("a member whose install outlasts the creator's epoch carries its held moves once instead of displacing them, and the loop ends", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-slow-member-carry-"));
+	directories.push(directory);
+	const INSTALLS = 5;
+	const MOVES_PER_INSTALL = 3;
+	// A batched row (applicationBatch) carries several moves.
+	const movesOf = (operation: unknown): string[] => {
+		if (operation === null || typeof operation !== "object") return [];
+		const id = Reflect.get(operation, "id");
+		if (typeof id === "string") return [id];
+		const entries = Reflect.get(Reflect.get(operation, "batch") ?? {}, "entries");
+		return Array.isArray(entries) ? entries.flatMap((entry) => movesOf(Reflect.get(entry, "operation"))) : [];
+	};
+	const admitted = async (role: RoleEndpoint, author: string, ids: readonly string[]) => {
+		const vertices = ((await role.acceptedVertices?.()) ?? []).filter((vertex) => vertex.author === author);
+		const all = vertices.flatMap((vertex) => movesOf(JSON.parse(vertex.operation)));
+		return ids.map((id) => all.filter((each) => each === id).length);
+	};
+	type Install = { from: number; startedAt: number; endedAt?: number; displaced?: number; rolledDuring?: boolean; replaced?: number };
+	const installs: Install[] = [];
+	let gating = false;
+	let duringInstall: ((install: Install) => Promise<void>) | undefined;
+	let afterInstall: ((install: Install) => Promise<void>) | undefined;
+	try {
+		const { creator, writer } = await openPair(directory, {
+			deliveryRoom: (room) => ({
+				authority: () => room.authority(),
+				connectedPeers: () => room.connectedPeers(),
+				installCreatorSuccessor: async (request) => {
+					if (!gating) return room.installCreatorSuccessor(request);
+					const record: Install = { from: room.authority()?.epoch ?? 0, startedAt: performance.now() };
+					installs.push(record);
+					try {
+						await room.installCreatorSuccessor(request);
+					} finally {
+						record.endedAt = performance.now();
+						await afterInstall?.(record);
+					}
+				},
+			}),
+			// The install's material fetch: the moves made during the install, and (when the install
+			// outlasts the creator's epoch) the creator's rollover, happen here, after the creator served
+			// the material.
+			relay: async (_request, forward) => {
+				const reply = await forward();
+				const install = installs.at(-1);
+				if (gating && install !== undefined && install.endedAt === undefined && install.displaced === undefined)
+					await duringInstall?.(install);
+				return reply;
+			},
+		});
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		let carrying: Promise<void> = Promise.resolve();
+		const serial = (carry: () => Promise<void>) => (carrying = carrying.then(carry, carry));
+		const ordinal = { next: 0 };
+		let writerOrdinal = 10;
+		const moves: { id: string; outcome: Promise<{ ok: boolean; error?: string }> }[] = [];
+		// Every own row the member published, in issue order (the outbox is pruned as epochs retire).
+		const own: { sequence: number; epoch: number; id: string }[] = [];
+		let ownCursor: number | null = null;
+		const readOwn = async () => {
+			for (;;) {
+				const page = await writer.published(ownCursor);
+				if (page.length === 0) return;
+				for (const row of page) {
+					const value = rowValue(row);
+					for (const id of movesOf(value.operation)) own.push({ sequence: value.authorSequence, epoch: value.epoch, id });
+				}
+				ownCursor = page.at(-1)!.authorSequence;
+			}
+		};
+		let pumping = true;
+		const pump = (async () => {
+			while (pumping) {
+				await serial(rows.toCreator);
+				await serial(rows.toWriter);
+				await sleep(100);
+			}
+		})();
+		try {
+			// Connected for two epochs at the creator's pace.
+			for (let n = 0; n < 2; n++) {
+				const epoch = await rollCreator(creator, () => serial(rows.toWriter), ordinal);
+				await wire.caughtUp(epoch);
+				await serial(rows.toWriter);
+				await writer.issue(epoch, n);
+				await serial(rows.toCreator);
+			}
+			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
+			await readOwn();
+			// Successor frames are carried by hand from here (the creator's announcement must reach the
+			// member's delivery before the install it rolled during has ended).
+			await wire.pause();
+			const carryFrames = async () => {
+				const down = (await creator.successorFrames?.()) ?? [];
+				const up = (await writer.successorFrames?.()) ?? [];
+				if (down.length) await writer.deliverSuccessorFrames?.(down);
+				if (up.length) await creator.deliverSuccessorFrames?.(up);
+				await sleep(100);
+			};
+			const acceptedOwnIds = async () =>
+				new Set(
+					((await creator.acceptedVertices?.()) ?? [])
+						.filter((vertex) => vertex.author === writerAuthor)
+						.flatMap((vertex) => movesOf(JSON.parse(vertex.operation)))
+				);
+			duringInstall = async (install) => {
+				// Rows this install must replace: own rows of the epoch it leaves that the creator closed
+				// without them.
+				await readOwn();
+				const accepted = await acceptedOwnIds();
+				install.displaced = own.filter((row) => row.epoch === install.from && row.id.startsWith("block-1-") && !accepted.has(row.id)).length;
+				for (let n = 0; n < MOVES_PER_INSTALL; n++) {
+					const id = `block-1-${writerOrdinal}`;
+					moves.push({
+						id,
+						outcome: writer.issueRoom!(install.from, writerOrdinal++).then(
+							() => ({ ok: true }),
+							(error: unknown) => ({ ok: false, error: String(error).slice(0, 300) })
+						),
+					});
+				}
+				// The first install outlasts the creator's epoch; after it, a loaded install does.
+				install.rolledDuring = installs.length === 1 || install.displaced > 0;
+				if (install.rolledDuring) {
+					await rollCreator(creator, async () => undefined, ordinal);
+					await carryFrames();
+				}
+			};
+			// Moves signed again (a replacement row) since the start.
+			const replacedSoFar = () => own.length - new Set(own.map((row) => row.id)).size;
+			let replacedBefore = replacedSoFar();
+			afterInstall = async (install) => {
+				await readOwn();
+				install.replaced = replacedSoFar() - replacedBefore;
+				replacedBefore = replacedSoFar();
+			};
+			gating = true;
+			let epoch = await rollCreator(creator, () => serial(rows.toWriter), ordinal);
+			await carryFrames();
+			const started = performance.now();
+			while (installs.filter((install) => install.endedAt !== undefined).length < INSTALLS) {
+				if (performance.now() - started > 300_000) throw new Error(`installs stalled: ${JSON.stringify(installs)}`);
+				await sleep(300);
+				const last = installs.at(-1);
+				if (last === undefined || last.replaced === undefined) continue;
+				// No install queued: the creator's epoch is longer than this install, so it rolls once the
+				// member's moves have reached it.
+				await Promise.all(moves.map((move) => move.outcome));
+				await serial(rows.toCreator);
+				if (installs.at(-1) !== last || installs.length >= INSTALLS) continue;
+				epoch = await rollCreator(creator, () => serial(rows.toWriter), ordinal);
+				await carryFrames();
+			}
+			gating = false;
+			process.stdout.write(`SLOW_MEMBER_CARRY_INSTALLS ${JSON.stringify(installs.map((install) => ({ ...install, ms: Math.round((install.endedAt ?? 0) - install.startedAt) })))}\n`);
+			// Landing: rows flow, the member follows, every move lands on the creator exactly once.
+			wire.resume();
+			epoch = Math.max(epoch, (await creator.rollover?.())?.epoch ?? 0);
+			await wire.caughtUp(epoch, 120_000);
+			expect(await Promise.all(moves.map((move) => move.outcome)), "moves made during the installs").toEqual(moves.map(() => ({ ok: true })));
+			// Displaced moves come back through the settlement window once the member's rows reach the
+			// creator; the creator keeps moving (at a person's pace) while they land.
+			const ids = ["block-1-0", "block-1-1", ...moves.map((move) => move.id)];
+			await waitFor(
+				"the creator admits every move of the member",
+				async () => {
+					const counts = await admitted(creator, writerAuthor, ids);
+					if (counts.some((count) => count === 0)) {
+						await creator.issue(0, ordinal.next++);
+						await sleep(LANDING_CREATOR_MOVE_MS);
+					}
+					return counts;
+				},
+				(counts) => counts.every((count) => count >= 1),
+				300_000
+			);
+			// Close the epoch they landed in; the member follows it.
+			epoch = await rollCreator(creator, () => serial(rows.toWriter), ordinal);
+			await wire.caughtUp(epoch, 120_000);
+			await sleep(1_000);
+			await readOwn();
+			expect(await admitted(creator, writerAuthor, ids), "each move accepted by the creator once").toEqual(ids.map(() => 1));
+			expect(await writer.state()).toBe(await creator.state());
+			// Author order: each move's first row follows the order the moves were made.
+			const firstRows = ids.slice(2).map((id) => own.find((row) => row.id === id)?.sequence ?? -1);
+			expect(firstRows, "first rows in move order").toEqual([...firstRows].sort((left, right) => left - right));
+			// The loop: after the first install, no install had displaced rows to replace (so none
+			// outlasted the creator's epoch), and no install replaced a row.
+			expect(installs.slice(1, INSTALLS).map((install) => install.displaced), "rows displaced at each later install").toEqual(installs.slice(1, INSTALLS).map(() => 0));
+			expect(installs.slice(1, INSTALLS).map((install) => install.replaced), "rows replaced by each later install").toEqual(installs.slice(1, INSTALLS).map(() => 0));
+			// Install time returns to its unloaded level: the later installs (nothing to replace) take
+			// less than the first one, which the creator's rollover ran during (median, host noise).
+			const installMs = (install: Install) => (install.endedAt ?? Infinity) - install.startedAt;
+			const later = installs.slice(1, INSTALLS).map(installMs).sort((left, right) => left - right);
+			expect(later[Math.floor(later.length / 2)], "median later install vs the first install (ms)").toBeLessThan(installMs(installs[0]!));
+			// Each move made during the installs was signed once.
+			const rowsPerMove = moves.map((move) => own.filter((row) => row.id === move.id).length);
+			expect(rowsPerMove, "rows signed per move").toEqual(moves.map(() => 1));
+		} finally {
+			pumping = false;
+			gating = false;
+			await pump;
+			wire.resume();
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}, 600_000);

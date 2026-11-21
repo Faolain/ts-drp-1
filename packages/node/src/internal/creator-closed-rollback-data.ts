@@ -11198,6 +11198,32 @@ function authenticateClosedSigningSummaryEpoch(
 	});
 }
 
+/**
+ * The AHE coordinator a closed-signing classification reads. An ACTIVE preparation was derived while
+ * the coordinator had none (a derivation with one only resumes it: installClosedRetirementSource), on
+ * its completed decision, and preparing changes nothing else these classifiers read
+ * (boundPreparedFields keeps completed). Until the signing participant joins that preparation (staged
+ * it, completed it, or drains it), resuming it classifies on that same coordinator: reading the active
+ * labels instead turned a SAME-P summary or evidence decision into a fresh one, and the resumed source
+ * no longer re-derived the prepared proof (box m45 rcd5: a creator reopened between the AHE prepare and
+ * the signing stage refused chain-invalid; formal/closed-retirement-resume-classification.qnt).
+ * @param control - The signing participant's native control.
+ * @param coordinator - The AHE coordinator's native control.
+ * @returns The coordinator the active preparation was derived on, or the coordinator itself.
+ */
+function closedSigningClassificationCoordinator(
+	control: SigningRetirementControl | null,
+	coordinator: AheRetirementControl | null
+): AheRetirementControl | null {
+	const active = coordinator?.active?.preparation;
+	if (coordinator == null || active == null) return coordinator;
+	const joined = [control?.active?.preparation, control?.completed, control?.drain?.plan.baseControl.completed].some(
+		(labels) => labels != null && labels.decisionDigest === active.decisionDigest &&
+			labels.sourceProofDigest === active.sourceProofDigest
+	);
+	return joined ? coordinator : Object.freeze({ ...coordinator, active: null });
+}
+
 function classifyClosedSigningSummaries(
 	input: Readonly<{
 		objectId: string;
@@ -11213,7 +11239,8 @@ function classifyClosedSigningSummaries(
 ): ClosedRetirementSource["signingSummaries"] {
 	const control = closedSigningControl(input.rows, input.objectId);
 	if (control?.completed == null) return undefined;
-	const p = input.coordinator?.active?.preparation ?? input.coordinator?.completed;
+	const coordinator = closedSigningClassificationCoordinator(control, input.coordinator);
+	const p = coordinator?.active?.preparation ?? coordinator?.completed;
 	const preparation = control.active?.preparation ?? control.completed;
 	const stored = preparation.summarySource;
 	// A preparation has floorEpoch, a completion throughEpoch. Check the real
@@ -11260,7 +11287,7 @@ function classifyClosedSigningSummaries(
 		}
 		for (const bytes of [closedRetirementBytes(stored)])
 			requireLaw(input.accounting.charge(bytes), "proof-budget-exceeded");
-		if (control.active === null && input.coordinator?.active === null && drain != null &&
+		if (control.active === null && coordinator?.active === null && drain != null &&
 			isSigningSummaryRetirementPlan(drain.plan) && drain.cursor === drain.plan.entries.length) {
 			checkClosedSigningSummaryImage({ rows: input.rows, original: input.rows, objectId: input.objectId,
 				source: stored, control,
@@ -11294,7 +11321,7 @@ function classifyClosedSigningSummaries(
 		}
 		if (
 			control.active === null &&
-			input.coordinator?.active === null &&
+			coordinator?.active === null &&
 			drain != null &&
 			isSigningSummaryRetirementPlan(drain.plan) &&
 			drain.plan.baseControl.completed?.decisionDigest === preparation.decisionDigest &&
@@ -11321,7 +11348,7 @@ function classifyClosedSigningSummaries(
 		return stored;
 	}
 	if (control.drain != null && control.drain.cursor !== control.drain.plan.entries.length) return undefined;
-	const prior = input.coordinator?.completed;
+	const prior = coordinator?.completed;
 	if (
 		input.unclassified ||
 		prior == null ||
@@ -11487,7 +11514,8 @@ function classifyClosedSigningEvidence(
 	const frames = data.map((bytes) => ({ bytes, frame: decodeCanonical(bytes) as unknown[] }));
 	const control = closedSigningControl(input.rows, input.objectId);
 	const drain = control?.drain;
-	const p = input.coordinator?.active?.preparation ?? input.coordinator?.completed;
+	const coordinator = closedSigningClassificationCoordinator(control, input.coordinator);
+	const p = coordinator?.active?.preparation ?? coordinator?.completed;
 	const original = drain?.plan.baseControl.completed;
 	const same =
 		drain != null &&
@@ -16027,20 +16055,35 @@ function completeSnapshotRecoveryInventoryIsPresent(
  * A completed metadata fence cannot lose a protected scope at the same head.
  * Keep that whole CURRENT pool until the original authenticated head advances;
  * this partition is scheduling only, never a native retirement capability.
+ *
+ * An active snapshot fence is a closed-retirement install that stopped between
+ * the participant's fence and the coordinator's completion (box m46: a creator
+ * killed there refused snapshot-unavailable on every reopen). When it is the
+ * coordinator's own ACTIVE preparation, only that install can finish it (it
+ * resumes the prepared participant): keep the whole pool and retire nothing
+ * until it completes, exactly as a blocked completed fence does. A fence no
+ * active coordinator preparation owns still refuses.
+ * @param coordinatorActive - The AHE coordinator's active preparation labels, read
+ * under the same exclusions; absent when the caller has no coordinator read.
  */
 function selectCurrentSnapshotTurnoverInventory(
 	selection: NonNullable<ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory>>,
 	inventory: SnapshotRecoveryRoleInventory,
 	snapshot: SnapshotRetirementImageObservation,
-	currentHead: CreatorExpectedRoomHead
+	currentHead: CreatorExpectedRoomHead,
+	coordinatorActive?: Readonly<{ decisionDigest: string; sourceProofDigest: string }> | null
 ): ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory> {
 	if (!completeSnapshotRecoveryInventoryIsPresent(inventory, snapshot, currentHead)) return undefined;
 	const control = snapshot.control;
-	if (control !== null && (control.objectId !== currentHead.objectId || control.active !== null)) return undefined;
+	if (control !== null && control.objectId !== currentHead.objectId) return undefined;
+	const fence = control?.active?.preparation;
+	const joinedFence = fence != null && coordinatorActive != null &&
+		fence.decisionDigest === coordinatorActive.decisionDigest && fence.sourceProofDigest === coordinatorActive.sourceProofDigest;
+	if (fence != null && !joinedFence) return undefined;
 	const completed = control?.completed;
-	const blocked = completed != null && currentHead.epoch <= completed.throughEpoch + 1 &&
+	const blocked = joinedFence || (completed != null && currentHead.epoch <= completed.throughEpoch + 1 &&
 		completed.protectedScopes.some(pair => selection.retiringScopes.some(scope =>
-			closedRetirementEqual(scope, pair.scope)) && snapshot.image.scopes.some(current => closedRetirementEqual(current, pair)));
+			closedRetirementEqual(scope, pair.scope)) && snapshot.image.scopes.some(current => closedRetirementEqual(current, pair))));
 	if (!blocked) return selection;
 	if (inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
 	return Object.freeze({survivingScopes: Object.freeze(inventory.scopes.map(row => row.scope)),
@@ -24331,7 +24374,20 @@ async function reconcileSnapshotRecoveryRoles(
 			requireLaw(schedulingFrame !== undefined && schedulingFrame.alive, "internal-invariant");
 			const snapshotBytes = closedRetirementBytes(snapshot);
 			requireLaw(schedulingFrame.accounting.charge(snapshotBytes), "proof-budget-exceeded");
-			const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshot, floor.state.stable);
+			// Only a fence in flight needs the coordinator's active preparation (a resumed install).
+			let coordinatorActive: Readonly<{ decisionDigest: string; sourceProofDigest: string }> | null = null;
+			if (snapshot.control?.active != null) {
+				const nativeObject = parseStorageObjectId(input.objectId);
+				requireLaw(nativeObject.ok, "internal-invariant");
+				const ahe = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementControl"]>>(
+					input.store, "readRetirementControl")(nativeObject.value);
+				if (!ahe.ok) throw new Refusal(failure("ahe-rejected", "ahe", `RETIREMENT_SOURCE_CONTROL:${ahe.reason}`));
+				requireLaw(schedulingFrame.accounting.charge(ahe.value === null ? closedRetirementBytes(null) :
+					encodeAheRetirementControl(ahe.value)), "proof-budget-exceeded");
+				coordinatorActive = ahe.value?.active?.preparation ?? null;
+			}
+			const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshot, floor.state.stable,
+				coordinatorActive);
 			requireLaw(selection !== undefined, "snapshot-unavailable");
 			protectedScopes = selection.survivingScopes.map(nativeScope);
 			requireLaw(protectedScopes.length >= 2 && protectedScopes.length <= 4, "proof-budget-exceeded");
