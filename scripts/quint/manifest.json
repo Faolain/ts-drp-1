@@ -332,6 +332,44 @@
 			]
 		},
 		{
+			"file": "packages/node/formal/batch-prefix-commit.qnt",
+			"modules": [
+				{
+					"main": "batchPrefixCommit",
+					"step": "step",
+					"tests": [
+						"soundPrefixThenReuseTest",
+						"soundCrashResumesWholeTest",
+						"stopAfterSignEquivocatesTest",
+						"dropMarkerEquivocatesTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initStopAfterSign",
+							"invariants": [
+								"noSecondSignature"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initDropMarker",
+							"invariants": [
+								"noSecondSignature"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
 			"file": "packages/node/formal/carried-move-path.qnt",
 			"modules": [
 				{
@@ -457,6 +495,73 @@
 							"maxSteps": 12,
 							"expect": "hold",
 							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/closed-retirement-resume-classification.qnt",
+			"modules": [
+				{
+					"main": "closedRetirementResumeClassification",
+					"step": "step",
+					"tests": [
+						"preparedNotStagedTest",
+						"preFixRefusesRcd5Test",
+						"fixResumesRcd5Test",
+						"fullCycleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"resumeMatchesFix",
+								"liveUnchanged"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"invariants": [
+								"resumeMatchesPre"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/closed-retirement-snapshot-fence-resume.qnt",
+			"modules": [
+				{
+					"main": "closedRetirementSnapshotFenceResume",
+					"step": "step",
+					"tests": [
+						"fencedTest",
+						"preRefusesFencedTest",
+						"fixResumesFencedTest",
+						"orphanRefusesTest",
+						"fullCycleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"reopenResumesFix",
+								"fenceKeepsPoolFix",
+								"unownedRefusesFix",
+								"idleUnchanged"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"invariants": [
+								"reopenResumesPre"
+							]
 						}
 					]
 				}
@@ -2381,6 +2486,38 @@
 			]
 		},
 		{
+			"file": "packages/node/formal/member-retained-successor-readoption.qnt",
+			"modules": [
+				{
+					"main": "memberRetainedSuccessorReadoption",
+					"step": "step",
+					"tests": [
+						"retainedTest",
+						"preRefusesTest",
+						"fixReadoptsTest",
+						"cycleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"reopenReadoptsFix",
+								"fixMatchesLive"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"invariants": [
+								"reopenReadoptsPre"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
 			"file": "packages/node/formal/member-successor-install.qnt",
 			"modules": [
 				{
@@ -3221,12 +3358,18 @@
 					"step": "step",
 					"tests": [
 						"enqueueStaleTest",
+						"fixedCarryLapseTest",
+						"fixedCarryTest",
 						"fixedExpireRetargetTest",
 						"fixedFollowsTest",
 						"fixedHoldTest",
 						"forgedTest",
 						"giveUpTest",
+						"noCarryReleaseTest",
+						"noRetargetChainTest",
 						"refuseRetryTest",
+						"retargetDefersTest",
+						"retargetWindowTest",
 						"singleSealWindowTest"
 					],
 					"checks": [
@@ -3254,6 +3397,13 @@
 							],
 							"samples": 500,
 							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoRetarget",
+							"invariants": [
+								"noReplacementWasted"
+							]
 						}
 					]
 				}
