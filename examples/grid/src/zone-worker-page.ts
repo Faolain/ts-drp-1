@@ -23,9 +23,11 @@ import {
 } from "@ts-drp/example-v3-room";
 import { RoomWorkerUnsupported } from "@ts-drp/room-worker";
 import {
+	createRoomWorkerFrameMeter,
 	openRoomWorker,
+	type RoomWorkerFrameMeterControl,
+	type RoomWorkerFrameMeterOptions,
 	type RoomWorkerHandle,
-	type RoomWorkerMeter,
 	type RoomWorkerSendRefusal,
 } from "@ts-drp/room-worker/page";
 import type { RoomWorkerRtcStats } from "@ts-drp/room-worker/worker";
@@ -83,47 +85,25 @@ export interface GridRoomWorkerControl {
 }
 
 /**
- * Where a movement's time goes between the page and the worker (ms):
+ * The bridge meter's latency stages for a movement (ms):
  * - `moveHop`: the page posting a move to the worker handling it (its queue included);
  * - `transientPacing`: the worker holding an emitted transient value for the page's frame credit;
  * - `transientHop`: the worker sending a transient value to the page handling it;
  * - `transientFrameWait`: the page handling a transient value to its rendering frame.
  */
-export type GridRoomWorkerLatencyStage = "moveHop" | "transientPacing" | "transientHop" | "transientFrameWait";
-
-/**
- * One message kind's share of the library cost: its handlings and posts, and what it spent in frames
- * whose library cost exceeded half a millisecond.
- */
-export interface GridRoomWorkerMeterKind {
-	readonly count: number;
-	readonly totalMs: number;
-	readonly maxMs: number;
-	readonly heavyFrames: number;
-	readonly heavyMs: number;
-}
-
-/** Per-frame main-thread cost of the bridge (library) and of Grid's DOM rendering (app). */
-export interface GridRoomWorkerMeter {
-	read(): Readonly<{
-		library: readonly number[];
-		render: readonly number[];
-		dropped: number;
-		kinds: Readonly<Record<string, GridRoomWorkerMeterKind>>;
-		latency: Readonly<Record<GridRoomWorkerLatencyStage, readonly number[]>>;
-	}>;
-	reset(): void;
-}
+const GRID_METER_STAGES: RoomWorkerFrameMeterOptions = {
+	commands: { move: "moveHop" },
+	streams: { transient: ["transientPacing", "transientHop", "transientFrameWait"] },
+};
 
 declare global {
 	interface Window {
 		__TS_DRP_GRID_ROOM_WORKER__?: GridRoomWorkerControl;
-		__TS_DRP_GRID_ROOM_WORKER_METER__?: GridRoomWorkerMeter;
+		__TS_DRP_GRID_ROOM_WORKER_METER__?: RoomWorkerFrameMeterControl;
 	}
 }
 
 const REFUSAL_LIMIT = 64;
-const METER_FRAME_LIMIT = 100_000;
 
 /**
  * How a recovered placement was resolved: it had already landed (not offered again), it was offered
@@ -159,135 +139,6 @@ export async function recoverBlockPlacement(zone: V3ZoneWorkerApi, block: ZoneBl
 	}
 }
 
-interface BridgeMeter extends RoomWorkerMeter {
-	readonly control: GridRoomWorkerMeter;
-	/** Runs Grid's rendering, counted as app cost. */
-	render(draw: () => void): void;
-	/** Wraps a frame callback whose work is Grid's rendering. */
-	renderFrame(callback: FrameRequestCallback): FrameRequestCallback;
-}
-
-/**
- * The bridge meter (`?roomWorkerMeter`): each page frame's worker-message handling and posts, less
- * the Grid rendering they ran, is the library's cost; Grid's rendering (projection, network panel,
- * the transient frame) is the app's. Totals are exact; a cost lands in the frame its handler ran.
- */
-function createBridgeMeter(): BridgeMeter {
-	let library = 0;
-	let render = 0;
-	// Grid rendering run by the worker message being handled (its listeners render synchronously).
-	let renderInMessage = 0;
-	let dropped = 0;
-	const libraryFrames: number[] = [];
-	const renderFrames: number[] = [];
-	type Kind = { count: number; totalMs: number; maxMs: number; heavyFrames: number; heavyMs: number };
-	const kinds = new Map<string, Kind>();
-	const frameKinds = new Map<string, number>();
-	const latency: Record<GridRoomWorkerLatencyStage, number[]> = {
-		moveHop: [],
-		transientPacing: [],
-		transientHop: [],
-		transientFrameWait: [],
-	};
-	const sample = (stage: GridRoomWorkerLatencyStage, ms: number): void => {
-		if (latency[stage].length < METER_FRAME_LIMIT) latency[stage].push(Math.max(0, ms));
-	};
-	// When the newest unrendered transient value was handled (timeOrigin + now), for the frame wait.
-	let transientReceivedAt: number | undefined;
-	const charge = (kind: string, ms: number): void => {
-		library += ms;
-		let entry = kinds.get(kind);
-		if (entry === undefined) {
-			entry = { count: 0, totalMs: 0, maxMs: 0, heavyFrames: 0, heavyMs: 0 };
-			kinds.set(kind, entry);
-		}
-		entry.count++;
-		entry.totalMs += ms;
-		entry.maxMs = Math.max(entry.maxMs, ms);
-		frameKinds.set(kind, (frameKinds.get(kind) ?? 0) + ms);
-	};
-	const tick = (): void => {
-		if (libraryFrames.length < METER_FRAME_LIMIT) {
-			libraryFrames.push(library);
-			renderFrames.push(render);
-		} else dropped++;
-		if (library > 0.5)
-			for (const [kind, ms] of frameKinds) {
-				const entry = kinds.get(kind);
-				if (entry === undefined) continue;
-				entry.heavyFrames++;
-				entry.heavyMs += ms;
-			}
-		frameKinds.clear();
-		library = 0;
-		render = 0;
-		requestAnimationFrame(tick);
-	};
-	requestAnimationFrame(tick);
-	const timed = (draw: () => void): number => {
-		const started = performance.now();
-		let spent = 0;
-		try {
-			draw();
-		} finally {
-			spent = performance.now() - started;
-			render += spent;
-		}
-		return spent;
-	};
-	const meter: BridgeMeter = {
-		message(kind, ms) {
-			charge(kind, Math.max(0, ms - renderInMessage));
-			renderInMessage = 0;
-		},
-		post(kind, ms) {
-			charge(`post:${kind}`, ms);
-		},
-		render(draw) {
-			renderInMessage += timed(draw);
-		},
-		renderFrame: (callback) => (time) => {
-			if (transientReceivedAt !== undefined) {
-				sample("transientFrameWait", performance.timeOrigin + performance.now() - transientReceivedAt);
-				transientReceivedAt = undefined;
-			}
-			timed(() => callback(time));
-		},
-		stream(name, emittedAt, sentAt, receivedAt) {
-			if (name !== "transient") return;
-			sample("transientPacing", sentAt - emittedAt);
-			sample("transientHop", receivedAt - sentAt);
-			transientReceivedAt = receivedAt;
-		},
-		command(name, postedAt, handledAt) {
-			if (name === "move") sample("moveHop", handledAt - postedAt);
-		},
-		control: {
-			read: () => ({
-				library: [...libraryFrames],
-				render: [...renderFrames],
-				dropped,
-				kinds: Object.fromEntries([...kinds].map(([kind, entry]) => [kind, { ...entry }])),
-				latency: {
-					moveHop: [...latency.moveHop],
-					transientPacing: [...latency.transientPacing],
-					transientHop: [...latency.transientHop],
-					transientFrameWait: [...latency.transientFrameWait],
-				},
-			}),
-			reset: () => {
-				libraryFrames.length = 0;
-				renderFrames.length = 0;
-				kinds.clear();
-				frameKinds.clear();
-				for (const values of Object.values(latency)) values.length = 0;
-				dropped = 0;
-			},
-		},
-	};
-	return meter;
-}
-
 interface OpenedZoneWorker {
 	readonly handle: RoomWorkerHandle<ZoneWorkerCommands>;
 	readonly ready: ZoneWorkerReady;
@@ -313,7 +164,9 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 		__TS_DRP_V3_ZONE__?: V3ZoneWorkerApi;
 	};
 	const params = new URLSearchParams(window.location.search);
-	const meter = params.has("roomWorkerMeter") ? createBridgeMeter() : undefined;
+	// The bridge meter (`?roomWorkerMeter`): per frame, the bridge's main-thread cost (library) and
+	// Grid's rendering (projection, network panel, the transient frame).
+	const meter = params.has("roomWorkerMeter") ? createRoomWorkerFrameMeter(GRID_METER_STAGES) : undefined;
 	const render = meter === undefined ? (draw: () => void): void => draw() : meter.render;
 	const presentation = createZonePresentation(
 		meter === undefined

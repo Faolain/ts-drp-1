@@ -31,6 +31,14 @@ export {
 	type RoomWorkerState,
 } from "./client.js";
 export { createPageRtcHost, type PageRtcHost } from "./rtc-page.js";
+export {
+	createRoomWorkerFrameMeter,
+	type RoomWorkerFrameMeter,
+	type RoomWorkerFrameMeterControl,
+	type RoomWorkerFrameMeterKind,
+	type RoomWorkerFrameMeterOptions,
+	type RoomWorkerFrameMeterReading,
+} from "./frame-meter.js";
 
 export interface OpenRoomWorkerOptions<Commands extends CommandMap = CommandMap>
 	extends Omit<RoomWorkerClientOptions<Commands>, "port" | "rtc" | "onStopped" | "storage"> {
