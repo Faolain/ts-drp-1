@@ -71,6 +71,13 @@ const movesOf = (operation: unknown): string[] => {
 	const entries = Reflect.get(Reflect.get(operation, "batch") ?? {}, "entries");
 	return Array.isArray(entries) ? entries.flatMap((entry) => movesOf(Reflect.get(entry, "operation"))) : [];
 };
+// Block ids in a role's projected Grid state (examples/grid/src/v3-zone.ts canonicalZoneStateBytes:
+// blocks are kept sorted by id, one per id). The reopened projection is rebuilt from the role's durable
+// stores, so this is the durable record of every admitted move.
+const creatorBlocks = async (role: RoleEndpoint): Promise<string[]> => {
+	const state = decodeCanonical(Buffer.from(await role.state(), "hex")) as { blocks?: { id?: unknown }[] };
+	return (state.blocks ?? []).map((block) => String(block.id));
+};
 // The creator's native files (tests/fixtures/track-m-apps/app-long-room.ts sqliteFile; the AHE owner
 // opens "<name>--ahe").
 const FAMILIES = ["ahe", "issuance", "journal", "snapshots", "signing"] as const;
@@ -360,16 +367,29 @@ it.runIf(INNER)(
 			const ordinal = { next: death.ordinal + 1_000 };
 			const ids = [...death.ids];
 			let nextMove = death.nextMove + 1_000;
+			// What the creator admitted before the kill, from its DURABLE state (the reopened projection), read
+			// before anything reaches it. The child's record (death.creatorAdmitted) is in memory and can be
+			// stale: the creator admits received rows asynchronously, so a kill can land after an admission and
+			// before the record (box m46: move 2 admitted durably, never in the record), and the reopened
+			// creator's acceptedVertices only sees admissions after the reopen.
+			const durable = await creatorBlocks(creator);
+			expect(
+				death.creatorAdmitted.filter((id) => !durable.includes(id)),
+				"every admission the child recorded before the kill is in the reopened creator's durable state"
+			).toEqual([]);
+			const admittedBeforeKill = new Set(death.ids.filter((id) => durable.includes(id)));
+			process.stdout.write(
+				`CREATOR_RETIREMENT_REOPEN ${JSON.stringify({ edge, durableBeforeKill: [...admittedBeforeKill], recorded: death.creatorAdmitted })}\n`
+			);
 			const admitted = async () =>
 				((await creator.acceptedVertices?.()) ?? [])
 					.filter((vertex) => vertex.author === death.writerAuthor)
 					.flatMap((vertex) => movesOf(JSON.parse(vertex.operation)));
+			// A move admitted before the kill counts once from durable state and must not be admitted again;
+			// every other move must be admitted after the reopen exactly once.
 			const counts = async () => {
 				const moves = await admitted();
-				return ids.map(
-					(id) =>
-						death.creatorAdmitted.filter((move) => move === id).length + moves.filter((move) => move === id).length
-				);
+				return ids.map((id) => (admittedBeforeKill.has(id) ? 1 : 0) + moves.filter((move) => move === id).length);
 			};
 			try {
 				let epoch = (await creator.rollover?.())?.epoch ?? 0;
@@ -397,6 +417,12 @@ it.runIf(INNER)(
 					300_000
 				);
 				expect(await counts(), "each member move admitted by the creator once").toEqual(ids.map(() => 1));
+				// The durable outcome: every move is in the creator's state exactly once.
+				const finalBlocks = await creatorBlocks(creator);
+				expect(
+					ids.map((id) => finalBlocks.filter((block) => block === id).length),
+					"each member move in the creator's state exactly once"
+				).toEqual(ids.map(() => 1));
 				expect(await writer.state()).toBe(await creator.state());
 			} finally {
 				await wire.stop();
