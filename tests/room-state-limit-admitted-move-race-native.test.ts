@@ -1,12 +1,15 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
 import { encodeCanonical } from "@ts-drp/canonical";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
 import { afterEach, expect, it } from "vitest";
 
-import * as rollover from "../examples/v3-room/src/rollover.js";
 import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
 import { settlementDelivery, type SettlementRoom } from "./fixtures/track-m/settlement-room.js";
+import { declinedMove, stateLimitDeclineViolation } from "./fixtures/track-m-apps/declined-move.js";
+import type { DeclinedMove } from "./fixtures/track-m-apps/long-room-driver.js";
 import { isControl } from "./fixtures/track-x/outside-rows-room.js";
 import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
+import * as rollover from "../examples/v3-room/src/rollover.js";
 import { ROOM_APPLICATION_STATE_BYTES } from "../packages/node/src/v3-live.js";
 
 // The hot-writer loss (verify-int7wo2/policy1.log, block-1-687), driven without timing luck.
@@ -22,9 +25,12 @@ import { ROOM_APPLICATION_STATE_BYTES } from "../packages/node/src/v3-live.js";
 // (hooks.onDeclined). W is gone from the converged state.
 //
 // The application below keeps its books the way the hot-writer harness does (app-rollover-policy-native
-// playPastCeiling with stateLimitRefusals, and the track-m-apps fixture's member policy hooks): a move is
-// accepted when its issue resolves, a typed V3RoomStateLimitRefused is a refusal, and the policy gets
-// only onError. The converged state must hold exactly the moves the application holds as accepted.
+// playPastCeiling with stateLimitRefusals and stateLimitDeclines, and the track-m-apps fixture's member
+// policy hooks): a move is accepted when its issue resolves, a typed V3RoomStateLimitRefused is a refusal,
+// and a move the policy declines (hooks.onDeclined) leaves the accepted moves only when it was declined
+// typed at the state limit and the converged state has no room for it (stateLimitDeclineViolation). The
+// converged state must hold exactly the moves the application holds as accepted. Before the harness
+// listened to onDeclined (a decline never reaches onError), its books kept W: the hot-writer failure.
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
@@ -47,7 +53,12 @@ const block = (prefix: string, ordinal: number, idBytes: number): Block => ({
 	y: Math.floor(ordinal / 16) % 16,
 });
 
-/** The Grid zone's exact canonical state with these placements added (the room's state-limit measure). */
+/**
+ * The Grid zone's exact canonical state with these placements added (the room's state-limit measure).
+ * @param projection - The room's projection.
+ * @param added - The placements.
+ * @returns The state's canonical bytes.
+ */
 function stateBytesWith(projection: Projection, added: readonly Block[]): number {
 	const blocks = new Map(projection.blocks.map((value) => [value.id, value]));
 	for (const { action: _action, ...value } of added) blocks.set(value.id, value);
@@ -83,7 +94,10 @@ it("a Writer move admitted at the state limit and then given back is in the conv
 	const writer = await fixture.open(1);
 	const LIMIT = ROOM_APPLICATION_STATE_BYTES;
 	const projection = (peer: typeof creator) => peer.room.projection() as unknown as Projection;
-	const ids = (peer: typeof creator) => projection(peer).blocks.map((value) => value.id).sort();
+	const ids = (peer: typeof creator) =>
+		projection(peer)
+			.blocks.map((value) => value.id)
+			.sort();
 	let delivered: number | null = null;
 	// The Writer's published rows reach the creator (the last ordinary one is awaited), in order.
 	const deliver = async (): Promise<void> => {
@@ -140,8 +154,15 @@ it("a Writer move admitted at the state limit and then given back is in the conv
 	await deliver();
 	// Fill to just under the limit with the creator's blocks (rolling every 8, the Writer following).
 	let placed = 0;
-	for (const [prefix, idBytes, margin] of [["big", 1000, 2600], ["mid", 100, 1400]] as const) {
-		for (let count = 0; stateBytesWith(projection(creator), [block(prefix, placed, idBytes)]) <= LIMIT - margin; count++) {
+	for (const [prefix, idBytes, margin] of [
+		["big", 1000, 2600],
+		["mid", 100, 1400],
+	] as const) {
+		for (
+			let count = 0;
+			stateBytesWith(projection(creator), [block(prefix, placed, idBytes)]) <= LIMIT - margin;
+			count++
+		) {
 			const fill = block(prefix, placed, idBytes);
 			expect(await play(fill.id, () => creator.room.issue(fill))).toBe(true);
 			placed++;
@@ -162,10 +183,14 @@ it("a Writer move admitted at the state limit and then given back is in the conv
 
 	// The Writer's application: the shipped member policy, with the hooks the hot-writer harness gives it.
 	const policyErrors: string[] = [];
+	const declined: DeclinedMove[] = [];
 	const policy = rollover.createV3RoomRolloverPolicy({
 		role: "member",
 		budget: { movesPerAuthor: 100_000, idleMs: 20_000 },
-		hooks: { onError: (error) => policyErrors.push(error instanceof Error ? error.message : String(error)) },
+		hooks: {
+			onError: (error) => policyErrors.push(error instanceof Error ? error.message : String(error)),
+			onDeclined: (move) => declined.push(declinedMove(move)),
+		},
 	});
 	// The room's state-bound diagnostics (the "__warmProofEvent" hook): each admission judgement's outcome.
 	const judged: Readonly<Record<string, unknown>>[] = [];
@@ -209,11 +234,31 @@ it("a Writer move admitted at the state limit and then given back is in the conv
 		const answered = () =>
 			policy.status().kept.length === 0 && required(writer.room.settlementStatus?.()).undelivered.length === 0;
 		expect(await until(answered, 20_000), "the policy answered the given-back move").toBe(true);
-		console.log(`ADMITTED_MOVE_RACE_POLICY ${JSON.stringify({ policyErrors, kept: policy.status().kept.length })}`);
+		console.log(
+			`ADMITTED_MOVE_RACE_POLICY ${JSON.stringify({ policyErrors, kept: policy.status().kept.length, declined: declined.map((move) => [String(move.operation.id).slice(0, 7), move.name, move.reason, move.cause]) })}`
+		);
 		// Converged: both roles hold C and not W.
 		expect(ids(writer)).toEqual(ids(creator));
 		expect(ids(creator)).toContain(moveC.id);
 		expect(ids(creator)).not.toContain(moveW.id);
+		// The application was told: W was declined, typed, at the state limit, with no room left for it.
+		expect(
+			declined.map((move) => move.operation.id),
+			"the policy declined W and told the application"
+		).toEqual([moveW.id]);
+		for (const move of declined) {
+			expect(
+				stateLimitDeclineViolation(
+					move,
+					(operation) => stateBytesWith(projection(creator), [operation as Block]),
+					LIMIT
+				),
+				"the decline was forced by the state limit"
+			).toBeUndefined();
+			const index = accepted.indexOf(String(move.operation.id));
+			expect(index, "the declined move was accepted before").toBeGreaterThanOrEqual(0);
+			accepted.splice(index, 1);
+		}
 		// The converged state holds exactly the moves the application holds as accepted.
 		expect(ids(creator), "the state holds exactly the accepted moves").toEqual([...accepted].sort());
 	} finally {
