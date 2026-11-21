@@ -14,12 +14,18 @@ import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-pa
 // - the creator revokes the joiner with "Revoke Writer"; the creator's page drops its share, and
 //   the creator then fills the window: the departed member's messages stay until the window needs
 //   their space, then leave first, oldest first, before any of the creator's own.
-// The pages expose no rollover control and no room handle, so the harness appends one read-only
-// accessor, `globalThis.__TRACK_W2_ROOM__ = () => room`, to the page's room module (src/chat-room.ts) as served, on the main-thread page (`?mainThread`:
-// the page hosts the room in a room worker by default, and this suite reads it through the module's
-// binding), and
-// drives seal, export and adopt on the creator and install on the joiner through it, as Track X's
-// harness does. Each checkpoint prints a TRACK_W2_EPOCH line (timings and the window's bytes).
+// The pages expose no room handle, so the harness adds two read-only accessors to the page's room
+// module (src/chat-room.ts) as served, on the main-thread page (`?mainThread`: the page hosts the room
+// in a room worker by default, and this suite reads it through the module's bindings):
+// `globalThis.__TRACK_W2_ROOM__ = () => room` at the module's end, and `globalThis.__TRACK_W2_ROLLOVER__`,
+// the open room's own rollover policy (examples/chat/src/rollover.ts), right after the `rollovers`
+// binding, which is local to createChatRoom.
+// Each shipped page rolls its own room over (the creator's policy seals once an author has used half
+// its allowance, or 15 s after the last message) and delivers successors over its own node, so the
+// harness is never a second rollover host: at a checkpoint it waits for any rollover the page started,
+// seals and adopts the current epoch, and has the page's policy export and announce the successor;
+// the joiner's page installs it by itself. Checkpoint numbers are read from the room, never counted
+// by the harness. Each checkpoint prints a TRACK_W2_EPOCH line (timings and the window's bytes).
 
 const { encodeCanonical } = (
 	await importWorkspacePackageExportFile({
@@ -32,6 +38,9 @@ const { encodeCanonical } = (
 const ORIGIN = "http://127.0.0.1:4181";
 const HEAD_FACTORY = "__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__";
 const ACCESSOR = "\n;globalThis.__TRACK_W2_ROOM__ = () => room;\n";
+// Inserted right after createChatRoom's `rollovers` binding (local to the room factory; `room` is a
+// module binding, visible there too).
+const ROLLOVER_ACCESSOR = " globalThis.__TRACK_W2_ROLLOVER__ = () => (room === undefined ? undefined : rollovers.get(room));";
 const CONVERGE_MS = 60_000;
 const MAX_FILL_EPOCHS = 40;
 
@@ -68,9 +77,16 @@ async function exposeRoom(context: BrowserContext): Promise<void> {
 			const response = await route.fetch();
 			const body = await response.text();
 			if (!/\blet room\b/u.test(body)) throw new Error("TRACK_W2_ROOM_BINDING_ABSENT");
+			const binding = /\bconst rollovers\b[^;]*;/u.exec(body);
+			if (binding === null) throw new Error("TRACK_W2_ROLLOVER_BINDING_ABSENT");
+			const at = binding.index + binding[0].length;
 			const headers = { ...response.headers() };
 			delete headers["content-length"];
-			await route.fulfill({ status: response.status(), headers, body: body + ACCESSOR });
+			await route.fulfill({
+				status: response.status(),
+				headers,
+				body: body.slice(0, at) + ROLLOVER_ACCESSOR + body.slice(at) + ACCESSOR,
+			});
 		}
 	);
 }
@@ -164,54 +180,67 @@ test("the shipped chat page: a late joiner made Writer mid-room sends; a revoked
 	let epoch = 0;
 	const records: unknown[] = [];
 
-	// The creator seals, exports and adopts; the joiner installs from the creator's peer.
-	const rollover = async (creatorPeer: string, note: Record<string, unknown> = {}): Promise<void> => {
+	// The room's current checkpoint as the page holds it (its authority's epoch).
+	const roomEpoch = (page: Page): Promise<number> =>
+		page.evaluate(() => {
+			const room = (Reflect.get(globalThis, "__TRACK_W2_ROOM__") as () => unknown)() as
+				| { authority(): { epoch: number } | undefined }
+				| undefined;
+			return room?.authority()?.epoch ?? 0;
+		});
+
+	// The creator's page finishes any rollover it started, seals and adopts the current checkpoint,
+	// and its policy exports and announces the successor; the joiner's page installs it by itself.
+	const rollover = async (note: Record<string, unknown> = {}): Promise<void> => {
 		const result = await creator.evaluate(async () => {
 			const room = (Reflect.get(globalThis, "__TRACK_W2_ROOM__") as () => unknown)() as {
+				authority(): { epoch: number } | undefined;
 				sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
-				exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 				adoptCreatorSuccessor(): Promise<unknown>;
 			};
+			const policy = (Reflect.get(globalThis, "__TRACK_W2_ROLLOVER__") as () => unknown)() as
+				| { settled(): Promise<void>; publishCurrent(): Promise<void> }
+				| undefined;
+			if (policy === undefined) throw new Error("TRACK_W2_ROLLOVER_POLICY_ABSENT");
+			// A rollover the page started by itself finishes first (the room takes one close at a time).
+			await policy.settled();
+			const before = room.authority()?.epoch ?? 0;
 			let begun = performance.now();
 			const close = await room.sealEpoch();
 			const seal = performance.now() - begun;
 			if (!close.ok) throw new Error("TRACK_W2_CLOSE_REFUSED");
 			begun = performance.now();
-			const offer = await room.exportCreatorSuccessor();
-			const exported = performance.now() - begun;
-			begun = performance.now();
 			await room.adoptCreatorSuccessor();
 			const adoption = performance.now() - begun;
+			// The page's policy exports the adopted successor and announces it over the page's delivery.
+			begun = performance.now();
+			await policy.publishCurrent();
+			const exported = performance.now() - begun;
 			return {
+				before,
 				close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
-				ms: { seal, export: exported, adoption },
-				offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, Array.from(value)])),
+				ms: { seal, adoption, export: exported },
 			};
 		});
-		expect(result.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
+		expect(result.close).toEqual({ ok: true, epoch: result.before, successorEpoch: result.before + 1 });
+		// Checkpoints the page closed by itself since the harness's last one.
+		expect(result.before).toBeGreaterThanOrEqual(epoch);
+		const selfRolled = result.before - epoch;
 		let install: number | string | null = null;
 		if (joinerFollows) {
+			const begun = Date.now();
 			try {
-				install = await joiner.evaluate(
-					async ({ offer, peer }) => {
-						const room = (Reflect.get(globalThis, "__TRACK_W2_ROOM__") as () => unknown)() as {
-							installCreatorSuccessor(input: unknown): Promise<unknown>;
-						};
-						const begun = performance.now();
-						await room.installCreatorSuccessor({
-							peers: [peer],
-							offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
-						});
-						return performance.now() - begun;
-					},
-					{ offer: result.offer, peer: creatorPeer }
-				);
+				await expect
+					.poll(() => roomEpoch(joiner), { timeout: CONVERGE_MS })
+					.toBeGreaterThanOrEqual(result.close.successorEpoch);
+				install = Date.now() - begun;
 			} catch (error) {
 				install = `failed: ${String(error).slice(0, 300)}`;
 				joinerFollows = false;
 			}
 		}
-		epoch += 1;
+		epoch = result.close.successorEpoch;
+		if (selfRolled > 0) note = { ...note, selfRolled };
 		const view = await seen(creator);
 		const record = {
 			epoch,
@@ -268,16 +297,19 @@ test("the shipped chat page: a late joiner made Writer mid-room sends; a revoked
 		// Checkpoint 0: the creator speaks; the joiner (an observer) shows it.
 		await send(creator, "w2 hello from the creator");
 		await expect.poll(() => shows(joiner, "w2 hello from the creator"), { timeout: CONVERGE_MS }).toBe(true);
-		await rollover(creatorPeer);
+		await rollover();
 
 		// Checkpoint 1: mid-room, the creator makes the joiner a Writer (it latches at checkpoint 2).
 		await creator.locator("#memberInput").fill(joinerAuthor);
+		const grantedIn = await roomEpoch(creator);
 		await creator.locator("#grantWriter").click();
 		await expect(creator.getByRole("status", { name: "Chat connection status" })).toContainText(/Writer granted/u);
 		await send(creator, "w2 creator in checkpoint 1");
-		await rollover(creatorPeer, { event: "grant latches" });
+		await rollover({ event: "grant latches" });
 
-		// Checkpoint 2: the creator's page gives the joiner a share from checkpoint 3, by itself.
+		// Checkpoint 2: the creator's page gives the joiner a share from checkpoint 3, by itself (the
+		// checkpoint numbers move later when the page closed a checkpoint by itself meanwhile).
+		const shareFrom = grantedIn + 2;
 		await expect
 			.poll(
 				async () => (await seen(creator)).capacity.allocations.find((row) => row[0] === joinerAuthor)?.[2] ?? null,
@@ -285,15 +317,15 @@ test("the shipped chat page: a late joiner made Writer mid-room sends; a revoked
 					timeout: CONVERGE_MS,
 				}
 			)
-			.toBe(3);
+			.toBe(shareFrom);
 		await expect
 			.poll(async () => (await seen(joiner)).capacity.allocations.find((row) => row[0] === joinerAuthor)?.[2] ?? null, {
 				timeout: CONVERGE_MS,
 			})
-			.toBe(3);
-		await expect(joiner.locator("#sendHint")).toContainText(/from checkpoint 3/u);
+			.toBe(shareFrom);
+		await expect(joiner.locator("#sendHint")).toContainText(`from checkpoint ${shareFrom}`);
 		await expect(joiner.locator("#messageInput")).toBeDisabled();
-		await rollover(creatorPeer, { event: "share in force" });
+		await rollover({ event: "share in force" });
 
 		// Checkpoint 3: the joiner's page sends (reopening as a Writer on this first Send).
 		const joinerSent: string[] = [];
@@ -306,18 +338,18 @@ test("the shipped chat page: a late joiner made Writer mid-room sends; a revoked
 		joinerSent.push(joinerText(1));
 		await send(joiner, joinerText(1));
 		await expect.poll(() => shows(creator, joinerText(1)), { timeout: CONVERGE_MS }).toBe(true);
-		await rollover(creatorPeer, { event: "joiner spoke" });
+		await rollover({ event: "joiner spoke" });
 		// Checkpoint 4: the joiner, now a Writer replica, speaks again after a checkpoint.
 		joinerSent.push(joinerText(2));
 		await send(joiner, joinerText(2));
 		await expect.poll(() => shows(creator, joinerText(2)), { timeout: CONVERGE_MS }).toBe(true);
-		await rollover(creatorPeer);
+		await rollover();
 
 		// Checkpoint 5: the creator revokes the joiner (it latches at checkpoint 6).
 		await creator.locator("#memberInput").fill(joinerAuthor);
 		await creator.locator("#revokeWriter").click();
 		await expect(creator.getByRole("status", { name: "Chat connection status" })).toContainText(/Writer revoked/u);
-		await rollover(creatorPeer, { event: "revoke latches" });
+		await rollover({ event: "revoke latches" });
 		// Checkpoint 6: the creator's page drops the departed member's share, by itself.
 		await expect
 			.poll(async () => (await seen(creator)).capacity.allocations.map((row) => row[0]), { timeout: CONVERGE_MS })
@@ -359,7 +391,7 @@ test("the shipped chat page: a late joiner made Writer mid-room sends; a revoked
 			if (departedAfter.length > 0)
 				expect(creatorTexts.filter((value) => value.startsWith("w2 fill "))).toEqual(creatorSent);
 			expect(windowTotal(after)).toBeLessThanOrEqual(after.capacity.windowBytes);
-			await rollover(creatorPeer, {
+			await rollover({
 				event: "fill",
 				departedMessages: departedAfter.length,
 				reclaimed: departedAfter.length < departedBefore.length,
