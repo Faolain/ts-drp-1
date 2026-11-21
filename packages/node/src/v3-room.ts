@@ -8361,11 +8361,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		// Every field but the entries, the records and the reissue origins as they were; an entry the new
 		// records took over is dropped, the last one too (no entry left: the field is absent).
+		// The entry leaves rule R's owed set here (`expire`): its source-authority record (written by the
+		// merge that added the row) loses it in this same write and leaves with its last owed row, as in
+		// every replacing or give-back write; a record naming a row no longer owed is refused by the store.
 		const { reissueOrigins: _priorOrigins, ...kept } = current;
 		await issuanceStore.transactWriteSettlementPlan({
 			expectedRevision: current.revision,
 			scope: settlementScope,
-			plan: Object.freeze({
+			plan: Object.freeze(normalizeSettlementSourceAuthorities({
 				...kept,
 				revision: current.revision + 1,
 				entries: Object.freeze(
@@ -8383,7 +8386,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...(recorded.reissueOrigins === undefined
 					? {}
 					: { reissueOrigins: Object.freeze([...recorded.reissueOrigins]) }),
-			}),
+			} as RoomSettlementPlan)),
 		});
 		await refreshHandBackListing();
 	};
