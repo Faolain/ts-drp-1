@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { installRtcObserver, resetRtcObserver, rtcObservations } from "./fixtures/e4-aoi/rtc-observer.js";
 import type { RtcObservation } from "./fixtures/e4-aoi/rtc-observer.js";
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+import { GRID_ROLLOVER_BUDGET } from "../examples/grid/src/rollover.js";
 
 const OWNER_READY = existsSync("packages/ephemeral/src/aoi-projection.ts");
 const LOSS_PERCENT = 30;
@@ -51,6 +52,7 @@ interface ZoneSnapshot {
 	readonly enrollment: string;
 	readonly invite: string;
 	readonly localPeerId: string;
+	readonly outcomeContext: Readonly<{ readonly epoch: number }> | null;
 	readonly rawTransport: Readonly<{
 		readonly fallbackCount: 0;
 		readonly links: readonly Readonly<{ readonly peerId: string }>[];
@@ -243,6 +245,17 @@ test("three real clients recover targeted AOI state after raw loss without durab
 		]);
 		const observerPeerId = (await zone(observer)).localPeerId;
 		const excludedPeerId = (await zone(excluded)).localPeerId;
+		// The shipped creator closes an epoch an idle period after its last admitted vertex (the
+		// joins' vertices here); the campaign below admits none, so it runs in the epoch after that
+		// rollover, once every client has installed it and the raw links are back. Otherwise the
+		// rollover lands mid-campaign and resets the targeted state and the durable baseline.
+		const epochOf = async (page: Page): Promise<number> => (await zone(page)).outcomeContext?.epoch ?? -1;
+		const joinedEpoch = await epochOf(creator);
+		await expect
+			.poll(async () => Promise.all([epochOf(creator), epochOf(observer), epochOf(excluded)]), {
+				timeout: GRID_ROLLOVER_BUDGET.idleMs + 60_000,
+			})
+			.toEqual([joinedEpoch + 1, joinedEpoch + 1, joinedEpoch + 1]);
 		await expect
 			.poll(async () => (await zone(creator)).rawTransport.links.map(({ peerId }) => peerId).sort())
 			.toEqual([excludedPeerId, observerPeerId].sort());
