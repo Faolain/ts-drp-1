@@ -27,6 +27,8 @@
 		"cli": "tsx ./packages/cli/src/run.ts",
 		"coverage": "pnpm tsx scripts/coverage.ts",
 		"docs": "typedoc",
+		"formal": "node scripts/quint/quint-ci.mjs run --tier pr",
+		"formal:nightly": "node scripts/quint/quint-ci.mjs run --tier nightly",
 		"e2e-test": "pnpm exec playwright test --config examples/grid/playwright.modular.config.ts --fail-on-flaky-tests",
 		"e2e-test:canvas-chat": "pnpm exec playwright test --config playwright.canvas-chat.config.ts --fail-on-flaky-tests",
 		"e2e-test:platform": "pnpm exec playwright test --config playwright.platform-capability.config.ts",

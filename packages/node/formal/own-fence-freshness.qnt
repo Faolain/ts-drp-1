@@ -1,11 +1,13 @@
-// Own-fence freshness (G6 follow-up to G5's own-fence authentication). Measurement model: no fix
-// is merged; FIXED below is the proposed guard.
+// Own-fence freshness (G6 follow-up to G5's own-fence authentication). MINIMAL below is the guard
+// shipped in 90d70ae8e; CURRENT is the code before it; FIXED (MINIMAL plus the gap check) is not
+// implemented.
 //
 // Design notes. Probes (tests/own-fence-freshness-probe-native.test.ts):
 // a deleted own row or truncated suffix is refused at reopen by journal replay authentication;
 // an older restored store opens, and install adopts the successor and rewrites the settlement
 // plan BEFORE D.108d1b (V3_LOCAL_LINEAGE_BEHIND_FRONTIER) refuses at first signature (the RED).
-// Guard (MINIMAL, implemented in creator-adoption.ts assertReceivedLineageAboveAdmittedFrontier):
+// Guard (MINIMAL, implemented in creator-adoption.ts:1572 assertReceivedLineageAboveAdmittedFrontier,
+// called from receiveCreatorSuccessorAdoption at :2107):
 // lineage.next > creator-signed admittedAuthorSequence right after the successor authenticates,
 // before native custody, adoption and the plan write; refuse with the existing
 // V3LocalLineageBehindFrontier / decision B "behind-frontier" path, no state change. The creator's
@@ -19,7 +21,7 @@
 //
 // A Writer's own rows are moves and author fences, at contiguous author sequences. The creator
 // admits a row only in the epoch it was signed in: a move at T + 1, or a fence above T, where T is
-// the author's frontier (deriveCreatorAuthorSettlementFrontier). A fence moves the boundary, so the
+// the author's frontier (creator-close.ts:1462 deriveCreatorAuthorSettlementFrontier). A fence moves the boundary, so the
 // moves it skips are never admitted. On each install the Writer resolves every pending own move
 // against the creator's signed frontier T, then signs its epoch fence at its lineage's next
 // sequence:
@@ -30,16 +32,20 @@
 //   - otherwise still pending.
 // The frontier rule is only sound if every own fence the creator admitted is in the store. Losses:
 //   - deleteRow: one own row lost from the issuance store alone; the live journal (same origin)
-//     still names it, and replay refuses the reopen (v3-live recovery "journal replay
+//     still names it, and replay refuses the reopen (v3-live.ts:15721 recovery "v3 journal replay
 //     authentication failed");
 //   - restore: whole-origin restore of an earlier backup. Nothing in the origin notices (G6). The
 //     restored session is not yet current (sync before sending) until it installs.
 // Rules compared:
-//   CURRENT: the code today. The journal refuses deleteRow. Install resolves and persists the plan,
-//            then signs the fence; the D.108d1b guard refuses that signature when next <= T
-//            (V3_LOCAL_LINEAGE_BEHIND_FRONTIER). The plan rewrite stays.
+//   CURRENT: the code before 90d70ae8e. The journal refuses deleteRow. Install resolves and persists
+//            the plan, then signs the fence; the D.108d1b guard refuses that signature when next <= T
+//            (v3-live.ts:6248 V3LocalLineageBehindFrontier, thrown at :17010/:17731). The plan
+//            rewrite stays.
 //   MINIMAL: the D.108d1b check (next > T) moved before resolution: a refused install changes
-//            nothing. The journal still refuses deleteRow.
+//            nothing. The journal still refuses deleteRow. Shipped in 90d70ae8e. The shipped guard
+//            returns without checking when it cannot resolve the frontier (no closed ACL, a
+//            receive-only member, no closed trust, no verified historical issuance or a null
+//            admittedAuthorSequence: creator-adoption.ts:1579-1599); here the guard always fires.
 //   FIXED:   MINIMAL plus a gap check: every own sequence <= T is present in the store (so the
 //            journal's retention is not relied on).
 //   Configurations checked:

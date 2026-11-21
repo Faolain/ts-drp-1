@@ -1,7 +1,13 @@
 module scheduledLullExportOrder {
-  // The creator session's lifecycle FIFO (v3-room.ts enqueueLifetimeTransition) with the
-  // scheduled recovery-pool lull (internal/recovery-pool-scheduled.ts) and the shipped rollover
-  // policy (examples/v3-room/src/rollover.ts: seal, adopt, export, publish).
+  // The creator session's lifecycle FIFO (v3-room.ts:6596 enqueueLifetimeTransition) with the
+  // scheduled recovery-pool lull (internal/recovery-pool-scheduled.ts:68
+  // createScheduledRecoveryPoolLull) and the shipped rollover policy
+  // (examples/v3-room/src/rollover.ts: seal, adopt, export, publish).
+  //
+  // STALE against the stepped lull (36341e1d4, f58abd6f1: internal/lull-passes.ts
+  // createLullPassScheduler, wired at v3-room.ts:10290): a lull now runs as several bounded steps,
+  // each its own FIFO admission, and anything queued meanwhile (a seal included) runs between two
+  // steps. Here a lull is one atomic FIFO entry, so trackZ covers only the lull's first step.
   //
   // Every admitted transition runs to completion, one at a time, in admission order. The
   // adoption schedules one lull for the epoch it produced. The policy's export is its

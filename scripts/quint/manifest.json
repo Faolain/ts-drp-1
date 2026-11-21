@@ -1,0 +1,5642 @@
+{
+	"$comment": [
+		"Quint CI policy, executed by scripts/quint/quint-ci.mjs (see its header for tiers and failure rules).",
+		"Every .qnt under packages/ must appear in `files`, as `modules`, `typecheckOnly` (with the reason) or `delegated`.",
+		"hold: init/step must keep `invariants` and reach every `witnesses` entry. violate: the pre-fix variant (init or step)",
+		"must break exactly the invariant its bug broke; `residual: true` marks a known-open violation that a fix must flip.",
+		"tier defaults to pr (verify is always nightly). Samples are per check; the nightly tier multiplies hold samples.",
+		"When a model lands, add its entry here in the same change; a fix ships a violate check for its pre-fix variant."
+	],
+	"defaults": {
+		"seed": "7",
+		"samples": 500,
+		"maxSteps": 20,
+		"timeoutMs": 180000,
+		"verifyTimeoutMs": 3600000,
+		"apalacheVersion": "0.56.1",
+		"nightly": {
+			"sampleScale": 10
+		}
+	},
+	"external": [
+		{
+			"name": "track-j formal",
+			"argv": [
+				"bash",
+				"packages/protocol-v3/formal/settlement-replacement-retirement-mutations/track-j.sh",
+				"formal"
+			],
+			"timeoutMs": 3600000
+		},
+		{
+			"name": "check-native-custody",
+			"argv": [
+				"node",
+				"packages/protocol-v3/formal/check-native-custody.mjs"
+			],
+			"timeoutMs": 1800000
+		},
+		{
+			"name": "check-replay-custody",
+			"argv": [
+				"node",
+				"packages/protocol-v3/formal/check-replay-custody.mjs"
+			],
+			"timeoutMs": 1800000
+		},
+		{
+			"name": "check-rejoin-contract",
+			"argv": [
+				"node",
+				"packages/protocol-v3/formal/check-rejoin-contract.mjs"
+			],
+			"timeoutMs": 1800000
+		},
+		{
+			"name": "check-pending-floor",
+			"argv": [
+				"node",
+				"packages/protocol-v3/formal/check-pending-floor.mjs"
+			],
+			"timeoutMs": 1800000
+		},
+		{
+			"name": "check-source-proof-drain",
+			"argv": [
+				"node",
+				"packages/protocol-v3/formal/check-source-proof-drain.mjs"
+			],
+			"timeoutMs": 1800000
+		}
+	],
+	"files": [
+		{
+			"file": "packages/ephemeral/formal/ephemeral-adjacent-authority.qnt",
+			"modules": [
+				{
+					"main": "ephemeralAdjacentAuthority",
+					"step": "step",
+					"tests": [
+						"creatorAheadBothDirectionsTest",
+						"exactRuleBlacksOutTest",
+						"foreignTupleRefusedTest",
+						"removedSenderRefusedOnceInstalledTest",
+						"senderFloorRefusesReplayTest",
+						"twoEpochsAwayRefusedTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"seenImpliesInstalled"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "aheadStep",
+							"invariants": [
+								"verifiedContext"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "prevAclStep",
+							"invariants": [
+								"authorizedDelivery",
+								"removedRefused"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "nofloorStep",
+							"invariants": [
+								"senderMonotone"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "anyPastStep",
+							"invariants": [
+								"boundedWindow",
+								"verifiedContext"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/issuance-store/formal/removed-author-fence-release.qnt",
+			"modules": [
+				{
+					"main": "removedAuthorFenceRelease",
+					"step": "step",
+					"tests": [
+						"allowCurrentFenceBrokenTest",
+						"allowUnresolvedBrokenTest",
+						"fenceIsAHoleWithoutReleaseTest",
+						"ignoreWindowBrokenTest",
+						"lineageFromRowsBrokenTest",
+						"readmitKeepsOldFenceTest",
+						"releaseThenReadmitTest",
+						"releaseWithoutWorkTest",
+						"unresolvedKeepsFenceTest",
+						"writerEpochChangeTest",
+						"writerReleaseThenWorkTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initAllowCurrentFence",
+							"invariants": [
+								"planFenceRetained"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initAllowUnresolved",
+							"invariants": [
+								"unresolvedBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initIgnoreWindow",
+							"invariants": [
+								"noLostRollback"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initLineageFromRows",
+							"invariants": [
+								"noEquivocation"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/issuance-store/formal/verified-once-cache.qnt",
+			"modules": [
+				{
+					"main": "verifiedOnceCache",
+					"step": "step",
+					"tests": [
+						"testAddressKeyedMemoServesStaleAdmit",
+						"testForeignCommitIsReadNotRemembered",
+						"testOtherConnectionUncommittedIsInvisible",
+						"testReopenKeepsOnlyExactHits",
+						"testRollbackReturnsToVerifiedImage"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedFullMemo",
+								"reachedHit",
+								"reachedHitAfterRestart",
+								"reachedOwnUncommittedRead",
+								"reachedRefusal"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenStep",
+							"invariants": [
+								"noStaleAdmit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 10,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/admitted-move-state-limit-race.qnt",
+			"modules": [
+				{
+					"main": "admittedMoveStateLimitRace",
+					"step": "step",
+					"tests": [
+						"dropRefusedTest",
+						"hotWriterRacePreFixTest",
+						"hotWriterRaceTest",
+						"writerTrustedTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initPreFix",
+							"invariants": [
+								"toldOrCarried"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initDropRefused",
+							"invariants": [
+								"toldOrCarried"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initWriterTrusted",
+							"invariants": [
+								"stateWithinLimit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 7,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/carried-move-path.qnt",
+			"modules": [
+				{
+					"main": "carriedMovePath",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "initShipped",
+							"invariants": [
+								"exactlyOnce",
+								"noLandAfterGiveBack",
+								"displacedNeverAdmitted"
+							],
+							"claim": "the shipped rules keep the settlement lemma"
+						},
+						{
+							"kind": "hold",
+							"init": "initA1",
+							"invariants": [
+								"exactlyOnce",
+								"noLandAfterGiveBack",
+								"displacedNeverAdmitted"
+							],
+							"claim": "proposal A1 (seal cut applies received rows first) keeps it"
+						},
+						{
+							"kind": "hold",
+							"init": "initHold",
+							"invariants": [
+								"exactlyOnce",
+								"noLandAfterGiveBack",
+								"displacedNeverAdmitted"
+							],
+							"claim": "proposal HOLD keeps it"
+						},
+						{
+							"kind": "violate",
+							"init": "initA2",
+							"invariants": [
+								"displacedNeverAdmitted"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "A2 (admit a closed-epoch row into the current epoch) breaks the settlement lemma"
+						},
+						{
+							"kind": "violate",
+							"init": "initA2Guard",
+							"invariants": [
+								"displacedNeverAdmitted"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "A2GUARD still breaks the settlement lemma"
+						},
+						{
+							"kind": "verify",
+							"init": "initShipped",
+							"invariants": [
+								"exactlyOnce",
+								"noLandAfterGiveBack",
+								"displacedNeverAdmitted"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/census-classification-cell.qnt",
+			"modules": [
+				{
+					"main": "censusClassificationCell",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepIgnorePages",
+							"invariants": [
+								"exactDecision"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepIgnorePending",
+							"invariants": [
+								"exactDecision"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepCrossLeaseProbe",
+							"invariants": [
+								"exactDecision"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 12,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-adoption-fence-admission.qnt",
+			"modules": [
+				{
+					"main": "creatorAdoptionFenceAdmission",
+					"step": "step",
+					"tests": [
+						"freshBindingFenceTest",
+						"ownMovesKeepSourceTest",
+						"skipReserveWitnessTest",
+						"staleAfterReceivedWitnessTest",
+						"warmFenceTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedColdFallbackFence",
+								"reachedRefusedFence",
+								"reachedSecondEpochWarmFence",
+								"reachedWarmFence"
+							]
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-close-crash-recovery.qnt",
+			"modules": [
+				{
+					"main": "creatorCloseCrashRecovery",
+					"step": "step",
+					"tests": [
+						"admitBeforeRetryAfterBindBrokenTest",
+						"admitBeforeRetryBrokenTest",
+						"autoRetryAfterDeathTest",
+						"diesAfterBindTest",
+						"diesAfterOpenTest",
+						"diesAfterRetainTest",
+						"noAutoRetryHoldsTest",
+						"offeredAfterBindTest",
+						"offeredAfterOpenTest",
+						"refuseInFlightBrokenTest",
+						"retireUnderBindingBrokenTest",
+						"steadyDiesAfterBindTest",
+						"strictReadinessBrokenTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initStrictReadiness",
+							"invariants": [
+								"recoverable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initRefuseInFlight",
+							"invariants": [
+								"recoverable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initRetireUnderBinding",
+							"invariants": [
+								"recoverable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initAdmitBeforeRetry",
+							"invariants": [
+								"recoverable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 14,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-equivocation-close.qnt",
+			"modules": [
+				{
+					"main": "creatorEquivocationClose",
+					"step": "step",
+					"tests": [
+						"case23BaseTest",
+						"case23SoundTest",
+						"freezeAllTest",
+						"mergeFirstCopyTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"all_"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initBase",
+							"invariants": [
+								"closeNeverRefused"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initFreezeAll",
+							"invariants": [
+								"honestAdvance"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initMergeFirstCopy",
+							"invariants": [
+								"equivocatorFrozen",
+								"neverMerged"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initAdvanceBelow",
+							"invariants": [
+								"equivocatorFrozen"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initExcludeEquivocator",
+							"invariants": [
+								"cutClosed"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-fence-single-custody.qnt",
+			"modules": [
+				{
+					"main": "creatorFenceSingleCustody",
+					"step": "step",
+					"tests": [
+						"carriedWitnessTest",
+						"detachedRereadTest",
+						"exactSingleCustodyTest",
+						"secondCustodyExactTest",
+						"staleWitnessTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedExactSingleRead",
+								"reachedRereadRefusal",
+								"reachedRereadTwoReads",
+								"reachedSecondCustodyExact"
+							]
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-move-equivocation-recovery.qnt",
+			"modules": [
+				{
+					"main": "creatorMoveEquivocationRecovery",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							]
+						},
+						{
+							"kind": "hold",
+							"init": "initSound",
+							"invariants": [
+								"allSafety"
+							],
+							"claim": "the SOUND rule: allSafety holds"
+						},
+						{
+							"kind": "violate",
+							"init": "initAdmitOriginal",
+							"invariants": [
+								"closeNotBlocked"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initExcludeDivergence",
+							"invariants": [
+								"memberWorkKept"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initMemberLocalChoice",
+							"invariants": [
+								"convergence"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initAdmitDependents",
+							"invariants": [
+								"cutClosed"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoOriginalHalt",
+							"invariants": [
+								"noKnowingSplit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-pending-ingress-census.qnt",
+			"modules": [
+				{
+					"main": "creatorPendingIngressCensus",
+					"step": "step",
+					"tests": [
+						"budgetEvictTest",
+						"case1SoundTest",
+						"case1Test",
+						"censusIgnoresPendingTest",
+						"closeIncludesPendingTest",
+						"dependsOnPendingTest",
+						"evictAdmittedOrOwnTest",
+						"noBackstopTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"all_"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initBase",
+							"invariants": [
+								"noPendingRefusal"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initBaseNoRepair",
+							"invariants": [
+								"noPendingRefusal"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initEvict",
+							"invariants": [
+								"noPendingRefusal"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initDependsOnPending",
+							"invariants": [
+								"journalTopological"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initCensusIgnoresPending",
+							"invariants": [
+								"censusCovers"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initUnboundedPending",
+							"invariants": [
+								"pendingBounded"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initCloseIncludesPending",
+							"invariants": [
+								"cutSound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoBackstop",
+							"invariants": [
+								"censusFits"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initEvictAdmittedOrOwn",
+							"invariants": [
+								"admittedMonotone"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"all_"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-pending-intent-resume.qnt",
+			"modules": [
+				{
+					"main": "creatorPendingIntentResume",
+					"step": "step",
+					"tests": [
+						"fenceOnlyResumesFenceTest",
+						"fenceOnlyWedgesReplacementTest",
+						"noCurrencyCheckConflictsTest",
+						"noCurrencyCheckSignsBeforeCurrentTest",
+						"planFirstWedgesTest",
+						"restoredBehindFrontierRefusedTest",
+						"resumeFenceNextEpochTest",
+						"resumeNextEpochTest",
+						"resumeSameEpochTest",
+						"silentDropEquivocatesTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initPlanFirst",
+							"invariants": [
+								"noWedge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initFenceOnly",
+							"invariants": [
+								"noWedge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSilentDrop",
+							"invariants": [
+								"noEquivocation"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoCurrencyCheck",
+							"invariants": [
+								"noResumeBeforeCurrent"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 20,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-promotion-generation-lifecycle.qnt",
+			"modules": [
+				{
+					"main": "creatorPromotionGenerationLifecycle",
+					"step": "step",
+					"tests": [
+						"testDischargeOperationalCaught",
+						"testDropOperationalCaught",
+						"testForecastIgnoresClassifiedCaught",
+						"testIgnoreClassifiedCaught",
+						"testOriginalWedges",
+						"testRetireAtPromotedCaught",
+						"testSoundFloor2Slot0",
+						"testSoundFloor2Slot1",
+						"testSoundFloor6Slot4Header"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"inv"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenOriginal",
+							"invariants": [
+								"noWedge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenRetireAtPromoted",
+							"invariants": [
+								"neverRetireNeeded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenIgnoreClassified",
+							"invariants": [
+								"neverRetireNeeded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenDropOperational",
+							"invariants": [
+								"neverRetireNeeded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenDischargeOperational",
+							"invariants": [
+								"neverRetireNeeded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenForecastIgnoresClassified",
+							"invariants": [
+								"forecastSound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-promotion-retained-source-journal.qnt",
+			"modules": [
+				{
+					"main": "creatorPromotionRetainedSourceJournal",
+					"step": "step",
+					"tests": [
+						"testFloor2Slot0GuardedSafe",
+						"testFloor2Slot0UnguardedStrands",
+						"testFloor2Slot1GenesisResidueTrusted",
+						"testFloor3Slot1UnguardedAlreadyCoordinated"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"inv"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenUnguardedPrune",
+							"invariants": [
+								"evidenceBounded",
+								"signingSafe"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-replaced-pending-census.qnt",
+			"modules": [
+				{
+					"main": "creatorReplacedSourceRelease",
+					"step": "step",
+					"tests": [
+						"committedReleasesRemovedTest",
+						"committedTamperLateOriginalTest",
+						"committedTamperRefusesTest",
+						"noClaimTamperDoubleCreditsTest",
+						"replacedLosesMoveTest",
+						"shippedFenceReleasesMemberTest",
+						"shippedWithholdStallsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "initCommitted",
+							"invariants": [
+								"safety",
+								"noWithholdStall"
+							],
+							"claim": "design (b) committed basis: safe and no withhold stall"
+						},
+						{
+							"kind": "hold",
+							"init": "initCommittedTamper",
+							"invariants": [
+								"safety"
+							],
+							"claim": "committed basis under a forged plan: the unique-claim check keeps safety"
+						},
+						{
+							"kind": "violate",
+							"init": "initShipped",
+							"invariants": [
+								"noWithholdStall"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "shipped `fence` rule holds a removed author's completed link forever (p6)"
+						},
+						{
+							"kind": "violate",
+							"init": "initNoClaimTamper",
+							"invariants": [
+								"noDoubleCredit"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "without the unique-claim check a forged plan double-credits one committed link"
+						},
+						{
+							"kind": "violate",
+							"init": "initReplaced",
+							"invariants": [
+								"noLostMove"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "releasing as soon as a replacement exists loses the move"
+						},
+						{
+							"kind": "violate",
+							"init": "initCommittedTamperLate",
+							"invariants": [
+								"noLostMove"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "late-original residual (accepted, see the model header)",
+							"residual": true
+						},
+						{
+							"kind": "verify",
+							"init": "initCommitted",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 10,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				},
+				{
+					"main": "creatorReplacedPendingCensus",
+					"step": "step",
+					"tests": [
+						"chainOnlyStallsWithoutCustodyTest",
+						"proposedAgedLandsOnceTest",
+						"proposedCommittedReplacementTest",
+						"proposedLostTwiceLandsOnceTest",
+						"shippedLostTwiceStallsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "initProposed",
+							"invariants": [
+								"safety",
+								"noStall"
+							],
+							"claim": "every-close custody: no stall"
+						},
+						{
+							"kind": "violate",
+							"init": "initShipped",
+							"invariants": [
+								"noStall"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "shipped census stalls on a replaced pending source"
+						},
+						{
+							"kind": "violate",
+							"init": "initChainOnly",
+							"invariants": [
+								"noStall"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "chain-only census still stalls"
+						},
+						{
+							"kind": "verify",
+							"init": "initProposed",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 10,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-restore-currency.qnt",
+			"modules": [
+				{
+					"main": "creatorRestoreCurrency",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							],
+							"witnesses": [
+								"reachedConfirmedResume",
+								"reachedCoveredCurrent",
+								"reachedLateRefusal",
+								"reachedLoneResidual",
+								"reachedRefusalAtReopen",
+								"reachedRefusalInsideHold",
+								"reachedSoloImmediate"
+							]
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							],
+							"maxSteps": 10,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-seal-adopt-yield.qnt",
+			"modules": [
+				{
+					"main": "creatorSealAdoptYield",
+					"step": "step",
+					"tests": [
+						"testAbortAfterQCDoubleSigns",
+						"testAbortInsideSigningOrphansQC",
+						"testJobRevokedAtBoundary",
+						"testRefusedIngressResettles",
+						"testStopAfterQCJoins",
+						"testStopAtAcquiredBoundaryAborts",
+						"testStopInsideSigningJoins"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedAbortRetry",
+								"reachedAdopted",
+								"reachedRevokedJob",
+								"reachedStopAfterQC"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenAdmitWhileClosing",
+							"invariants": [
+								"sealedEpochFrozen"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenAbortAfterQC",
+							"invariants": [
+								"noOrphanQC"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenAbortInsideSigning",
+							"invariants": [
+								"noOrphanQC"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenRetainAtWrite",
+							"invariants": [
+								"noLockConflict"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenDropAcks",
+							"invariants": [
+								"noLostAcceptedWrite"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenWriterOutsideSlot",
+							"invariants": [
+								"noLockConflict"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenNoQualify",
+							"invariants": [
+								"noStaleAdmit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 10,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-successor-lineage-admission.qnt",
+			"modules": [
+				{
+					"main": "creatorSuccessorLineageAdmission",
+					"step": "step",
+					"tests": [
+						"testClosedInstallReissuesLiveSlot",
+						"testFreshSeedResidual",
+						"testInFlightResidual",
+						"testMigratedNotCurrent",
+						"testMigrationFiltered",
+						"testMigrationWholeCopyTwoWriters",
+						"testMultiTabFrontierLive",
+						"testMultiTabOldRuleRefuses",
+						"testReopenConfirmsAndIssues",
+						"testRestoreBeforeInstallNotCurrent",
+						"testRestoreInstallGuardRefuses",
+						"testRestoreInstallReopenOnlyReissues",
+						"testRestoreInstallThenCurrent",
+						"testRestoreInstalledOrdinaryRefused",
+						"testRestoreIssueBeforeCurrentReissues",
+						"testRestoreLiveInstallReadOnly",
+						"testRestoreLiveInstallRefused",
+						"testSameEpochNoFrontierReissues",
+						"testSameEpochRestoreCannotConfirm",
+						"testSharedLayoutTwoWriters",
+						"testStaleCloneFrontierRefuses",
+						"testStaleCloneNoCheckReissues",
+						"testStaleProfileCopy"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"inv"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenNoCheck",
+							"invariants": [
+								"noAdmittedReissue"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenOldRule",
+							"invariants": [
+								"noAdmittedReissue"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "issuanceStep",
+							"invariants": [
+								"noAdmittedReissue"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenReopenOnly",
+							"invariants": [
+								"noAdmittedReissue"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenIssueBeforeCurrent",
+							"invariants": [
+								"noAdmittedReissue"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "hold",
+							"init": "initPerPlayer",
+							"step": "perPlayerStep",
+							"invariants": [
+								"perPlayerInv"
+							],
+							"claim": "decision A (one writer per database) keeps perPlayerInv"
+						},
+						{
+							"kind": "hold",
+							"init": "init",
+							"step": "migrationStep",
+							"invariants": [
+								"migrationInv"
+							],
+							"claim": "the filtered migration keeps migrationInv"
+						},
+						{
+							"kind": "violate",
+							"init": "initPerPlayer",
+							"step": "brokenPerPlayerClosedInstall",
+							"invariants": [
+								"perPlayerInv"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "install before the live rule (closed frontier only) reissues a current sequence"
+						},
+						{
+							"kind": "violate",
+							"init": "initPerPlayer",
+							"step": "brokenPerPlayerIssueBeforeCurrent",
+							"invariants": [
+								"perPlayerInv"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "issuing before the store is current reissues"
+						},
+						{
+							"kind": "violate",
+							"init": "initPerPlayer",
+							"step": "brokenConfirmWithoutFrontier",
+							"invariants": [
+								"perPlayerInv"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "confirming without the frontier reissues"
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenWholeCopyMigration",
+							"invariants": [
+								"migrationInv"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "the whole-copy migration puts both authors' rows in one player database"
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/creator-unpublished-fence-census.qnt",
+			"modules": [
+				{
+					"main": "creatorUnpublishedFenceCensus",
+					"step": "step",
+					"tests": [
+						"anyKindLosesMoveTest",
+						"baseWedgesTest",
+						"fullPlanRefusesMoveTest",
+						"layer3Test",
+						"publishedFenceControlTest",
+						"silentDropLosesCustodyTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initBase",
+							"invariants": [
+								"noFenceRefusal"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSilentDrop",
+							"invariants": [
+								"custodyKept"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initAnyKind",
+							"invariants": [
+								"noLostMove"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 12,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/given-back-own-row-origin.qnt",
+			"modules": [
+				{
+					"main": "givenBackOwnRowOrigin",
+					"step": "step",
+					"tests": [
+						"genuineNewerTest",
+						"replacedReissuedChainTest",
+						"replacedReissuedTest",
+						"thirdHandBackNoSameMoveTest",
+						"thirdHandBackTest",
+						"twiceFixedTest",
+						"twicePreFixNaiveAppLosesTest",
+						"twicePreFixTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "hold",
+							"init": "initFixedNaiveApp",
+							"invariants": [
+								"safety"
+							],
+							"claim": "own-row origin (the fix) with the naive application still holds"
+						},
+						{
+							"kind": "violate",
+							"init": "initPreFix",
+							"invariants": [
+								"noSelfSupersession"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initPreFixNaiveApp",
+							"invariants": [
+								"noSelfSupersession"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initThird",
+							"invariants": [
+								"noSelfSupersession"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"residual": true,
+							"claim": "known-open residual (third give-back / replaced-reissued still self-supersede under the shipped rule); a fix must flip this"
+						},
+						{
+							"kind": "violate",
+							"init": "initThirdNoSameMove",
+							"invariants": [
+								"noSelfSupersession"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"residual": true,
+							"claim": "known-open residual (third give-back / replaced-reissued still self-supersede under the shipped rule); a fix must flip this"
+						},
+						{
+							"kind": "violate",
+							"init": "initThirdNaiveApp",
+							"invariants": [
+								"noSelfSupersession"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"residual": true,
+							"claim": "known-open residual (third give-back / replaced-reissued still self-supersede under the shipped rule); a fix must flip this"
+						},
+						{
+							"kind": "violate",
+							"init": "initReplacedReissued",
+							"invariants": [
+								"noSelfSupersession"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"residual": true,
+							"claim": "known-open residual (third give-back / replaced-reissued still self-supersede under the shipped rule); a fix must flip this"
+						},
+						{
+							"kind": "hold",
+							"init": "initReplacedReissuedChain",
+							"invariants": [
+								"safety"
+							],
+							"claim": "chain-record rule closes the replaced-reissued residual"
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 7,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/held-anchor-retention.qnt",
+			"modules": [
+				{
+					"main": "heldAnchorRetention",
+					"step": "step",
+					"tests": [
+						"chainAgeRefusesP1Test",
+						"chainAgeRefusesP2Test",
+						"cutProofHandsBackRetainedTest",
+						"cutProofKeepsP1Test",
+						"cutProofKeepsP2Test",
+						"fenceFirstKeepsP1Test",
+						"fenceFirstKeepsP2Test",
+						"fenceFirstReviewsRetainedTest",
+						"fenceOverLostAfterHoldKeepsTest",
+						"fenceOverLostAwaitedLullRefusesTest",
+						"fenceOverLostHoldsMoveTest",
+						"fenceOverLostNoHoldRefusesTest",
+						"fenceOverLostRemovedKeepsSourceTest",
+						"holdKeepsP1Test",
+						"holdKeepsP2Test",
+						"proveDropLosesMoveTest",
+						"proveFirstHandsBackRetainedTest",
+						"proveFirstKeepsP1Test",
+						"proveFirstKeepsP2Test",
+						"releaseFenceFirstKeepsP1Test",
+						"releaseFenceFirstKeepsP2Test",
+						"releaseFenceOverLostAwaitedLullKeepsTest",
+						"releaseFenceOverLostKeepsP4Test",
+						"releaseFenceOverLostRemovedReleasesSourceTest",
+						"releaseKeepsP1Test",
+						"releaseProveFirstKeepsP1Test",
+						"releaseProveFirstKeepsP2Test",
+						"releaseProveFirstRefusesP4Test",
+						"releaseRefusesP2Test",
+						"shippedHandsBackRetainedTest",
+						"shippedKeepsP1WithoutOverflowTest",
+						"shippedKeepsP2WithoutOverflowTest",
+						"shippedRefusesP1Test",
+						"shippedRefusesP2Test",
+						"shippedRefusesP4Test"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allProps"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initShipped",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initHold",
+							"invariants": [
+								"boundedAge",
+								"boundedGens"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initChainAge",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initRelease",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initOverRelease",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initGuardAny",
+							"invariants": [
+								"guardSound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initCutProof",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initCutEarly",
+							"invariants": [
+								"guardSound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initProveDrop",
+							"invariants": [
+								"noLostMove"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initFenceOverLost",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initReleaseFenceOverLost",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initFenceOverLostNoHold",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initReleaseNoWindow",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initReleaseNoGuard",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepBounded",
+							"invariants": [
+								"noUnexcusedRefusal"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepReachable",
+							"invariants": [
+								"boundedAge"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/held-dependency-anchor.qnt",
+			"modules": [
+				{
+					"main": "heldDependencyAnchor",
+					"step": "step",
+					"tests": [
+						"beforeRefusesReviewTest",
+						"fixedKeepsSilentWriterTest",
+						"fixedRefusesForgedTest",
+						"fixedRefusesUncoveredRebaseTest",
+						"linksCoupledWaitsForRetirementTest",
+						"linksCoversReviewOnceTest",
+						"linksRefusesSilentWriterTest",
+						"overExemptReplaysUncoveredTest",
+						"unverifiedAcceptsForgedTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"noForgedAccepted",
+								"refusedOnlyForReplayable",
+								"replaySafe"
+							]
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initOverExempt",
+							"invariants": [
+								"replaySafe"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initUnverified",
+							"invariants": [
+								"noForgedAccepted"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/host-foreground-priority.qnt",
+			"modules": [
+				{
+					"main": "hostForegroundPriority",
+					"step": "step",
+					"tests": [
+						"testBlockedForegroundReleasedByIdle",
+						"testDefersBehindCohort",
+						"testMisclassifiedForegroundEnds",
+						"testUnboundedDeadlocks"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedAllDone",
+								"reachedBlockedForeground",
+								"reachedCohortWake"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenNoDeferral",
+							"invariants": [
+								"foregroundPriority"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenUnbounded",
+							"invariants": [
+								"boundedDeferral"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenUnboundedMisclassify",
+							"invariants": [
+								"boundedDeferral"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenNoRecheck",
+							"invariants": [
+								"stopRechecked"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/issuance-image-capacity.qnt",
+			"modules": [
+				{
+					"main": "issuanceImageCapacity",
+					"step": "step",
+					"tests": [
+						"noOriginReserveViolatesTest",
+						"originReserveCoversEntryTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allProperties"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepBeforeInControl",
+							"invariants": [
+								"imageWithinForecast"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "init",
+							"step": "stepCompactAlways",
+							"invariants": [
+								"neverStuck"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepSkipTargetCheck",
+							"invariants": [
+								"restoresTrueSource"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepExcludeClosing",
+							"invariants": [
+								"forecastOnlyGrowsByAdmission",
+								"maintenanceAdmits"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepHistoricalSource",
+							"invariants": [
+								"forecastOnlyGrowsByAdmission"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepCommittedLaterExpires",
+							"invariants": [
+								"forecastOnlyGrowsByAdmission"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepHolesForWindow",
+							"invariants": [
+								"maintenanceAdmits"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepFloorSkipsPending",
+							"invariants": [
+								"noPendingLost"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepNoHandBackReserve",
+							"invariants": [
+								"forecastOnlyGrowsByAdmission"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepAdmissionOmitsHoles",
+							"invariants": [
+								"maintenanceAdmits"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepReplacedReceiptUncharged",
+							"invariants": [
+								"forecastOnlyGrowsByAdmission"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepNoOriginReserve",
+							"invariants": [
+								"maintenanceAdmits"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepOriginReserveIgnoresConsumed",
+							"invariants": [
+								"forecastOnlyGrowsByAdmission"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"allProperties"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/member-received-close-pending-release.qnt",
+			"modules": [
+				{
+					"main": "memberReceivedClosePendingRelease",
+					"step": "step",
+					"tests": [
+						"baseRefusesAdmissibleTest",
+						"baseStrandsTest",
+						"noDedupeTest",
+						"noReofferTest",
+						"ownCloseReleaseLandsTest",
+						"ownCloseStrandsTest",
+						"releaseAdmittedTest",
+						"releaseLandsOnceTest",
+						"soundDrainsAdmissibleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"all_"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initBase",
+							"invariants": [
+								"noAdmissibleRefusal",
+								"noStrand"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initReleaseAdmitted",
+							"invariants": [
+								"releaseKeepsAdmitted"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoDedupe",
+							"invariants": [
+								"allLand",
+								"exactlyOnce"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoReoffer",
+							"invariants": [
+								"allLand"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"all_"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/member-received-turnover-token.qnt",
+			"modules": [
+				{
+					"main": "memberReceivedTurnoverToken",
+					"step": "step",
+					"tests": [
+						"abandonOnlyMissesSettleTest",
+						"baseRedundantTest",
+						"edgeOnlyMissesAbandonTest",
+						"lullThenSkipTest",
+						"settledLullSkipsTest",
+						"shippedAbandonSkipsTest",
+						"shippedEdgeSkipsTest",
+						"soundAbandonTurnsOverTest",
+						"soundEdgeTurnsOverTest",
+						"unsettledLullSkipsOwedTest",
+						"workOnlyMissesEdgeTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initSkipWithoutToken",
+							"invariants": [
+								"skipSeesWork"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initNoDischarge",
+							"invariants": [
+								"recoveryLeavesResolvable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/member-successor-install.qnt",
+			"modules": [
+				{
+					"main": "memberSuccessorInstall",
+					"step": "step",
+					"tests": [
+						"adjacentAfterSkipTest",
+						"brokenWedgeTest",
+						"fixedRecoversTest",
+						"followsTest",
+						"reopenAfterSkipRefusedTest",
+						"reopenAfterSkipTest",
+						"reopenAfterSkipWidenedTest",
+						"staleThenNewerTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initBroken",
+							"invariants": [
+								"recoveryLeavesResolvable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/own-fence-freshness.qnt",
+			"modules": [
+				{
+					"main": "ownFenceFreshness",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							],
+							"witnesses": [
+								"reachedHandBackAfterRestore",
+								"reachedOrphanFalseCommit",
+								"reachedOrphanedResign",
+								"reachedRestoreRefused"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initNoGuard",
+							"invariants": [
+								"falseCommitFree",
+								"noResign"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "hold",
+							"init": "initMinimal",
+							"invariants": [
+								"allSafety"
+							],
+							"claim": "MINIMAL is the guard shipped in 90d70ae8e: allSafety holds"
+						},
+						{
+							"kind": "hold",
+							"init": "initFixedNoJournal",
+							"invariants": [
+								"allSafety"
+							],
+							"claim": "FIXED rule without the journal: allSafety holds"
+						},
+						{
+							"kind": "violate",
+							"init": "initMinimalNoJournal",
+							"invariants": [
+								"falseCommitFree"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSignOnly",
+							"invariants": [
+								"refusedIntact"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/plane-recovery-pending-carry.qnt",
+			"modules": [
+				{
+					"main": "planeRecoveryPendingCarry",
+					"step": "step",
+					"tests": [
+						"appendRecheckTest",
+						"baseDropsHeldTest",
+						"carriedDuplicateTest",
+						"carryAcrossEpochTest",
+						"carryLandsOnceTest",
+						"forwardAcrossEpochTest",
+						"inflightCarriedTest",
+						"noDedupeTest",
+						"noRecheckGhostTest",
+						"noTombstoneDropsTest",
+						"releaseAdmittedTest",
+						"snapshotOnlyDropsInflightTest",
+						"tombstoneRefusesTest",
+						"trustedCarryTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"all_"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initBase",
+							"invariants": [
+								"heldNotDropped"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSnapshotOnly",
+							"invariants": [
+								"heldNotDropped"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoTombstone",
+							"invariants": [
+								"heldNotDropped"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoRecheck",
+							"invariants": [
+								"noGhost"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initForwardAcrossEpoch",
+							"invariants": [
+								"epochBound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initReleaseAdmitted",
+							"invariants": [
+								"admittedKept"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initTrustedCarry",
+							"invariants": [
+								"parentsFirst"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initCarryAcrossEpoch",
+							"invariants": [
+								"epochBound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/refused-replay-settlement.qnt",
+			"modules": [
+				{
+					"main": "refusedReplaySettlement",
+					"step": "step",
+					"tests": [
+						"creatorDrivenReoffersTest",
+						"declineFreesWriterTest",
+						"noDeclineStuckTest",
+						"proposedFullRetriesTest",
+						"proposedHandsBackOnceTest",
+						"proposedKilledRetriesTest",
+						"proposedWindowExpiresTest",
+						"reissueThenDeclineTest",
+						"shippedStallsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "initProposed",
+							"invariants": [
+								"safety",
+								"proposedInv"
+							],
+							"claim": "proposed hand-back settlement"
+						},
+						{
+							"kind": "violate",
+							"init": "initShipped",
+							"invariants": [
+								"noStall",
+								"noStuckWriter"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "shipped: a refused replay throws out of issueSettlement (stall)"
+						},
+						{
+							"kind": "violate",
+							"init": "initCreatorDriven",
+							"invariants": [
+								"noRefusedReoffer",
+								"noStuckWriter"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "creator-driven replays re-offer refused rows or strand the writer"
+						},
+						{
+							"kind": "violate",
+							"init": "initProposedNoDecline",
+							"invariants": [
+								"noStuckWriter"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "without the application's decline the writer is stuck"
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/reissue-origin-plan-write.qnt",
+			"modules": [
+				{
+					"main": "reissueOriginPlanWrite",
+					"step": "step",
+					"tests": [
+						"dropAllLosesOriginTest",
+						"fixedGivenBackAgainTest",
+						"keepOldGivenBackAgainTest",
+						"keepOldStuckTest",
+						"lastEntryDroppedTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initKeepOldWhenEmpty",
+							"invariants": [
+								"backlogOwed",
+								"droppedStaysDropped",
+								"entriesOwed"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initDropAll",
+							"invariants": [
+								"backlogOwed",
+								"owedHasEntry"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/room-state-limit-admission.qnt",
+			"modules": [
+				{
+					"main": "roomStateLimitAdmission",
+					"step": "step",
+					"tests": [
+						"firstCrossesTest",
+						"noCheckWedgesTest",
+						"prefixSplitTest",
+						"probeRaceTest",
+						"seedBypassTest",
+						"seedPendingExactTest",
+						"untypedFreezesTest",
+						"wholeBatchRefusedTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initNoCheck",
+							"invariants": [
+								"stateWithinLimit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initWholeBatch",
+							"invariants": [
+								"noOverRefusal"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initUntyped",
+							"invariants": [
+								"writerKeepsPlaying"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSeedBypass",
+							"invariants": [
+								"stateWithinLimit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 7,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				},
+				{
+					"main": "refusedReplayDrainChunk",
+					"step": "step",
+					"tests": [
+						"creditTest",
+						"crossingChunkTest",
+						"doubleFirstAttemptTest",
+						"dropRefusedTest",
+						"noChunkCheckTest",
+						"recordsFullDefersTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initNoChunkCheck",
+							"invariants": [
+								"stateWithinLimit"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initDoubleFirstAttempt",
+							"invariants": [
+								"transientAttemptsBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initDropRefused",
+							"invariants": [
+								"noLostMove"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initStallOnRefusal",
+							"invariants": [
+								"noStall"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 8,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/scheduled-lull-export-order.qnt",
+			"modules": [
+				{
+					"main": "scheduledLullExportOrder",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initInline",
+							"invariants": [
+								"offerFirst"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoFlush",
+							"step": "stepOpen",
+							"invariants": [
+								"trackZ"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "without the flush the export overtakes track Z (stepOpen reaches the later epochs, per the model's note)"
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/settlement-chain-age.qnt",
+			"modules": [
+				{
+					"main": "settlementChainAge",
+					"step": "step",
+					"tests": [
+						"proposedKeepsCoverageTest",
+						"shippedLosesCoverageTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "initProposed",
+							"invariants": [
+								"exactlyOnce",
+								"coverage"
+							],
+							"claim": "origin-age window (what settlementWindowExpired ships since 94d117ca4)"
+						},
+						{
+							"kind": "violate",
+							"init": "initShipped",
+							"invariants": [
+								"coverage"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "newest-link window loses certificate coverage (stale variant, kept as the documented counterexample)"
+						},
+						{
+							"kind": "verify",
+							"init": "initProposed",
+							"invariants": [
+								"exactlyOnce",
+								"coverage"
+							],
+							"maxSteps": 12,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/settlement-window.qnt",
+			"modules": [
+				{
+					"main": "settlementAuthorOrder",
+					"step": "step",
+					"tests": [
+						"carrierOrderBreaksTest",
+						"fixedKeepsOriginPastFrontierTest",
+						"originOrderTest",
+						"reissuedReplacedExpiredTest",
+						"terminalDropLosesOriginTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initCarrierOrder",
+							"invariants": [
+								"listingInAuthorOrder"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initTerminalDrop",
+							"invariants": [
+								"listingInAuthorOrder"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "settlementWindowOne",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initC08",
+							"invariants": [
+								"scopesBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initPremature",
+							"invariants": [
+								"retiredUnadmittable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initGap",
+							"invariants": [
+								"atMostOnce"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initVolatile",
+							"invariants": [
+								"noLoss"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						}
+					]
+				},
+				{
+					"main": "settlementWindowTwo",
+					"step": "step",
+					"tests": [
+						"backlogRefusesThenClearsTest",
+						"connectedNeverRefusedTest",
+						"dropLosesMoveTest",
+						"noBoundExceedsBacklogTest",
+						"overflowLivesPastWindowTest",
+						"overflowStaysLiveTest",
+						"reissueKeepsSlotTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initC08",
+							"invariants": [
+								"scopesBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initPremature",
+							"invariants": [
+								"retiredUnadmittable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initGap",
+							"invariants": [
+								"atMostOnce"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initVolatile",
+							"invariants": [
+								"noLoss",
+								"retiredUnadmittable"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initDrop",
+							"invariants": [
+								"backlogBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initNoBound",
+							"invariants": [
+								"backlogBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/skip-scope-carrier.qnt",
+			"modules": [
+				{
+					"main": "skipScopeInstallerCoverage",
+					"step": "step",
+					"tests": [
+						"fixedRefusesForgedTest",
+						"fixedRetiresTest",
+						"mismatchRefusesTest",
+						"strictStuckTest",
+						"unverifiedWrongTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initMismatch",
+							"invariants": [
+								"honestNeverRefused"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initUnverified",
+							"invariants": [
+								"neverWronglyRetired"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "skipScopeFrontier",
+					"step": "step",
+					"tests": [
+						"coveredJoinTest",
+						"hashOrderJoinGapTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initHashOrder",
+							"invariants": [
+								"noCommittedHandedBack"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "skipScopeCarrier",
+					"step": "step",
+					"tests": [
+						"fixedBoundedTest",
+						"noneLeaksTest",
+						"unauthWrongTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initNone",
+							"invariants": [
+								"scopesBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initUnauth",
+							"invariants": [
+								"neverWronglyCollectible",
+								"scopesBounded"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/node/formal/slow-member-follow.qnt",
+			"modules": [
+				{
+					"main": "slowMemberFollow",
+					"step": "step",
+					"tests": [
+						"enqueueStaleTest",
+						"fixedExpireRetargetTest",
+						"fixedFollowsTest",
+						"fixedHoldTest",
+						"forgedTest",
+						"giveUpTest",
+						"refuseRetryTest",
+						"singleSealWindowTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initEnqueue",
+							"invariants": [
+								"neverStale"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSingle",
+							"invariants": [
+								"neverStale"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v2/formal/ahe-v2-signed-envelope-variables.qnt",
+			"typecheckOnly": "no step and no run declarations"
+		},
+		{
+			"file": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"modules": [
+				{
+					"main": "authorLineageActions",
+					"step": "step",
+					"tests": [
+						"testBoundedCapsStutterWithoutGrowth",
+						"testDifferentOperationSameSlotDetectsEquivocation",
+						"testEquivocationDetectionAcrossBoundedSequences",
+						"testFailedLocalIssuanceConsumesAndExposesNothing",
+						"testLocalIssueBindsSelectedSequenceIntoSignedRecord",
+						"testRemoteDecisionHistoryIndependentForValidCandidates",
+						"testRemoteDuplicateAndGapRemainAdmissible",
+						"testSameOperationDuplicateIsNotEquivocation",
+						"testSignedFieldsDeriveFromTypedAuthenticatedVertex",
+						"testSignedVertexFieldMutationsFailAuthentication",
+						"testSuccessfulLocalIssuanceIsContiguous"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"authorSequenceAuthenticated",
+								"successfulLocalIssuanceContiguous",
+								"failedLocalIssuanceOpaque",
+								"remoteAdmissionArrivalOrderIndependent",
+								"duplicateAndGapNeverReject",
+								"equivocationObservationSound",
+								"localIssuedRecordsBindSelectedSequence",
+								"validRemoteDecisionHistoryIndependent",
+								"operationIdentityGrounded",
+								"boundedStateFinite",
+								"signedFieldDerivationSound"
+							],
+							"witnesses": [
+								"witnessLocalIssueSuccess",
+								"witnessLocalIssueFailure",
+								"witnessRemoteGap",
+								"witnessRemoteDuplicate",
+								"witnessEquivocationDetected",
+								"witnessLocalSignedRecordExposed",
+								"witnessRemoteDecisionAfterHistory",
+								"witnessBoundedStutter"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/author-lineage-adjuncts.qnt",
+			"modules": [
+				{
+					"main": "localSourceSettlementAuthority",
+					"tests": [
+						"testLocalSettlementAlteredCandidateRefusal",
+						"testLocalSettlementAlteredPlanRefusal",
+						"testLocalSettlementClosedAliasRefusesNewAdmission",
+						"testLocalSettlementClosingJoinsAdmitted",
+						"testLocalSettlementControlSourceRefusal",
+						"testLocalSettlementCurrentWholeStateAcquisition",
+						"testLocalSettlementEarlyReleaseMutationDetected",
+						"testLocalSettlementFloorChangeAfterSourceReadRefuses",
+						"testLocalSettlementHeadChangeAfterSourceReadRefuses",
+						"testLocalSettlementHistoricalRefereeContinuation",
+						"testLocalSettlementJournalReleaseRaceRefusesWithDebt",
+						"testLocalSettlementLaterChangesDoNotRewritePastDelivery",
+						"testLocalSettlementMissingSourceRefusal",
+						"testLocalSettlementOriginalNonwriterRefusal",
+						"testLocalSettlementPolicyBindingRefusal",
+						"testLocalSettlementSourceRefreshMutationDetected",
+						"testLocalSettlementStaleDeliveryMutationDetected"
+					]
+				},
+				{
+					"main": "roomPublicInputCustody",
+					"step": "step",
+					"tests": [
+						"testRoomInputEarlyRefundRejected",
+						"testRoomInputReentryUsesCurrentRemainingBytes",
+						"testRoomInputRetainedUntilBatchJoin",
+						"testRoomInputRevocationJoinsAdmitted",
+						"testRuntimeInputPartialCaptureReentryRefusesAndReturnsCredit"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						}
+					]
+				},
+				{
+					"main": "readControlAdmission",
+					"step": "step",
+					"tests": [
+						"testReadControlFullPoolJoinsThenRequiredTransitionContinues",
+						"testReadControlOverbookMutationRejected",
+						"testReadControlRevocationRefusesAndJoinsAdmitted",
+						"testReplayableDifferentIdentityAndReentryStayFresh",
+						"testReplayableSameIdentityCutJoinsThenFreshContinuation",
+						"testReplayableStaleCutMutationRejected",
+						"testTerminalCopiedInputAliasMutationRejected",
+						"testTerminalCopiedInputFullWaitingPoolStillCommits",
+						"testTerminalCopiedInputMutationJoinsThenRetry",
+						"testTerminalPublicationCommitsAndReleasesJoined",
+						"testTerminalPublicationPrematureReleaseMutationRejected",
+						"testTerminalPublicationRefusesThenAbsentRetryJoins",
+						"testTerminalPublicationRevocationJoinsBeforeRelease"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeOverbookRead",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenPublicationStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenCopiedInputStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenReplayableStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "currentOperationAuthority",
+					"tests": [
+						"testCurrentAdminOnlyFoldProgress",
+						"testCurrentFrontierJoinOrderingMutationDetected",
+						"testCurrentFrontierPreflightRefusesPrefix",
+						"testCurrentIngressNonwriterRefusal",
+						"testCurrentLocalNonwriterRefusal",
+						"testCurrentPermissionlessStillRequiresMembership",
+						"testCurrentReplayNonwriterRefusal",
+						"testCurrentStagedWriterNoEscalation",
+						"testCurrentWriterBypassMutationDetected",
+						"testCurrentWriterPositive"
+					]
+				},
+				{
+					"main": "carriedChatCapacity",
+					"step": "step",
+					"tests": [
+						"testCarriedCapacityAuthenticatedReleaseAndReallocation",
+						"testCarriedCapacityCompletionStillHoldsUntilJoin",
+						"testCarriedCapacityDormantGrantAndMessage",
+						"testCarriedCapacityRefreshMutationRejected",
+						"testCarriedCapacityRolloverPreservesClaimsAndMessages",
+						"testCarriedCapacityTerminalThroughDoesNotRelease"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"canRollover"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeRefresh",
+							"invariants": [
+								"ceilingsAndClaimsCarried",
+								"finiteDisjointEntitlements"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "brokenStep",
+							"invariants": [
+								"ceilingsAndClaimsCarried",
+								"finiteDisjointEntitlements"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "issuanceNativeRetirementParticipant",
+					"tests": [
+						"issuanceParticipantActiveSettlementPostimageTest",
+						"issuanceParticipantBusyConsumedTest",
+						"issuanceParticipantCloseRetainsNativeSignExclusionTest",
+						"issuanceParticipantCommitNoAbortTest",
+						"issuanceParticipantCommittedSettlementPostimageTest",
+						"issuanceParticipantControlCurrencyTest",
+						"issuanceParticipantEarlyCloseReleaseKilledTest",
+						"issuanceParticipantFutureSequenceTest",
+						"issuanceParticipantHeldPresignFenceTest",
+						"issuanceParticipantHoleDropTest",
+						"issuanceParticipantLostAckTest",
+						"issuanceParticipantMissingFenceKilledTest",
+						"issuanceParticipantMissingImageKilledTest",
+						"issuanceParticipantOldPublicationTest",
+						"issuanceParticipantPendingHoleTest",
+						"issuanceParticipantPresignCloseJoinTest",
+						"issuanceParticipantReleaseJoinTest",
+						"issuanceParticipantRetiredPresignRefusalTest",
+						"issuanceParticipantRowCurrencyTest"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/creator-checkpoint-reattachment.qnt",
+			"modules": [
+				{
+					"main": "creatorCheckpointReattachment",
+					"step": "step",
+					"tests": [
+						"crashBeforePublicationTest",
+						"longOfflineTest",
+						"missingFrontierIsNotDoneTest",
+						"oldHandleCannotReviveTest",
+						"removedReadmittedSameStoreTest",
+						"twoMissedInstallsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepSmallLoseIntent",
+							"invariants": [
+								"noIntentLoss"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "stepSmallReviveSession",
+							"invariants": [
+								"noResurrection"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/current-fence-bridge.qnt",
+			"modules": [
+				{
+					"main": "currentFenceBridge",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allInvariants"
+							],
+							"witnesses": [
+								"reachedCollectedBeforeLanding",
+								"reachedCrashThenCleanup",
+								"reachedExpiredCollected",
+								"reachedFenceAndChain",
+								"reachedFenceDoubleMiss",
+								"reachedJGoneIPresent",
+								"reachedLateMove",
+								"reachedOldWorkExpired",
+								"reachedPartialCollected",
+								"reachedProofAfterScope",
+								"reachedRejoinInPlace",
+								"reachedRetiredPresent",
+								"reachedReviewCollected",
+								"reachedSeqCollision",
+								"reachedWholeInstallMiss"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/current-fence-projection.qnt",
+			"modules": [
+				{
+					"main": "currentFenceProjection",
+					"step": "step",
+					"tests": [
+						"fenceOverwriteCounterexampleTest",
+						"freshReadmissionWritesItsOwnFenceTest",
+						"installedFenceSurvivesLaterIssueTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"currentFence"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"currentFence"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/disposable-terminal.qnt",
+			"modules": [
+				{
+					"main": "disposableTerminal",
+					"step": "step",
+					"tests": [
+						"abandonedPreparationContinuationTest",
+						"alteredBindingTest",
+						"backupRefusalTest",
+						"brokenBackupTest",
+						"brokenEarlyReleaseTest",
+						"brokenFenceTest",
+						"brokenProtectedDeletionTest",
+						"interruptedCleanupRetryTest",
+						"joinedAliasTest",
+						"nonemptyContinuationTest",
+						"protectedDebtRefusalTest",
+						"staleFloorRefusalTest",
+						"survivingAliasCrashTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/issuance-quote-currency.qnt",
+			"modules": [
+				{
+					"main": "issuanceQuoteCurrency",
+					"step": "step",
+					"tests": [
+						"enteredForeignControlChangeRefusesTest",
+						"enteredSameConnectionLineageChangeRefusesTest",
+						"exactOwnPhasesReachCryptoTest",
+						"rebaselineForeignMutationCounterexampleTest",
+						"reservedForeignRowChangeRefusesTest",
+						"reservedSameConnectionChangeRefusesTest",
+						"skipEnteredCurrencyCounterexampleTest",
+						"unexpectedEnteringDmlDeltaRefusesTest",
+						"unexpectedOwnDmlDeltaRefusesTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/journal-partial-prefix-drain.qnt",
+			"modules": [
+				{
+					"main": "journalPartialPrefixDrain",
+					"step": "step",
+					"tests": [
+						"appendsResumeAfterDrainTest",
+						"crashMidDrainReopenCompletesTest",
+						"ineligibleRetirementMutantTest",
+						"ineligibleShallowMutantTest",
+						"nearCapAppendRefusedTest",
+						"nearCapJournalDrainsAcrossEpisodesTest",
+						"residualSelectionMutantTest",
+						"shortReserveMutantTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initIneligibleMutantShallow",
+							"invariants": [
+								"noIneligibleRetired"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initResidualMutant",
+							"invariants": [
+								"resumeReproduces"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "initIneligibleMutant",
+							"invariants": [
+								"resumeReproduces"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						},
+						{
+							"kind": "violate",
+							"init": "initShortReserveMutant",
+							"invariants": [
+								"readinessBound"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/journal-retirement.qnt",
+			"modules": [
+				{
+					"main": "journalReplayReuse",
+					"tests": [
+						"pageReuseFiniteAvailableProgressTest",
+						"pageReuseForeignAppendPrefixFallbackTest",
+						"pageReuseForeignCorruptionRefusalTest",
+						"pageReuseForgedTokenRefusalTest",
+						"pageReuseHealthyBoundTest",
+						"pageReuseOwnAppendPrefixFallbackTest",
+						"pageReuseStaleHighWatermarkRefusalTest",
+						"pageReuseUnstableFullFallbackTest",
+						"pageReuseVersionGuardRuleKilledTest"
+					]
+				},
+				{
+					"main": "browserJournalHeldPage",
+					"tests": [
+						"browserPageConditionalProgressTest",
+						"browserPageForeignWriteExcludedTest",
+						"browserPageForgedTokenFullTest",
+						"browserPageHeldBoundTest",
+						"browserPageIdentityGuardKilledTest",
+						"browserPageLiveGuardKilledTest",
+						"browserPageNewTransactionFullTest",
+						"browserPageReleasedPoisonFullTest",
+						"browserPageRestoredPrefixFullTest"
+					]
+				},
+				{
+					"main": "hostFloorParticipant",
+					"step": "step",
+					"tests": [
+						"hostFloorAdmittedJoinTest",
+						"hostFloorBrokenCasRejectedTest",
+						"hostFloorBrokenJoinRejectedTest",
+						"hostFloorForeignIncarnationRefusesTest",
+						"hostFloorFreshIncarnationIsNotVacuouslyBlockedTest",
+						"hostFloorHealthyReachabilityTest",
+						"hostFloorHeldExclusionTest",
+						"hostFloorLostAckResumeTest",
+						"hostFloorQueuedForeignRefusesTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafePrepareWithoutImageCas",
+							"invariants": [
+								"nativeCasSafety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "journalNativeFenceParticipant",
+					"tests": [
+						"journalNativeBusyConsumedTest",
+						"journalNativeCommittedReadbackTest",
+						"journalNativeControlCurrencyTest",
+						"journalNativeFourMutatorsTest",
+						"journalNativeFutureScopeTest",
+						"journalNativeHoleDropPermanentTest",
+						"journalNativeHoleRestorationKilledTest",
+						"journalNativeIllegalNonconsumeTest",
+						"journalNativeIncarnationTest",
+						"journalNativeMissingFenceKilledTest",
+						"journalNativeProtectedHoleTest",
+						"journalNativeRowCurrencyTest",
+						"journalNativeStaleAbortKilledTest",
+						"journalNativeStaleAbortTest"
+					]
+				},
+				{
+					"main": "snapshotNativeFenceParticipant",
+					"tests": [
+						"snapshotNativeCasMutantTest",
+						"snapshotNativeForeignImageTest",
+						"snapshotNativeHealthyTest",
+						"snapshotNativeHolePermanentTest",
+						"snapshotNativeIncarnationMutantTest",
+						"snapshotNativeIncarnationTest",
+						"snapshotNativeJoinMutantTest",
+						"snapshotNativeJoinedAdmissionTest",
+						"snapshotNativeStaleAbortTest",
+						"snapshotProtectedDeleteMutantTest",
+						"snapshotProtectedDeleteRefusesTest"
+					]
+				},
+				{
+					"main": "aheFutureNomination",
+					"tests": [
+						"boundWholeImageRefusesTest",
+						"changedProtectedIdentityMutantRejectedTest",
+						"changedPublishedIdentityMutantRejectedTest",
+						"completedOrdinaryFacadeRefusesTest",
+						"freshGenuineNomineeResumeTest",
+						"freshIntentAfterPublishedPreservesIdentityTest",
+						"genuineFutureContinuationTest",
+						"legacyCommitRefusesTest",
+						"nomineeRebindMutantRejectedTest",
+						"oneUseFutureRefusesTest",
+						"protectedIdentitySurvivesLifecycleTest",
+						"rawEpochMutantRejectedTest",
+						"retiredEpochRefusesTest",
+						"unauthenticatedNomineeResumeRefusesTest",
+						"wrongNomineePublicationRefusesTest"
+					]
+				},
+				{
+					"main": "journalRetirement",
+					"step": "step",
+					"tests": [
+						"currentWorkRemainsEnabledTest",
+						"foreignDebtAfterPrepareRefusesTest",
+						"healthyFiniteDrainTest",
+						"lateDebtAfterFenceRefusesTest",
+						"lostAckCrashRecoveryTest",
+						"pendingDependencyRefusesTest",
+						"permanentFenceAfterReleaseTest",
+						"replayDependencyRefusesTest",
+						"sharedDependencyRefusesTest",
+						"staleCompletionAuthorityRefusesTest",
+						"staleDrainAuthorityRefusesTest",
+						"staleReadTokenRejectedTest",
+						"staleReadbackAuthorityRefusesTest",
+						"unsafeCounterResetCounterexampleTest",
+						"unsafeLateInstallCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/native-retirement-custody.qnt",
+			"modules": [
+				{
+					"main": "nativeRetirementCustodySmall",
+					"step": "step",
+					"tests": [
+						"custodyDoesNotBlockPruningTest",
+						"retiredDropCounterexampleTest",
+						"rewriteAndCrashTest",
+						"sourceReleaseKeepsEntriesUntilPrunedTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"inv"
+							],
+							"witnesses": [
+								"reachedChangedSource",
+								"reachedCustody",
+								"reachedPortablePin",
+								"reachedPrunedBehindCustody",
+								"reachedRewrite"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "nativeRetirementCustodyToday",
+					"step": "step",
+					"tests": [
+						"floorFirstCounterexampleTest",
+						"planFirstCounterexampleTest",
+						"rescanOfRetiredRowRefusedTest",
+						"retiredSourceLosesEntryTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedChangedSource",
+								"reachedPortablePin",
+								"reachedRewrite"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "nativeRetirementCustody300",
+					"step": "step",
+					"tests": [
+						"threeHundredEpochsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"inv"
+							],
+							"witnesses": [
+								"reachedChangedSource",
+								"reachedCustody",
+								"reachedPortablePin",
+								"reachedPrunedBehindCustody",
+								"reachedRewrite"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/pending-floor-ephemeral.qnt",
+			"modules": [
+				{
+					"main": "pendingFloorEphemeral",
+					"step": "step",
+					"tests": [
+						"ambiguousAbortCounterexampleTest",
+						"beginAmbiguityFailsGatedTest",
+						"cachedAuthorityCounterexampleTest",
+						"coldActivationCounterexampleTest",
+						"coldCommittedCompletesTest",
+						"coldPendingNewCompletesTest",
+						"coldPendingOldCompletesTest",
+						"conservativeGateBeforeNativeEffectTest",
+						"earlyNewActivationCounterexampleTest",
+						"installedOldAfterFloorCommitTest",
+						"installedOldDuringPendingTest",
+						"lateGateCounterexampleTest",
+						"newTupleWorksAfterReadyTest",
+						"noEffectAbortRestoresTest",
+						"oldQueuedBytesAfterReplacementTest",
+						"queueCounterexampleTest",
+						"queuedPendingTrafficObservedTest",
+						"queuedPostcommitTrafficObservedTest",
+						"queuedSuspensionBypassCounterexampleTest",
+						"replacementBeforeRoomRebindTest",
+						"tupleCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeEarlyNewActivation",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "earlyStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "coldStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "abortStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "tupleStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "pendingFloorOwnerGate",
+					"step": "step",
+					"tests": [
+						"changedRegistrationCounterexampleTest",
+						"changedRegistrationDoesNotRestoreTest",
+						"closeAbsorbsCompletionTest",
+						"delayedAuthorizationAfterFreshGrantTest",
+						"delayedAuthorizationRecheckedTest",
+						"delayedReceiveCounterexampleTest",
+						"staleAttemptDoesNotReleaseNewGateTest",
+						"staleCaptureAfterFreshGrantCounterexampleTest",
+						"staleFinishCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "delayedStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "finishStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/received-certificate-retry.qnt",
+			"modules": [
+				{
+					"main": "receivedCertificateRetry",
+					"tests": [
+						"detachedAbsenceAbortCounterexampleTest",
+						"detachedAbsenceDoesNotReserveTest",
+						"doubleChargeCounterexampleTest",
+						"earlyAbortOccupiedCounterexampleTest",
+						"exactOccupiedRetryTest",
+						"lookupRequiresReplayTest",
+						"mismatchedCertificateRefusesTest",
+						"occupiedCannotAbortTest",
+						"originalRetainRestrictedToPrefixTest",
+						"reconstructionRequiredTest",
+						"reservationExcludesForeignRetainTest",
+						"staleOccupiedOwnerRefusesTest",
+						"staleReplayAfterLookupRefusesTest",
+						"startupHeadDoesNotImplyReplayTest",
+						"unknownLookupCannotAbortTest",
+						"unrelatedCandidateCounterexampleTest",
+						"unsafeAbortCounterexampleTest",
+						"verifiedAbsenceMayAbortTest"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/record-observer.qnt",
+			"modules": [
+				{
+					"main": "recordObserver",
+					"tests": [
+						"anchorCeilingCannotObserveCutTest",
+						"oversizedRecordRefusesTest",
+						"typedSealCeilingTest"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+			"typecheckOnly": "no step and no run declarations"
+		},
+		{
+			"file": "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+			"modules": [
+				{
+					"main": "rejoinHeadFloor",
+					"step": "step",
+					"tests": [
+						"afterPublishRecoveryTest",
+						"beforePublishRecoveryTest",
+						"competingOfferPreservesOriginalReceiptTest",
+						"gapAndReadmissionTest",
+						"highestEpochReceiptReplacementCounterexampleTest",
+						"loweredFloorCounterexampleTest",
+						"oldRoleCounterexampleTest",
+						"receiptDiscoveryKeepsWriterHaltedTest",
+						"receiptOldAdmissionCounterexampleTest",
+						"receiptOnlyColdRecoveryTest",
+						"receiptOnlyDiscoveryCounterexampleTest",
+						"staleAttachmentCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "receiptTargetStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "receiptAdmissionStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "receiptOnlyStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "staleStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "lowerStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "reviveStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "signatureStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "rejoinActualHeadRoles",
+					"step": "step",
+					"tests": [
+						"actualEightFourTwoTest",
+						"mixedAdjacentGapColdOpenTest",
+						"normalizeThenColdOpenBeforeNextFloorTest",
+						"obsoleteSignatureCounterexampleTest",
+						"ordinaryPointRefusalCounterexampleTest",
+						"promoteFirstForwardTest",
+						"promoteOldestForwardTest",
+						"protectedOldestCounterexampleTest",
+						"remoteSevenNeverLocalTest",
+						"trustOnlyColdOpenTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "mixedStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "remoteStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "protectedStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "obsoleteStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "rejoinRoleProjection",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+			"modules": [
+				{
+					"main": "rejoinAbsenceProjection",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "rejoinPruningCurrency",
+					"step": "step",
+					"tests": [
+						"heldNativeExcludesWriteTest",
+						"historicalCertificateAfterAdvanceTest",
+						"incompleteCensusCounterexampleTest",
+						"joinedDeletionTest",
+						"normalizationPreservesExactCertificateTest",
+						"oldCertificateCannotClassifyForeignTest",
+						"oldCertificateCannotClassifyProtectedTest",
+						"oldFloorCounterexampleTest",
+						"oldIntentCounterexampleTest",
+						"staleNativeCounterexampleTest",
+						"unjoinedCapsuleCounterexampleTest",
+						"unjoinedNativeReceiptCounterexampleTest",
+						"unretainedHistoricalBasisRefusesTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "forgedStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "staleStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "receiptProtectedStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "receiptForeignStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "consumerStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "censusStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+			"modules": [
+				{
+					"main": "rejoinUnknownCustody",
+					"step": "step",
+					"tests": [
+						"actualCommitProofMayResolveTest",
+						"actuallyOmittedAutoReplayCounterexampleTest",
+						"automaticExpiryCounterexampleTest",
+						"changedFloorRequiresFreshAuthorRequestTest",
+						"crashUnsignedRequestDoesNotExpireTest",
+						"exactSignedCommitSurvivesAdjacentRemovalTest",
+						"expiryCannotUndoCommittedEffectTest",
+						"expiryCommittedUnknownPreservesApplicationTest",
+						"expiryDoesNotUndoLaterRemoteArrivalTest",
+						"expiryOmittedUnknownPreservesApplicationTest",
+						"finalConsumerCounterexampleTest",
+						"missingPreJumpCustodyCounterexampleTest",
+						"otherSourceEvidenceCannotClassifyTest",
+						"potentiallyCommittedDuplicateCounterexampleTest",
+						"projectionAloneCannotClassifyCommitTest",
+						"reserveMissingCounterexampleTest",
+						"staleFloorExpiryCounterexampleTest",
+						"unknownSurvivesGapRemovalReadmissionColdTest",
+						"zeroSourceReceiveOnlyThenWriterTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "gapCustodyStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "staleExpiryStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "projectionCommitStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "wrongSourceStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "replayStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "autoExpiryStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unknownStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "consumerStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "reserveStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "undoStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "foreignStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "rejoinCustodyProjection",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+			"modules": [
+				{
+					"main": "replayBroadcastRounds",
+					"step": "step",
+					"tests": [
+						"cancellationJoinsThenResolvesPendingCallersTest",
+						"continuousDemandDoesNotExtendEarlierPromiseTest",
+						"lateCurrentJoinCounterexampleTest",
+						"latePeerGetsFullPendingRoundTest",
+						"quietOnlyCompletionStaysPendingTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"tier": "nightly",
+							"init": "init",
+							"step": "unsafeSafetyStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 20000,
+							"maxSteps": 40,
+							"claim": "held at 500 samples x 3 seeds; violated at 5000 x 40 (seed 7); nightly runs 20000 x 40"
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/replay-egress-pool.qnt",
+			"modules": [
+				{
+					"main": "replayEgressPoolSmall",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedRetiredNative"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "replayEgressPool32",
+					"step": "step",
+					"tests": [
+						"predecessorSendsLeaveThirtyCurrentSlotsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedRetiredNative"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/replay-read-custody.qnt",
+			"modules": [
+				{
+					"main": "replayReadPhases",
+					"step": "step",
+					"tests": [
+						"cacheRollbackCounterexampleTest",
+						"completedFailureRestoreCounterexampleTest",
+						"enteredReadDrainsBeforeCloseTest",
+						"failedCloseIsUnavailableWithoutAnotherRaceTest",
+						"failedCloseRetryOwnsItsCompletionTest",
+						"hotHandoffCannotRestoreCapturedPrefixTest",
+						"queuedReadYieldsBeforeSourceAcquisitionTest",
+						"readinessRestoresItsPriorPhaseTest",
+						"retirementAbsorbsLateCompletionTest",
+						"retirementCompletionCounterexampleTest",
+						"sourceAcquisitionRaceCounterexampleTest",
+						"staleReadReleaseCounterexampleTest",
+						"staleRetryCompletionCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedRetiredCapture",
+								"reachedRetry"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "replayBorrowedCustody",
+					"step": "step",
+					"tests": [
+						"acquisitionRaceReleasesOnlyItsChildTest",
+						"childCancellationCounterexampleTest",
+						"childReleasePreservesNativeParentTest",
+						"parentReleaseJoinsOutstandingChildrenTest",
+						"parentRevocationRaceCounterexampleTest",
+						"revokedParentReadCounterexampleTest",
+						"revokedParentRefusesAChildReadTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/retirement-intent-selection.qnt",
+			"modules": [
+				{
+					"main": "retirementIntentSelection",
+					"step": "step",
+					"tests": [
+						"activeForeignIntentRefusesTest",
+						"completedRowsNeverReenterNewSelectionTest",
+						"dependencyClosureCounterexampleTest",
+						"freshSameFloorDecisionRederivesHolesTest",
+						"freshSameFloorSourceRederivesHolesTest",
+						"reconstructedActiveRetryKeepsOriginalHolesTest",
+						"replacementWaitsForItsSourceTest",
+						"sameFloorReuseCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/retirement-recovery-admission.qnt",
+			"modules": [
+				{
+					"main": "retirementRecoveryAdmission",
+					"step": "step",
+					"tests": [
+						"completionBeforeReleaseCounterexampleTest",
+						"crashAfterCommitReverifiesBeforeAdmissionTest",
+						"emptyProofCounterexampleTest",
+						"emptyProofRefusesAdmissionTest",
+						"exactRecoveryJoinsBeforeOrdinaryTest",
+						"foreignActiveIntentCounterexampleTest",
+						"ordinaryBeforeRecoveryCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeForeignRecovery",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeAdmitWhileHalted",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/room-repair-custody.qnt",
+			"modules": [
+				{
+					"main": "roomRepairCustodySmall",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedCancelledNative",
+								"reachedUnrememberedPeer"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "roomRepairCustody65",
+					"step": "step",
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedCancelledNative"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-exhaustive.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-instances.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a1-partial-cut-receipt.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a2-expired-outside.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a2-instead-of-b2.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/carrier-without-minus-own.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-cross-store-crash.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-early-plan-drop.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-either-drop-review.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-fence-runs-beyond-max-scopes.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-guard-one-pass.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-no-old-incarnation.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-proof-handoff.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-readmit-abandon.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-seq-identity.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-settled-without-t.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-t-without-settled.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-under-decided-truth.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-volatile-authority.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-without-expire-settled.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-without-f1.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/fence-in-cut-control.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/fence-runs-beyond-max-scopes.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/no-r7.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/pre-r5.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r5-without-chain.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r5-without-r5b.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r6-absent.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/today-window.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/w1-misses-beyond-max-scopes.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement-proofs.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/settlement-replacement-retirement.qnt",
+			"delegated": "track-j"
+		},
+		{
+			"file": "packages/protocol-v3/formal/source-age-projection.qnt",
+			"modules": [
+				{
+					"main": "sourceAgeProjection",
+					"step": "step",
+					"tests": [
+						"currentEpochDispositionCounterexampleTest",
+						"installAssignsOnlyOlderSourcesTest",
+						"laterApplicationIssuePreservesSourceAgeTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/formal/source-proof-drain.qnt",
+			"modules": [
+				{
+					"main": "sourceProofDrain",
+					"step": "step",
+					"tests": [
+						"coldProgressPreservesProofTest",
+						"finalNativeAbsenceReleasesSharedProofTest",
+						"independentPrefixKeepsProofTest",
+						"partialDrainColdReopenTest",
+						"partialSharedContextLossCounterexampleTest",
+						"pendingPhysicalLossCounterexampleTest",
+						"pendingPublicationKeepsPairTest",
+						"prematureInverseMasksLossOnlyAtExactTargetTest",
+						"prematureProofLossAfterProgressColdTest",
+						"proofDoesNotProtectEligiblePairTest",
+						"publishedLaterSourceWaitsForPrefixTest",
+						"sharedContextSurvivesPartialDrainTest",
+						"staleInverseCannotBecomeCurrentAuthorityTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "prematureStep",
+							"invariants": [
+								"currentCustody"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "contextStep",
+							"invariants": [
+								"currentCustody",
+								"sharedContextRetained"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "pendingStep",
+							"invariants": [
+								"pendingRetained"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "inverseStep",
+							"invariants": [
+								"currentCustody"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				},
+				{
+					"main": "sourceProofTargetCurrency",
+					"step": "step",
+					"tests": [
+						"changedTargetRefusesTest",
+						"exactTargetReadTest",
+						"staleTargetCounterexampleTest",
+						"validEarlierReadIsHistoricalTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "init",
+							"step": "unsafeStep",
+							"invariants": [
+								"safety"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/protocol-v3/supplements/equivocation-digest-identity-v1/equivocation-digest-identity.qnt",
+			"modules": [
+				{
+					"main": "equivocationDigestIdentity",
+					"tests": [
+						"testDependencyForkIsEquivocation",
+						"testExactlyThreeUnorderedProofPairs",
+						"testLogicalTimeForkIsEquivocation",
+						"testSameDigestRecarrierIsDuplicate"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/seal/formal/seal-pacemaker-admission.qnt",
+			"modules": [
+				{
+					"main": "sealPacemakerAdmission",
+					"step": "step",
+					"tests": [
+						"testFullTimerContinuesAfterJoin",
+						"testLegitimateContinuationAndJoinedStop"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"admissionSafe"
+							]
+						},
+						{
+							"kind": "hold",
+							"init": "initFull",
+							"invariants": [
+								"admissionSafe"
+							],
+							"claim": "full pool: capacity refusal keeps admissionSafe"
+						},
+						{
+							"kind": "violate",
+							"init": "initFull",
+							"step": "brokenAdmit",
+							"invariants": [
+								"admissionSafe"
+							],
+							"samples": 500,
+							"maxSteps": 30,
+							"claim": "the old guard admits past LIMIT from a full pool"
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"admissionSafe"
+							],
+							"maxSteps": 12,
+							"expect": "hold",
+							"timeoutMs": 900000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/seal/formal/seal-pacemaker.qnt",
+			"modules": [
+				{
+					"main": "sealPacemaker",
+					"step": "step",
+					"tests": [
+						"testByzantineEquivocationDoesNotFormConflictingQcs",
+						"testCatchupNeedsFPlusOne",
+						"testCommitQcFinalizes",
+						"testCrashRestartRetainsDurableAuthority",
+						"testDuplicateLossAndInvalidNestedQc",
+						"testRoundCarryover"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							],
+							"witnesses": [
+								"reachedCatchup",
+								"reachedCommitQc",
+								"reachedDuplicate",
+								"reachedEquivocation",
+								"reachedInvalidNestedQcRejection",
+								"reachedLoss",
+								"reachedPrepareQc",
+								"reachedProposal",
+								"reachedRestart",
+								"reachedRoundChange",
+								"reachedTimeout"
+							]
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"allSafety"
+							],
+							"maxSteps": 12,
+							"expect": "hold",
+							"timeoutMs": 3600000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/seal/formal/seal-safety.qnt",
+			"modules": [
+				{
+					"main": "sealSafety",
+					"tests": [
+						"testAgreement",
+						"testCrashPreservesLock",
+						"testDurableBeforeGossip",
+						"testSameValueRoundCarryover"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/seal/formal/signing-native-frontier.qnt",
+			"modules": [
+				{
+					"main": "signingNativeFrontier",
+					"tests": [
+						"nativeDelayedAckRefusesTest",
+						"nativeDelayedRestorationRefusesTest",
+						"nativeEvidenceDebtRefusesTest",
+						"nativeFrontierAbortNoEffectsTest",
+						"nativeFrontierDeliveryRuleKilledTest",
+						"nativeFrontierOldRuleKilledTest",
+						"nativeFrontierProgressTest",
+						"nativeFrontierStaleIncarnationTest",
+						"nativeFrontierStaleRevisionTest",
+						"nativeFrontierSummaryRuleKilledTest",
+						"nativeLostDeliveryReadbackTest",
+						"nativePublicationDebtRefusesTest",
+						"nativeSummaryRetainedTest"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/seal/formal/signing-native-participant.qnt",
+			"modules": [
+				{
+					"main": "signingNativeParticipant",
+					"tests": [
+						"participantAbortPreservesSummariesTest",
+						"participantDebtRefusalTest",
+						"participantEarlyDeliveryRuleKilledTest",
+						"participantEarlyPhaseRefusalNonconsumingTest",
+						"participantForeignImageCasTest",
+						"participantHoleCannotReturnTest",
+						"participantLiveCaptureReturnTest",
+						"participantLostDeliveryReadbackTest",
+						"participantNativeRefusalConsumesReadTest",
+						"participantPrepareCommitProgressTest",
+						"participantProtectedHoleAndFutureProgressTest",
+						"participantReadOnlyCasRefusalBoundaryTest",
+						"participantRequestCommitRuleKilledTest",
+						"participantRetiredWorkRuleKilledTest",
+						"participantRevokedCaptureGuardKilledTest",
+						"participantRevokedCaptureRefusesTest",
+						"participantStaleIncarnationTest",
+						"presignAcquisitionIncludedInJoinTest",
+						"presignCloseHoldGuardKilledTest",
+						"presignCloseRetainsNativeUntilCryptoJoinTest",
+						"presignEnteredCryptoHoldsNativeTest",
+						"presignFirstAbsentRowProgressTest",
+						"presignNativeGuardKilledTest",
+						"presignRetiredScopeBeforeCryptoTest",
+						"presignRetirementGapFencesMutationTest",
+						"presignUnboundRequestRefusesTest",
+						"presignWrongKeyRefusesTest",
+						"thirdRetirementClosingEpochRefusalTest",
+						"thirdRetirementHealthyVerifiedClosingScopeTest",
+						"thirdRetirementSuccessorAgeGuardKilledTest"
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/seal/formal/signing-retirement.qnt",
+			"modules": [
+				{
+					"main": "finalityExecutionCustody",
+					"step": "step",
+					"tests": [
+						"executionEarlyJoinKilledTest",
+						"executionEveryAdmittedSignatureJoinsTest",
+						"executionHealthyContinuationTest",
+						"executionMissingAdmissionGuardKilledTest",
+						"executionRetireDuringAcquisitionTest",
+						"executionRetirementJoinsTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						}
+					]
+				},
+				{
+					"main": "signingRetirement",
+					"step": "step",
+					"tests": [
+						"conflictingSignatureRefusesTest",
+						"currentSigningStillEnabledTest",
+						"delayedAckRefusesTest",
+						"delayedDispatchRefusesTest",
+						"delayedRestoreRefusesTest",
+						"delayedSignRefusesTest",
+						"healthyDetailDrainTest",
+						"lostAckNeedsReadbackTest",
+						"newlySignedDeliveryGroundedTest",
+						"staleIncarnationRefusesTest",
+						"staleRevisionRefusesTest",
+						"unoccupiedCurrentRoundLockRefusesTest",
+						"unsafeConflictCounterexampleTest",
+						"unsafeRestoreCounterexampleTest",
+						"unsafeSummaryResetCounterexampleTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/storage-node/formal/journal-image-memo.qnt",
+			"modules": [
+				{
+					"main": "journalImageMemo",
+					"step": "step",
+					"tests": [
+						"deletionPrefixWitnessTest",
+						"hitTest",
+						"otherConnectionAppendTest",
+						"ownWriteRollbackTest",
+						"refusalTest",
+						"rewriteObjectWitnessTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedHit",
+								"reachedMultiRowHit",
+								"reachedOwnUncommittedRead",
+								"reachedRefusal"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/storage-node/formal/received-quarantine-supersede.qnt",
+			"modules": [
+				{
+					"main": "receivedQuarantineSupersede",
+					"step": "step",
+					"tests": [
+						"checkpointPastDeathBrokenTest",
+						"checkpointPastDeathTest",
+						"supersedeAtOrAboveBrokenTest",
+						"supersedeRecoveryBrokenTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							]
+						},
+						{
+							"kind": "violate",
+							"init": "initNoSupersede",
+							"invariants": [
+								"turnoverAdmissible"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSupersedeRecovery",
+							"invariants": [
+								"noLostRecovery"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "violate",
+							"init": "initSupersedeAtOrAbove",
+							"invariants": [
+								"noLostLive"
+							],
+							"samples": 500,
+							"maxSteps": 30
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 12,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		},
+		{
+			"file": "packages/storage/formal/verified-image-cache.qnt",
+			"modules": [
+				{
+					"main": "verifiedImageCache",
+					"step": "step",
+					"tests": [
+						"hitAcrossConnectionsTest",
+						"otherConnectionWriteTest",
+						"poisonTest",
+						"revokeReopenTest",
+						"rollbackStaleWitnessTest"
+					],
+					"checks": [
+						{
+							"kind": "hold",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"witnesses": [
+								"reachedExactHit",
+								"reachedHitAfterReopen"
+							]
+						},
+						{
+							"kind": "verify",
+							"init": "init",
+							"invariants": [
+								"safety"
+							],
+							"maxSteps": 10,
+							"expect": "hold",
+							"timeoutMs": 1800000
+						}
+					]
+				}
+			]
+		}
+	]
+}
