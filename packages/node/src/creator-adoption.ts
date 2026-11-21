@@ -5198,7 +5198,7 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			if (!digest.ok) throw new TypeError("creator retained recovery proof digest is invalid");
 			return Object.freeze({ bytes, ref: Object.freeze({ digest: digest.value, byteLength: bytes.byteLength }) });
 		});
-		const proposedCandidates = (attachmentIdentity === undefined ? [
+		const rawCandidates = (attachmentIdentity === undefined ? [
 			...current.filter(
 				({ ref, bytes }) =>
 					!sameRef(ref, oldTrust.ref) && !new Set(["drp-creator-author-settlement-state","drp-creator-issuance-retirement-state","drp-creator-author-issuance-frontiers-state"]).has(String(canonicalRecord(bytes)?.kind))
@@ -5206,6 +5206,30 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			...proof,
 		] : [...attachmentIdentity.proofCandidates, oldProjection, proof.find(candidate =>
 			sameBytes(candidate.bytes, certificate.exactCanonicalHistoryBytes))!]).sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+		// The live receive and the occupied-custody path stage this proposal (the retiring predecessor
+		// Cut/QC/ACL leave it) before retaining or adopting it; verification accepts only the staged
+		// closure. Re-derive it the same way (box m55: unstaged, every retained re-adoption refused
+		// chain-invalid).
+		let proposedCandidates = rawCandidates;
+		if (attachmentIdentity === undefined) {
+			const stagingSnapshot = await verifySnapshot({ snapshotDeclaration: observation.declaration, snapshotStore: input.snapshotStore },
+				{ cut, successorTrust: checkpoint.currentTrust }, proofAccounting);
+			if (stagingSnapshot === undefined) throw new TypeError("creator retained recovery snapshot is invalid");
+			const staged = inspectCreatorTransitionAdvance({
+				current: { candidates: current, closure: native.closure },
+				currentTrust: checkpoint.predecessorTrust,
+				mode: "stage",
+				proofRefs: [(proof[0] as (typeof proof)[number]).ref, (proof[1] as (typeof proof)[number]).ref],
+				proposed: { candidates: rawCandidates, closure: rawCandidates.map(({ ref }) => ref) },
+				successorTrust: checkpoint.currentTrust,
+				settlementAcl: {
+					current: oldAcl,
+					successor: stagingSnapshot.authorizedAclBytes ?? encodeCanonical(stagingSnapshot.payload.acl),
+				},
+			});
+			if (!staged.ok) throw new TypeError(`creator retained recovery transition is invalid: ${staged.reason}`);
+			proposedCandidates = [...staged.proposed.candidates].sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+		}
 		const owner = Object.freeze({});
 		let facts: SealedAdoptionFacts = Object.freeze({
 			...(attachment?.ok === true ? {checkpoint: attachment.capability} : {}),
