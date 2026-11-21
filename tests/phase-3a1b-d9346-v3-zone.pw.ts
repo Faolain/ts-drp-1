@@ -643,15 +643,16 @@ function escaped(value: string): string {
 }
 
 /**
- * D9346_ROOM_WORKER opts the two-client scenario's pages into the room worker (`?roomWorker`):
+ * D9346_ROOM_WORKER puts the two-client scenario's pages in the room worker (Grid's default, `/`):
  * "both", or one role ("creator" or "joiner") for a main-thread tab beside a worker tab. Unset,
- * every page runs the zone on the main thread, as before.
+ * every page opts out with `?mainThread` and runs the zone on the main thread, as this suite always
+ * has (Grid's default changed to the room worker; the suite's subject did not).
  */
 const ROOM_WORKER_ROLES = process.env.D9346_ROOM_WORKER ?? "";
 
 async function openGrid(page: Page, role?: "creator" | "joiner"): Promise<void> {
 	const worker = role !== undefined && (ROOM_WORKER_ROLES === "both" || ROOM_WORKER_ROLES === role);
-	await page.goto(worker ? "/?roomWorker" : "/");
+	await page.goto(worker ? "/" : "/?mainThread");
 	if (worker) await page.waitForFunction(() => window.__TS_DRP_GRID_ROOM_WORKER__ !== undefined);
 	await page.waitForFunction(() => window.__TS_DRP_GRID_SESSION__ !== undefined);
 	await expect(page.locator("#loadingMessage")).toBeHidden();

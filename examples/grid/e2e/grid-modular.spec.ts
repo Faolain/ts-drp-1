@@ -113,7 +113,10 @@ test("cold-starts, authenticates, and replaces a failed relay without fixed boot
 });
 
 async function openModularGrid(page: Page): Promise<void> {
-	await page.goto("/");
+	// Grid hosts its zone in a room worker by default; this suite drives the main-thread zone it was
+	// written against (its synchronous snapshot and the page's own node), so it opts out with
+	// `?mainThread`. The worker default is covered by tests/room-worker-grid.pw.ts and the FPS gate.
+	await page.goto("/?mainThread");
 	await page.waitForFunction(() => {
 		return Boolean(
 			(window as typeof window & { __TS_DRP_GRID_SESSION__?: { snapshot(): unknown } }).__TS_DRP_GRID_SESSION__

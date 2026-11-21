@@ -1,5 +1,6 @@
 /**
- * The Grid zone's room worker contract (opt-in: `?roomWorker` hosts the zone in a dedicated worker).
+ * The Grid zone's room worker contract (the default: the zone runs in a dedicated worker; `?mainThread`
+ * opts out).
  * The only code the page and the worker share: command names and kinds, the move validator, the
  * streams and the page hooks. It must stay light: no room, node or network imports.
  */

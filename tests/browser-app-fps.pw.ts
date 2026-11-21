@@ -82,10 +82,16 @@ const ROLLOVER_TAIL_MS = 1_000;
 const CPU_THROTTLE = Number(process.env.BROWSER_FPS_CPU_THROTTLE ?? 1);
 const CPU_THROTTLE_MODE = (process.env.BROWSER_FPS_CPU_THROTTLE_MODE ?? "process") as ThrottleMode;
 const CPU_THROTTLE_QUANTUM_MS = Number(process.env.BROWSER_FPS_CPU_THROTTLE_QUANTUM_MS ?? 4);
-// BROWSER_FPS_ROOM_WORKER=1: Grid opens with its zone in the opt-in room worker (`?roomWorker`) and the
-// page's bridge meter (`roomWorkerMeter`): each frame's bridge cost (library) and Grid rendering (app),
-// and the worker's data-channel counts and attach latency, are reported under summary.roomWorker.
-const ROOM_WORKER = process.env.BROWSER_FPS_ROOM_WORKER === "1";
+// The room runtime. An app with a room worker hosts its room there by default, as its shipped page does, and
+// opens here with the page's bridge meter (`?roomWorkerMeter`): each frame's bridge cost (library) and the app's
+// rendering, and the worker's data-channel counts and attach latency, are reported under summary.roomWorker.
+// BROWSER_FPS_ROOM_WORKER=0 opens every app with `?mainThread` (the room on the page's main thread).
+const ROOM_WORKER = process.env.BROWSER_FPS_ROOM_WORKER !== "0";
+/** The apps whose shipped page hosts the room in a room worker by default. */
+const ROOM_WORKER_APPS: ReadonlySet<string> = new Set(["grid"]);
+const roomWorkerFor = (app: string): boolean => ROOM_WORKER && ROOM_WORKER_APPS.has(app);
+/** The page query that selects the run's runtime for an app. */
+const runtimeQuery = (app: string): string => (roomWorkerFor(app) ? "?roomWorkerMeter" : "?mainThread");
 const TRACE_EPOCHS = (process.env.BROWSER_FPS_TRACE_EPOCHS ?? "")
 	.split("-")
 	.filter((value) => value !== "")
@@ -246,7 +252,7 @@ function gridDriver(): AppDriver {
 	let keyMismatch = 0;
 
 	const open = async (page: Page): Promise<void> => {
-		await page.goto(ROOM_WORKER ? `${origin}/?roomWorker&roomWorkerMeter` : `${origin}/`);
+		await page.goto(`${origin}/${runtimeQuery("grid")}`);
 		await page.waitForFunction(() => Reflect.get(window, "__TS_DRP_GRID_SESSION__") !== undefined, undefined, {
 			timeout: 60_000,
 		});
@@ -498,7 +504,7 @@ function gridDriver(): AppDriver {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The opt-in room worker (BROWSER_FPS_ROOM_WORKER=1, Grid only)
+// The room worker (the default runtime of the apps in ROOM_WORKER_APPS; BROWSER_FPS_ROOM_WORKER=0 opts out)
 
 interface RoomWorkerMeterReading {
 	readonly library: readonly number[];
@@ -522,22 +528,27 @@ interface RoomWorkerRtcReading {
 
 function roomWorkerReading(
 	page: Page,
+	app: string,
 	action: "reset" | "read"
 ): Promise<Readonly<{ meter: RoomWorkerMeterReading; rtc: RoomWorkerRtcReading }> | null> {
-	return page.evaluate(async (selected) => {
-		const meter = Reflect.get(window, "__TS_DRP_GRID_ROOM_WORKER_METER__") as
-			| { read(): RoomWorkerMeterReading; reset(): void }
-			| undefined;
-		const control = Reflect.get(window, "__TS_DRP_GRID_ROOM_WORKER__") as
-			| { rtcStats(): Promise<RoomWorkerRtcReading> }
-			| undefined;
-		if (meter === undefined || control === undefined) throw new Error("BROWSER_FPS_ROOM_WORKER_ABSENT");
-		if (selected === "reset") {
-			meter.reset();
-			return null;
-		}
-		return { meter: meter.read(), rtc: await control.rtcStats() };
-	}, action);
+	return page.evaluate(
+		async ({ selected, prefix }) => {
+			const meter = Reflect.get(window, `__TS_DRP_${prefix}_ROOM_WORKER_METER__`) as
+				| { read(): RoomWorkerMeterReading; reset(): void }
+				| undefined;
+			const control = Reflect.get(window, `__TS_DRP_${prefix}_ROOM_WORKER__`) as
+				| { rtcStats(): Promise<RoomWorkerRtcReading> }
+				| undefined;
+			// The page fell back to the main thread (or never opened its worker): this run is not the worker run.
+			if (meter === undefined || control === undefined) throw new Error(`BROWSER_FPS_ROOM_WORKER_ABSENT ${prefix}`);
+			if (selected === "reset") {
+				meter.reset();
+				return null;
+			}
+			return { meter: meter.read(), rtc: await control.rtcStats() };
+		},
+		{ selected: action, prefix: app.toUpperCase() }
+	);
 }
 
 function distribution(
@@ -561,10 +572,14 @@ function distribution(
  * @param pages
  * @param playMs
  */
-async function roomWorkerSummary(pages: ReadonlyMap<Role, Page>, playMs: number): Promise<Record<string, unknown>> {
+async function roomWorkerSummary(
+	pages: ReadonlyMap<Role, Page>,
+	app: string,
+	playMs: number
+): Promise<Record<string, unknown>> {
 	const roles: Record<string, unknown> = {};
 	for (const [role, page] of pages) {
-		const reading = await roomWorkerReading(page, "read");
+		const reading = await roomWorkerReading(page, app, "read");
 		if (reading === null) continue;
 		const { meter, rtc } = reading;
 		const channels = rtc.channelsCreated + rtc.channelsReceived;
@@ -1148,7 +1163,7 @@ for (const app of APPS)
 	test(`${app}: the shipped page keeps rendering through its own rollovers`, async ({ browser, browserName }) => {
 		mkdirSync(OUT, { recursive: true });
 		const driver = (DRIVERS[app] as () => AppDriver)();
-		const base = `${browserName}-${app}${ROOM_WORKER ? "-worker" : ""}${CONTROL ? "-control" : ""}`;
+		const base = `${browserName}-${app}${roomWorkerFor(app) ? "-worker" : "-main"}${CONTROL ? "-control" : ""}`;
 		const epochLog = join(OUT, `${base}-epochs.jsonl`);
 		writeFileSync(epochLog, "");
 		const sourceDiff = execFileSync("git", ["diff", "--no-ext-diff", "HEAD"], {
@@ -1166,7 +1181,8 @@ for (const app of APPS)
 			dirtyTracked: sourceDiff.length !== 0,
 			sourceDiffSha256: createHash("sha256").update(sourceDiff).digest("hex"),
 			control: CONTROL,
-			roomWorker: ROOM_WORKER && app === "grid",
+			roomWorker: roomWorkerFor(app),
+			runtimeQuery: runtimeQuery(app),
 			injectBlock: INJECT === "" ? null : { ms: INJECT_MS, everyFrames: INJECT_EVERY },
 			cadenceMs: { drain: DRAIN_MS, move: MOVE_MS, place: PLACE_MS, paint: PAINT_MS, chat: CHAT_MS },
 			memberRolloverIssueBoundMs: APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS,
@@ -1273,7 +1289,7 @@ for (const app of APPS)
 			const openStarted = Date.now();
 			await driver.open(creator, member);
 			const openMs = Date.now() - openStarted;
-			const roomWorker = ROOM_WORKER && app === "grid";
+			const roomWorker = roomWorkerFor(app);
 			// The throttle self-check: every page and every worker it runs is slowed, or the run fails here.
 			if (throttle !== undefined) {
 				await throttle.measure(rolePages);
@@ -1283,7 +1299,7 @@ for (const app of APPS)
 					throw new Error(`BROWSER_FPS_THROTTLE_SELF_CHECK ${throttleSelfCheck.failures.join("; ")}`);
 			}
 			workerTimelines = installWorkerTimelines(rolePages);
-			if (roomWorker) await Promise.all([creator, member].map((page) => roomWorkerReading(page, "reset")));
+			if (roomWorker) await Promise.all([creator, member].map((page) => roomWorkerReading(page, app, "reset")));
 			await Promise.all(
 				[creator, member].map((page) =>
 					page.evaluate(() => (Reflect.get(globalThis, "__TS_DRP_REALTIME_PROBE__") as { start(): void }).start())
@@ -1352,6 +1368,7 @@ for (const app of APPS)
 							["creator", creator],
 							["member", member],
 						]),
+						app,
 						playMs
 					)
 				: null;

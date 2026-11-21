@@ -1,5 +1,5 @@
 /**
- * The Grid page with its zone hosted in a room worker (opt-in: `?roomWorker`).
+ * The Grid page with its zone hosted in a room worker (the default; `?mainThread` opts out).
  *
  * The page keeps rendering, input and identity; the worker (zone-worker.ts) runs the node and the
  * room. `window.__TS_DRP_V3_ZONE__` has the main-thread zone's methods with two differences:
@@ -294,7 +294,7 @@ interface OpenedZoneWorker {
 }
 
 /**
- * Open the Grid zone in a room worker: the worker page (`?roomWorker`), with the main-thread page
+ * Open the Grid zone in a room worker: the default page, with the main-thread page
  * as its fallback when this browser cannot host the room in a worker.
  * @param fallback - Opens the zone on the main thread (main-thread.ts's main).
  */

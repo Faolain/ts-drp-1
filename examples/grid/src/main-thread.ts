@@ -45,7 +45,8 @@ export function getNetworkConfigFromEnv(): ReturnType<typeof selectNetworkConfig
 }
 
 /**
- * Open the zone on the page's main thread (the default; `?roomWorker` opts into a room worker).
+ * Open the zone on the page's main thread: the `?mainThread` opt-out, and the fallback of a browser
+ * that cannot host the room in a worker (the default hosts it in a room worker).
  */
 export async function main(): Promise<void> {
 	if (env.enableTracing) await enableTracing();
