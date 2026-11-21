@@ -25,7 +25,9 @@
 //   creatorLocalDefault  the creator's admission and seal machine use the default (a constant left in);
 //   uncheckedCeiling     a member (and creator) accepts an invite whose limit is outside [default, ceiling];
 //   admitUnavailable     the creator admits a move unchecked while its state check is unavailable;
-//   untyped              a refusal is a plain error (the application cannot tell it from a failure).
+//   untyped              a refusal is a plain error (the application cannot tell it from a failure);
+//   memberSnapshotBound  a member's snapshot-closed import bounds the state by the snapshot bound, not the
+//                        room's limit (before f85588820), so it takes a faulty creator's oversized state.
 // Invariants:
 //   joinedOnlyValid   no member joins a room whose declared limit is invalid;
 //   limitsAgree       every joined member enforces the room's authenticated limit (so all agree);
@@ -33,7 +35,9 @@
 //   stateWithinCeiling no admitted or signed state passes the library ceiling;
 //   noWedge           no seal refuses and no member refuses a signed state (a full room does not wedge);
 //   writerKeepsPlaying every refusal is typed;
-//   noOverRefusal     a move is refused only when it does not fit the room's limit.
+//   noOverRefusal     a move is refused only when it does not fit the room's limit;
+//   memberStateWithinLimit no member imports a signed snapshot state past the room's limit (G5: even one a
+//                     faulty creator signed).
 //   safety = all. signedWithinLimit (the seal's fold as backstop) holds even under admitUnavailable.
 //
 // Commands (packages/node/formal; JAVA_HOME=/opt/homebrew/opt/openjdk@17, PATH=$JAVA_HOME/bin:$PATH):
@@ -50,6 +54,7 @@
 //   $V --init initAdmitUnavailable --invariants safety                    # violation (stateWithinLimit)
 //   $V --init initAdmitUnavailable --invariants signedWithinLimit         # [ok]: the seal is the backstop
 //   $V --init initUntyped --invariants safety                             # violation (writerKeepsPlaying)
+//   $V --init initMemberSnapshotBound --invariants safety                 # violation (memberStateWithinLimit)
 //   Outcomes are recorded in .logs/realtime-resume-2026-11-10/agent-status/room-state-policy.md.
 module roomStateLimitPolicy {
   pure val DEFAULT = 2
@@ -60,11 +65,14 @@ module roomStateLimitPolicy {
   pure val DELTAS = Set(-1, 1, 2)
   pure val MAX_MOVES = 4
   pure val MAX_SEALS = 2
+  pure val SNAPSHOT_BOUND = CEILING + 2   // maxSnapshotBytes: far above any room's limit
   type Mutants = {
     memberLocalDefault: bool, creatorLocalDefault: bool, uncheckedCeiling: bool, admitUnavailable: bool, untyped: bool,
+    memberSnapshotBound: bool,
   }
   pure val SOUND: Mutants = {
     memberLocalDefault: false, creatorLocalDefault: false, uncheckedCeiling: false, admitUnavailable: false, untyped: false,
+    memberSnapshotBound: false,
   }
 
   // protocol-v3 room-parameters: isRegisteredRoomParameterExtension / roomApplicationStateLimit.
@@ -78,6 +86,7 @@ module roomStateLimitPolicy {
   var stateBytes: int               // the creator's admitted epoch state
   var signed: int                   // the last signed (sealed) state
   var installedAt: int -> int       // the signed state each member installed (-1: none yet)
+  var snapshotAt: int -> int        // the signed state each member imported on a snapshot-closed plane (-1: none)
   var unavailable: bool             // the creator's state check is unavailable (closing / folded / no machine)
   var moves: int
   var seals: int
@@ -98,7 +107,7 @@ module roomStateLimitPolicy {
   action initWith(mu: Mutants): bool = all {
     declared' = -1, joined' = MEMBERS.mapBy(m => false), limitOf' = MEMBERS.mapBy(m => 0), stateBytes' = 0,
     signed' = 0, installedAt' = MEMBERS.mapBy(m => -1), unavailable' = false, moves' = 0, seals' = 0,
-    wedged' = false, frozen' = false, refusedFitting' = false, mutants' = mu,
+    wedged' = false, frozen' = false, refusedFitting' = false, mutants' = mu, snapshotAt' = MEMBERS.mapBy(m => -1),
   }
   action init = initWith(SOUND)
   action initMemberLocalDefault = initWith({ ...SOUND, memberLocalDefault: true })
@@ -106,6 +115,7 @@ module roomStateLimitPolicy {
   action initUncheckedCeiling = initWith({ ...SOUND, uncheckedCeiling: true })
   action initAdmitUnavailable = initWith({ ...SOUND, admitUnavailable: true })
   action initUntyped = initWith({ ...SOUND, untyped: true })
+  action initMemberSnapshotBound = initWith({ ...SOUND, memberSnapshotBound: true })
 
   // The creator signs an invite declaring d (any d: a faulty creator may sign an invalid one). The
   // creator's own room opens only when its check accepts d (createV3RoomCreatorInviteMaterial).
@@ -119,7 +129,7 @@ module roomStateLimitPolicy {
       installedAt' = installedAt.set(0, if (ok) 0 else -1),
     },
     stateBytes' = stateBytes, signed' = signed, unavailable' = unavailable, moves' = moves, seals' = seals,
-    wedged' = wedged, frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants,
+    wedged' = wedged, frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
   }
   action create = { nondet d = DECLARED.oneOf() createWith(d) }
 
@@ -129,7 +139,7 @@ module roomStateLimitPolicy {
     joined' = joined.set(m, true), limitOf' = limitOf.set(m, readLimit(m)),
     installedAt' = installedAt.set(m, signed),
     declared' = declared, stateBytes' = stateBytes, signed' = signed, unavailable' = unavailable, moves' = moves,
-    seals' = seals, wedged' = wedged, frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants,
+    seals' = seals, wedged' = wedged, frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
   }
   action join = { nondet m = WRITERS.oneOf() joinWith(m) }
 
@@ -152,7 +162,7 @@ module roomStateLimitPolicy {
       refusedFitting' = if (fitsRoom) true else refusedFitting,
     },
     declared' = declared, joined' = joined, limitOf' = limitOf, signed' = signed, installedAt' = installedAt,
-    unavailable' = unavailable, seals' = seals, wedged' = wedged, mutants' = mutants,
+    unavailable' = unavailable, seals' = seals, wedged' = wedged, mutants' = mutants, snapshotAt' = snapshotAt,
   }
   action issue = { nondet m = MEMBERS.oneOf() nondet d = DELTAS.oneOf() issueWith(m, d) }
 
@@ -162,7 +172,7 @@ module roomStateLimitPolicy {
     unavailable' = true,
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, signed' = signed,
     installedAt' = installedAt, moves' = moves, seals' = seals, wedged' = wedged, frozen' = frozen,
-    refusedFitting' = refusedFitting, mutants' = mutants,
+    refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
   }
   // The seal folds the epoch on the creator's machine: past its limit the fold refuses and the room wedges.
   action seal = all {
@@ -174,7 +184,7 @@ module roomStateLimitPolicy {
       unavailable' = false,
     },
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, moves' = moves,
-    frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants,
+    frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants, snapshotAt' = snapshotAt,
   }
   // A Writer installs the signed successor state on a machine with its own limit.
   action installWith(m: int): bool = all {
@@ -183,11 +193,24 @@ module roomStateLimitPolicy {
     else all { installedAt' = installedAt, wedged' = true },
     declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, signed' = signed,
     unavailable' = unavailable, moves' = moves, seals' = seals, frozen' = frozen, refusedFitting' = refusedFitting,
-    mutants' = mutants,
+    mutants' = mutants, snapshotAt' = snapshotAt,
   }
   action install = { nondet m = WRITERS.oneOf() installWith(m) }
 
-  action step = any { create, join, issue, closeBegin, seal, install }
+  // A member activates a snapshot-closed plane from a signed snapshot of state s. A faulty creator can
+  // sign any s; the member imports it into a machine bounded by its limit (importBlueprintSnapshotPayload
+  // with the room's limit) and refuses it past that. The variant bounds it by the snapshot bound instead.
+  action snapshotImportWith(m: int, s: int): bool = all {
+    joined.get(m),
+    val bound = if (mutants.memberSnapshotBound) SNAPSHOT_BOUND else limitOf.get(m)
+    snapshotAt' = if (s <= bound) snapshotAt.set(m, s) else snapshotAt,
+    declared' = declared, joined' = joined, limitOf' = limitOf, stateBytes' = stateBytes, signed' = signed,
+    installedAt' = installedAt, unavailable' = unavailable, moves' = moves, seals' = seals, wedged' = wedged,
+    frozen' = frozen, refusedFitting' = refusedFitting, mutants' = mutants,
+  }
+  action snapshotImport = { nondet m = WRITERS.oneOf() nondet s = 0.to(SNAPSHOT_BOUND).oneOf() snapshotImportWith(m, s) }
+
+  action step = any { create, join, issue, closeBegin, seal, install, snapshotImport }
 
   val joinedOnlyValid = MEMBERS.forall(m => joined.get(m) implies valid(declared))
   val limitsAgree = MEMBERS.forall(m => joined.get(m) implies limitOf.get(m) == roomLimit)
@@ -197,8 +220,9 @@ module roomStateLimitPolicy {
   val noWedge = not(wedged)
   val writerKeepsPlaying = not(frozen)
   val noOverRefusal = not(refusedFitting)
+  val memberStateWithinLimit = MEMBERS.forall(m => snapshotAt.get(m) <= roomLimit)
   val safety = joinedOnlyValid and limitsAgree and stateWithinLimit and stateWithinCeiling and noWedge and
-    writerKeepsPlaying and noOverRefusal
+    writerKeepsPlaying and noOverRefusal and memberStateWithinLimit
 
   // Tests (deterministic traces).
   // A room created without the setting enforces the default; one created with 4 admits past the default.
@@ -241,6 +265,12 @@ module roomStateLimitPolicy {
     .then(issueWith(0, 1))
     .then(all { assert(stateBytes == 3 and not(stateWithinLimit) and signedWithinLimit), seal })
     .then(all { assert(wedged and signed == 0 and signedWithinLimit), closeBegin.fail() })
+  // A snapshot-closed member refuses a signed state past the room's limit and takes one within it.
+  run snapshotBoundTest = init.then(createWith(3)).then(joinWith(1)).then(snapshotImportWith(1, 5))
+    .then(all { assert(snapshotAt.get(1) == -1 and safety), snapshotImportWith(1, 3) })
+    .then(all { assert(snapshotAt.get(1) == 3 and safety), snapshotImportWith(1, 0) })
+  run memberSnapshotBoundTest = initMemberSnapshotBound.then(createWith(3)).then(joinWith(1)).then(snapshotImportWith(1, 5))
+    .then(all { assert(snapshotAt.get(1) == 5 and not(memberStateWithinLimit)), snapshotImportWith(1, 0) })
   run untypedTest = initUntyped.then(createWith(0)).then(issueWith(0, 2)).then(issueWith(0, 1))
     .then(all { assert(frozen and not(writerKeepsPlaying)), closeBegin })
 }
