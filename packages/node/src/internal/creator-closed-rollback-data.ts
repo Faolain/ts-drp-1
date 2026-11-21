@@ -23444,7 +23444,12 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 			{ kind: "full-recovery-role-acquisition", owner: input.store, objectId: nativeObject.value,
 				limits: AHE_BOUNDED_READ_LIMITS, reader: admitted });
 		const forward = facts.forward;
-		requireLaw(forward !== undefined && forward.held.length === 2, "snapshot-unavailable");
+		// The same held-target law as stage 1's acquisition (acquireClosedData): a native publication
+		// (a settlement-v1 member whose base is a received or checkpoint publication) holds one target
+		// per authenticated row carrying a live generation, otherwise the two newest closed epochs.
+		requireLaw(forward !== undefined && forward.held.length === (forward.nativePublication === true
+			? forward.rows.filter(row => uniqueCreatorTransitionCandidate(view(admitted, admitted.generations.indexOf(row)).candidates,
+				"v3-live-generation-2") !== undefined).length : 2), "snapshot-unavailable");
 		const work = creatorClosedProofWork(source);
 		requireLaw(work !== undefined && creatorClosedProofWorkAvailable(work), "internal-invariant");
 		// The steady shape this planner decides; any other boundary is stage 1's.
