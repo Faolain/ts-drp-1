@@ -330,9 +330,13 @@ module refusedReplayDrainChunk {
     },
     delta' = delta, mutants' = mutants,
   }
+  // The install goes on once the chunk is settled (or the install failed): stutter, so a finished chunk
+  // is not a deadlock.
+  action finished = all { if (phase == "done") true else stalled, keepAll }
   action step = any {
     nondet t = Set(true, false).oneOf()
     any { batchWith(t), singleWith(t) },
+    finished,
   }
 
   val stateWithinLimit = stateBytes <= LIMIT

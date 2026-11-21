@@ -199,7 +199,8 @@ module givenBackOwnRowOrigin {
     givenBacks' = givenBacks, dIssued' = dIssued, keepConfig,
   }
 
-  action step = any { issueD, replace, giveBack, merge, offer }
+  // Nothing else to do within the bounds: stutter (no deadlock).
+  action step = any { issueD, replace, giveBack, merge, offer, unchangedAll }
 
   val noSelfSupersession = if (listedBy == NONE) true else op.get(listedBy) != "M"
   val noDuplicate = not(duplicate)
