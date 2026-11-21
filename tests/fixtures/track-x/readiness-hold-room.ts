@@ -84,7 +84,8 @@ export async function readinessHoldRoom(
 		/** Parent-owned directory for native process-death/reopen tests. */
 		directory?: string;
 		window?: V3RoomApplication["ordinaryFinishingWindow"];
-		parameters?: Partial<typeof defaultParameters>;
+		/** Parameter overrides, including the room's optional application state limit. */
+		parameters?: Partial<typeof defaultParameters & { maxApplicationStateBytes: number }>;
 		/** Non-creator Writers (default 1; row 60 R5 refusal case c uses 2). */
 		writers?: number;
 		/** The shipped zone's per-epoch admission policy factory (Grid wires outcome-commit's). */
