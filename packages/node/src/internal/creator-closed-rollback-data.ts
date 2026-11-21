@@ -16032,20 +16032,35 @@ function completeSnapshotRecoveryInventoryIsPresent(
  * A completed metadata fence cannot lose a protected scope at the same head.
  * Keep that whole CURRENT pool until the original authenticated head advances;
  * this partition is scheduling only, never a native retirement capability.
+ *
+ * An active snapshot fence is a closed-retirement install that stopped between
+ * the participant's fence and the coordinator's completion (box m46: a creator
+ * killed there refused snapshot-unavailable on every reopen). When it is the
+ * coordinator's own ACTIVE preparation, only that install can finish it (it
+ * resumes the prepared participant): keep the whole pool and retire nothing
+ * until it completes, exactly as a blocked completed fence does. A fence no
+ * active coordinator preparation owns still refuses.
+ * @param coordinatorActive - The AHE coordinator's active preparation labels, read
+ * under the same exclusions; absent when the caller has no coordinator read.
  */
 function selectCurrentSnapshotTurnoverInventory(
 	selection: NonNullable<ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory>>,
 	inventory: SnapshotRecoveryRoleInventory,
 	snapshot: SnapshotRetirementImageObservation,
-	currentHead: CreatorExpectedRoomHead
+	currentHead: CreatorExpectedRoomHead,
+	coordinatorActive?: Readonly<{ decisionDigest: string; sourceProofDigest: string }> | null
 ): ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory> {
 	if (!completeSnapshotRecoveryInventoryIsPresent(inventory, snapshot, currentHead)) return undefined;
 	const control = snapshot.control;
-	if (control !== null && (control.objectId !== currentHead.objectId || control.active !== null)) return undefined;
+	if (control !== null && control.objectId !== currentHead.objectId) return undefined;
+	const fence = control?.active?.preparation;
+	const joinedFence = fence != null && coordinatorActive != null &&
+		fence.decisionDigest === coordinatorActive.decisionDigest && fence.sourceProofDigest === coordinatorActive.sourceProofDigest;
+	if (fence != null && !joinedFence) return undefined;
 	const completed = control?.completed;
-	const blocked = completed != null && currentHead.epoch <= completed.throughEpoch + 1 &&
+	const blocked = joinedFence || (completed != null && currentHead.epoch <= completed.throughEpoch + 1 &&
 		completed.protectedScopes.some(pair => selection.retiringScopes.some(scope =>
-			closedRetirementEqual(scope, pair.scope)) && snapshot.image.scopes.some(current => closedRetirementEqual(current, pair)));
+			closedRetirementEqual(scope, pair.scope)) && snapshot.image.scopes.some(current => closedRetirementEqual(current, pair))));
 	if (!blocked) return selection;
 	if (inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
 	return Object.freeze({survivingScopes: Object.freeze(inventory.scopes.map(row => row.scope)),
@@ -24316,7 +24331,20 @@ async function reconcileSnapshotRecoveryRoles(
 			requireLaw(schedulingFrame !== undefined && schedulingFrame.alive, "internal-invariant");
 			const snapshotBytes = closedRetirementBytes(snapshot);
 			requireLaw(schedulingFrame.accounting.charge(snapshotBytes), "proof-budget-exceeded");
-			const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshot, floor.state.stable);
+			// Only a fence in flight needs the coordinator's active preparation (a resumed install).
+			let coordinatorActive: Readonly<{ decisionDigest: string; sourceProofDigest: string }> | null = null;
+			if (snapshot.control?.active != null) {
+				const nativeObject = parseStorageObjectId(input.objectId);
+				requireLaw(nativeObject.ok, "internal-invariant");
+				const ahe = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementControl"]>>(
+					input.store, "readRetirementControl")(nativeObject.value);
+				if (!ahe.ok) throw new Refusal(failure("ahe-rejected", "ahe", `RETIREMENT_SOURCE_CONTROL:${ahe.reason}`));
+				requireLaw(schedulingFrame.accounting.charge(ahe.value === null ? closedRetirementBytes(null) :
+					encodeAheRetirementControl(ahe.value)), "proof-budget-exceeded");
+				coordinatorActive = ahe.value?.active?.preparation ?? null;
+			}
+			const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshot, floor.state.stable,
+				coordinatorActive);
 			requireLaw(selection !== undefined, "snapshot-unavailable");
 			protectedScopes = selection.survivingScopes.map(nativeScope);
 			requireLaw(protectedScopes.length >= 2 && protectedScopes.length <= 4, "proof-budget-exceeded");
