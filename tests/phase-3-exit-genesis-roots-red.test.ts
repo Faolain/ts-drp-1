@@ -258,6 +258,8 @@ function expectProductInput(
 		readonly profileId: string;
 		readonly signerAuthor: string;
 		readonly stateBytes: Uint8Array;
+		/** The room's application state limit the product creates its rooms with (absent: the default). */
+		readonly maxApplicationStateBytes?: number;
 	}>
 ): void {
 	expect(input.objectId).toBe(expected.objectId);
@@ -266,7 +268,13 @@ function expectProductInput(
 	expect(Reflect.get(input, "exactCanonicalApplicationStateBytes")).toEqual(expected.stateBytes);
 	expect(input.exactCanonicalLatchedAclBytes).toEqual(expected.acl);
 	expect(input.exactCanonicalParametersCarrierBytes).toEqual(
-		encodeCanonical({ ...EXPECTED_PARAMETERS, authorShareMultiplier: 4 })
+		encodeCanonical({
+			...EXPECTED_PARAMETERS,
+			authorShareMultiplier: 4,
+			...(expected.maxApplicationStateBytes === undefined
+				? {}
+				: { maxApplicationStateBytes: expected.maxApplicationStateBytes }),
+		})
 	);
 	const signerSet = encodeCanonical([{ publicKey: expected.signerAuthor, signerId: "creator" }]);
 	expect(input.exactCanonicalSignerSetBytes).toEqual(signerSet);
@@ -651,6 +659,8 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 			profileId: "creator-trusted-settlement-v1",
 			signerAuthor: zoneCreatorAuthor,
 			stateBytes: zoneStateBytes,
+			// Grid creates its rooms with an explicit limit covering its bounded board (owner decision 2026-11-21).
+			maxApplicationStateBytes: 98_304,
 		});
 		await expectProductSigner(zoneInput, zoneCreator);
 		expect(builderProbe.materials).toHaveLength(2);
