@@ -8143,7 +8143,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 		expect(read({...forward, predecessorIndex: 1}, frame)).toBeUndefined();
 		frame.alive = false; expect(read(forward, frame)).toBeUndefined();
 	});
-	function fixture() {
+	function fixture(maxApplicationStateBytes = 32_768) {
 		const runtimePath = new URL("../src/v3-live.ts", import.meta.url);
 		const runtimeFile = ts.createSourceFile(runtimePath.pathname, readFileSync(runtimePath, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const runtimeDeclaration = (name: string) => {
@@ -8209,7 +8209,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 			const machine = {snapshot: () => ({blueprintDigest: "b".repeat(64), stateDigest: "d".repeat(64), exactCanonicalStateBytes: state.baseBytes})};
 			const machineIdentity = {machine, expectedStateDigest: "d".repeat(64)};
 			const registration = {blueprintMachine: machine, blueprintMachineIdentity: machineIdentity,
-				payload: {provenance: {blueprintDigest: "b".repeat(64)}, parameters: {maxDependencies: 4, maxSnapshotBytes: 268435456, snapshotChunkBytes: 65536},
+				payload: {provenance: {blueprintDigest: "b".repeat(64)}, parameters: {maxApplicationStateBytes: ${maxApplicationStateBytes}, maxDependencies: 4, maxSnapshotBytes: 268435456, snapshotChunkBytes: 65536},
 					catalog: {blueprintDigest: "b".repeat(64), artifactId: "grid", artifactDigest: "e".repeat(64), catalogDigest: "f".repeat(64),
 						runtimeProfile: "ecmascript-2024-sync-v1", exactArtifactBytes: Uint8Array.of(9), canonicalBlueprintPackageBytes: Uint8Array.of(8)}},
 				closeVertices: new Map([["a".repeat(64), {hash: "a".repeat(64), kind: "drp-epoch-anchor", objectId: "room", epoch: 3, dependencies: []}]]),
@@ -8449,6 +8449,9 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 		expect(facts.current.candidate.exactCanonicalUnsignedVertexBytes).toEqual(f.unsignedBytes);
 		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(32_768); // The room's application state limit, never the snapshot bound.
 		expect(facts.current.parameters.snapshotChunkBytes).toBe(65536); // Exact supplied original parameter, never a fixed inferred chunk size.
+		// G22 sizing charges the room's own limit (a per-room parameter, owner decision 2026-11-21).
+		const wide = fixture(131_072), wideReadout = await wide.proof.readCurrentDimensions(wide.unsignedBytes);
+		expect(wide.resolve(wideReadout, wide.proof, wide.unsignedBytes)!.current.blueprint.maxApplicationStateBytes).toBe(131_072);
 		expect(facts.current.successorFenceCount).toBe(0); expect(facts.current.nativeCounts.lineages).toBe(1);
 		expect(facts.current.blueprint.catalog.exactArtifactBytes).toEqual(Uint8Array.of(9));
 		expect(facts.current.currentEpochVertexCount).toBe(1); expect(facts.current.currentSignedPreimageByteLengths).toEqual([]);

@@ -39,7 +39,22 @@ import { GRID_ROLLOVER_BUDGET } from "./rollover.js";
 import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
 import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
 import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZonePlacementGrowthProjection, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
-const PARAMETERS = Object.freeze({
+/**
+ * Grid's bounded board. A cell placement (placeCell) keys its block by its cell, so it overwrites
+ * whatever block the cell holds: a zone placing by cell holds at most one block per cell however long it
+ * plays, and its blocks are bounded by width x height x the widest cell. (placeBlock keeps its
+ * caller-chosen ids, so its blocks grow with unique ids; the room's application state limit refuses,
+ * typed, a move past it.)
+ */
+export const GRID_ZONE_BOARD = Object.freeze({ width: 32, height: 32, maxKindLength: 16 });
+/**
+ * The application state limit Grid creates its rooms with (the room's signed parameters): a full board
+ * of the widest cells is 52,771 canonical bytes; 98,304 leaves ~45 KB for the roster, trade outcomes and
+ * id-keyed placements, and is within the library ceiling (131,072).
+ */
+export const GRID_ZONE_STATE_LIMIT_BYTES = 98_304;
+/** The parameters Grid signs into every new room's genesis. */
+export const GRID_ZONE_ROOM_PARAMETERS = Object.freeze({
 	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -48,7 +63,34 @@ const PARAMETERS = Object.freeze({
 	maxSnapshotBytes: 268_435_456,
 	maxPendingEntries: 4096,
 	maxPendingBytes: 16_777_216,
+	maxApplicationStateBytes: GRID_ZONE_STATE_LIMIT_BYTES,
 });
+const PARAMETERS = GRID_ZONE_ROOM_PARAMETERS;
+
+/** A cell placement: the cell and the kind of block it now holds. */
+export interface ZoneCell {
+	readonly kind: string;
+	readonly x: number;
+	readonly y: number;
+}
+
+/**
+ * The placement operation of a cell: a placeBlock whose block id is the cell's, so the reducer's
+ * replace-by-id overwrites the block the cell holds (in the room's linearized order, last placement wins).
+ * @param input - The cell (on the board) and the kind (1 to 16 printable ASCII characters).
+ * @returns The frozen placeBlock operation.
+ */
+export function zoneCellPlacement(input: ZoneCell): Readonly<{ action: "placeBlock"; id: string; kind: string; x: number; y: number }> {
+	const { kind, x, y } = input ?? ({} as ZoneCell);
+	if (
+		!Number.isSafeInteger(x) || x < 0 || x >= GRID_ZONE_BOARD.width ||
+		!Number.isSafeInteger(y) || y < 0 || y >= GRID_ZONE_BOARD.height ||
+		typeof kind !== "string" || kind.length === 0 || kind.length > GRID_ZONE_BOARD.maxKindLength ||
+		!/^[\x21-\x7e]+$/u.test(kind)
+	)
+		throw new TypeError("v3 zone cell placement is outside the board or its kind is invalid");
+	return Object.freeze({ action: "placeBlock", id: `cell:${x}:${y}`, kind, x, y });
+}
 const FABRIC_CAMPAIGN_INTERVAL_MS = 33;
 const FABRIC_CAMPAIGN_SAMPLE_COUNT = 600;
 const FABRIC_RELIABLE_OBSERVATION_TAIL_MS = 15_000;
@@ -349,6 +391,8 @@ export interface V3ZoneApi {
 	join(invite: string): Promise<void>;
 	move(dx: number, dy: number): void;
 	placeBlock(input: ZoneBlock): Promise<void>;
+	/** Places a block of `kind` on a cell of the board, overwriting the block the cell holds. */
+	placeCell(input: ZoneCell): Promise<void>;
 	prepareTradeIntent(
 		input: Readonly<{
 			readonly clientOperationId: string;
@@ -1315,6 +1359,11 @@ export function createV3ZoneApi(
 			await (rollover ?? selected).issue(
 				Object.freeze({ action: "placeBlock", id: input.id, kind: input.kind, x: input.x, y: input.y })
 			);
+		},
+		async placeCell(input: ZoneCell): Promise<void> {
+			const selected = room;
+			if (selected === undefined) throw new TypeError("v3 zone is not open");
+			await (rollover ?? selected).issue(zoneCellPlacement(input));
 		},
 		prepareTradeIntent(input): Promise<PreparedTradeIntent> {
 			const selected = room;

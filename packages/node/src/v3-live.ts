@@ -129,6 +129,11 @@ import {
 	stageLatchedAclOperations,
 } from "@ts-drp/protocol-v3/latched-acl";
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
+import {
+	ROOM_APPLICATION_STATE_DEFAULT_BYTES,
+	ROOM_APPLICATION_STATE_LIMIT_PARAMETER,
+	roomApplicationStateLimit,
+} from "@ts-drp/protocol-v3/room-parameters";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	createCreatorSealActor,
@@ -279,6 +284,7 @@ export {
 import { v3RoomRetentionOpener, type V3RoomRetirementSession } from "./internal/room-retirement.js";
 import { createRoomRetentionLedger, type RoomRetentionLedger } from "./internal/room-retention-ledger.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
+import { snapshotParameterRecord, V3_ROOM_PARAMETER_SCHEMA as PARAMETER_SCHEMA } from "./internal/v3-room-parameters.js";
 import type { NodeRoomDeliveryRepairTracking } from "./room-network.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -388,14 +394,14 @@ const PROVENANCE_KEYS = [
 ] as const;
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 /**
- * The room's reviewed application state limit, in canonical bytes (with at most 16,384 items and
- * depth 16). No room's parameters declare a limit, so every room takes 32,768 bytes: the bound the
- * room's genesis and migration checks and the shipped applications' own state bounds already state.
- * The plane's fold machine carries it, and admission refuses any vertex whose fold would pass it
- * (`applicationStateAdmits`), so a seal's fold never refuses. maxSnapshotBytes bounds the snapshot
- * carrier, not the state.
+ * The application state limit of a room whose parameters declare none, in canonical bytes (with at most
+ * 16,384 items and depth 16). A room's own limit is its authenticated parameters' optional
+ * `maxApplicationStateBytes` (protocol-v3 room-parameters; AcceptedParameters.maxApplicationStateBytes),
+ * fixed for the room's life. The plane's fold machine carries the room's limit, and admission refuses any
+ * vertex whose fold would pass it (`applicationStateAdmits`), so a seal's fold never refuses.
+ * maxSnapshotBytes bounds the snapshot carrier, not the state.
  */
-export const ROOM_APPLICATION_STATE_BYTES = 32_768;
+export const ROOM_APPLICATION_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
@@ -1298,6 +1304,8 @@ interface AcceptedParameters {
 	readonly maxPendingEntries: number;
 	readonly maxSnapshotBytes: number;
 	readonly snapshotChunkBytes: number;
+	/** The room's application state limit (its parameters' optional field; 32,768 when absent). */
+	readonly maxApplicationStateBytes: number;
 }
 
 const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
@@ -1603,17 +1611,6 @@ function captureInput(input: PrepareV3LiveGenerationInput): CapturedInput | unde
 	});
 }
 
-interface ParameterFieldSchema {
-	readonly maximum: number;
-	readonly minimum: number;
-	readonly name: string;
-	readonly required: boolean;
-}
-
-interface ParameterSchema {
-	readonly domain: string;
-	readonly fields: readonly ParameterFieldSchema[];
-}
 
 function ownDataValue(value: unknown, key: string): unknown {
 	if (!isObject(value)) return undefined;
@@ -1688,120 +1685,6 @@ function snapshotDenseArray(value: unknown, expectedLength: number): readonly un
 	}
 }
 
-function snapshotPublishedParameterSchema(value: unknown): ParameterSchema | undefined {
-	try {
-		const kinds = ownDataValue(value, "kinds");
-		const parameters = snapshotClosedRecord(ownDataValue(kinds, "parameters"), [
-			"domain",
-			"encoding",
-			"fields",
-			"signedEnvelope",
-		]);
-		if (
-			parameters === undefined ||
-			typeof parameters.domain !== "string" ||
-			parameters.encoding !== "canonical-object"
-		) {
-			return undefined;
-		}
-		const fields = snapshotDenseArray(parameters.fields, 8);
-		if (fields === undefined) return undefined;
-		const captured: ParameterFieldSchema[] = [];
-		for (let index = 0; index < fields.length; index += 1) {
-			const field = snapshotClosedRecord(fields[index], [
-				"name",
-				"type",
-				"const",
-				"constraints",
-				"required",
-				"sortRule",
-			]);
-			if (
-				field === undefined ||
-				typeof field.name !== "string" ||
-				field.name.length === 0 ||
-				field.type !== "safe-integer" ||
-				field.const !== null ||
-				typeof field.required !== "boolean" ||
-				field.sortRule !== null
-			) {
-				return undefined;
-			}
-			const constraints = snapshotClosedRecord(field.constraints, ["minimum", "maximum"]);
-			if (
-				constraints === undefined ||
-				typeof constraints.minimum !== "number" ||
-				!NumberIsSafeInteger(constraints.minimum) ||
-				typeof constraints.maximum !== "number" ||
-				!NumberIsSafeInteger(constraints.maximum) ||
-				constraints.minimum > constraints.maximum
-			) {
-				return undefined;
-			}
-			for (let previous = 0; previous < captured.length; previous += 1) {
-				if (captured[previous]?.name === field.name) return undefined;
-			}
-			if (
-				!defineDenseElement(
-					captured,
-					index,
-					ObjectFreeze({
-						maximum: constraints.maximum,
-						minimum: constraints.minimum,
-						name: field.name,
-						required: field.required,
-					})
-				)
-			) {
-				return undefined;
-			}
-		}
-		const frozenFields = finishDenseArray(captured, fields.length);
-		return frozenFields === undefined ? undefined : ObjectFreeze({ domain: parameters.domain, fields: frozenFields });
-	} catch {
-		return undefined;
-	}
-}
-
-const PARAMETER_SCHEMA = snapshotPublishedParameterSchema(parameterRegistry);
-
-function snapshotParameterRecord(value: unknown, schema: ParameterSchema): PlainRecord | undefined {
-	try {
-		if (!isObject(value) || ObjectGetPrototypeOf(value) !== null) return undefined;
-		const keys = ReflectOwnKeys(value);
-		if (keys.some((key) => typeof key !== "string" || !schema.fields.some(({ name }) => name === key))) {
-			return undefined;
-		}
-		const output = ObjectCreate(null) as Record<string, unknown>;
-		for (let fieldIndex = 0; fieldIndex < schema.fields.length; fieldIndex += 1) {
-			const field = schema.fields[fieldIndex] as ParameterFieldSchema;
-			let keyFound = false;
-			for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
-				if (keys[keyIndex] === field.name) keyFound = true;
-			}
-			if (!keyFound) {
-				if (field.required) return undefined;
-				continue;
-			}
-			const descriptor = ObjectGetOwnPropertyDescriptor(value, field.name);
-			if (
-				descriptor === undefined ||
-				descriptor.enumerable !== true ||
-				!("value" in descriptor) ||
-				typeof descriptor.value !== "number" ||
-				!NumberIsSafeInteger(descriptor.value) ||
-				descriptor.value < field.minimum ||
-				descriptor.value > field.maximum
-			) {
-				return undefined;
-			}
-			output[field.name] = descriptor.value;
-		}
-		return output;
-	} catch {
-		return undefined;
-	}
-}
 
 function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): AcceptedParameters | undefined {
 	try {
@@ -1811,10 +1694,18 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 		const reencoded = encodeCanonical(snapshot);
 		if (!sameBytes(reencoded, bytes)) return undefined;
 		const digest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, reencoded));
+		// The supported profile is judged on the registry fields; the room's own limit (the registered
+		// extension, absent in every room before the setting) is judged by its owner.
+		const maxApplicationStateBytes = roomApplicationStateLimit(snapshot);
+		const profile = ObjectCreate(null) as Record<string, unknown>;
+		for (const key of ReflectOwnKeys(snapshot) as string[])
+			if (key !== ROOM_APPLICATION_STATE_LIMIT_PARAMETER) profile[key] = snapshot[key];
+		const profileDigest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, encodeCanonical(profile)));
 		if (
+			maxApplicationStateBytes === undefined ||
 			digest !== expectedDigest ||
-			(digest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
-				digest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
+			(profileDigest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
+				profileDigest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
 		) {
 			return undefined;
 		}
@@ -1851,6 +1742,7 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 					maxPendingEntries,
 					maxSnapshotBytes,
 					snapshotChunkBytes,
+					maxApplicationStateBytes,
 				})
 			: undefined;
 	} catch {
@@ -4831,7 +4723,7 @@ function resolveOrdinaryIssuanceRuntimeHold(value: unknown, owners: CreatorSnaps
 				...(typeof action === "string" ? {action} : {}), control}),
 			blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 				exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
+				maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes, maxDepth: 16 as const, maxItems: 16384 as const,
 				catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 					runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 					canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -13126,7 +13018,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		parameters: ObjectFreeze({...registration.payload.parameters}),
 		blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 			exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
+			maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes, maxDepth: 16 as const, maxItems: 16384 as const,
 			catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 				runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 				canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -17212,7 +17104,7 @@ async function issueOneVertex(
 				: stateLimitRejected
 					? localIssueFailure(
 							"application-state-limit",
-							`v3 local operation would pass the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes)`
+							`v3 local operation would pass the room's application state limit (${registration.payload.parameters.maxApplicationStateBytes} bytes)`
 						)
 				: signerResolved
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
@@ -23475,12 +23367,12 @@ const applicationStateBoundSeeds = createDeferredSeedRunner<V3PlaneRegistration,
  * limit. A bound that does not fit the limit even before any operation (a constant ceiling above the
  * room's limit) cannot decide this room's moves: the exact fold judges them.
  */
-function fittingApplicationStateBound(created: unknown): V3ApplicationStateBound | undefined {
+function fittingApplicationStateBound(created: unknown, limitBytes: number): V3ApplicationStateBound | undefined {
 	const bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
 		typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
 		? created as V3ApplicationStateBound : undefined;
 	const quotedBase = bound?.quoteBase();
-	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES
+	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > limitBytes
 		? undefined : bound;
 }
 
@@ -23524,7 +23416,7 @@ function seedApplicationStateBound(
 	const started = typeof performance === "undefined" ? 0 : performance.now();
 	let bound: V3ApplicationStateBound | undefined;
 	try {
-		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]));
+		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]), registration.payload.parameters.maxApplicationStateBytes);
 	} catch {
 		bound = undefined;
 	}
@@ -23572,12 +23464,12 @@ function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): 
 					const create = Reflect.get(policy as object, "createApplicationStateBound");
 					return typeof create !== "function" ? undefined : ObjectFreeze({
 						step: () => true,
-						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes])),
+						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes]), registration.payload.parameters.maxApplicationStateBytes),
 					});
 				}
 				return ObjectFreeze({
 					step: (byteBudget: number) => ReflectApply(Reflect.get(seed, "step") as (budget: number) => unknown, seed, [byteBudget]) === true,
-					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, [])),
+					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, []), registration.payload.parameters.maxApplicationStateBytes),
 				});
 			},
 			current: () => applicationStateBoundBaseCurrent(registration, base, index, payload),
@@ -23659,7 +23551,7 @@ function applicationStateBoundAdmits(
 		}
 		const quoted = cache.bound.quote(candidate.operation);
 		if (quoted === undefined || !NumberIsSafeInteger(quoted) || quoted < 1) return disable();
-		const admitted = quoted <= ROOM_APPLICATION_STATE_BYTES;
+		const admitted = quoted <= registration.payload.parameters.maxApplicationStateBytes;
 		if (admitted) {
 			cache.pending = ObjectFreeze({ digest: candidate.digest, operation: candidate.operation });
 			cache.admittedByBound = true;
@@ -23680,7 +23572,7 @@ function applicationStateBoundUnsound(registration: V3PlaneRegistration, error: 
 	if (!isObject(error) || Reflect.get(error, "code") !== "INVALID_APPLICATION_STATE" || !applicationStateBoundUsed(registration))
 		return undefined;
 	const detail = `APPLICATION_STATE_BOUND_UNSOUND: the application's state bound (readOrdinaryApplicationResourceBound) admitted ` +
-		`operations whose exact fold passes the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes); ` +
+		`operations whose exact fold passes the room's application state limit (${registration.payload.parameters.maxApplicationStateBytes} bytes); ` +
 		`the application's bound is wrong: ${error instanceof Error ? error.message : "unknown failure"}`;
 	try {
 		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-application-state", detail]);
@@ -24149,6 +24041,8 @@ function importLiveSnapshotMachine(
 			expectedPayloadDigest: input.expectedPayloadDigest as string,
 			expectedSchemaVersion: SNAPSHOT_SCHEMA_VERSION,
 			maxSnapshotBytes: payload.parameters.maxSnapshotBytes,
+			// The room's authenticated limit bounds the imported state, as it bounds a successor install.
+			maxApplicationStateBytes: payload.parameters.maxApplicationStateBytes,
 			preparedBlueprintRuntime: payload.runtime,
 		});
 		return imported.machine;
@@ -24182,7 +24076,7 @@ function importCreatorSuccessorInitialMachine(
 			return undefined;
 		}
 		return new BlueprintStateMachine({
-			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
+			maxApplicationStateBytes: recovered.prepared.parameters.maxApplicationStateBytes,
 			exactCanonicalInitialStateBytes,
 			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
 			expectedInitialStateDigest: input.expectedApplicationStateDigest,
@@ -24278,7 +24172,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		let machine: BlueprintStateMachine;
 		try {
 			machine = new BlueprintStateMachine({
-				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
+				maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes,
 				exactCanonicalInitialStateBytes: initialStateBytes,
 				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
 				expectedInitialStateDigest: initialStateDigest,

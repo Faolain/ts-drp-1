@@ -42,6 +42,10 @@ const config = defineConfig({
 				__dirname,
 				"packages/protocol-v3/src/settlement-profile.ts"
 			),
+			"@ts-drp/protocol-v3/room-parameters": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/room-parameters.ts"
+			),
 			"@ts-drp/control-plane/creator-trust-checkpoint-advance": path.resolve(
 				__dirname,
 				"packages/control-plane/src/creator-trust-checkpoint-advance.ts"

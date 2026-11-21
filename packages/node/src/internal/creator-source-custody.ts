@@ -13,6 +13,7 @@ import { creatorCloseMembershipSubsetFields, creatorCloseMembershipSubsetMemberF
 import { openReceivedCloseMembership, RECEIVED_CLOSE_AUTHORITY_MAX_RECORD_BYTES } from "./creator-received-close-membership.js";
 import {creatorQ1SealQcFields, creatorQ1SealVoteFields} from "@ts-drp/seal/creator";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with {type: "json"};
+import { ROOM_APPLICATION_STATE_CEILING_BYTES, ROOM_APPLICATION_STATE_LIMIT_PARAMETER, roomApplicationStateLimit } from "@ts-drp/protocol-v3/room-parameters";
 import { creatorReplacedSourceFields, creatorSourceExpiryFields, verifyCreatorReplacedSourceReceipt, verifyCreatorSourceExpiryReceipt,
 	type CreatorReplacedSourceReceipt, type CreatorSourceExpiryReceipt } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
 
@@ -23,8 +24,10 @@ const EXPIRY_KIND = "creator-settlement-source-expiry-1";
 // A replaced-source frontier resolution carrier: never an expiry (distinct carrier and receipt kinds).
 const REPLACED_KIND = "creator-settlement-replaced-source-1";
 export { creatorReplacedSourceFields, creatorSourceExpiryFields };
-const MAX_PARAMETERS = encodeCanonical(Object.fromEntries(registry.kinds.parameters.fields.map(field =>
-	[field.name, field.constraints.maximum]))).byteLength;
+// The parameters record's registered complete domain: every registry field at its maximum and the record's one
+// registered extension (protocol-v3 room-parameters: the room's application state limit) at the library ceiling.
+const MAX_PARAMETERS = encodeCanonical({...Object.fromEntries(registry.kinds.parameters.fields.map(field =>
+	[field.name, field.constraints.maximum])), [ROOM_APPLICATION_STATE_LIMIT_PARAMETER]: ROOM_APPLICATION_STATE_CEILING_BYTES}).byteLength;
 // Exact existing anchor, ACL and registered parameter-schema bounds, with canonical field overhead.
 export const CREATOR_SOURCE_CONTEXT_MAX_BYTES = encodeCanonical({kind: KIND, version: 1,
 	anchorPreimage: new Uint8Array(8192), anchorSignature: new Uint8Array(64), aclBytes: new Uint8Array(65536),
@@ -188,9 +191,12 @@ export function openCreatorSourceCustody(input: Readonly<{
 			Array.from(hashDomain("ts-drp/parameters/v3", decoded.parametersBytes), value => value.toString(16).padStart(2, "0")).join("") !==
 				anchor.parametersDigest) return undefined;
 		const parameters = decodeCanonical(decoded.parametersBytes);
-		if (!isClosedDurableIssuanceRecord(parameters, registry.kinds.parameters.fields
+		const hasExtension = parameters !== null && typeof parameters === "object" && Object.hasOwn(parameters, ROOM_APPLICATION_STATE_LIMIT_PARAMETER);
+		if (!isClosedDurableIssuanceRecord(parameters, [...registry.kinds.parameters.fields
 			.filter(field => field.required || parameters !== null && typeof parameters === "object" && Object.hasOwn(parameters, field.name))
-			.map(field => field.name)) ||
+			.map(field => field.name), ...(hasExtension ? [ROOM_APPLICATION_STATE_LIMIT_PARAMETER] : [])]) ||
+			// The record's one registered extension, judged by its owner: absent, or a limit in [default, ceiling].
+			roomApplicationStateLimit(parameters) === undefined ||
 			registry.kinds.parameters.fields.some(field => (field.required || Object.hasOwn(parameters, field.name)) &&
 				(!Number.isSafeInteger(parameters[field.name]) || Number(parameters[field.name]) < field.constraints.minimum ||
 					Number(parameters[field.name]) > field.constraints.maximum))) return undefined;

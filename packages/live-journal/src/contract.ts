@@ -1,4 +1,5 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { ROOM_APPLICATION_STATE_LIMIT_PARAMETER, roomApplicationStateLimit } from "@ts-drp/protocol-v3/room-parameters";
 import { parseStorageObjectId } from "@ts-drp/storage";
 
 import { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS, LIVE_JOURNAL_DOMAINS } from "./types.js";
@@ -360,6 +361,8 @@ function validateParameters(parameters: Readonly<Record<string, unknown>>): bool
 	) {
 		return false;
 	}
+	// The record's one registered extension (protocol-v3 room-parameters): absent, or a valid limit.
+	if (roomApplicationStateLimit(parameters) === undefined) return false;
 	for (const [key, minimum, maximum] of [
 		["maxEpochVertices", 32, 1_000_000],
 		["maxEpochBytes", 65_536, 1_073_741_824],
@@ -495,7 +498,7 @@ function validateUnsignedInstallMaterial(
 	readonly stored: Omit<LiveJournalStoredScope, "detachedAnchorSignature">;
 }> {
 	const anchor = exactDecoded(anchorBytes, ANCHOR_KEYS);
-	const parameters = exactDecoded(parametersBytes, PARAMETER_KEYS, ["authorShareMultiplier"]);
+	const parameters = exactDecoded(parametersBytes, PARAMETER_KEYS, ["authorShareMultiplier", ROOM_APPLICATION_STATE_LIMIT_PARAMETER]);
 	if (anchor === undefined || parameters === undefined || !validateAnchor(anchor) || !validateParameters(parameters)) {
 		return failure("noncanonical-preimage");
 	}
