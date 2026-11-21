@@ -284,6 +284,7 @@ export {
 import { v3RoomRetentionOpener, type V3RoomRetirementSession } from "./internal/room-retirement.js";
 import { createRoomRetentionLedger, type RoomRetentionLedger } from "./internal/room-retention-ledger.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
+import { snapshotParameterRecord, V3_ROOM_PARAMETER_SCHEMA as PARAMETER_SCHEMA } from "./internal/v3-room-parameters.js";
 import type { NodeRoomDeliveryRepairTracking } from "./room-network.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -401,31 +402,6 @@ const DIGEST_HEX = /^[0-9a-f]{64}$/u;
  * maxSnapshotBytes bounds the snapshot carrier, not the state.
  */
 export const ROOM_APPLICATION_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
-/**
- * The application state a genesis or a migration record carries, at most: 32,768 bytes, whatever the
- * room's own limit. A migration record holds the state inline under its committed 49,152-byte record
- * bound, so a room whose state has grown past 32,768 bytes cannot migrate it (the migration is refused
- * before anything is signed) until its state is back within it. Every room's limit is at least this.
- */
-export const MIGRATION_RECORD_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
-
-/**
- * A room's application state limit from its exact parameters carrier, judged as the plane judges the
- * carrier at open (the registry fields within their ranges and the registered extension, exact
- * canonical bytes; the supported-profile digest gate stays the plane's own).
- * @param bytes - The exact parameters carrier.
- * @returns The limit in canonical bytes, or undefined when the carrier is not valid.
- */
-export function v3RoomParametersApplicationStateLimit(bytes: Uint8Array): number | undefined {
-	try {
-		if (PARAMETER_SCHEMA === undefined) return undefined;
-		const snapshot = snapshotParameterRecord(decodeCanonical(bytes), PARAMETER_SCHEMA);
-		if (snapshot === undefined || !sameBytes(encodeCanonical(snapshot), bytes)) return undefined;
-		return roomApplicationStateLimit(snapshot);
-	} catch {
-		return undefined;
-	}
-}
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
@@ -1635,17 +1611,6 @@ function captureInput(input: PrepareV3LiveGenerationInput): CapturedInput | unde
 	});
 }
 
-interface ParameterFieldSchema {
-	readonly maximum: number;
-	readonly minimum: number;
-	readonly name: string;
-	readonly required: boolean;
-}
-
-interface ParameterSchema {
-	readonly domain: string;
-	readonly fields: readonly ParameterFieldSchema[];
-}
 
 function ownDataValue(value: unknown, key: string): unknown {
 	if (!isObject(value)) return undefined;
@@ -1720,133 +1685,6 @@ function snapshotDenseArray(value: unknown, expectedLength: number): readonly un
 	}
 }
 
-function snapshotPublishedParameterSchema(value: unknown): ParameterSchema | undefined {
-	try {
-		const kinds = ownDataValue(value, "kinds");
-		const parameters = snapshotClosedRecord(ownDataValue(kinds, "parameters"), [
-			"domain",
-			"encoding",
-			"fields",
-			"signedEnvelope",
-		]);
-		if (
-			parameters === undefined ||
-			typeof parameters.domain !== "string" ||
-			parameters.encoding !== "canonical-object"
-		) {
-			return undefined;
-		}
-		const fields = snapshotDenseArray(parameters.fields, 8);
-		if (fields === undefined) return undefined;
-		const captured: ParameterFieldSchema[] = [];
-		for (let index = 0; index < fields.length; index += 1) {
-			const field = snapshotClosedRecord(fields[index], [
-				"name",
-				"type",
-				"const",
-				"constraints",
-				"required",
-				"sortRule",
-			]);
-			if (
-				field === undefined ||
-				typeof field.name !== "string" ||
-				field.name.length === 0 ||
-				field.type !== "safe-integer" ||
-				field.const !== null ||
-				typeof field.required !== "boolean" ||
-				field.sortRule !== null
-			) {
-				return undefined;
-			}
-			const constraints = snapshotClosedRecord(field.constraints, ["minimum", "maximum"]);
-			if (
-				constraints === undefined ||
-				typeof constraints.minimum !== "number" ||
-				!NumberIsSafeInteger(constraints.minimum) ||
-				typeof constraints.maximum !== "number" ||
-				!NumberIsSafeInteger(constraints.maximum) ||
-				constraints.minimum > constraints.maximum
-			) {
-				return undefined;
-			}
-			for (let previous = 0; previous < captured.length; previous += 1) {
-				if (captured[previous]?.name === field.name) return undefined;
-			}
-			if (
-				!defineDenseElement(
-					captured,
-					index,
-					ObjectFreeze({
-						maximum: constraints.maximum,
-						minimum: constraints.minimum,
-						name: field.name,
-						required: field.required,
-					})
-				)
-			) {
-				return undefined;
-			}
-		}
-		const frozenFields = finishDenseArray(captured, fields.length);
-		return frozenFields === undefined ? undefined : ObjectFreeze({ domain: parameters.domain, fields: frozenFields });
-	} catch {
-		return undefined;
-	}
-}
-
-const PARAMETER_SCHEMA = snapshotPublishedParameterSchema(parameterRegistry);
-
-function snapshotParameterRecord(value: unknown, schema: ParameterSchema): PlainRecord | undefined {
-	try {
-		if (!isObject(value) || ObjectGetPrototypeOf(value) !== null) return undefined;
-		const keys = ReflectOwnKeys(value);
-		if (
-			keys.some(
-				(key) =>
-					typeof key !== "string" ||
-					(!schema.fields.some(({ name }) => name === key) && key !== ROOM_APPLICATION_STATE_LIMIT_PARAMETER)
-			)
-		) {
-			return undefined;
-		}
-		const output = ObjectCreate(null) as Record<string, unknown>;
-		// The record's one registered extension (protocol-v3 room-parameters), checked by its owner.
-		const extension = ObjectGetOwnPropertyDescriptor(value, ROOM_APPLICATION_STATE_LIMIT_PARAMETER);
-		if (extension !== undefined) {
-			if (extension.enumerable !== true || !("value" in extension)) return undefined;
-			output[ROOM_APPLICATION_STATE_LIMIT_PARAMETER] = extension.value;
-			if (roomApplicationStateLimit(output) === undefined) return undefined;
-		}
-		for (let fieldIndex = 0; fieldIndex < schema.fields.length; fieldIndex += 1) {
-			const field = schema.fields[fieldIndex] as ParameterFieldSchema;
-			let keyFound = false;
-			for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
-				if (keys[keyIndex] === field.name) keyFound = true;
-			}
-			if (!keyFound) {
-				if (field.required) return undefined;
-				continue;
-			}
-			const descriptor = ObjectGetOwnPropertyDescriptor(value, field.name);
-			if (
-				descriptor === undefined ||
-				descriptor.enumerable !== true ||
-				!("value" in descriptor) ||
-				typeof descriptor.value !== "number" ||
-				!NumberIsSafeInteger(descriptor.value) ||
-				descriptor.value < field.minimum ||
-				descriptor.value > field.maximum
-			) {
-				return undefined;
-			}
-			output[field.name] = descriptor.value;
-		}
-		return output;
-	} catch {
-		return undefined;
-	}
-}
 
 function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): AcceptedParameters | undefined {
 	try {

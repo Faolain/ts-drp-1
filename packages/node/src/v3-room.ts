@@ -58,6 +58,7 @@ import {
 } from "@ts-drp/node/creator-close";
 import { consumeCreatorAdoptionPendingRecovery } from "@ts-drp/node/internal/creator-adoption-recover";
 import { permitsStagedCreatorCheckpointFloorAdvance } from "./internal/creator-adoption-intent.js";
+import { v3RoomParametersApplicationStateLimit } from "./internal/v3-room-parameters.js";
 import { createV3SnapshotTransferOwner } from "@ts-drp/node/snapshot-transfer";
 import {
 	createCreatorSuccessorServingRouter,
@@ -94,9 +95,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
-	MIGRATION_RECORD_STATE_BYTES,
 	ROOM_APPLICATION_STATE_BYTES,
-	v3RoomParametersApplicationStateLimit,
 	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3CreatorSupersededVertex,
@@ -130,7 +129,7 @@ import {
 import { digestReceivedVertexPreimage } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "@ts-drp/keychain/finality";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
-import { roomApplicationStateLimit } from "@ts-drp/protocol-v3/room-parameters";
+import { ROOM_APPLICATION_STATE_DEFAULT_BYTES, roomApplicationStateLimit } from "@ts-drp/protocol-v3/room-parameters";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	AHE_BOUNDED_READ_LIMITS,
@@ -1684,6 +1683,14 @@ function strictCanonicalBytes(value: unknown, name: string): Uint8Array {
 	if (!sameBytes(encodeCanonical(decoded), output)) throw new TypeError(`${name} is not canonical`);
 	return output;
 }
+
+/**
+ * The application state a genesis or a migration record carries, at most: 32,768 bytes, whatever the
+ * room's own limit. A migration record holds the state inline under its committed 49,152-byte record
+ * bound, so a room whose state has grown past 32,768 bytes cannot migrate it (the migration is refused
+ * before anything is signed) until its state is back within it. Every room's limit is at least this.
+ */
+const MIGRATION_RECORD_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
 
 /**
  * The exact canonical application state, copied and checked.
