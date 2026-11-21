@@ -1,4 +1,11 @@
-// PROPOSAL MODEL (not implemented): bound the age of a move's replacement chain.
+// Bound the age of a move's replacement chain. Written (48421007e) as a proposal, but the code
+// already judges the window on the chain's origin: v3-room.ts:7690 settlementWindowExpired walks
+// the plan's replacement links back to the oldest link's epoch and expires the displaced row once
+// that origin is V3_SETTLEMENT_OWN_WINDOW_EPOCHS (v3-live.ts:14445, = 4) epochs old (94d117ca4).
+// So expireByRoot (initProposed) is the closer match to the code and initShipped is STALE: it
+// models a newest-link rule the code no longer has. Not modelled: a reissued row restarts the
+// chain (the walk stops at a reissueOrigins entry), the walk is bounded at 64 links, and a link
+// whose source row is already retired counts as expired.
 //
 // One member move M. Each time the member installs a later epoch while M is displaced (never
 // admitted), the room either REPLACES it (signs a new link in the member's current epoch, whose
@@ -10,7 +17,7 @@
 // RECOVERY_DEPENDENCY_ANCHOR_UNCOVERED and the member's room closes (observed in the 100-move,
 // 16-epoch catch-up: rows at epoch 18 when the member reached 29, certificate covering 19..29).
 //
-// Shipped rule: the settlement window (WINDOW) is judged on the NEWEST link's epoch, which every
+// "Shipped" rule (stale, see above): the settlement window (WINDOW) is judged on the NEWEST link's epoch, which every
 // replacement renews, so a move that keeps missing the creator keeps a chain whose root ages
 // without bound. Proposed rule (expireByRoot): the window is judged on the ROOT's epoch: a
 // displaced move whose root is WINDOW epochs old is expired and handed back instead of replaced.
@@ -81,7 +88,8 @@ module settlementChainAge {
   // Every live link is inside the member's certificate coverage.
   val coverage = links.foldl(true, (ok, e) => ok and e > memberEpoch - COVER)
 
-  // The shipped rule loses coverage when the move keeps missing the creator.
+  // The newest-link rule (initShipped; stale against settlementWindowExpired) loses coverage when
+  // the move keeps missing the creator.
   run shippedLosesCoverageTest = initShipped
     .then(roll).then(install).then(roll).then(install).then(roll).then(install).then(roll).then(install)
     .then(roll).then(install).then(roll).then(install).then(roll).then(install).then(roll).then(install)

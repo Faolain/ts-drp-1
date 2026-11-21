@@ -12,23 +12,26 @@
 // (settlement hand-back) and admitted there; lost copies are fetched again by repair.
 //
 // The received close's recovery dependency hold requires an empty pending ingress
-// (v3-live captureCreatorRecoveryRuntime: non-active observation). That rule stays.
+// (v3-live.ts:12900 captureCreatorRecoveryRuntime: non-active observation). That rule stays.
 //
 // Rule under test (what beginReceived does with pending ingress):
-//   BASE (current code): keep the pending rows. The hold is then unavailable, the
-//     install fails and the member must recover by a fresh install (stranded).
-//   SOUND (proposal): release every pending row at beginReceived, the same clear the
-//     hot handoff already applies at the successor (v3-live hot handoff), only earlier.
+//   BASE (the code before 84aea6b68): keep the pending rows. The hold is then unavailable,
+//     the install fails and the member must recover by a fresh install (stranded).
+//   SOUND (shipped in 84aea6b68; v3-live.ts:24982 beginReceived clears pendingIngress in its
+//     FIFO turn): release every pending row at beginReceived, the same clear the hot handoff
+//     already applies at the successor (v3-live.ts:25604 hot handoff), only earlier.
 //     A released copy counts as lost for the closing plane; the successor snapshot or
 //     the author's re-offer delivers the move.
 // Retained-admissible rows (the issuance census refusal, v3-live census): SOUND lets
 //   the row stay a pending root until a drain admits it (resume after every maintenance
-//   job, and the census carries it); BASE refuses the creator's next issue.
+//   job: v3-live.ts:8299 resumePendingIngress; and the census carries it: d276aeaed,
+//   v3-live.ts:8205 CREATOR_ISSUE_PENDING_CENSUS_BYTES); BASE refuses the creator's next issue.
 // Broken controls: releaseAdmitted (the release also drops an admitted row),
 //   noDedupe (a re-offer of a move the successor already holds is admitted again),
 //   noReoffer (the author never re-offers a move outside the cut).
 //
-// The creator's own close (v3-live stageClosedBlueprintEpoch adopt) is the same receiver-side
+// The creator's own close (v3-live.ts:21434 stageClosedBlueprintEpoch, its adopt at :21510;
+// shipped in 751b46ec5) is the same receiver-side
 // rule with the cut taken at the closing plane's OWN admitted index: ownClose folds, cuts at mAdm
 // and (SOUND) releases the pending rows at once; its inline maintenance hold (pool full,
 // generation pressure) requires an empty pending ingress just as the received install does.

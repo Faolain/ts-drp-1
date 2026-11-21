@@ -34,7 +34,9 @@
 //             unsettled epoch they carry one epoch past the settlement window;
 //   token     what a completed lull leaves for the next install: the plane, the head
 //             epoch, the inventory and the work it reconciled (NONE epoch: no token).
-// The code keys the token by the plane handle (a WeakMap), so a reopen or a successor
+// The code keys the token by the plane handle (creator-adoption.ts:1105, the WeakMap
+// reconciledReceivedTurnovers of ReceivedTurnoverBoundary :1103, captured by
+// captureReceivedTurnoverBoundary :1140, consumed by the install at :1644), so a reopen or a successor
 // plane drops it; a lull clears it on entry and sets it only when its passes ran to
 // completion; the install consumes it at its turnover step and skips only when the
 // token's plane, epoch, inventory and work equal the current ones. The epoch fixes the
@@ -46,6 +48,13 @@
 // 7125cdb1 had neither (SHIPPED below). The settling lull (fix/int7-turnover-skip-bounds):
 // a lull acknowledges its completed drain and runs passes until one drains nothing, so
 // it leaves nothing owed; 509d145d's lull did one round (UNSETTLED below).
+//
+// STALE against the stepped lull (36341e1d4: creator-adoption.ts:1469
+// stepCreatorRecipientRecoveryPool, progress kept per plane in recipientLullProgress :1456): the
+// lull now runs one turnover pass per lifecycle admission, so an install or a seal can interleave
+// between passes, and a lull entered at the exact boundary the previous lull settled keeps that
+// token instead of clearing it (:1490). This model's lull is one atomic pass sequence and always
+// clears the token on entry.
 //
 // Ghost state:
 //   cleanAt     the head epoch whose complete reconciliation the durable state still

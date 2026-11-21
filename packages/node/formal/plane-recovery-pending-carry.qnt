@@ -5,18 +5,20 @@
 // admits a copy whose parent is admitted (then drains pending rows that became admissible) and
 // holds it as pending ingress otherwise (bounded). Its admitted index is durable.
 //
-// A same-epoch recovery (v3-room recoverSettlementOwner: an ambiguous settlement issue, a
+// A same-epoch recovery (v3-room.ts:8022 recoverSettlementOwner: an ambiguous settlement issue, a
 // resumed intent of the current epoch, a creator adoption that finds the room head pending, a
 // creator recipient retry) deactivates the live plane and activates a successor of the SAME
-// epoch from durable truth. Deactivation clears pending ingress (v3-live deactivateRegistration).
+// epoch from durable truth. Deactivation clears pending ingress (v3-live.ts:7680 deactivateRegistration).
 // While no plane is active, an arriving copy has no owner and is lost to the transport.
 //
 // Rule under test (what the recovery does with the predecessor's pending rows):
-//   BASE (current code): they are dropped. The transport considers them delivered, so only a
+//   BASE (the code before ecebce59d): they are dropped. The transport considers them delivered, so only a
 //     later child naming the row as missing (Track AA "missing" hint) or the creator's periodic
 //     repair sweep (one connected peer every 5 s) brings them back; an in-process harness has
 //     neither. A row the receiver held is discarded (DROPPED).
-//   SOUND (proposal): their exact signed bytes are carried to the successor of the same epoch
+//   SOUND (shipped: ecebce59d, then d7fbe75a7 and 917dab203 for the in-flight, durable-append and
+//     end rules below; v3-live.ts:9440 carryV3PendingIngress, :9495 reofferV3CarriedPendingIngress,
+//     called from v3-room.ts:8030/:8049): their exact signed bytes are carried to the successor of the same epoch
 //     and re-offered through its ordinary ingress: re-authenticated, deduplicated against the
 //     successor's index, admitted when their parent is, held as pending otherwise, refused at
 //     the successor's own pending bound (a refused copy is a transport loss, named to repair).
@@ -25,7 +27,7 @@
 //
 // In flight: the plane's ingress is a FIFO of asynchronous jobs. A copy the transport handed to
 // the predecessor (counted delivered) can still be inside its job when the recovery starts: it
-// meets the revoked plane before authentication (v3-live authenticateV3Ingress returns when the
+// meets the revoked plane before authentication (v3-live.ts:8826 authenticateV3Ingress returns when the
 // registration is no longer current), or its verdict lands after deactivation (a received append
 // refused because the close actor stopped, "creator issuance maintenance admission was revoked",
 // then retained onto the deactivated predecessor). SOUND collects those late rows into the same
@@ -36,11 +38,14 @@
 // the recovery revoked it (the custody path awaits its journal reads in between). Appended then, the
 // row is durable but in no live index (the successor already rebuilt from the journal): a ghost,
 // whose child is held until delivery repair. SOUND re-checks currency right before the append and
-// hands the row to the carry instead.
+// hands the row to the carry instead (d7fbe75a7; v3-live.ts:8647, before appendAccepted).
 //
 // The carry's end: once the epoch changes, a late row of the old plane is refused and named to
 // repair (a refusing tombstone until the predecessor's last job settles), never carried across and
-// never silently dropped.
+// never silently dropped (917dab203; v3-live.ts:9314 endPendingIngressCarry).
+//
+// Not modelled: a recovery that fails releases the carry (v3-room.ts:8053
+// releaseV3CarriedPendingIngress); this model has no failed-recovery path.
 //
 // Broken controls:
 //   snapshotOnly    - the carry is a snapshot of pending at deactivation; a row in flight is lost;

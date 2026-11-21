@@ -1,6 +1,13 @@
 module disposableTerminal {
-  // Semantic differential of terminalDisposition and ownedContract. One
-  // independently chosen slot of a finite two-slot profile is represented;
+  // Semantic differential of terminalDisposition and ownedContract.
+  // (Current code: terminalDisposition is node v3-live.ts:16484/:17515, set from
+  // v3-room.ts:5768 admittedSink. `ownedContract` never reached committed source;
+  // the owned disposable-session account contract it named is storage-node
+  // room-head.ts:75 acquireNodeDisposableSessionAccount / :82
+  // resolveNodeDisposableSessionAccount (AccountLeaseFacts :50), driven by
+  // v3-room-host.ts:103 resumeTerminalCleanup and
+  // internal/local-session-catalog.ts:324 commitDisposableFence.)
+  // One independently chosen slot of a finite two-slot profile is represented;
   // other slots are unchanged. Two incarnations bound these controls, NOT the
   // product policy. Real monotone safe-integer allocation is a native premise.
   pure val SLOTS = Set(0, 1)
