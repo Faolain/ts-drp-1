@@ -63,6 +63,19 @@ export interface LongRoomOptions {
 
 export type RolloverChoice = "harness" | "app";
 
+/** A given-back move a member's rollover policy declined (its V3RoomMoveDeclined), as plain data. */
+export interface DeclinedMove {
+	readonly operation: Readonly<Record<string, unknown>>;
+	/** The decline's error name (V3RoomMoveDeclined). */
+	readonly name: string;
+	/** Its lasting reason ("application-state-limit" or "admission-rejected"). */
+	readonly reason: string;
+	/** The epoch it was refused in. */
+	readonly epoch: number;
+	/** The room's refusal it carries as `cause` (V3RoomHandBackRefused), its name and lasting reason. */
+	readonly cause: Readonly<{ name: string; reason: unknown }> | null;
+}
+
 /** One role's application rollover policy (app mode), observation only. */
 export interface RolloverObservation {
 	readonly epoch: number;
@@ -71,6 +84,16 @@ export interface RolloverObservation {
 	readonly waiting: number;
 	/** Rollover and offer-publication failures the policy reported (it retries rollovers). */
 	readonly errors: readonly string[];
+	/**
+	 * Member: the given-back moves the policy declined (hooks.onDeclined), in order. Each was accepted once,
+	 * displaced, given back by the room (row 97) and refused again for a lasting reason when offered with its
+	 * record: it is not in the room and is never sent again. The application is told only through this hook.
+	 */
+	readonly declined: readonly DeclinedMove[];
+	/** Member: the moves the policy keeps for a later offer (status().kept). */
+	readonly kept: number;
+	/** Member: the given-back moves the room still lists (settlementStatus().undelivered). */
+	readonly undelivered: number;
 	readonly events: readonly Readonly<{
 		epoch: number;
 		successorEpoch: number;

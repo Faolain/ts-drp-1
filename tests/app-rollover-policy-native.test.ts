@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -43,6 +43,7 @@ vi.mock("../packages/node/src/internal/creator-closed-rollback-data.js", async (
 		}) as typeof original.acquireCreatorForwardPromotionSource,
 	};
 });
+import { stateLimitDeclineViolation } from "./fixtures/track-m-apps/declined-move.js";
 import { openRole } from "./fixtures/track-m-apps/long-room-core.js";
 import {
 	type AppKind,
@@ -52,6 +53,7 @@ import {
 	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
+import { ROOM_APPLICATION_STATE_BYTES } from "../packages/node/src/v3-live.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // App rollover policy: each shipped application rolls its own room over. Measured on native
@@ -147,6 +149,12 @@ async function openApp(
  * typed refusal (V3RoomStateLimitRefused) is not admitted: it is recorded here (role, ordinal and the
  * refusal's name, kind and limit) instead of failing the run, and is not counted as accepted. Any other
  * refusal still fails the run. Without it, every move must be accepted.
+ * @param stateLimitDeclines - With stateLimitRefusals: a Writer move the app was told was accepted can still be
+ * given back at the limit (its replay refused by the Writer's own admission once it sees the creator's
+ * concurrent moves, row 97) and declined by the member's policy, which tells the app (hooks.onDeclined,
+ * V3RoomMoveDeclined). Such a move leaves the accepted moves only when it was declined typed at the state
+ * limit and the converged state has no room for it (stateLimitDeclineViolation); it is recorded here. Every
+ * given-back or kept move must be answered by the end. Without stateLimitRefusals no move may be declined.
  * @returns The creator's policy observation.
  */
 async function playPastCeiling(
@@ -169,7 +177,8 @@ async function playPastCeiling(
 			room: Readonly<{ issue: (ordinal: number) => Promise<unknown>; track: (ordinal: number, move: Promise<unknown>) => void }>
 		) => void;
 	}>,
-	stateLimitRefusals?: { role: number; ordinal: number; name: string; kind: unknown; limitBytes: unknown }[]
+	stateLimitRefusals?: { role: number; ordinal: number; name: string; kind: unknown; limitBytes: unknown }[],
+	stateLimitDeclines?: { role: number; ordinal: number; name: string; reason: string; epoch: number }[]
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
@@ -294,6 +303,18 @@ async function playPastCeiling(
 			await redeliver(0);
 			await redeliver(1);
 		}
+		// The books are read once the member's policy has answered every given-back or kept move: the room
+		// lists a given-back move until a row offering it again consumes its record or the policy declines it.
+		if (stateLimitRefusals !== undefined) {
+			step = "answered";
+			for (const deadline = performance.now() + 30_000; performance.now() < deadline; ) {
+				const view = await other.rollover?.();
+				if ((view?.kept ?? 0) === 0 && (view?.undelivered ?? 0) === 0) break;
+				await new Promise((resolve) => setTimeout(resolve, 250));
+				await deliver(1);
+				await redeliver(1);
+			}
+		}
 	} finally {
 		clearInterval(watchdog);
 		await wire.stop();
@@ -310,6 +331,14 @@ async function playPastCeiling(
 	expect(delivery?.installed ?? 0, "the member's own delivery installed the successors").toBeGreaterThan(0);
 	expect((policy?.errors ?? ["no creator policy"]).filter((error) => toleratedErrors?.test(error) !== true)).toEqual([]);
 	expect(member?.waiting ?? 0).toBe(0);
+	expect(policy?.declined ?? [], "the creator declines no move").toEqual([]);
+	const declined = member?.declined ?? [];
+	if (stateLimitRefusals === undefined)
+		expect(declined, "no move the app was told was accepted is declined").toEqual([]);
+	else {
+		expect(member?.kept ?? 0, "every kept move of the member is answered").toBe(0);
+		expect(member?.undelivered ?? 0, "every given-back move of the member is answered").toBe(0);
+	}
 	expect(await other.authorityEpoch()).toBe(policy?.epoch);
 	const [left, right] = [await creator.state(), await other.state()];
 	expect(left).toBe(right);
@@ -318,6 +347,23 @@ async function playPastCeiling(
 		blocks?: { id: string; x: number }[];
 		messages?: { clientOperationId: string }[];
 	};
+	// A move the app was told was accepted and then declined at the state limit (and only such a move) leaves
+	// the accepted moves: the app was told it did not happen. Grid only (the hot writer).
+	for (const move of declined) {
+		const id = String(move.operation.id ?? "");
+		const parsed = app === "grid" ? /^block-(\d+)-(\d+)$/u.exec(id) : null;
+		expect(parsed, `a declined move of ${app}: ${JSON.stringify(move)}`).not.toBeNull();
+		expect(
+			stateLimitDeclineViolation(move, gridStateBytesWith(left), ROOM_APPLICATION_STATE_BYTES),
+			`the decline of ${id} was forced by the state limit`
+		).toBeUndefined();
+		const role = Number(parsed?.[1]);
+		const ordinal = Number(parsed?.[2]);
+		const index = accepted.findIndex((row) => row.role === role && row.ordinal === ordinal);
+		expect(index, `${id} was accepted before it was declined`).toBeGreaterThanOrEqual(0);
+		accepted.splice(index, 1);
+		stateLimitDeclines?.push({ role, ordinal, name: move.name, reason: move.reason, epoch: move.epoch });
+	}
 	if (app === "canvas")
 		expect(state.counters?.reduce((sum, rgb) => sum + (rgb[0] ?? 0), 0)).toBe(
 			accepted.reduce((sum, row) => sum + 1 + row.role, 0)
@@ -333,6 +379,24 @@ async function playPastCeiling(
 	for (const audit of [await creator.settlementAudit(), await other.settlementAudit()])
 		expect(audit.missing).toEqual([]);
 	return policy;
+}
+
+/**
+ * The Grid state's exact canonical bytes with one placement's block added (the room's state-limit measure).
+ * @param stateHex - The converged canonical state.
+ * @returns The measure.
+ */
+function gridStateBytesWith(stateHex: string): (operation: Readonly<Record<string, unknown>>) => number {
+	const bytes = Uint8Array.from(Buffer.from(stateHex, "hex"));
+	const state = decodeCanonical(bytes) as Record<string, unknown> & { blocks: { id: string }[] };
+	if (encodeCanonical(state).byteLength !== bytes.byteLength) throw new TypeError("grid state does not round-trip");
+	return (operation) => {
+		const { action: _action, ...block } = operation as { action: unknown; id: string };
+		const blocks = new Map(state.blocks.map((value) => [value.id, value]));
+		blocks.set(block.id, block);
+		const sorted = [...blocks.values()].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+		return encodeCanonical({ ...state, blocks: sorted }).byteLength;
+	};
 }
 
 it.each(cases)(
@@ -600,16 +664,21 @@ it("grid with a hot writer: no admitted move's settlement is refused by the Writ
 		// never removed, and with the creator's block every 8 Writer moves the state passes the limit at
 		// about the 686th Writer move (700 moves would be 788 blocks, 33,461 B). A move refused at the limit
 		// is not admitted: it gets the typed refusal (V3RoomStateLimitRefused) and the player keeps playing.
-		// Every admitted move still settles, and the state holds exactly the admitted moves.
+		// A Writer's admission is advisory at the limit (it has not seen the creator's concurrent moves): a move
+		// it admitted that the creator's cut excluded and whose replay then no longer fits is given back (row
+		// 97) and declined by its policy, which tells the app (V3RoomMoveDeclined). Every admitted move settles
+		// or is declined typed at the limit with no room left for it, and the state holds exactly the admitted
+		// moves less the declined ones (playPastCeiling, stateLimitDeclines).
 		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 700);
 		// The creator moves every 8 Writer moves (admission evidence, as an online room has).
 		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 8);
 		const refusals: { role: number; ordinal: number; name: string; kind: unknown; limitBytes: unknown }[] = [];
+		const declines: { role: number; ordinal: number; name: string; reason: string; epoch: number }[] = [];
 		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 },
-			(ordinal) => ordinal % creatorEvery === 0, undefined, undefined, refusals);
+			(ordinal) => ordinal % creatorEvery === 0, undefined, undefined, refusals, declines);
 		process.stdout.write(`HOT_WRITER_SETTLEMENT ${JSON.stringify({ writerMoves, creatorEvery, rollovers: policy?.rollovers,
 			triggers: policy?.events.map((event) => event.trigger), stateLimitRefusals: refusals.length,
-			firstRefusal: refusals[0] })}\n`);
+			firstRefusal: refusals[0], stateLimitDeclines: declines })}\n`);
 		// The run reaches the limit (it proves the limit path, not avoids it), and every refusal is the typed one.
 		expect(refusals.length, "moves past the room's state limit are refused").toBeGreaterThan(0);
 		for (const refusal of refusals)

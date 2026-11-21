@@ -13,6 +13,7 @@ import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
 import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
+import { declinedMove } from "./declined-move.js";
 import { genesisProfileFor } from "./genesis-profile.js";
 import {
 	type AppKind,
@@ -23,6 +24,7 @@ import {
 	type LongRoomOptions,
 	type ObservedEvent,
 	type RoleEndpoint,
+	type DeclinedMove,
 	type RolloverObservation,
 	type StoreCensus,
 	toBase64,
@@ -622,6 +624,14 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		: undefined;
 	const rolloverEvents: (V3RoomRolloverEvent & Readonly<{ endedAt: number }>)[] = [];
 	const rolloverErrors: string[] = [];
+	const rolloverDeclined: DeclinedMove[] = [];
+	// The given-back moves the room still lists (V3RoomSession.settlementStatus().undelivered).
+	const undeliveredMoves = (): number => {
+		const status = Reflect.get(room, "settlementStatus") as
+			| (() => { undelivered?: readonly unknown[] } | undefined)
+			| undefined;
+		return status?.call(room)?.undelivered?.length ?? 0;
+	};
 	const policy = appMode
 		? appRolloverPolicy(
 				options.app,
@@ -636,6 +646,8 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 						true,
 					onRollover: (event) => rolloverEvents.push({ ...event, endedAt: performance.timeOrigin + performance.now() }),
 					onError: (error) => rolloverErrors.push(error instanceof Error ? error.message : String(error)),
+					// A given-back move offered again and refused for good (row 97): the page is told only here.
+					onDeclined: (declined) => rolloverDeclined.push(declinedMove(declined)),
 				}
 		  )
 		: undefined;
@@ -1128,6 +1140,9 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				rollovers: stats?.rollovers ?? 0,
 				waiting: policy?.waiting() ?? 0,
 				errors: [...rolloverErrors],
+				declined: [...rolloverDeclined],
+				kept: policy?.status().kept.length ?? 0,
+				undelivered: undeliveredMoves(),
 				events: [...rolloverEvents],
 			};
 		},
