@@ -212,6 +212,9 @@ importers:
       "@ts-drp/node":
         specifier: 0.11.0
         version: link:../../packages/node
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/types":
         specifier: 0.11.0
         version: link:../../packages/types

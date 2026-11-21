@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 import * as binding from "../examples/v3-room/src/index.js";
-import { chatSharesRoomFixture, closeChatSharesRooms, type ChatSharesRoom } from "./fixtures/chat-membership-shares/room.js";
+import {
+	chatSharesRoomFixture,
+	closeChatSharesRooms,
+	type ChatSharesRoom,
+} from "./fixtures/chat-membership-shares/room.js";
 
 // Owner decision A (2026-10-28): one room database per player. The shipped pages named a room's
 // database by objectId alone, so two identity slots of one browser origin shared it (RED 2725235d:
@@ -74,7 +78,8 @@ describe("decision A: per-player room database names", () => {
 	it("the shipped pages open the per-player database, migrating the shared one first", () => {
 		for (const [file, application] of [
 			["examples/chat/src/index.ts", "chat"],
-			["examples/canvas/src/index.ts", "canvas"],
+			// The canvas room (run by the main-thread page and the room worker alike).
+			["examples/canvas/src/canvas-room.ts", "canvas"],
 			["examples/grid/src/v3-zone.ts", "zone"],
 		] as const) {
 			const source = readFileSync(join(import.meta.dirname, "..", file), "utf8");
@@ -98,7 +103,9 @@ describe("decision A: per-player room database names", () => {
 					}>;
 				}
 			).prepareV3RoomPlayerDatabase({ application: "zone", objectId, author: alice });
-			expect(prepared.databaseName).toBe(room.v3RoomPlayerDatabaseName({ application: "zone", objectId, author: alice }));
+			expect(prepared.databaseName).toBe(
+				room.v3RoomPlayerDatabaseName({ application: "zone", objectId, author: alice })
+			);
 			expect(prepared.migration).toEqual({ kind: "no-indexeddb", writers: [], copied: [] });
 		} finally {
 			if (saved !== undefined) Object.defineProperty(globalThis, "indexedDB", saved);
@@ -126,7 +133,11 @@ async function browserRoom() {
 		expect((await creator.room.sealEpoch()).ok).toBe(true);
 		await creator.room.adoptCreatorSuccessor();
 	};
-	const texts = () => creator.room.projection().messages.map((entry) => entry.clientOperationId).sort();
+	const texts = () =>
+		creator.room
+			.projection()
+			.messages.map((entry) => entry.clientOperationId)
+			.sort();
 	return { f, creator, deliver, close, texts };
 }
 

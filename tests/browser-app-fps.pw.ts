@@ -88,7 +88,7 @@ const CPU_THROTTLE_QUANTUM_MS = Number(process.env.BROWSER_FPS_CPU_THROTTLE_QUAN
 // BROWSER_FPS_ROOM_WORKER=0 opens every app with `?mainThread` (the room on the page's main thread).
 const ROOM_WORKER = process.env.BROWSER_FPS_ROOM_WORKER !== "0";
 /** The apps whose shipped page hosts the room in a room worker by default. */
-const ROOM_WORKER_APPS: ReadonlySet<string> = new Set(["grid"]);
+const ROOM_WORKER_APPS: ReadonlySet<string> = new Set(["grid", "canvas"]);
 const roomWorkerFor = (app: string): boolean => ROOM_WORKER && ROOM_WORKER_APPS.has(app);
 /** The page query that selects the run's runtime for an app. */
 const runtimeQuery = (app: string): string => (roomWorkerFor(app) ? "?roomWorkerMeter" : "?mainThread");
@@ -722,7 +722,8 @@ function canvasDriver(): AppDriver {
 			);
 		},
 		open: async (creator, member) => {
-			await Promise.all([creator.goto(`${origin}/`), member.goto(`${origin}/`)]);
+			const url = `${origin}/${runtimeQuery("canvas")}`;
+			await Promise.all([creator.goto(url), member.goto(url)]);
 			await Promise.all([waitForRelay(creator), waitForRelay(member)]);
 			await expect(creator.locator("#create")).toBeEnabled({ timeout: 60_000 });
 			await creator.locator("#create").click();

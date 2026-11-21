@@ -94,7 +94,12 @@ describe("D.110c-0c1f5b0v replayable callback contract", () => {
 		// createV3RoomRolloverPolicy) count each accepted vertex in memory, per author and epoch; they
 		// reconstruct nothing, and a replayed vertex at most brings the next rollover forward.
 		expect(inventory).toEqual([
-			{ path: "examples/canvas/src/index.ts", callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"] },
+			// Canvas's room moved from its page entry into canvas-room.ts (run by the main-thread page and the
+			// room worker alike); the callback is the same.
+			{
+				path: "examples/canvas/src/canvas-room.ts",
+				callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"],
+			},
 			{ path: "examples/chat/src/index.ts", callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"] },
 			{ path: "examples/grid/src/v3-zone.ts", callbacks: ["onAcceptedVertex: (vertex) => policy.observe(vertex)"] },
 			{ path: "examples/v3-chat/src/index.ts", callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"] },

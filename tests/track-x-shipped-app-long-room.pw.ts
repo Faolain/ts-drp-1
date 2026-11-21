@@ -23,8 +23,8 @@ import {
 // and adopts the successor, and the recipient installs it from the creator's peer.
 //
 // The shipped pages expose no rollover control and no room handle, so the harness appends
-// one read-only accessor, `globalThis.__TRACK_X_ROOM__ = () => room`, to the page's own
-// /src/index.ts as the dev server serves it. The page's code is otherwise unchanged, and
+// one read-only accessor, `globalThis.__TRACK_X_ROOM__ = () => room`, to the page's own room
+// module (ShippedApp.roomModule) as the dev server serves it, on the main-thread page (`?mainThread`). The page's code is otherwise unchanged, and
 // the accessor returns the exact room session the page opened. Measurement only: it asserts
 // convergence and successful transitions, and bounds nothing. On non-convergence it prints
 // TRACK_X_STUCK with the recent console lines (and, with TRACK_X_PROBE=1, whether a later
@@ -35,7 +35,7 @@ import {
 // not return in time the harness prints TRACK_X_ROLLOVER_HUNG with the step the creator's
 // rollover reached, both pages' recent console lines and, with TRACK_X_NET_PROBE=1, every
 // network call of each page still in flight. TRACK_X_NET_PROBE=1 also appends
-// `globalThis.__TRACK_X_NODE__ = () => node;` to the page's entry module and wraps the page's
+// `globalThis.__TRACK_X_NODE__ = () => node;` to the page's room module and wraps the page's
 // own network node's send and publish methods to time them (observation only: each wrapper
 // calls the original with the same arguments and returns its result). TRACK_X_CONSOLE_ALL=1
 // keeps every console line of both pages (not only warnings and errors) for those prints.
@@ -86,6 +86,8 @@ interface ShippedApp {
 	readonly origin: string;
 	readonly headFactory: string;
 	readonly sessionGlobal: string;
+	/** The served module whose module bindings `room` (and `node`) are the page's room and node. */
+	readonly roomModule: string;
 	/** Creates the room through the UI and returns its invite. */
 	create(page: Page): Promise<string>;
 	/** Joins with the invite through the UI. */
@@ -103,6 +105,7 @@ const canvas: ShippedApp = {
 	origin: "http://127.0.0.1:4180",
 	headFactory: "__TS_DRP_CANVAS_ROOM_HEAD_AUTHORITY_FOR_OPEN__",
 	sessionGlobal: "__TS_DRP_CANVAS_SESSION__",
+	roomModule: "/src/canvas-room.ts",
 	async create(page) {
 		await expect(page.locator("#create")).toBeEnabled();
 		await page.locator("#create").click();
@@ -157,6 +160,7 @@ const chat: ShippedApp = {
 	origin: "http://127.0.0.1:4181",
 	headFactory: "__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__",
 	sessionGlobal: "__TS_DRP_CHAT_SESSION__",
+	roomModule: "/src/index.ts",
 	async create(page) {
 		await expect(page.locator("#createRoom")).toBeEnabled();
 		await page.locator("#createRoom").click();
@@ -250,10 +254,10 @@ const issuance = (value: Census): Readonly<{ issuedRecords: number | null; issua
 		: { issuedRecords: entry[1].issuedRecords ?? null, issuanceOutbox: entry[1].issuanceOutbox ?? null };
 };
 
-// Appends the read-only room accessor to the page's own entry module as served.
+// Appends the read-only room accessor to the page's own room module as served.
 async function exposeRoom(context: BrowserContext, app: ShippedApp): Promise<void> {
 	await context.route(
-		(url) => url.origin === app.origin && url.pathname === "/src/index.ts",
+		(url) => url.origin === app.origin && url.pathname === app.roomModule,
 		async (route) => {
 			const response = await route.fetch();
 			const body = await response.text();
@@ -266,7 +270,9 @@ async function exposeRoom(context: BrowserContext, app: ShippedApp): Promise<voi
 }
 
 async function openApp(page: Page, app: ShippedApp): Promise<void> {
-	await page.goto(`${app.origin}/`);
+	// The shipped apps host their room in a room worker by default; this suite reads the room through
+	// the page's module bindings, so it opens the main-thread room (`?mainThread`).
+	await page.goto(`${app.origin}/?mainThread`);
 	await page.waitForFunction((name) => {
 		const session = Reflect.get(window, name) as { snapshot(): { relayReservations: readonly unknown[] } } | undefined;
 		return (session?.snapshot().relayReservations.length ?? 0) >= 1;
