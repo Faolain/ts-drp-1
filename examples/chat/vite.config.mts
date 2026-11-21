@@ -8,6 +8,8 @@ export default defineConfig({
 		target: "esnext",
 	},
 	plugins: [nodePolyfills()],
+	// The room worker (src/chat-worker.ts) is a module worker.
+	worker: { format: "es", plugins: () => [nodePolyfills()] },
 	optimizeDeps: {
 		esbuildOptions: {
 			target: "esnext",

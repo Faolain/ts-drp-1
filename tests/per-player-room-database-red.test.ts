@@ -77,7 +77,8 @@ describe("decision A: per-player room database names", () => {
 
 	it("the shipped pages open the per-player database, migrating the shared one first", () => {
 		for (const [file, application] of [
-			["examples/chat/src/index.ts", "chat"],
+			// The chat room (run by the main-thread page and the room worker alike).
+			["examples/chat/src/chat-room.ts", "chat"],
 			// The canvas room (run by the main-thread page and the room worker alike).
 			["examples/canvas/src/canvas-room.ts", "canvas"],
 			["examples/grid/src/v3-zone.ts", "zone"],

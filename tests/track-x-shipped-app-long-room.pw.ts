@@ -160,7 +160,7 @@ const chat: ShippedApp = {
 	origin: "http://127.0.0.1:4181",
 	headFactory: "__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__",
 	sessionGlobal: "__TS_DRP_CHAT_SESSION__",
-	roomModule: "/src/index.ts",
+	roomModule: "/src/chat-room.ts",
 	async create(page) {
 		await expect(page.locator("#createRoom")).toBeEnabled();
 		await page.locator("#createRoom").click();
