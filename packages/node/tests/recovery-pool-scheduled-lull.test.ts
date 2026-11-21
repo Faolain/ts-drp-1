@@ -90,6 +90,68 @@ describe("the scheduled recovery-pool lull", () => {
 		}
 	});
 
+	// A recipient's lull runs as bounded steps outside the lifecycle FIFO (lull "A", 2ca8eccc),
+	// so `run` is entered for an explicit call while the scheduled run of the same epoch has not
+	// settled yet. The once-per-epoch rule still holds: the call joins the running lull, with no
+	// second lull and no second observation (tests/track-z-room-database-default.test.ts).
+	it("joins a call in an epoch whose lull is still running: one lull, one observation", async () => {
+		const s = bookkeeping();
+		try {
+			let finish!: (result: CreatorRecoveryPoolResult) => void;
+			s.lull.mockImplementationOnce(
+				() =>
+					new Promise<CreatorRecoveryPoolResult>((resolve) => {
+						finish = resolve;
+					})
+			);
+			const scheduled = s.schedule.run(true, s.lull);
+			const explicit = s.schedule.run(false, s.lull);
+			await Promise.resolve();
+			finish({ kind: "maintained" });
+			expect(await scheduled).toEqual({ kind: "maintained" });
+			expect(await explicit).toEqual({ kind: "maintained" });
+			expect(s.lull).toHaveBeenCalledTimes(1);
+			expect(s.events.map((event) => [event.trigger, event.epoch, event.result])).toEqual([
+				["scheduled", 3, "maintained"],
+			]);
+			expect(s.schedule.settled(3)).toBe(true);
+		} finally {
+			s.restore();
+		}
+	});
+
+	// ...and when that earlier lull resolves last, it does not take back the later epoch's settle
+	// (which would let a further call in the later epoch run a second lull).
+	it("a running lull of an earlier epoch is not joined by a call in the next epoch, nor unsettles it", async () => {
+		const s = bookkeeping();
+		try {
+			let finish!: (result: CreatorRecoveryPoolResult) => void;
+			s.lull.mockImplementationOnce(
+				() =>
+					new Promise<CreatorRecoveryPoolResult>((resolve) => {
+						finish = resolve;
+					})
+			);
+			const earlier = s.schedule.run(true, s.lull);
+			s.room.epoch = 4;
+			const later = s.schedule.run(false, s.lull);
+			s.room.epoch = 3;
+			finish({ kind: "maintained" });
+			await Promise.all([earlier, later]);
+			expect(s.lull).toHaveBeenCalledTimes(2);
+			expect(s.events.map((event) => [event.trigger, event.epoch])).toEqual([
+				["explicit", 4],
+				["scheduled", 3],
+			]);
+			expect(s.schedule.settled(4)).toBe(true);
+			s.room.epoch = 4;
+			expect(await s.schedule.run(false, s.lull)).toEqual({ kind: "maintained" });
+			expect(s.lull).toHaveBeenCalledTimes(2);
+		} finally {
+			s.restore();
+		}
+	});
+
 	it("skips an epoch an earlier explicit lull already settled", async () => {
 		const s = bookkeeping();
 		try {

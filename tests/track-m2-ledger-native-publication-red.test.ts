@@ -42,6 +42,38 @@ afterEach(async () => {
 
 const EPOCHS = 8;
 
+// RED (narrower; the refusal left after the held-target law was fixed). A recipient lull runs
+// two turnover passes at one boundary. The first (planned by the ledger, then decided and
+// applied by stage 1) retires the oldest generation; that changes the recovery-role
+// certificate's required generations, so on the second pass a generation carrying a retained
+// cut is an authenticated excluded (historical) generation instead of a required one. Stage 1's
+// acquisition does not prove retained cuts against local generations for a native publication
+// (1515daab: checkpoint cuts name remote proof epochs; it checks each native row's carrier trust
+// instead), so it accepts that repeat pass. The ledger planner's retained-cut proof
+// (authenticateRoomRetentionRetainedCuts) still requires every cut's carrier to be a required
+// generation and refuses the repeat pass `chain-invalid`, dropping the ledger at every boundary.
+it("a settlement-v1 recipient's repeat pass at one boundary is planned by the ledger, not refused chain-invalid (6 epochs)", async () => {
+	Reflect.set(globalThis, "__roomRetentionLedgerMode", "shadow");
+	const fixture = await settlementRoom({ retention: true, name: "m2-native-repeat-pass" });
+	const peers = [await fixture.open(0), await fixture.open(1)] as const;
+	const delivered: (number | null)[] = [null, null];
+	for (let epoch = 0; epoch < 6; epoch++) {
+		await settlementTransition(fixture, peers, delivered, epoch);
+		await peers[0].room.maintainRecoveryPool();
+		await peers[1].room.maintainRecoveryPool();
+	}
+	await fixture.stop(peers[1]);
+	await fixture.stop(peers[0]);
+	const dropped = ledger.filter((event) => event.role === "recipient" && event.action === "dropped");
+	expect(dropped.map(stable), "recipient ledger dropped at a boundary").toEqual([]);
+	for (const shadow of shadows) expect(shadow, stable(shadow)).toMatchObject({ equal: true });
+	// Both passes of one recipient boundary compared: the repeat pass is the ledger's too.
+	const perEpoch = new Map<unknown, number>();
+	for (const shadow of shadows.filter((shadow) => shadow.role === "recipient"))
+		perEpoch.set(shadow.epoch, (perEpoch.get(shadow.epoch) ?? 0) + 1);
+	expect([...perEpoch.values()].some((count) => count >= 2), stable(Object.fromEntries(perEpoch))).toBe(true);
+}, 3_600_000);
+
 it(`the ledger planner plans a settlement-v1 recipient's native-publication boundary (${EPOCHS} epochs)`, async () => {
 	Reflect.set(globalThis, "__roomRetentionLedgerMode", "shadow");
 	const fixture = await settlementRoom({ retention: true, name: "m2-native-publication" });
