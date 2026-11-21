@@ -42,6 +42,7 @@ export const ZONE_WORKER_CONTRACT = defineRoomWorkerContract({
 		"close": call(),
 		"stop": call(),
 		"placeBlock": call(),
+		"placeCell": call(),
 		"sealEpoch": call(),
 		"exportCreatorSuccessor": call(),
 		"adoptCreatorSuccessor": call(),
@@ -112,6 +113,7 @@ export interface ZoneWorkerCommands {
 	"close": V3ZoneApi["close"];
 	"stop"(): Promise<void>;
 	"placeBlock": V3ZoneApi["placeBlock"];
+	"placeCell": V3ZoneApi["placeCell"];
 	"sealEpoch": V3ZoneApi["sealEpoch"];
 	"exportCreatorSuccessor": V3ZoneApi["exportCreatorSuccessor"];
 	"adoptCreatorSuccessor": V3ZoneApi["adoptCreatorSuccessor"];

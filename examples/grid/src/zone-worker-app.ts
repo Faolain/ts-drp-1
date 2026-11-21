@@ -88,6 +88,7 @@ export default defineRoomWorkerApp<ZoneWorkerInit>({
 			"close": () => zone.close(),
 			stop,
 			"placeBlock": (block: Parameters<typeof zone.placeBlock>[0]) => zone.placeBlock(block),
+			"placeCell": (cell: Parameters<typeof zone.placeCell>[0]) => zone.placeCell(cell),
 			"sealEpoch": () => zone.sealEpoch(),
 			"exportCreatorSuccessor": () => zone.exportCreatorSuccessor(),
 			"adoptCreatorSuccessor": () => zone.adoptCreatorSuccessor(),

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { createV3ZoneApplication } from "../examples/grid/src/v3-zone.js";
 import { createV3RoomCreatorInviteMaterial, type V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
-import { authenticateV3RoomCreatorInvite } from "../packages/node/src/v3-room.js";
+import { authenticateV3RoomApplicationStateLimit } from "../packages/node/src/v3-room.js";
 
 // Owner decision 2026-11-21: the room's application state limit is a per-room setting chosen when the
 // room is created. It is the optional `maxApplicationStateBytes` field of the room's signed parameters
@@ -101,7 +101,9 @@ async function signedInviteWith(parameters: Readonly<Record<string, number>>): P
 	});
 }
 
-const authenticate = (creatorInvite: string) => authenticateV3RoomCreatorInvite({ creatorInvite, application });
+const authenticate = (creatorInvite: string) => ({
+	maxApplicationStateBytes: authenticateV3RoomApplicationStateLimit({ creatorInvite, application }),
+});
 
 describe("the room's application state limit is a per-room authenticated creation parameter", () => {
 	it("a room created without the setting keeps exactly the 32,768-byte limit", async () => {

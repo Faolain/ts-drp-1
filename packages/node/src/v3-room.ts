@@ -94,7 +94,9 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
+	MIGRATION_RECORD_STATE_BYTES,
 	ROOM_APPLICATION_STATE_BYTES,
+	v3RoomParametersApplicationStateLimit,
 	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3CreatorSupersededVertex,
@@ -128,6 +130,7 @@ import {
 import { digestReceivedVertexPreimage } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "@ts-drp/keychain/finality";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
+import { roomApplicationStateLimit } from "@ts-drp/protocol-v3/room-parameters";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	AHE_BOUNDED_READ_LIMITS,
@@ -1686,15 +1689,16 @@ function strictCanonicalBytes(value: unknown, name: string): Uint8Array {
  * The exact canonical application state, copied and checked.
  * @param value - The candidate state bytes.
  * @param purpose - Genesis or migration (the error label).
- * @param maxBytes - The byte bound. 32,768 by default: a migration record carries the state and is
- * itself bounded (49,152 bytes). A successor's projection base is not carried in any record; it
- * takes the native plane's own application-state bound (the room's maxSnapshotBytes).
+ * @param maxBytes - The byte bound. MIGRATION_RECORD_STATE_BYTES (32,768) by default: a migration
+ * record carries the state inline and is itself bounded (49,152 bytes), and a genesis state is at most
+ * that too; both are within every room's limit (whose floor is 32,768). A successor's projection base is
+ * not carried in any record; it takes the room's own application state limit.
  * @returns The detached exact state.
  */
 function normalizeApplicationStateBytes(
 	value: unknown,
 	purpose: "genesis" | "migration",
-	maxBytes = 32_768
+	maxBytes: number = MIGRATION_RECORD_STATE_BYTES
 ): Uint8Array {
 	let backing: unknown;
 	let backingByteLength: unknown;
@@ -1782,6 +1786,30 @@ function assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierByte
 	throw new TypeError("v3 room genesis lineage policy is invalid");
 }
 
+/**
+ * The room's application state limit, declared at creation in its signed parameters
+ * (`maxApplicationStateBytes`, protocol-v3 room-parameters): 32,768 bytes when absent. The creator refuses
+ * to build, and every member refuses to read, an invite whose declared limit is outside [32,768, the
+ * library ceiling]; the parameters digest the creator signs makes the value the same for every member,
+ * and no signed path changes it for the room's life.
+ * @param exactCanonicalParametersCarrierBytes - The room's exact parameters carrier.
+ * @returns The limit in canonical bytes.
+ */
+function roomApplicationStateLimitOf(exactCanonicalParametersCarrierBytes: Uint8Array): number {
+	let limit: number | undefined;
+	try {
+		const parameters = decodeCanonical(exactCanonicalParametersCarrierBytes);
+		limit =
+			parameters !== null && typeof parameters === "object" && !Array.isArray(parameters)
+				? roomApplicationStateLimit(parameters as Readonly<Record<string, unknown>>)
+				: undefined;
+	} catch {
+		limit = undefined;
+	}
+	if (limit === undefined) throw new TypeError("v3 room application state limit is invalid");
+	return limit;
+}
+
 function inviteBytes(values: Record<string, unknown>, field: string): Uint8Array {
 	const value = values[field];
 	if (!(value instanceof Uint8Array) || value.byteLength === 0) {
@@ -1837,6 +1865,7 @@ function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {
 	}
 	const exactCanonicalParametersCarrierBytes = inviteBytes(values, "exactCanonicalParametersCarrierBytes");
 	assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes);
+	roomApplicationStateLimitOf(exactCanonicalParametersCarrierBytes);
 	return Object.freeze({
 		detachedGenesisSignature,
 		exactCanonicalLatchedAclBytes: inviteBytes(values, "exactCanonicalLatchedAclBytes"),
@@ -1851,7 +1880,7 @@ function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {
 function authenticateCreatorInviteMaterial(
 	material: V3RoomCreatorInviteMaterial,
 	application: Pick<V3RoomApplication, "catalog" | "canonicalBlueprintPackageBytes">
-): Readonly<{ readonly objectId: string; readonly blueprintDigest: string }> {
+): Readonly<{ readonly objectId: string; readonly blueprintDigest: string; readonly maxApplicationStateBytes: number }> {
 	// Reuse the protocol's genuine signature/pin/profile owner without installing
 	// anything in a native store. This local trust object never leaves this check.
 	const installed = installCreatorAnchorTrustRoot({
@@ -1873,6 +1902,10 @@ function authenticateCreatorInviteMaterial(
 	if (digest("ts-drp/parameters/v3", parameters) !== provenance.parametersDigest) {
 		throw new TypeError("v3 room creator invite parameters are invalid");
 	}
+	// The parameters as the native plane opens them (the registry fields and the room's limit): an
+	// invite the plane would refuse is refused here, before any host acquisition.
+	const maxApplicationStateBytes = v3RoomParametersApplicationStateLimit(parameters);
+	if (maxApplicationStateBytes === undefined) throw new TypeError("v3 room creator invite parameters are invalid");
 	const anchor = decodeCanonical(material.exactCanonicalGenesisAnchorPreimageBytes);
 	const acl = openCanonicalLatchedAclSnapshot({
 		exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
@@ -1893,7 +1926,11 @@ function authenticateCreatorInviteMaterial(
 		canonicalBlueprintPackageBytes: application.canonicalBlueprintPackageBytes,
 		expectedBlueprintDigest: provenance.blueprintDigest,
 	});
-	return Object.freeze({ objectId: provenance.objectId, blueprintDigest: provenance.blueprintDigest });
+	return Object.freeze({
+		objectId: provenance.objectId,
+		blueprintDigest: provenance.blueprintDigest,
+		maxApplicationStateBytes,
+	});
 }
 
 /**
@@ -2147,7 +2184,8 @@ export class V3RoomStateLimitRefused extends TypeError {
 	readonly kind = "application-state-limit" as const;
 	/**
 	 * @param detail - The local issue failure detail.
-	 * @param limitBytes - The room's application state limit, in canonical bytes.
+	 * @param limitBytes - The room's application state limit, in canonical bytes (the room's own; the
+	 * default limit when not given).
 	 */
 	constructor(
 		readonly detail: string,
@@ -2409,10 +2447,40 @@ export function authenticateV3RoomCreatorInvite(
 		record.application as Pick<V3RoomApplication, "catalog" | "canonicalBlueprintPackageBytes">
 	);
 	return Object.freeze({
-		...identity,
+		objectId: identity.objectId,
+		blueprintDigest: identity.blueprintDigest,
 		creatorInvite: record.creatorInvite,
 		pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
 	});
+}
+
+/**
+ * The application state limit of the room a signed invite creates, authenticated exactly as
+ * authenticateV3RoomCreatorInvite authenticates the invite: the value the creator signed into the room's
+ * parameters (32,768 bytes when it declares none), the same for every member, fixed for the room's life.
+ * An invite whose limit is outside [32,768, the library ceiling] is refused.
+ * @param input - Exact wire invite and trusted local catalog/package selection.
+ * @returns The room's limit in canonical bytes.
+ */
+export function authenticateV3RoomApplicationStateLimit(
+	input: Readonly<{
+		readonly creatorInvite: string;
+		readonly application: Pick<V3RoomApplication, "catalog" | "canonicalBlueprintPackageBytes">;
+	}>
+): number {
+	const record = exactRecord(input, ["application", "creatorInvite"]);
+	if (
+		record === undefined ||
+		typeof record.creatorInvite !== "string" ||
+		record.application === null ||
+		typeof record.application !== "object"
+	) {
+		throw new TypeError("v3 room creator invite authentication input is invalid");
+	}
+	return authenticateCreatorInviteMaterial(
+		decodeCreatorInvite(record.creatorInvite),
+		record.application as Pick<V3RoomApplication, "catalog" | "canonicalBlueprintPackageBytes">
+	).maxApplicationStateBytes;
 }
 
 /**
@@ -2465,6 +2533,7 @@ export async function createV3RoomCreatorInviteMaterial(
 		"exactCanonicalParametersCarrierBytes"
 	);
 	assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes);
+	roomApplicationStateLimitOf(exactCanonicalParametersCarrierBytes);
 	const exactCanonicalProfileBytes = strictCanonicalBytes(
 		record.exactCanonicalProfileBytes,
 		"exactCanonicalProfileBytes"
@@ -3059,7 +3128,7 @@ function validMigrationRecordOperation(
 		!(stateBytes.buffer instanceof ArrayBuffer) ||
 		stateBytes.byteOffset !== 0 ||
 		stateBytes.buffer.byteLength !== stateBytes.byteLength ||
-		stateBytes.byteLength > 32_768 ||
+		stateBytes.byteLength > MIGRATION_RECORD_STATE_BYTES ||
 		!Number.isSafeInteger(sourceCount) ||
 		(sourceCount as number) < 0 ||
 		(sourceCount as number) > 8192 ||
@@ -3082,7 +3151,7 @@ function validMigrationRecordOperation(
 		return false;
 	}
 	try {
-		const decodedState = decodeCanonical(stateBytes, { maxBytes: 32_768, maxDepth: 16, maxItems: 16_384 });
+		const decodedState = decodeCanonical(stateBytes, { maxBytes: MIGRATION_RECORD_STATE_BYTES, maxDepth: 16, maxItems: 16_384 });
 		return (
 			sameBytes(encodeCanonical(decodedState), stateBytes) &&
 			migrationTargetObjectId(sourceObjectId, nonce) === targetObjectId &&
@@ -3101,7 +3170,7 @@ function validMigrationRecordOperation(
  * Startup and successor workloads may differ; epoch selection grants no wire,
  * signing, retirement or protocol-validity authority. */
 function roomOrdinaryFinishingWindowForEpoch(application: V3RoomApplication,
-	context: Readonly<{objectId: string; epoch: number}>): CreatorOrdinaryFinishingWindowLimits | undefined {
+	context: Readonly<{objectId: string; epoch: number}>, roomStateLimitBytes: number): CreatorOrdinaryFinishingWindowLimits | undefined {
 	const policy = application.ordinaryFinishingWindow;
 	const selected = typeof policy !== "function" ? policy :
 		Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]) as
@@ -3110,7 +3179,7 @@ function roomOrdinaryFinishingWindowForEpoch(application: V3RoomApplication,
 	// A window can never describe a state past the room's application state limit (admission refuses
 	// any fold past it), and the creator's window capture declines one that declares more: refused here,
 	// at the close binding, rather than opening a room whose every ordinary move is refused.
-	if (selected !== undefined && !(selected.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+	if (selected !== undefined && !(selected.maxApplicationBytes <= roomStateLimitBytes))
 		throw new TypeError("v3 room finishing window passes the room's application state limit");
 	return selected;
 }
@@ -3208,7 +3277,10 @@ function createRoomOperationAdmissionPolicy(
 ): V3OperationAdmissionPolicy {
 	const authority = migrationInviteAuthority(material);
 	const applicationPolicy = input.createOperationAdmissionPolicy?.(
-		Object.freeze({ ...context, maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES })
+		Object.freeze({
+			...context,
+			maxApplicationStateBytes: roomApplicationStateLimitOf(material.exactCanonicalParametersCarrierBytes),
+		})
 	);
 	let inherited = false;
 	let migrationPrefixOnly = context.epoch === 0 && context.authenticatedApplicationStateBytes === undefined;
@@ -3929,11 +4001,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	ownsLocalSession = false
 ): Promise<V3RoomSession<Projection>> {
 	localOwner?.assertCurrent();
-	// A fixed finishing window past the room's application state limit is refused before anything opens
-	// (a selector's window is refused at each close binding, roomOrdinaryFinishingWindowForEpoch).
-	const fixedWindow = input.application.ordinaryFinishingWindow;
-	if (fixedWindow !== undefined && typeof fixedWindow !== "function" && !(fixedWindow.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
-		throw new TypeError("CREATOR_ORDINARY_FINISHING_WINDOW_INVALID: the finishing window passes the room's application state limit");
 	// The trusted application owns displacement semantics for this room lifetime.
 	if (input.receiveOnly !== undefined && input.receiveOnly !== true)
 		throw new TypeError("v3 room receive-only restriction is invalid");
@@ -4043,10 +4110,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	const { invite, material, settlementProfile } = captureInvite(input.creatorInvite);
 	const ownedSettlementPolicy = localSettlementPolicy(input.application, material);
+	// The room's own application state limit, authenticated in its signed parameters (32,768 when the
+	// room declares none) and fixed for its life.
+	const roomStateLimitBytes = roomApplicationStateLimitOf(material.exactCanonicalParametersCarrierBytes);
+	// A fixed finishing window past the room's application state limit is refused before anything opens
+	// (a selector's window is refused at each close binding, roomOrdinaryFinishingWindowForEpoch).
+	const fixedWindow = input.application.ordinaryFinishingWindow;
+	if (fixedWindow !== undefined && typeof fixedWindow !== "function" && !(fixedWindow.maxApplicationBytes <= roomStateLimitBytes))
+		throw new TypeError("CREATOR_ORDINARY_FINISHING_WINDOW_INVALID: the finishing window passes the room's application state limit");
 	// A successor's projection base comes from the native plane, whose fold carries the room's
 	// application state limit and whose admission refuses any operation past it (with at most 16,384
-	// items); the room accepts every state it seals.
-	const successorStateMaxBytes = ROOM_APPLICATION_STATE_BYTES;
+	// items); the room accepts every state it seals, and no state past its limit.
+	const successorStateMaxBytes = roomStateLimitBytes;
 	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
@@ -6112,7 +6187,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				let ordinaryFinishingWindow: CreatorOrdinaryFinishingWindowLimits | undefined;
 				try {
 					ordinaryFinishingWindow = roomOrdinaryFinishingWindowForEpoch(input.application,
-						{objectId: input.objectId, epoch: plane.epoch});
+						{objectId: input.objectId, epoch: plane.epoch}, roomStateLimitBytes);
 				} catch {
 					return Promise.resolve(Object.freeze({ok: false as const, reason: "CREATOR_ORDINARY_FINISHING_WINDOW_INVALID"}));
 				}
@@ -6887,7 +6962,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// off any admitted prefix as split-required): that move is refused typed, and the rest are judged
 		// on their own (a later move that does not grow the state may still fit).
 		if (!issued.ok && issued.kind === "application-state-limit" && owned.length > 1) {
-			owned[0]?.reject(new V3RoomStateLimitRefused(issued.detail));
+			owned[0]?.reject(new V3RoomStateLimitRefused(issued.detail, roomStateLimitBytes));
 			await issueOwned(owned.slice(1));
 			return;
 		}
@@ -6903,7 +6978,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				handBack !== undefined
 					? new V3RoomHandBackRefused(handBack, issued.kind, issued.detail)
 					: issued.kind === "application-state-limit"
-						? new V3RoomStateLimitRefused(issued.detail)
+						? new V3RoomStateLimitRefused(issued.detail, roomStateLimitBytes)
 						: new TypeError(`v3 room issue failed: ${issued.kind}: ${issued.detail}`)
 			);
 			return;

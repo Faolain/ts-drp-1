@@ -129,6 +129,11 @@ import {
 	stageLatchedAclOperations,
 } from "@ts-drp/protocol-v3/latched-acl";
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
+import {
+	ROOM_APPLICATION_STATE_DEFAULT_BYTES,
+	ROOM_APPLICATION_STATE_LIMIT_PARAMETER,
+	roomApplicationStateLimit,
+} from "@ts-drp/protocol-v3/room-parameters";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	createCreatorSealActor,
@@ -388,14 +393,39 @@ const PROVENANCE_KEYS = [
 ] as const;
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 /**
- * The room's reviewed application state limit, in canonical bytes (with at most 16,384 items and
- * depth 16). No room's parameters declare a limit, so every room takes 32,768 bytes: the bound the
- * room's genesis and migration checks and the shipped applications' own state bounds already state.
- * The plane's fold machine carries it, and admission refuses any vertex whose fold would pass it
- * (`applicationStateAdmits`), so a seal's fold never refuses. maxSnapshotBytes bounds the snapshot
- * carrier, not the state.
+ * The application state limit of a room whose parameters declare none, in canonical bytes (with at most
+ * 16,384 items and depth 16). A room's own limit is its authenticated parameters' optional
+ * `maxApplicationStateBytes` (protocol-v3 room-parameters; AcceptedParameters.maxApplicationStateBytes),
+ * fixed for the room's life. The plane's fold machine carries the room's limit, and admission refuses any
+ * vertex whose fold would pass it (`applicationStateAdmits`), so a seal's fold never refuses.
+ * maxSnapshotBytes bounds the snapshot carrier, not the state.
  */
-export const ROOM_APPLICATION_STATE_BYTES = 32_768;
+export const ROOM_APPLICATION_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
+/**
+ * The application state a genesis or a migration record carries, at most: 32,768 bytes, whatever the
+ * room's own limit. A migration record holds the state inline under its committed 49,152-byte record
+ * bound, so a room whose state has grown past 32,768 bytes cannot migrate it (the migration is refused
+ * before anything is signed) until its state is back within it. Every room's limit is at least this.
+ */
+export const MIGRATION_RECORD_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
+
+/**
+ * A room's application state limit from its exact parameters carrier, judged as the plane judges the
+ * carrier at open (the registry fields within their ranges and the registered extension, exact
+ * canonical bytes; the supported-profile digest gate stays the plane's own).
+ * @param bytes - The exact parameters carrier.
+ * @returns The limit in canonical bytes, or undefined when the carrier is not valid.
+ */
+export function v3RoomParametersApplicationStateLimit(bytes: Uint8Array): number | undefined {
+	try {
+		if (PARAMETER_SCHEMA === undefined) return undefined;
+		const snapshot = snapshotParameterRecord(decodeCanonical(bytes), PARAMETER_SCHEMA);
+		if (snapshot === undefined || !sameBytes(encodeCanonical(snapshot), bytes)) return undefined;
+		return roomApplicationStateLimit(snapshot);
+	} catch {
+		return undefined;
+	}
+}
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
@@ -1298,6 +1328,8 @@ interface AcceptedParameters {
 	readonly maxPendingEntries: number;
 	readonly maxSnapshotBytes: number;
 	readonly snapshotChunkBytes: number;
+	/** The room's application state limit (its parameters' optional field; 32,768 when absent). */
+	readonly maxApplicationStateBytes: number;
 }
 
 const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
@@ -1769,10 +1801,23 @@ function snapshotParameterRecord(value: unknown, schema: ParameterSchema): Plain
 	try {
 		if (!isObject(value) || ObjectGetPrototypeOf(value) !== null) return undefined;
 		const keys = ReflectOwnKeys(value);
-		if (keys.some((key) => typeof key !== "string" || !schema.fields.some(({ name }) => name === key))) {
+		if (
+			keys.some(
+				(key) =>
+					typeof key !== "string" ||
+					(!schema.fields.some(({ name }) => name === key) && key !== ROOM_APPLICATION_STATE_LIMIT_PARAMETER)
+			)
+		) {
 			return undefined;
 		}
 		const output = ObjectCreate(null) as Record<string, unknown>;
+		// The record's one registered extension (protocol-v3 room-parameters), checked by its owner.
+		const extension = ObjectGetOwnPropertyDescriptor(value, ROOM_APPLICATION_STATE_LIMIT_PARAMETER);
+		if (extension !== undefined) {
+			if (extension.enumerable !== true || !("value" in extension)) return undefined;
+			output[ROOM_APPLICATION_STATE_LIMIT_PARAMETER] = extension.value;
+			if (roomApplicationStateLimit(output) === undefined) return undefined;
+		}
 		for (let fieldIndex = 0; fieldIndex < schema.fields.length; fieldIndex += 1) {
 			const field = schema.fields[fieldIndex] as ParameterFieldSchema;
 			let keyFound = false;
@@ -1811,10 +1856,18 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 		const reencoded = encodeCanonical(snapshot);
 		if (!sameBytes(reencoded, bytes)) return undefined;
 		const digest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, reencoded));
+		// The supported profile is judged on the registry fields; the room's own limit (the registered
+		// extension, absent in every room before the setting) is judged by its owner.
+		const maxApplicationStateBytes = roomApplicationStateLimit(snapshot);
+		const profile = ObjectCreate(null) as Record<string, unknown>;
+		for (const key of ReflectOwnKeys(snapshot) as string[])
+			if (key !== ROOM_APPLICATION_STATE_LIMIT_PARAMETER) profile[key] = snapshot[key];
+		const profileDigest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, encodeCanonical(profile)));
 		if (
+			maxApplicationStateBytes === undefined ||
 			digest !== expectedDigest ||
-			(digest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
-				digest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
+			(profileDigest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
+				profileDigest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
 		) {
 			return undefined;
 		}
@@ -1851,6 +1904,7 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 					maxPendingEntries,
 					maxSnapshotBytes,
 					snapshotChunkBytes,
+					maxApplicationStateBytes,
 				})
 			: undefined;
 	} catch {
@@ -4831,7 +4885,7 @@ function resolveOrdinaryIssuanceRuntimeHold(value: unknown, owners: CreatorSnaps
 				...(typeof action === "string" ? {action} : {}), control}),
 			blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 				exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
+				maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes, maxDepth: 16 as const, maxItems: 16384 as const,
 				catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 					runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 					canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -13126,7 +13180,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		parameters: ObjectFreeze({...registration.payload.parameters}),
 		blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 			exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES, maxDepth: 16 as const, maxItems: 16384 as const,
+			maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes, maxDepth: 16 as const, maxItems: 16384 as const,
 			catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 				runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 				canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -17212,7 +17266,7 @@ async function issueOneVertex(
 				: stateLimitRejected
 					? localIssueFailure(
 							"application-state-limit",
-							`v3 local operation would pass the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes)`
+							`v3 local operation would pass the room's application state limit (${registration.payload.parameters.maxApplicationStateBytes} bytes)`
 						)
 				: signerResolved
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
@@ -23475,12 +23529,12 @@ const applicationStateBoundSeeds = createDeferredSeedRunner<V3PlaneRegistration,
  * limit. A bound that does not fit the limit even before any operation (a constant ceiling above the
  * room's limit) cannot decide this room's moves: the exact fold judges them.
  */
-function fittingApplicationStateBound(created: unknown): V3ApplicationStateBound | undefined {
+function fittingApplicationStateBound(created: unknown, limitBytes: number): V3ApplicationStateBound | undefined {
 	const bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
 		typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
 		? created as V3ApplicationStateBound : undefined;
 	const quotedBase = bound?.quoteBase();
-	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES
+	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > limitBytes
 		? undefined : bound;
 }
 
@@ -23524,7 +23578,7 @@ function seedApplicationStateBound(
 	const started = typeof performance === "undefined" ? 0 : performance.now();
 	let bound: V3ApplicationStateBound | undefined;
 	try {
-		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]));
+		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]), registration.payload.parameters.maxApplicationStateBytes);
 	} catch {
 		bound = undefined;
 	}
@@ -23572,12 +23626,12 @@ function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): 
 					const create = Reflect.get(policy as object, "createApplicationStateBound");
 					return typeof create !== "function" ? undefined : ObjectFreeze({
 						step: () => true,
-						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes])),
+						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes]), registration.payload.parameters.maxApplicationStateBytes),
 					});
 				}
 				return ObjectFreeze({
 					step: (byteBudget: number) => ReflectApply(Reflect.get(seed, "step") as (budget: number) => unknown, seed, [byteBudget]) === true,
-					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, [])),
+					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, []), registration.payload.parameters.maxApplicationStateBytes),
 				});
 			},
 			current: () => applicationStateBoundBaseCurrent(registration, base, index, payload),
@@ -23659,7 +23713,7 @@ function applicationStateBoundAdmits(
 		}
 		const quoted = cache.bound.quote(candidate.operation);
 		if (quoted === undefined || !NumberIsSafeInteger(quoted) || quoted < 1) return disable();
-		const admitted = quoted <= ROOM_APPLICATION_STATE_BYTES;
+		const admitted = quoted <= registration.payload.parameters.maxApplicationStateBytes;
 		if (admitted) {
 			cache.pending = ObjectFreeze({ digest: candidate.digest, operation: candidate.operation });
 			cache.admittedByBound = true;
@@ -23680,7 +23734,7 @@ function applicationStateBoundUnsound(registration: V3PlaneRegistration, error: 
 	if (!isObject(error) || Reflect.get(error, "code") !== "INVALID_APPLICATION_STATE" || !applicationStateBoundUsed(registration))
 		return undefined;
 	const detail = `APPLICATION_STATE_BOUND_UNSOUND: the application's state bound (readOrdinaryApplicationResourceBound) admitted ` +
-		`operations whose exact fold passes the room's application state limit (${ROOM_APPLICATION_STATE_BYTES} bytes); ` +
+		`operations whose exact fold passes the room's application state limit (${registration.payload.parameters.maxApplicationStateBytes} bytes); ` +
 		`the application's bound is wrong: ${error instanceof Error ? error.message : "unknown failure"}`;
 	try {
 		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-application-state", detail]);
@@ -24182,7 +24236,7 @@ function importCreatorSuccessorInitialMachine(
 			return undefined;
 		}
 		return new BlueprintStateMachine({
-			maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
+			maxApplicationStateBytes: recovered.prepared.parameters.maxApplicationStateBytes,
 			exactCanonicalInitialStateBytes,
 			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
 			expectedInitialStateDigest: input.expectedApplicationStateDigest,
@@ -24278,7 +24332,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		let machine: BlueprintStateMachine;
 		try {
 			machine = new BlueprintStateMachine({
-				maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES,
+				maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes,
 				exactCanonicalInitialStateBytes: initialStateBytes,
 				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
 				expectedInitialStateDigest: initialStateDigest,
