@@ -7266,13 +7266,32 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 		reservations.push(terminalFloor);
 		for (const reservation of reservations) await reservation.check();
 	};
+	// Observation only: brackets ONE complete acquisition so a test can attribute its
+	// native/snapshot reads. Diagnostics never grant, extend or replace custody.
+	const acquisitionPurpose = mandatoryAdoptionFence ? "adoption-fence" : terminalWithdrawal ? "terminal-withdrawal" :
+		maintenancePurpose ?? "issuance";
+	const reportAcquisition = (kind: string): void => {
+		try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind, epoch: currentTrust.currentEpoch, purpose: acquisitionPurpose});
+		} catch { /* Diagnostics cannot alter acquisition or cleanup. */ }
+	};
 	try {
+		reportAcquisition("closed-maintenance-acquisition-start");
 		await acquireReservations();
 		const snapshotInventoryRead = bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
 			input.snapshotStore, "captureRecoveryRoleInventory");
 		const snapshotInventory = await snapshotCall(() => snapshotInventoryRead({objectId: input.objectId}, {signal: input.signal}));
 		let nativePreparation: Parameters<typeof acquireClosedData>[12];
-		if (lifetime.canDetachNativePreparation === true && snapshotInventory.owner.migration === "ready" &&
+		// The mandatory adoption fence reads its retained closed data ONCE, under
+		// the custody it already holds: the original held path, with complete
+		// authentication of every byte, the same book and the same limits. The
+		// detached preparations below read every image and retained snapshot
+		// before custody only to read and byte-compare them all again under it;
+		// that moves CPU out of custody for long ordinary forecasts, but the fence
+		// already holds the issuance consumer exclusively and its forecast is
+		// short, so for the fence they only double its reads.
+		const singleCustody = mandatoryAdoptionFence && !terminalWithdrawal && maintenancePurpose === undefined;
+		if (!singleCustody && lifetime.canDetachNativePreparation === true && snapshotInventory.owner.migration === "ready" &&
 			(snapshotInventory.legacyScopes?.length ?? 0) === 0) {
 			// This is the ONE original proof lifetime. authenticate consumes this
 			// same book; it must not create/reset a second preparation allowance.
@@ -7359,7 +7378,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			}});
 		} else try { const observer = Reflect.get(globalThis, "__warmProofEvent");
 			if (typeof observer === "function") observer({kind: "closed-native-preparation-declined", epoch: currentTrust.currentEpoch,
-				reason: lifetime.canDetachNativePreparation === true ? "snapshot-classification-owner" : "retained-native-source-custody"});
+				reason: singleCustody ? "adoption-fence-single-custody" :
+					lifetime.canDetachNativePreparation === true ? "snapshot-classification-owner" : "retained-native-source-custody"});
 		} catch { /* Original supported safe path remains unchanged. */ }
 		const acquired = await acquireClosedData(
 			value,
@@ -7373,7 +7393,9 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			mandatoryAdoptionFence || terminalWithdrawal || maintenancePurpose === "archive-close",
 			journalHeaderHold,
 			undefined,
-			Object.freeze({inventory: snapshotInventory, read: snapshotInventoryRead, targets: []}),
+			// No snapshot preparation for the fence: each retained target is read
+			// once under its own protection, digest-verified (readTarget's held path).
+			singleCustody ? undefined : Object.freeze({inventory: snapshotInventory, read: snapshotInventoryRead, targets: []}),
 			nativePreparation
 		);
 		nativePreparation = undefined;
@@ -7566,6 +7588,7 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				reservations.splice(index, 1); terminalFloor = undefined;
 			},
 		}));
+		reportAcquisition("closed-maintenance-acquisition-end");
 		return proof;
 	} catch (primary) {
 		try {
