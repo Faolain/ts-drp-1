@@ -23,9 +23,20 @@ import {
 // and adopts the successor, and the recipient installs it from the creator's peer.
 //
 // The shipped pages expose no rollover control and no room handle, so the harness appends
-// one read-only accessor, `globalThis.__TRACK_X_ROOM__ = () => room`, to the page's own
+// two read-only accessors, `globalThis.__TRACK_X_ROOM__ = () => room` and
+// `globalThis.__TRACK_X_ROLLOVER__` (the page's own rollover policy), to the page's own
 // /src/index.ts as the dev server serves it. The page's code is otherwise unchanged, and
-// the accessor returns the exact room session the page opened. Measurement only: it asserts
+// the accessors return the exact room session and policy the page opened.
+//
+// Each page rolls its own room over and delivers successor offers over its own node
+// (examples/v3-room rollover policy and successor delivery), and its policy publishes any
+// successor its room adopted outside the policy as soon as a member pulls from behind it. So
+// the harness never exports or installs beside the page: it joins a rollover the page started
+// by itself (policy.settled()), seals and adopts on the creator's room, and hands the export
+// and announcement to the page's policy (publishCurrent: one export, the page's). The
+// recipient's page installs the successor through its own delivery; the harness waits for its
+// room's epoch. "install" is the time from the creator's announcement to the recipient's
+// room reaching the successor epoch. Measurement only: it asserts
 // convergence and successful transitions, and bounds nothing. On non-convergence it prints
 // TRACK_X_STUCK with the recent console lines (and, with TRACK_X_PROBE=1, whether a later
 // creator move converges).
@@ -86,6 +97,8 @@ interface ShippedApp {
 	readonly origin: string;
 	readonly headFactory: string;
 	readonly sessionGlobal: string;
+	/** The page module's expression for its open room's rollover policy. */
+	readonly rolloverPolicy: string;
 	/** Creates the room through the UI and returns its invite. */
 	create(page: Page): Promise<string>;
 	/** Joins with the invite through the UI. */
@@ -103,6 +116,7 @@ const canvas: ShippedApp = {
 	origin: "http://127.0.0.1:4180",
 	headFactory: "__TS_DRP_CANVAS_ROOM_HEAD_AUTHORITY_FOR_OPEN__",
 	sessionGlobal: "__TS_DRP_CANVAS_SESSION__",
+	rolloverPolicy: "rollover",
 	async create(page) {
 		await expect(page.locator("#create")).toBeEnabled();
 		await page.locator("#create").click();
@@ -157,6 +171,7 @@ const chat: ShippedApp = {
 	origin: "http://127.0.0.1:4181",
 	headFactory: "__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__",
 	sessionGlobal: "__TS_DRP_CHAT_SESSION__",
+	rolloverPolicy: "(room === undefined ? undefined : rollovers.get(room))",
 	async create(page) {
 		await expect(page.locator("#createRoom")).toBeEnabled();
 		await page.locator("#createRoom").click();
@@ -250,7 +265,7 @@ const issuance = (value: Census): Readonly<{ issuedRecords: number | null; issua
 		: { issuedRecords: entry[1].issuedRecords ?? null, issuanceOutbox: entry[1].issuanceOutbox ?? null };
 };
 
-// Appends the read-only room accessor to the page's own entry module as served.
+// Appends the read-only room and rollover-policy accessors to the page's own entry module as served.
 async function exposeRoom(context: BrowserContext, app: ShippedApp): Promise<void> {
 	await context.route(
 		(url) => url.origin === app.origin && url.pathname === "/src/index.ts",
@@ -258,9 +273,11 @@ async function exposeRoom(context: BrowserContext, app: ShippedApp): Promise<voi
 			const response = await route.fetch();
 			const body = await response.text();
 			if (!/\blet room\b/u.test(body)) throw new Error("TRACK_X_ROOM_BINDING_ABSENT");
+			if (!/\b(?:let rollover|const rollovers)\b/u.test(body)) throw new Error("TRACK_X_ROLLOVER_BINDING_ABSENT");
 			const headers = { ...response.headers() };
 			delete headers["content-length"];
-			await route.fulfill({ status: response.status(), headers, body: body + ACCESSOR });
+			const policy = `;globalThis.__TRACK_X_ROLLOVER__ = () => ${app.rolloverPolicy};\n`;
+			await route.fulfill({ status: response.status(), headers, body: body + ACCESSOR + policy });
 		}
 	);
 }
@@ -724,15 +741,39 @@ for (const app of [canvas, chat])
 					deliveryMs.push(Date.now() - sent);
 				}
 				await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+				// The recipient's page installs the successor through its own delivery; this watch
+				// records (absolute page time) when its room first reaches the successor epoch. It
+				// starts before the creator's rollover so a fast install is not missed.
+				const installEvaluation = receiver.evaluate(
+					async ({ successorEpoch, bound }) => {
+						const room = (Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => unknown)() as {
+							authority(): { epoch: number } | undefined;
+						};
+						const begun = performance.now();
+						while ((room.authority()?.epoch ?? 0) < successorEpoch) {
+							if (performance.now() - begun > bound) throw new Error("TRACK_X_RECIPIENT_NOT_INSTALLED");
+							await new Promise((resolve) => setTimeout(resolve, 5));
+						}
+						return { end: performance.timeOrigin + performance.now() };
+					},
+					{ successorEpoch: epoch + 1, bound: CONVERGE_MS }
+				);
+				void installEvaluation.catch(() => undefined);
 				const rolloverEvaluation = creator.evaluate(async () => {
 					const step = (name: string): void => {
 						Reflect.set(globalThis, "__TRACK_X_STEP__", { name, at: Math.round(performance.now()) });
 					};
 					const room = (Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => unknown)() as {
 						sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
-						exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 						adoptCreatorSuccessor(): Promise<unknown>;
 					};
+					const policy = (Reflect.get(globalThis, "__TRACK_X_ROLLOVER__") as () => unknown)() as
+						| { settled(): Promise<void>; publishCurrent(): Promise<void> }
+						| undefined;
+					if (policy === undefined) throw new Error("TRACK_X_ROLLOVER_POLICY_ABSENT");
+					// A rollover the page started by itself finishes first (the room takes one close at a time).
+					step("settle");
+					await policy.settled();
 					// Absolute page times of the step boundaries (Track Z's windows).
 					const marks: number[] = [];
 					const mark = (): void => {
@@ -746,21 +787,21 @@ for (const app of [canvas, chat])
 					mark();
 					if (!close.ok) throw new Error("TRACK_X_HEALTHY_CLOSE_REFUSED");
 					begun = performance.now();
-					step("export");
-					const offer = await room.exportCreatorSuccessor();
-					const exported = performance.now() - begun;
-					mark();
-					begun = performance.now();
 					step("adopt");
 					await room.adoptCreatorSuccessor();
 					const adoption = performance.now() - begun;
+					mark();
+					// The page's policy exports the adopted successor and announces it over the page's delivery.
+					begun = performance.now();
+					step("export");
+					await policy.publishCurrent();
+					const exported = performance.now() - begun;
 					mark();
 					step("done");
 					return {
 						close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 						ms: { seal, export: exported, adoption },
 						marks,
-						offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, Array.from(value)])),
 					};
 				});
 				// A timed-out evaluation is abandoned; its later rejection (the page closing) is not unhandled.
@@ -769,27 +810,14 @@ for (const app of [canvas, chat])
 				if (rolloverResult === undefined) await hung("creator rollover", epoch + 1);
 				const rollover = (rolloverResult as NonNullable<typeof rolloverResult>).value;
 				expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
-				const installEvaluation = receiver.evaluate(
-					async ({ offer, peer }) => {
-						const room = (Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => unknown)() as {
-							installCreatorSuccessor(input: unknown): Promise<unknown>;
-						};
-						const begun = performance.now();
-						const start = performance.timeOrigin + begun;
-						await room.installCreatorSuccessor({
-							peers: [peer],
-							offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
-						});
-						const ended = performance.now();
-						return { ms: ended - begun, start, end: performance.timeOrigin + ended };
-					},
-					{ offer: rollover.offer, peer: creatorPeer }
-				);
-				void installEvaluation.catch(() => undefined);
 				const installResult = await bounded(installEvaluation, ROLLOVER_TIMEOUT_MS);
 				if (installResult === undefined) await hung("recipient install", epoch + 1);
-				const installed = (installResult as NonNullable<typeof installResult>).value;
-				const install = installed.ms;
+				// From the start of the creator's export and announcement to the recipient's room at the successor epoch.
+				const installed = {
+					start: rollover.marks[2] as number,
+					end: (installResult as NonNullable<typeof installResult>).value.end,
+				};
+				const install = installed.end - installed.start;
 				await expect.poll(() => app.view(receiver), { timeout: CONVERGE_MS }).toEqual(await app.view(creator));
 				if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
 				// Track Z: the explicit lull, creator first and then the recipient, as the bench orders it.
@@ -803,15 +831,17 @@ for (const app of [canvas, chat])
 					: [skipped, skipped];
 				if (PHASES) {
 					const takenAt = await pageNow(creator);
-					const [sealAt, exportAt, adoptAt, adoptedAt] = rollover.marks as [number, number, number, number];
+					// The page's policy exports after adoption: seal, adopt, then export and announce.
+					const [sealAt, adoptAt, exportAt, exportedAt] = rollover.marks as [number, number, number, number];
+					// The recipient may reach the successor while the announcement is still being sent.
+					const installedAt = Math.max(exportedAt, installed.end);
 					const windows: PhaseWindow[] = [
 						{ name: "play", start: phaseFrom, end: sealAt },
-						{ name: "seal", start: sealAt, end: exportAt },
-						{ name: "export", start: exportAt, end: adoptAt },
-						{ name: "adopt", start: adoptAt, end: adoptedAt },
-						{ name: "handoff", start: adoptedAt, end: installed.start },
-						{ name: "install", start: installed.start, end: installed.end },
-						{ name: "converge", start: installed.end, end: lull?.creator.start ?? convergedAt },
+						{ name: "seal", start: sealAt, end: adoptAt },
+						{ name: "adopt", start: adoptAt, end: exportAt },
+						{ name: "export", start: exportAt, end: exportedAt },
+						{ name: "install", start: exportedAt, end: installedAt },
+						{ name: "converge", start: installedAt, end: lull?.creator.start ?? convergedAt },
 						...(lull === undefined
 							? []
 							: [
