@@ -1,7 +1,9 @@
 # @ts-drp/room-worker
 
-Opt-in: host an app's room in a dedicated worker, so the page's main thread keeps only rendering and
-input. Apps that do not opt in run exactly as before; nothing here changes the main-thread API.
+Host an app's room in a dedicated worker, so the page's main thread keeps only rendering and input.
+An app adopts it explicitly; apps that do not run exactly as before, and nothing here changes the
+main-thread API. The shipped apps (Grid, Canvas, Chat) host their room here by default and open it
+on the main thread with `?mainThread`, or when the browser cannot host it in a worker (Fallback).
 
 ## The split
 
@@ -75,4 +77,12 @@ not offer it again. A fresh operation id would turn one intent into two operatio
 
 Each libp2p stream is a WebRTC data channel the page opens and transfers; `roomWorkerRtcStats()`
 reports channel counts and attach latency, so an app can see what that adds to join and first
-delivery. `openRoomWorker({ meter })` measures the bridge's main-thread cost per message.
+delivery. `openRoomWorker({ meter })` measures the bridge's main-thread cost per message;
+`createRoomWorkerFrameMeter` (from `@ts-drp/room-worker/page`) is that meter per page frame, split
+between the library and the app's rendering, with optional per-command and per-stream latency stages.
+
+## Formal model
+
+`formal/room-worker-bridge.qnt` models the page↔worker ordering and handoff: commands in the page's
+order, results after their stream values, `latest` credit, close, and a reopen with a new session.
+`formal/README.md` has the properties, the broken variants that violate them, and the commands.
