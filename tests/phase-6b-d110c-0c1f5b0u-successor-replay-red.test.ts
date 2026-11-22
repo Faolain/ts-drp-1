@@ -251,6 +251,10 @@ async function genuineSuccessor() {
 	const reopen = async () => {
 		const reopened = await createV3RoomSession({
 			...input,
+			// The creator reopens as the creator (the shipped wiring passes its finality signer): a
+			// session of the creator's author without it is not current until it confirms a creator
+			// statement (decision B), and nothing else can make one.
+			creatorFinalitySigner: finality.signer,
 			roomHeadAuthority: { ...roomHeadAuthority, initialization: { kind: "reopen" } },
 			successorSnapshotDeclaration: declaration,
 		});

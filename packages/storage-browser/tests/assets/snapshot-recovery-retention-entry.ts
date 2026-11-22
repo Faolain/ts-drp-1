@@ -15,9 +15,11 @@ import {
 	stable,
 } from "../../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import {
+	type OrphanedCloseScopeCase,
 	retain,
 	type RetentionCase,
 	type RetentionEnvironment,
+	runOrphanedCloseScopeCase,
 	runRetentionCase,
 	runTemporaryAdmissionCase,
 	type TemporaryAdmissionCase,
@@ -474,6 +476,8 @@ async function run(name: RetentionCase | NativeCase | `temporary-${TemporaryAdmi
 			return await runNative(name as NativeCase, env, databaseName);
 		if (name.startsWith("temporary-"))
 			return await runTemporaryAdmissionCase(name.slice(10) as TemporaryAdmissionCase, env);
+		if (name.startsWith("orphaned-"))
+			return await runOrphanedCloseScopeCase(name.slice(9) as OrphanedCloseScopeCase, env);
 		return await runRetentionCase(name as RetentionCase, env);
 	} finally {
 		for (const store of stores) await store.close();
@@ -483,7 +487,7 @@ async function run(name: RetentionCase | NativeCase | `temporary-${TemporaryAdmi
 declare global {
 	interface Window {
 		runSnapshotRecoveryRetention(
-			name: RetentionCase | NativeCase | `temporary-${TemporaryAdmissionCase}`
+			name: RetentionCase | NativeCase | `temporary-${TemporaryAdmissionCase}` | `orphaned-${OrphanedCloseScopeCase}`
 		): Promise<unknown>;
 		runSnapshotRetirementSourceImage(): Promise<unknown>;
 		runIssuanceRetirementSourceControl(): Promise<unknown>;

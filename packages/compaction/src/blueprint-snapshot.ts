@@ -58,6 +58,11 @@ export interface ImportBlueprintSnapshotPayloadInput {
 	readonly expectedPayloadDigest: string;
 	readonly expectedSchemaVersion: number;
 	readonly maxSnapshotBytes: number;
+	/**
+	 * The room's application state limit (its authenticated parameters): the imported machine's state
+	 * bound. Absent, the machine's own default (32,768 bytes), never the snapshot bound.
+	 */
+	readonly maxApplicationStateBytes?: number;
 	readonly preparedBlueprintRuntime: PreparedBlueprintRuntime;
 }
 
@@ -253,7 +258,7 @@ export function importBlueprintSnapshotPayload(
 		throw new TypeError("snapshot application state digest does not match");
 	}
 	const machine = new BlueprintStateMachine({
-		maxApplicationStateBytes: input.maxSnapshotBytes,
+		...(input.maxApplicationStateBytes === undefined ? {} : { maxApplicationStateBytes: input.maxApplicationStateBytes }),
 		exactCanonicalInitialStateBytes: exactCanonicalStateBytes,
 		expectedBlueprintDigest: input.expectedBlueprintDigest,
 		expectedInitialStateDigest: input.expectedApplicationStateDigest,

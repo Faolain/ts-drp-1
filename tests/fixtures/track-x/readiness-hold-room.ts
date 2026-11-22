@@ -84,9 +84,14 @@ export async function readinessHoldRoom(
 		/** Parent-owned directory for native process-death/reopen tests. */
 		directory?: string;
 		window?: V3RoomApplication["ordinaryFinishingWindow"];
-		parameters?: Partial<typeof defaultParameters>;
+		/** Parameter overrides, including the room's optional application state limit. */
+		parameters?: Partial<typeof defaultParameters & { maxApplicationStateBytes: number }>;
 		/** Non-creator Writers (default 1; row 60 R5 refusal case c uses 2). */
 		writers?: number;
+		/** The shipped zone's per-epoch admission policy factory (Grid wires outcome-commit's). */
+		createOperationAdmissionPolicy?: CreateV3RoomSessionInput["createOperationAdmissionPolicy"];
+		/** Replaces parts of every peer's zone application (for example, its resource bound reader). */
+		wrapApplication?: (zone: ReturnType<typeof createV3ZoneApplication>) => ReturnType<typeof createV3ZoneApplication>;
 	}> = {}
 ) {
 	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "track-x-readiness-hold-"));
@@ -98,8 +103,9 @@ export async function readinessHoldRoom(
 	const creator = required(identities[0]);
 	const roster = identities.map(({ author }, order) => ({ author, order, peerId: `track-x-hold-peer-${order}` }));
 	const zone = createV3ZoneApplication(roster, required(roster[0]).peerId, creator.author);
-	const application: typeof zone =
+	const windowed: typeof zone =
 		options.window === undefined ? zone : { ...zone, ordinaryFinishingWindow: options.window };
+	const application: typeof zone = options.wrapApplication?.(windowed) ?? windowed;
 	const parameters = Object.freeze({ ...defaultParameters, ...options.parameters });
 	const objectId = `creator:${hex(hashDomain("track-x-readiness-hold-object/v1", new TextEncoder().encode(directory))).slice(0, 32)}`;
 	const signers = [{ publicKey: creator.author, signerId: "creator" }];
@@ -129,6 +135,8 @@ export async function readinessHoldRoom(
 				version: 3,
 			}),
 			exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
+			// Deliberately creator-trusted-settlement-v1: this fixture tests that profile's settlement,
+			// whatever profile a shipped app signs; it does not mirror a shipped app.
 			exactCanonicalProfileBytes: encodeCanonical({
 				cryptoSuiteId: "ed25519-sha256-v3",
 				profileId: "creator-trusted-settlement-v1",
@@ -141,6 +149,7 @@ export async function readinessHoldRoom(
 		});
 	const invite = await material(objectId);
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (
 		index: number,
 		openOptions: Readonly<{
@@ -165,6 +174,15 @@ export async function readinessHoldRoom(
 			 * fault); unlike the hooks above, it may change results.
 			 */
 			host?: (host: V3RoomStorageHost) => V3RoomStorageHost;
+			/**
+			 * The test's own wrapper of this peer's vertex signer (for example, to fail one signature);
+			 * it may change results. `sign` is the peer's genuine Ed25519 signer.
+			 */
+			sign?: (
+				digest: Uint8Array,
+				request: unknown,
+				sign: (digest: Uint8Array) => Promise<Uint8Array>
+			) => Promise<Uint8Array>;
 		}> = {}
 	) => {
 		const identity = required(identities[index]);
@@ -242,6 +260,9 @@ export async function readinessHoldRoom(
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
 				: {}),
 			creatorInvite: openOptions.room?.invite ?? invite,
+			...(options.createOperationAdmissionPolicy === undefined
+				? {}
+				: { createOperationAdmissionPolicy: options.createOperationAdmissionPolicy }),
 			databaseName: name,
 			issuanceDatabaseName: name,
 			migrationDatabaseNamespace: name,
@@ -249,7 +270,10 @@ export async function readinessHoldRoom(
 			objectId: openOptions.room?.objectId ?? objectId,
 			publicKeyBytes: ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
-			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
+			signRegisteredVertexDigest: (digest, request) => {
+				const genuine = (value: Uint8Array): Promise<Uint8Array> => Promise.resolve(ed25519.sign(value, identity.seed));
+				return openOptions.sign === undefined ? genuine(digest) : openOptions.sign(digest, request, genuine);
+			},
 			onProjection: () => openOptions.onProjection?.(hookPeer),
 			onAcceptedVertex: (vertex) => {
 				const digest = hex(vertex.digest);
@@ -314,6 +338,13 @@ export async function readinessHoldRoom(
 		rooms.add(room);
 		resolveSession(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen === true && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		/**
 		 * Delivers signed rows of another peer and waits until the last one is accepted.
 		 * @param rows - Signed rows of the sender, in issue order.

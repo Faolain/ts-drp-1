@@ -3,6 +3,8 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 
 export const OUTCOME_COMMIT_MAX_PAYLOAD_BYTES = 8_192;
 export const OUTCOME_COMMIT_MAX_PROOF_BYTES = 32_768;
+/** A room's application state limit when it declares none (the room refuses any operation past it). */
+const OUTCOME_ROOM_STATE_DEFAULT_BYTES = 32_768;
 
 const INTENT_DOMAIN = "ts-drp/outcome-intent/v1";
 const PAYLOAD_DOMAIN = "ts-drp/outcome-payload/v1";
@@ -666,11 +668,19 @@ export function createOutcomeCommitAdmissionPolicy(
 		readonly maxEntries: number;
 		readonly objectId: string;
 		readonly authenticatedApplicationStateBytes?: Uint8Array;
+		/** The room's application state limit (canonical bytes); 32,768 when the room declares none. */
+		readonly maxApplicationStateBytes?: number;
 	}>
 ): OutcomeCommitAdmissionPolicy {
-	const record = exactRecord(input, ADMISSION_POLICY_KEYS) ?? exactRecord(input, [...ADMISSION_POLICY_KEYS, "authenticatedApplicationStateBytes"]);
+	const optionalKeys = (["authenticatedApplicationStateBytes", "maxApplicationStateBytes"] as const).filter(
+		(key) => typeof input === "object" && input !== null && Object.hasOwn(input, key)
+	);
+	const record = exactRecord(input, [...ADMISSION_POLICY_KEYS, ...optionalKeys]);
+	const maxApplicationStateBytes = record?.maxApplicationStateBytes ?? OUTCOME_ROOM_STATE_DEFAULT_BYTES;
 	if (
 		record === undefined ||
+		!Number.isSafeInteger(maxApplicationStateBytes) ||
+		(maxApplicationStateBytes as number) < 1 ||
 		typeof record.aclDigest !== "string" ||
 		!DIGEST.test(record.aclDigest) ||
 		typeof record.anchorDigest !== "string" ||
@@ -704,7 +714,8 @@ export function createOutcomeCommitAdmissionPolicy(
 	};
 	if (record.authenticatedApplicationStateBytes !== undefined) {
 		const exactState = strictBytes(record.authenticatedApplicationStateBytes);
-		if (exactState === undefined || exactState.byteLength > 32_768) throw new TypeError("outcome inherited state is unbounded");
+		if (exactState === undefined || exactState.byteLength > (maxApplicationStateBytes as number))
+			throw new TypeError("outcome inherited state is unbounded");
 		for (const outcome of inheritedOutcomes(decodeCanonical(exactState))) {
 			if (registry.commit(outcome) !== "committed") throw new TypeError("outcome inherited registry is invalid");
 		}

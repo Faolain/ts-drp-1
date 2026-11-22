@@ -36,14 +36,20 @@ const { decodeCanonical, encodeCanonical } = (
  * only by the contexts explicitly installed together for one test.
  * @param contexts Browser contexts sharing one test-owned external account.
  * @param factoryName App-owned acquisition hook; Grid remains the default.
+ * @param initializationForJoin How a join opens this account's floor: "reopen" (a shared account
+ * whose creator made the floor), "create" (a newly owned independent account, joining once), or
+ * "create-then-reopen" (an independent account whose player joins, leaves and joins again: "create"
+ * until this account has created the room's floor, "reopen" afterwards).
  */
 export async function installGridRoomHeadAuthority(
 	contexts: readonly BrowserContext[],
 	factoryName = "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__",
-	initializationForJoin: "create" | "reopen" = "reopen"
+	initializationForJoin: JoinInitialization = "reopen"
 ): Promise<void> {
 	await installNativeRoomHeadAuthority(contexts, factoryName, initializationForJoin);
 }
+
+type JoinInitialization = "create" | "reopen" | "create-then-reopen";
 
 /**
  * Bridges genuine native floor proof ports for shipped browser app tests.
@@ -51,11 +57,12 @@ export async function installGridRoomHeadAuthority(
  * The same native owner supplies CAS, bounded images and joined reservations.
  * @param contexts Contexts explicitly sharing this one test-owned account.
  * @param factoryName Existing app acquisition hook.
+ * @param initializationForJoin How a join opens this account's floor (see installGridRoomHeadAuthority).
  */
 async function installNativeRoomHeadAuthority(
 	contexts: readonly BrowserContext[],
 	factoryName: string,
-	initializationForJoin: "create" | "reopen"
+	initializationForJoin: JoinInitialization
 ): Promise<void> {
 	if (contexts.length === 0) return;
 	const { createNodeRoomHeadAuthority } = (
@@ -200,8 +207,16 @@ async function installNativeRoomHeadAuthority(
 					const scope = { objectId: open.objectId, pinnedGenesisAnchorDigest: digest };
 					// Explicit host choice for a newly owned independent account; never
 					// infer creation permission from a missing file. Shared-account tests
-					// retain their original join=reopen contract by default.
-					const initialization = { kind: open.operation === "create" ? ("create" as const) : initializationForJoin };
+					// retain their original join=reopen contract by default. A returning
+					// player reopens the floor this account itself created (recorded in the
+					// test process when its create succeeded), never creates it again.
+					const joinKind =
+						initializationForJoin === "create-then-reopen"
+							? genesisByObject.has(open.objectId)
+								? ("reopen" as const)
+								: ("create" as const)
+							: initializationForJoin;
+					const initialization = { kind: open.operation === "create" ? ("create" as const) : joinKind };
 					const filename = join(directory, `${createHash("sha256").update(open.objectId).digest("hex")}.sqlite`);
 					// Reopen is native mode=rw, not existence-based permission to create.
 					const native = createNodeRoomHeadAuthority({ filename, initialization });

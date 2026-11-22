@@ -5,8 +5,10 @@ import { resolve } from "node:path";
 import type { NativeCase } from "./assets/snapshot-recovery-retention-entry.js";
 import { type Phase4cBrowserServer, startPhase4cBrowserServer } from "./phase-4c-browser-server.js";
 import {
+	expectedOrphanedCloseScopeCase,
 	expectedRetentionCase,
 	expectedTemporaryAdmissionCase,
+	ORPHANED_CLOSE_SCOPE_CASES,
 	RETENTION_CASES,
 	TEMPORARY_ADMISSION_CASES,
 } from "../../../tests/fixtures/snapshot-recovery-retention/contract.ts";
@@ -21,6 +23,14 @@ for (const name of TEMPORARY_ADMISSION_CASES)
 		);
 		await persistObservation(testInfo, "native-temporary-admission", result);
 		expect(result).toEqual(expectedTemporaryAdmissionCase(name));
+	});
+for (const name of ORPHANED_CLOSE_SCOPE_CASES)
+	test(`native orphaned close scope ${name} is visible to the admission image`, async ({ page }, testInfo) => {
+		await page.goto(server.origin);
+		await page.waitForFunction(() => typeof window.runSnapshotRecoveryRetention === "function");
+		const result = await page.evaluate((selected) => window.runSnapshotRecoveryRetention(`orphaned-${selected}`), name);
+		await persistObservation(testInfo, "native-orphaned-close-scope", result);
+		expect(result).toEqual(expectedOrphanedCloseScopeCase(name));
 	});
 async function persistObservation(testInfo: TestInfo, name: string, result: unknown): Promise<void> {
 	const path = testInfo.outputPath(`${name}.json`);

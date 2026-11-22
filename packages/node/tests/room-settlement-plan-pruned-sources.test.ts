@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { encodeCanonical } from "@ts-drp/canonical";
+import { normalizeSettlementSourceAuthorities, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
 import { describe, expect, it } from "vitest";
 
 // Track X, decision row 60 (R5, piece 2): the room's merged settlement plan carries prior entries
@@ -52,6 +53,10 @@ async function merge(entries: readonly Entry[], pruned: ReadonlySet<number>, sca
 		sameBytes,
 		encodeCanonical,
 		sameSettlementEntry: (left: Entry, right: Entry) => left === right,
+		// 34b08cd7: the merge carries each retained entry's exact source contexts.
+		settlementSourceContextsForEntries,
+		// And its source-authority records (cold reopen fix).
+		normalizeSettlementSourceAuthorities,
 		issuanceStore: {
 			readIssued: async (at: unknown, sequence: number) => {
 				expect(at).toBe(scope);

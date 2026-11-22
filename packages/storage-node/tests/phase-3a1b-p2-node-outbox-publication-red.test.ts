@@ -4,6 +4,8 @@ import path from "node:path";
 import { DatabaseSync, StatementSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
+
 import { derivedFilename, loadPhase2lCNodeModule } from "./fixtures/phase-2l-c-node-issuance-contract.js";
 import {
 	errorShape,
@@ -14,6 +16,10 @@ import {
 	PHASE_3A1B_P2_OTHER_SCOPE,
 	PHASE_3A1B_P2_SCOPE,
 } from "../../../tests/fixtures/phase-3a1b-p2-outbox-publication-contract.js";
+
+// The Node facade is the eight-member contract plus its native-only read reservation
+// (ea4eb158); the contract type and the browser facade stay at eight.
+const NODE_FACADE_METHODS = Object.freeze([...PHASE_3A1B_P2_METHODS, "acquireNativeReadReservation"].sort());
 
 const directories: string[] = [];
 
@@ -121,7 +127,9 @@ async function tracedNodeMark(
 		const owner = statements.get(this);
 		if (owner !== undefined) {
 			const sql = owner.sql;
-			const event = /\bFROM\s+lineages\b/iu.test(sql)
+			const event = /^\s*SELECT\s+length\(pending_unsigned\)[\s\S]*\bFROM\s+lineages\b/iu.test(sql)
+				? "lineage-size"
+				: /\bFROM\s+lineages\b/iu.test(sql)
 				? "lineage-select"
 				: /\bFROM\s+issued_records\b/iu.test(sql)
 					? "issued-read"
@@ -156,10 +164,10 @@ async function tracedNodeMark(
 }
 
 describe("D.93.29 Seam 2 Node durable publication", () => {
-	it("freezes the eight-member facade and exact synchronous writer/readback source trace", async () => {
+	it("freezes the eight-member contract facade plus native read reservation and exact synchronous writer/readback source trace", async () => {
 		const store = await open(primary("surface"));
-		expect(Object.keys(store).sort()).toEqual(PHASE_3A1B_P2_METHODS);
-		expect(Reflect.ownKeys(store).sort()).toEqual(PHASE_3A1B_P2_METHODS);
+		expect(Object.keys(store).sort()).toEqual(NODE_FACADE_METHODS);
+		expect(Reflect.ownKeys(store).sort()).toEqual(NODE_FACADE_METHODS);
 		expect(Object.getPrototypeOf(store)).toBe(Object.prototype);
 		expect(Object.isFrozen(store)).toBe(true);
 		await store.close();
@@ -175,12 +183,16 @@ describe("D.93.29 Seam 2 Node durable publication", () => {
 		expect(implementation).toContain("#readTerminal");
 		expect(PHASE_3A1B_P2_NODE_TRACE).toEqual([
 			"begin-immediate",
+			"lineage-size",
 			"lineage-select",
 			"issued-read",
 			"outbox-read",
+			"lineage-size",
+			"lineage-select",
 			"outbox-update",
 			"mutation-commit",
 			"readonly-begin",
+			"lineage-size",
 			"lineage-select",
 			"issued-read",
 			"outbox-read",
@@ -216,12 +228,16 @@ describe("D.93.29 Seam 2 Node durable publication", () => {
 		expect(new Set(trace.map(({ database }) => database))).toEqual(new Set([derivedFilename(filename)]));
 		expect(
 			trace
-				.filter(({ event }) => ["lineage-select", "issued-read", "outbox-read"].includes(event))
+				.filter(({ event }) => ["lineage-size", "lineage-select", "issued-read", "outbox-read"].includes(event))
 				.map(({ parameters }) => parameters)
 		).toEqual([
 			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author],
+			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author],
 			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author, 0],
 			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author, 0],
+			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author],
+			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author],
+			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author],
 			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author],
 			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author, 0],
 			[PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author, 0],
@@ -293,7 +309,8 @@ describe("D.93.29 Seam 2 Node durable publication", () => {
 			Promise.resolve(phase3a1bP2Commit(PHASE_3A1B_P2_SCOPE, ordinal, 67))
 		);
 		await seed.close();
-		const database = new DatabaseSync(derivedFilename(filename));
+		// Out-of-band damage fixture (ea4eb158 fences raw writers; see out-of-band-sqlite.ts).
+		const database = allowOutOfBandWrites(new DatabaseSync(derivedFilename(filename)));
 		database
 			.prepare("DELETE FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?")
 			.run(PHASE_3A1B_P2_SCOPE.objectId, PHASE_3A1B_P2_SCOPE.author, 0);

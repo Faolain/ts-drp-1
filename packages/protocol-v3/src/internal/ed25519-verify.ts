@@ -8,6 +8,19 @@ const MEMO_LIMIT = 2048;
 const MEMO_MAX_MESSAGE_BYTES = 256;
 const memo = new Map<string, boolean>();
 
+/** Measurement seam (count-based cost tests): told of every verification, and whether it was
+ * computed or answered by the exact-byte memo. Undefined unless a test installs one; never authority. */
+export type Ed25519VerifyObserver = (outcome: "computed" | "memo") => void;
+let verifyObserver: Ed25519VerifyObserver | undefined;
+
+/**
+ * Installs (or, with undefined, removes) the verification observer.
+ * @param observer - Called once per verifyEd25519 call; never alters a result.
+ */
+export function observeEd25519Verifications(observer: Ed25519VerifyObserver | undefined): void {
+	verifyObserver = observer;
+}
+
 function bytesKey(signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array): string {
 	let key = `${signature.byteLength}.${message.byteLength}.${publicKey.byteLength}:`;
 	for (const part of [signature, message, publicKey])
@@ -24,11 +37,17 @@ function bytesKey(signature: Uint8Array, message: Uint8Array, publicKey: Uint8Ar
  */
 export function verifyEd25519(signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array): boolean {
 	if (!(signature instanceof Uint8Array && message instanceof Uint8Array && publicKey instanceof Uint8Array) ||
-		message.byteLength > MEMO_MAX_MESSAGE_BYTES)
+		message.byteLength > MEMO_MAX_MESSAGE_BYTES) {
+		if (verifyObserver !== undefined) verifyObserver("computed");
 		return ed25519.verify(signature, message, publicKey, { zip215: false });
+	}
 	const key = bytesKey(signature, message, publicKey);
 	const known = memo.get(key);
-	if (known !== undefined) return known;
+	if (known !== undefined) {
+		if (verifyObserver !== undefined) verifyObserver("memo");
+		return known;
+	}
+	if (verifyObserver !== undefined) verifyObserver("computed");
 	const verified = ed25519.verify(signature, message, publicKey, { zip215: false });
 	if (memo.size >= MEMO_LIMIT) memo.delete(memo.keys().next().value!);
 	memo.set(key, verified);

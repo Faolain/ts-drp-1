@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 import { fixture, outcome } from "../../../../tests/fixtures/snapshot-recovery-owner/contract.js";
+import { allowOutOfBandWrites } from "./out-of-band-sqlite.js";
 import { createNodeSnapshotQuarantineStore } from "../../src/snapshot-transfer.js";
 
 const [primaryFilename, mode, control, token, objectId] = process.argv.slice(2);
@@ -105,7 +106,8 @@ async function run(): Promise<void> {
 			}
 		} else if (control === "control") {
 			// Native fault-instrumentation control only; this is NOT adapter retention.
-			const database = new DatabaseSync(`${primaryFilename}.drp-snapshot-quarantine-v1.sqlite`);
+			// A raw native connection, so it admits its own writes past the ea4eb158 owner fences.
+			const database = allowOutOfBandWrites(new DatabaseSync(`${primaryFilename}.drp-snapshot-quarantine-v1.sqlite`));
 			try {
 				database.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL");
 				armed = true;

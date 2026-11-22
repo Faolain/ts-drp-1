@@ -3,7 +3,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { createHash } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -147,7 +147,26 @@ export interface RoomOptions {
 	/** Optional genuine network boundary for native transport composition checks. */
 	readonly network?: ReturnType<typeof memoryNetwork>;
 	readonly peerIds?: readonly string[];
-	onAccepted?(index: number, digest: string, author: string): void;
+	onAccepted?(
+		index: number,
+		digest: string,
+		author: string,
+		vertex?: Readonly<{ epoch: number; operation: Readonly<Record<string, unknown>> }>
+	): void;
+	/**
+	 * One native storage host and directory per peer (as on separate devices) instead of one shared
+	 * host for every peer in this process. Reopen is not supported with it.
+	 */
+	readonly separateStorage?: boolean;
+	/** Measurement seam: called for every author-key vertex signature a peer makes. */
+	onSign?(index: number): void;
+	/**
+	 * The creator's observation-only received-move capacity refusal (the session's
+	 * onIngressCapacityRefusal), as the pages wire it to their rollover policy.
+	 */
+	onIngressCapacityRefusal?(reason: string): void;
+	/** Extra session options for every opened peer (measurement harnesses, e.g. the scheduled lull). */
+	readonly sessionOptions?: Readonly<{ recoveryPoolScheduledLull?: boolean }>;
 }
 
 /**
@@ -219,6 +238,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		if (byDigest === undefined) sent.set(from, (byDigest = new Map()));
 		if (!byDigest.has(digest)) byDigest.set(digest, message);
 	});
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (index: number, openOptions: Readonly<{ reopen?: true }> = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
@@ -236,10 +256,18 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			application,
 			storageHost: openOptions.reopen
 				? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
-				: storageHost,
+				: options.separateStorage === true
+					? createNodeV3RoomStorageHost({
+							directory: mkdirSync(join(directory, name), { recursive: true }) ?? join(directory, name),
+							initialization: () => "create",
+						})
+					: storageHost,
 			author: identity.author,
 			...(index === 0
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
+				: {}),
+			...(index === 0 && options.onIngressCapacityRefusal !== undefined
+				? { onIngressCapacityRefusal: (reason: string) => options.onIngressCapacityRefusal?.(reason) }
 				: {}),
 			creatorInvite: invite,
 			databaseName: name,
@@ -249,11 +277,14 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			objectId,
 			publicKeyBytes: ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
-			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
+			signRegisteredVertexDigest: (digest) => {
+				options.onSign?.(index);
+				return Promise.resolve(ed25519.sign(digest, identity.seed));
+			},
 			onProjection: () => undefined,
 			onAcceptedVertex: async (vertex) => {
 				seen.add(hex(vertex.digest));
-				options.onAccepted?.(index, hex(vertex.digest), vertex.author);
+				options.onAccepted?.(index, hex(vertex.digest), vertex.author, vertex);
 				if (index === 0) await creatorGate.pass();
 			},
 			// The genuine room transport, as `DRPNode.openRoomNetwork` opens it (the creator
@@ -268,10 +299,18 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 				ports.set(index, port);
 				return port;
 			},
+			...(options.sessionOptions as object | undefined),
 		};
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen === true && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		return { index, name, peerId, room, floor, networkNode, adapter, accepted: seen };
 	};
 	/**
@@ -370,6 +409,10 @@ export function historyRequestMessage(objectId: string, sender: string): Message
 	});
 }
 
+/**
+ *
+ * @param ms
+ */
 export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**

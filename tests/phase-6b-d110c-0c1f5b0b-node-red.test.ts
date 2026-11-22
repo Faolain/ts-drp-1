@@ -1,9 +1,12 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+// The genuine replacement scenario opens browser snapshot quarantine stores.
+import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it, type Mock } from "vitest";
 
 import { runSharedPlaneScenario } from "./fixtures/phase-3g/rebase-outbox-fixture.js";
 import {
 	auditNodeSettlementSource,
+	runNativeHistoricalReplacement,
 	issueFence,
 	issueReplacement,
 	type OpenSettlementNode,
@@ -188,25 +191,36 @@ describe("D.110c-0c1f5b0b Node settlement RED", () => {
 	});
 
 	it("[RED] links one replacement exactly once across same-epoch retry and restart", async () => {
+		// Since ea4eb158 a replacement is issued only through its owning authenticated
+		// displaced source (source.issueReplacement); a raw planEffect on issueLocal is refused.
 		const opened = await node();
 		await writeSettlementPlan(opened.issuanceStore, settlementPlan(opened.scope));
 		const fenced = await issueFence(opened);
 		expect(fenced, "D110C_0C1F5B0B_REPLACEMENT_FENCE_PRECONDITION").toMatchObject({ ok: true });
-		if (!fenced.ok) return;
-		const replacement = await issueReplacement(opened);
-		expect(replacement).toMatchObject({ authorSequence: 2, ok: true });
-		if (!replacement.ok) return;
-		expect(await opened.issuanceStore.readSettlementPlan(opened.scope)).toMatchObject({
-			entries: [expect.objectContaining({ replacementSequence: 2, sourceSequence: 10 })],
+		expect(await issueReplacement(opened), "D110C_0C1F5B0B_RAW_REPLACEMENT_NEEDS_OWNING_SOURCE").toMatchObject({
+			kind: "authorization-rejected",
+			ok: false,
 		});
-		expect(await issueReplacement(opened, 10, 4)).toMatchObject({ ok: false });
-		const restarted = await reopenSettlementNode(opened);
-		try {
-			expect(await opened.issuanceStore.readLineage(opened.scope)).toEqual({ exhausted: false, next: 3 });
-		} finally {
-			restarted.deactivate();
-		}
-	});
+		expect(await opened.issuanceStore.readLineage(opened.scope)).toEqual({ exhausted: false, next: 2 });
+		// Genuine path: an actual displaced source from a real close and cold adoption.
+		const result = await runNativeHistoricalReplacement(false, false, false, false, false, false, false, true);
+		const replacement = result.replacement as { ok: boolean; authorSequence?: number };
+		expect(replacement, JSON.stringify(result)).toMatchObject({ ok: true });
+		const sequence = replacement.authorSequence as number;
+		const linked = result.linkedRetry as Readonly<Record<string, unknown>>;
+		expect(linked.linkedPlan, "D110C_0C1F5B0B_REPLACEMENT_LINKED_ATOMICALLY").toMatchObject({
+			entries: [expect.objectContaining({ replacementSequence: sequence, sourceSequence: 1 })],
+		});
+		expect(linked.linkedLineage).toEqual({ exhausted: false, next: sequence + 1 });
+		expect(linked.retry, "D110C_0C1F5B0B_SAME_EPOCH_RETRY_REFUSED").toMatchObject({ ok: false });
+		expect(linked.retryPlan, "D110C_0C1F5B0B_RETRY_LEAVES_PLAN").toEqual(linked.linkedPlan);
+		expect(linked.retryLineage, "D110C_0C1F5B0B_RETRY_ISSUES_NOTHING").toEqual(linked.linkedLineage);
+		expect(result.localReopened, "D110C_0C1F5B0B_RESTART_PRECONDITION").toBe(true);
+		expect(result.lineage, "D110C_0C1F5B0B_RESTART_KEEPS_ONE_REPLACEMENT").toEqual({ exhausted: false, next: sequence + 1 });
+		expect(result.plan).toMatchObject({
+			entries: [expect.objectContaining({ replacementSequence: sequence, sourceSequence: 1 })],
+		});
+	}, 120_000);
 
 	it("[RED] halts after outcome-unknown and reopens to the atomic row+link or neither", async () => {
 		const opened = await node();

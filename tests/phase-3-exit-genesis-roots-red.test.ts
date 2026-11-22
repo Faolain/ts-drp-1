@@ -4,6 +4,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { createHash } from "node:crypto";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import { V3_CHAT_GENESIS_PROFILE } from "../examples/v3-chat/src/profile.js";
 import type {
 	createV3RoomCreatorInviteMaterial as exportedCreateV3RoomCreatorInviteMaterial,
 	V3RoomCreatorInviteMaterial,
@@ -244,7 +245,7 @@ async function expectedChatAcl(objectId: string): Promise<Uint8Array> {
 			.sort((left, right) => (left.author < right.author ? -1 : left.author > right.author ? 1 : 0)),
 		objectId,
 		permissionless: false,
-		version: 1,
+		version: V3_CHAT_GENESIS_PROFILE.latchedAclVersion,
 	});
 }
 
@@ -254,8 +255,11 @@ function expectProductInput(
 		readonly acl: Uint8Array;
 		readonly blueprintDigest: string;
 		readonly objectId: string;
+		readonly profileId: string;
 		readonly signerAuthor: string;
 		readonly stateBytes: Uint8Array;
+		/** The room's application state limit the product creates its rooms with (absent: the default). */
+		readonly maxApplicationStateBytes?: number;
 	}>
 ): void {
 	expect(input.objectId).toBe(expected.objectId);
@@ -264,14 +268,20 @@ function expectProductInput(
 	expect(Reflect.get(input, "exactCanonicalApplicationStateBytes")).toEqual(expected.stateBytes);
 	expect(input.exactCanonicalLatchedAclBytes).toEqual(expected.acl);
 	expect(input.exactCanonicalParametersCarrierBytes).toEqual(
-		encodeCanonical({ ...EXPECTED_PARAMETERS, authorShareMultiplier: 4 })
+		encodeCanonical({
+			...EXPECTED_PARAMETERS,
+			authorShareMultiplier: 4,
+			...(expected.maxApplicationStateBytes === undefined
+				? {}
+				: { maxApplicationStateBytes: expected.maxApplicationStateBytes }),
+		})
 	);
 	const signerSet = encodeCanonical([{ publicKey: expected.signerAuthor, signerId: "creator" }]);
 	expect(input.exactCanonicalSignerSetBytes).toEqual(signerSet);
 	expect(input.exactCanonicalProfileBytes).toEqual(
 		encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			profileId: "creator-trusted-v1",
+			profileId: expected.profileId,
 			quorum: 1,
 			signers: [{ publicKey: expected.signerAuthor, signerId: "creator" }],
 		})
@@ -608,6 +618,7 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 			acl: await expectedChatAcl(chatObjectId),
 			blueprintDigest: chatBlueprintDigest,
 			objectId: chatObjectId,
+			profileId: V3_CHAT_GENESIS_PROFILE.profileId,
 			signerAuthor: creatorFinality.localAuthorId,
 			stateBytes: chatStateBytes,
 		});
@@ -641,12 +652,15 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 				].sort((left, right) => (left.author < right.author ? -1 : left.author > right.author ? 1 : 0)),
 				objectId: zoneInput.objectId,
 				permissionless: false,
-				version: 1,
+				version: 3,
 			}),
 			blueprintDigest: zoneBlueprintDigest,
 			objectId: zoneInput.objectId,
+			profileId: "creator-trusted-settlement-v1",
 			signerAuthor: zoneCreatorAuthor,
 			stateBytes: zoneStateBytes,
+			// Grid creates its rooms with an explicit limit covering its bounded board (owner decision 2026-11-21).
+			maxApplicationStateBytes: 98_304,
 		});
 		await expectProductSigner(zoneInput, zoneCreator);
 		expect(builderProbe.materials).toHaveLength(2);

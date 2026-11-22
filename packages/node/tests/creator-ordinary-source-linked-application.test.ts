@@ -130,6 +130,7 @@ function captureFixture() {
 		outboxRowSnapshot: ({commit}: any, scope: any) => commit === null ? undefined : ({...commit.envelope, scope}),
 		classifyRebaseRow: (_registration: any, snapshot: any) => state.classify ? {row: snapshot, authenticated: auth(snapshot.canonicalPreimageBytes)} : undefined,
 		validRebaseRow: () => state.classify, createCreatorCensusVertexFacts: () => ({}),
+		createOwnEpochFenceReader: () => async () => new Map(),
 		ownSourceSettlementIsComplete: async () => {state.completions++; return state.complete;}});
 	const journal: any[] = [{journalSequence: 0, sourceKind: "received", digest: target.vertexDigest, byteCharge: target.exactCanonicalPreimageBytes.byteLength,
 		exactCanonicalPreimageBytes: target.exactCanonicalPreimageBytes.slice(), detachedSignature: target.detachedSignature.slice(),

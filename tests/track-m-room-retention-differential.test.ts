@@ -19,8 +19,13 @@ import {
 // beside the existing boundary's first pass: it plans from the SAME acquisition, plans
 // its first decision's exact rows in a discarded room transaction, and writes nothing;
 // the existing passes then run unchanged. The issuance holes the decisions would commit
-// must equal the existing planner's. Rows the existing planner deletes that the
-// decisions do not are reported (a retention gap retains more; it is never unsafe).
+// must equal the holes the existing planner selects from that SAME acquisition (the
+// first pass, beside which the probe ran). A later pass of the same lull may release
+// further holes at the same cut once their last journal consumer is gone (07252cc7:
+// the cut is a monotone frontier, not intent identity); that pass plans from a newer
+// pre-state, so it is compared only for safety: every hole the existing planner still
+// holds after the lull is one the decisions hold too. Rows the existing planner deletes
+// that the decisions do not are reported (a retention gap retains more; it is never unsafe).
 
 type Dump = Record<string, [unknown, unknown][]>;
 type Event = Readonly<Record<string, unknown>>;
@@ -125,12 +130,17 @@ function random(seed: number): () => number {
 
 const plans: Event[] = [];
 const declines: Event[] = [];
+// Probe and existing hole selections in observation order.
+const observed: Event[] = [];
 let armed = false;
 let restore: (() => void) | undefined;
 beforeEach(() => {
 	plans.length = 0;
 	declines.length = 0;
+	observed.length = 0;
 	restore = installEnvironment((event) => {
+		if (event.kind === "room-retention-plan-only" || event.kind === "closed-retirement-issuance-holes")
+			observed.push(event);
 		if (event.kind === "room-retention-plan-only") plans.push(event);
 		if (event.kind === "room-retention-declined") declines.push(event);
 	});
@@ -158,6 +168,8 @@ interface LullReport {
 	readonly gap: readonly string[];
 	readonly holes: "equal" | "differ" | "none";
 	readonly holeDetail?: unknown;
+	/** Holes the existing planner holds after the whole lull that the decisions would release. */
+	readonly releasedHoles: readonly string[];
 }
 
 async function lull(
@@ -170,6 +182,7 @@ async function lull(
 	const database = fixture.host.database(who === "creator" ? "creator" : "observer");
 	const pre = await dumpDatabase(database);
 	const before = plans.length;
+	const observedBefore = observed.length;
 	armed = true;
 	await room.room.maintainRecoveryPool();
 	armed = false;
@@ -190,6 +203,7 @@ async function lull(
 			unsafe: [],
 			gap: [],
 			holes: "none",
+			releasedHoles: [],
 		});
 		return;
 	}
@@ -197,6 +211,16 @@ async function lull(
 	const named = predicted(event, pre);
 	const selections = event.selections as readonly Selection[];
 	const holes = selections[0]?.issuance.protectedRecords;
+	// The existing planner's selection from the probe's own acquisition: the first hole
+	// selection the existing install made after the probe in this lull.
+	const lullEvents = observed.slice(observedBefore);
+	const existingFirst = lullEvents
+		.slice(lullEvents.indexOf(event) + 1)
+		.find((item) => item.kind === "closed-retirement-issuance-holes");
+	expect(existingFirst, `${who} lull ${epoch}: the existing pass selected holes beside the probe`).toBeDefined();
+	const existingHoles = existingFirst?.holes ?? null;
+	const finalHoles = (issuanceHoles(post) ?? []) as readonly unknown[];
+	const plannedHoles = new Set(((holes ?? []) as readonly unknown[]).map(stable));
 	reports.push({
 		epoch,
 		who,
@@ -205,10 +229,9 @@ async function lull(
 		deleted: deleted.size,
 		unsafe: [...named].filter((id) => !deleted.has(id)),
 		gap: [...deleted].filter((id) => !named.has(id)),
-		holes: stable(holes) === stable(issuanceHoles(post)) ? "equal" : "differ",
-		...(stable(holes) === stable(issuanceHoles(post))
-			? {}
-			: { holeDetail: { planned: holes, existing: issuanceHoles(post) } }),
+		holes: stable(holes) === stable(existingHoles) ? "equal" : "differ",
+		...(stable(holes) === stable(existingHoles) ? {} : { holeDetail: { planned: holes, existing: existingHoles } }),
+		releasedHoles: finalHoles.map(stable).filter((hole) => !plannedHoles.has(hole)),
 	});
 }
 
@@ -248,6 +271,8 @@ function verdict(label: string, reports: readonly LullReport[]): void {
 		// Safety: the retention decisions never delete a row the existing planner keeps.
 		expect(report.unsafe, at).toEqual([]);
 		if (report.planned) expect(report.holes, `${at}: issuance holes`).toBe("equal");
+		// Safety: the decisions never release a hole the existing planner still holds after the lull.
+		expect(report.releasedHoles, `${at}: holes the decisions would release`).toEqual([]);
 	}
 	// The probe ran on both peers once their pools were in steady turnover.
 	for (const who of ["creator", "recipient"] as const)

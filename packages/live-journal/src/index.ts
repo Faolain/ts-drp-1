@@ -3,6 +3,8 @@ export {
 	captureLiveJournalInput,
 	validateLiveJournalSnapshot,
 	captureSourceBoundJournalAppendInput,
+	captureLocalBatchJournalAppendInput,
+	classifyLiveJournalBatchAppendObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
@@ -12,8 +14,15 @@ export {
 	deriveLiveJournalSnapshotReadiness,
 	createLiveJournalSnapshotValidation,
 } from "./contract.js";
-export { LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES, LIVE_JOURNAL_DOMAINS, LIVE_JOURNAL_FAILURE_KINDS } from "./types.js";
+export {
+	LIVE_JOURNAL_ANCHOR_READ_MAX_BYTES,
+	LIVE_JOURNAL_APPEND_BATCH_MAX_ROWS,
+	LIVE_JOURNAL_DOMAINS,
+	LIVE_JOURNAL_FAILURE_KINDS,
+} from "./types.js";
 export type {
+	AppendAcceptedLocalBatchInput,
+	AppendAcceptedLocalBatchResult,
 	AppendAcceptedVertexInput,
 	AppendAcceptedVertexResult,
 	DurableLiveJournalStore,
@@ -72,10 +81,15 @@ export {
 	journalRetirementFrameDigest,
 	journalRetirementDrainItemCount,
 	reconstructJournalRetirementDrainSource,
+	journalRetirementDrainSourceCounts,
+	createJournalRetirementDrainSourceMemo,
+	JournalRetirementDrainSourceMemo,
 	advanceJournalRetirementControl,
 	advanceJournalRetirementMutationControl,
 	journalRetirementImage,
 	createJournalRetirementImageCapture,
+	journalRetirementImageOfCapturedFrames,
+	journalResidualImageDebug,
 	journalRetirementImageCountsFit,
 	journalRetirementRowCharge,
 	journalRetirementCanonicalRow,
@@ -86,6 +100,6 @@ export {
 	createJournalRetirementControlRead,
 } from "./retirement.js";
 export type { JournalRetirementDrainRow, JournalRetirementDrainHeader, JournalRetirementDrainItem } from "./retirement.js";
-export type { JournalFutureNativeWidths } from "./retirement.js";
+export type { JournalFutureNativeWidths, JournalRetirementDrainSourceCounts, JournalRetirementCapturedFrame } from "./retirement.js";
 export type { JournalOrdinaryFinishingCapacityProjection, JournalOrdinaryPhysicalGeometry,
 	JournalOrdinarySchemaFinishingCapacityInput } from "./retirement.js";

@@ -115,7 +115,7 @@ function fixture(profileId = "creator-trusted-v1", oldPayloadBytes = 700) {
 		isObject: (value: unknown) => value !== null && typeof value === "object",
 		lowerHexDigest: (value: Uint8Array) => Buffer.from(value).toString("hex"),
 		settlementProfileFor: (id: string) => id === "creator-trusted-settlement-v1" ? "v1" : undefined,
-		AHE_BOUNDED_READ_LIMITS: {maxBlobBytes: 786432}, preparedMigrationTargetFloors: new WeakMap(),
+		AHE_BOUNDED_READ_LIMITS: {maxBlobBytes: 786432}, preparedMigrationTargetFloors: new WeakMap(), ROOM_APPLICATION_STATE_BYTES: 32_768,
 		captureCreatorRecoveryRuntime: () => runtime, creatorOrdinaryIssuanceSourceIdentity: () => state.identity,
 		fullRecoveryCloseHoldFacts: (value: object) => value === hold && state.owned ? facts : undefined,
 		resolveCreatorOrdinarySourceCapture,
@@ -687,6 +687,8 @@ function terminalJournalAcknowledgement() {
 		requireLaw: (value: unknown, reason: string) => {if (!value) throw Error(reason);},
 		closedRetirementBytes: encodeCanonical,
 		closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+		// Row-by-row journal equality (as strict as one whole-array encode; the harness compares the arrays).
+		closedJournalRowsEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
 		journalRetirementDrainItemCount: () => 1,
 		advanceJournalRetirementMutationControl: (control: any) => ({...control, revision: control.revision + 1, drain: null}),
 		closedJournalNativeControlCarriers: (read: any) => [encodeCanonical(read.control)],
@@ -786,6 +788,7 @@ function terminalVerificationCustody() {
 		bindMethod: (owner: any, key: string) => owner[key].bind(owner),
 		requireLaw: (value: unknown, kind: string) => {if (!value) throw Error(kind);},
 		closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+		closedJournalRowsEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
 		closedRetirementBytes: encodeCanonical, encodeAheRetirementControl: encodeCanonical,
 		closedJournalNativeControlCarriers: () => [encodeCanonical(null)],
 		checkSourceImage: (actual: string, expected: string) => {expect(actual).toBe(expected);},
@@ -1612,13 +1615,15 @@ function roomBoundary(options: {profile?: string; receiveOnly?: boolean; prepare
 	 const shutdown=async()=>{calls.push("shutdown");closed=true;};
 	 const combineFailures=(primary,cleanup)=>new AggregateError([primary,cleanup]);
 	 const prepareCreatorOrdinaryReadiness=async current=>{calls.push("prepare");await options.prepare?.(current);};
+	 let poolMaintenanceBarrier;
+	 const drainPendingIssues=async()=>{};
 	 ${roomVariable("prepareCurrentCreatorOrdinaryReadiness")}
 	 ${roomVariable("rebasePromise")}
-	 return {done:rebasePromise,swap:()=>{activeHandle={};},failure:()=>terminalFailure};
+	 return {done:rebasePromise,swap:()=>{activeHandle={};},failure:()=>terminalFailure,issueBarrier:()=>poolMaintenanceBarrier};
 	`;
 	const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText;
 	return {plane, calls, ...new Function("options", "plane", "calls", js)(options, plane, calls)} as
-		{plane: object; calls: string[]; done: Promise<void>; swap(): void; failure(): unknown};
+		{plane: object; calls: string[]; done: Promise<void>; swap(): void; failure(): unknown; issueBarrier(): unknown};
 }
 
 describe("room explicit readiness boundary wiring", () => {
@@ -1631,7 +1636,10 @@ describe("room explicit readiness boundary wiring", () => {
 		await enteredPromise;
 		expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare"]);
 		expect(observed).toEqual([room.plane]); expect(ready).toBe(false);
+		// Local issues wait at the room's issue barrier while the readiness job holds the consumer.
+		expect(room.issueBarrier()).toBeInstanceOf(Promise);
 		release(); await room.done;
+		expect(room.issueBarrier()).toBeUndefined();
 		expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare", "publish"]);
 		expect(ready).toBe(true);
 	});

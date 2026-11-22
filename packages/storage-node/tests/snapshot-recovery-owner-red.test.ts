@@ -23,10 +23,21 @@ import {
 } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import * as sharedSnapshotContract from "../../storage/src/snapshot-transfer.js";
 import { createNodeSnapshotQuarantineStore } from "../src/snapshot-transfer.js";
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
 
 const directories: string[] = [];
 const stores: LegacyStore[] = [];
 const SOURCE_ROOT = resolve(import.meta.dirname, "../../..");
+// ea4eb158 migrated the Node snapshot schema v2 -> v6 (retirement controls, dependency slots,
+// owner classification intent). The shared contract still pins the v2-era common "fresh" image.
+const NODE_SNAPSHOT_SCHEMA_VERSION = 6;
+const NODE_SNAPSHOT_TABLES = [
+	"snapshot_chunks_v2",
+	"snapshot_dependency_slots",
+	"snapshot_owner_v2",
+	"snapshot_retirement_controls",
+	"snapshot_scopes_v2",
+];
 const SUFFIX = ".drp-snapshot-quarantine-v1.sqlite";
 
 function image(primaryFilename: string, readBigInts = false): OwnerImage {
@@ -42,13 +53,14 @@ function image(primaryFilename: string, readBigInts = false): OwnerImage {
 			.prepare("SELECT name FROM sqlite_schema WHERE type IN ('table','view') ORDER BY name")
 			.all()
 			.map(({ name }) => String(name));
-		const scopeTable = version === 2 ? "snapshot_scopes_v2" : "snapshot_scopes";
-		const chunkTable = version === 2 ? "snapshot_chunks_v2" : "snapshot_chunks";
+		// Schema 2 renamed the v1 tables; later versions (3-6, ea4eb158) keep the v2 tables.
+		const scopeTable = version >= 2 ? "snapshot_scopes_v2" : "snapshot_scopes";
+		const chunkTable = version >= 2 ? "snapshot_chunks_v2" : "snapshot_chunks";
 		return {
 			version,
 			names,
 			schema: db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all(),
-			ownerRows: version === 2 ? db.prepare("SELECT * FROM snapshot_owner_v2").all() : [],
+			ownerRows: version >= 2 ? db.prepare("SELECT * FROM snapshot_owner_v2").all() : [],
 			durableScopes: rows(`SELECT * FROM ${scopeTable} ORDER BY object_id,epoch,anchor,manifest_digest`),
 			durableChunks: rows(`SELECT * FROM ${chunkTable} ORDER BY object_id,epoch,anchor,manifest_digest,chunk_index`),
 			scopes: rows(
@@ -210,6 +222,7 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 			recovery_content_bytes: 0,
 			legacy_unclassified_scopes: 2,
 			legacy_unclassified_content_bytes: debt,
+			classification_intent: null,
 		},
 	]);
 	expect(after.durableScopes).toHaveLength(2);
@@ -222,10 +235,14 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 		incarnations.add(row.incarnation);
 	}
 	expect(incarnations.size).toBe(2);
+	// Columns the migration adds (received_certificate_bytes since ea4eb158) must start empty for legacy rows.
+	expect(after.durableScopes.map((row) => row.received_certificate_bytes)).toEqual([null, null]);
 	expect(
 		after.durableScopes.map((row) =>
 			Object.fromEntries(
-				Object.entries(row).filter(([key]) => !["retention", "incarnation", "descriptors"].includes(key))
+				Object.entries(row).filter(
+					([key]) => !["retention", "incarnation", "descriptors", "received_certificate_bytes"].includes(key)
+				)
 			)
 		)
 	).toEqual(before.durableScopes);
@@ -245,6 +262,7 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 			"retention",
 			"incarnation",
 			"descriptors",
+			"received_certificate_bytes",
 		];
 		const chunks = [
 			"object_id",
@@ -264,7 +282,10 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 			"recovery_content_bytes",
 			"legacy_unclassified_scopes",
 			"legacy_unclassified_content_bytes",
+			"classification_intent",
 		];
+		// ea4eb158 ALTER TABLE ... ADD COLUMN: nullable, no default.
+		const nullable = new Set(["descriptors", "received_certificate_bytes", "classification_intent"]);
 		const integers = new Set([
 			"epoch",
 			"total_bytes",
@@ -272,7 +293,7 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 			"expires_at",
 			"chunk_index",
 			"byte_length",
-			...owner,
+			...owner.filter((name) => name !== "classification_intent"),
 		]);
 		for (const [table, columns, primary] of [
 			["snapshot_scopes_v2", scope, 4],
@@ -285,10 +306,10 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 					name,
 					type: integers.has(name)
 						? "INTEGER"
-						: name === "exact_manifest_bytes" || name === "exact_bytes"
+						: name === "exact_manifest_bytes" || name === "exact_bytes" || name === "received_certificate_bytes"
 							? "BLOB"
 							: "TEXT",
-					notnull: name === "descriptors" ? 0 : 1,
+					notnull: nullable.has(name) ? 0 : 1,
 					dflt_value: name === "retention" ? "'legacy-unclassified'" : name === "incarnation" ? "''" : null,
 					pk: cid < primary ? cid + 1 : 0,
 					hidden: 0,
@@ -317,7 +338,12 @@ function assertCommittedMigration(primaryFilename: string, before: OwnerImage, a
 		expect(db.prepare("PRAGMA foreign_key_list(snapshot_scopes_v2)").all()).toEqual([]);
 		expect(db.prepare("PRAGMA foreign_key_list(snapshot_owner_v2)").all()).toEqual([]);
 		expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-		expect(db.prepare("SELECT name FROM sqlite_schema WHERE type IN ('view','trigger')").all()).toEqual([]);
+		// No views; the only triggers are the ea4eb158 owner write fences, one per table and mutation.
+		expect(db.prepare("SELECT name FROM sqlite_schema WHERE type IN ('view','trigger')").all()).toEqual(
+			["snapshot_scopes_v2", "snapshot_chunks_v2", "snapshot_owner_v2"].flatMap((table) =>
+				["insert", "update", "delete"].map((mutation) => ({ name: `snapshot_v4_${table}_${mutation}` }))
+			)
+		);
 	} finally {
 		db.close();
 	}
@@ -332,25 +358,51 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 	it("has one frozen shared snapshot contract runtime roster", () => {
 		expect(Object.keys(sharedSnapshotContract).sort()).toEqual([
 			"SNAPSHOT_QUARANTINE_RETENTION_MS",
+			"SNAPSHOT_RECEIVED_CERTIFICATE_MAX_BYTES",
+			"SNAPSHOT_RECEIVED_CERTIFICATE_WRAPPER_MAX_BYTES",
 			"snapshotQuarantineContract",
+			"snapshotRetirementContract",
 		]);
 		const contract = Reflect.get(sharedSnapshotContract, "snapshotQuarantineContract") as Record<string, unknown>;
 		expect(Object.isFrozen(contract)).toBe(true);
 		expect(Object.isFrozen(contract.limits) && Object.isFrozen(contract.defaultRecoveryLimits)).toBe(true);
 		expect(Object.keys(contract).sort()).toEqual([
 			"addRecoveryContentBytes",
+			"assertTemporaryAdmission",
+			"captureClassificationIntent",
 			"captureDeclaration",
 			"captureDescriptor",
 			"captureExactBytes",
+			"captureRecoveryDependencyScope",
+			"captureRecoveryDescriptorCarrier",
 			"captureRecoveryLimits",
+			"captureRecoveryRetirementScopes",
+			"captureRecoveryRoleCustody",
+			"captureRecoveryRoleObject",
+			"captureRecoveryRoleProtection",
+			"captureRecoveryRoleRetirementFact",
+			"captureRecoverySelector",
+			"captureRetentionOptions",
 			"captureScope",
+			"classificationSourceOwner",
+			"consumeRecoveryRoleRetirementDecision",
 			"createError",
 			"defaultRecoveryLimits",
 			"isError",
 			"limits",
+			"maxClassificationIntentBytes",
+			"maxRecoveryDescriptorBytes",
+			"openReceivedCertificate",
+			"receivedCertificateMaxBytes",
+			"receivedCertificateWrapperMaxBytes",
+			"recoveryClassificationAccounting",
 			"recoveryContentBytes",
+			"recoveryRetirementCarrier",
+			"recoveryRetirementFactFields",
+			"temporaryLimits",
 			"validateRecoveryChunk",
 			"validateRecoveryManifest",
+			"wrapReceivedCertificate",
 		]);
 		expect(contract.limits).toEqual({
 			maxManifestBytes: 212_387,
@@ -362,7 +414,10 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 	});
 	for (const name of COMMON_CASES)
 		it(name, async () => {
-			expect(await runCommonCase(name, environment())).toEqual(expectedCommonCase(name));
+			const expected = expectedCommonCase(name);
+			expect(await runCommonCase(name, environment())).toEqual(
+				name === "fresh" ? { ...(expected as object), version: NODE_SNAPSHOT_SCHEMA_VERSION } : expected
+			);
 		});
 
 	it("freezes real v1 source and mechanical runtime bytes", () => {
@@ -393,7 +448,7 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 		await store.close();
 		const committed = await env.image();
 		assertCommittedMigration(env.primaryFilename, legacy, committed, seeded.debt);
-		const db = new DatabaseSync(`${env.primaryFilename}${SUFFIX}`);
+		const db = allowOutOfBandWrites(new DatabaseSync(`${env.primaryFilename}${SUFFIX}`));
 		try {
 			for (const mutation of [
 				"UPDATE snapshot_scopes_v2 SET retention='temporary'",
@@ -426,7 +481,7 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 						String(row.manifest_digest)
 					);
 				db.exec("DELETE FROM snapshot_owner_v2");
-				db.prepare("INSERT INTO snapshot_owner_v2 VALUES(1,4,268435456,0,0,2,?)").run(seeded.debt);
+				db.prepare("INSERT INTO snapshot_owner_v2 VALUES(1,4,268435456,0,0,2,?,NULL)").run(seeded.debt);
 				db.exec("COMMIT");
 				expect(await env.image()).toEqual(committed);
 			}
@@ -474,8 +529,8 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 			oldRejected: [oldCancel, oldSweep, oldOpen].every(({ code }) => code !== "none"),
 			unchanged: stable(before) === stable(after),
 		}).toEqual({
-			version: 2,
-			names: ["snapshot_chunks_v2", "snapshot_owner_v2", "snapshot_scopes_v2"],
+			version: NODE_SNAPSHOT_SCHEMA_VERSION,
+			names: NODE_SNAPSHOT_TABLES,
 			preparedRejected: true,
 			newRejected: true,
 			oldRejected: true,
@@ -489,7 +544,7 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 		const seeded = await seedLegacy(env);
 		await seeded.old.close();
 		await env.open();
-		const db = new DatabaseSync(`${env.primaryFilename}${SUFFIX}`);
+		const db = allowOutOfBandWrites(new DatabaseSync(`${env.primaryFilename}${SUFFIX}`));
 		try {
 			db.exec("PRAGMA foreign_keys=ON");
 			const fks = db.prepare("PRAGMA foreign_key_list(snapshot_chunks_v2)").all();
@@ -594,7 +649,7 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 		const seeded = await seedLegacy(env);
 		await seeded.old.close();
 		const store = await env.open();
-		const db = new DatabaseSync(`${env.primaryFilename}${SUFFIX}`);
+		const db = allowOutOfBandWrites(new DatabaseSync(`${env.primaryFilename}${SUFFIX}`));
 		try {
 			db.exec("DELETE FROM snapshot_owner_v2");
 		} finally {
@@ -771,11 +826,9 @@ describe("1a-0 Node snapshot recovery owner RED", () => {
 				signal: "SIGKILL",
 			});
 			const after = await env.image();
-			expect(after.version).toBe(target === "after-mutation" ? 1 : 2);
+			expect(after.version).toBe(target === "after-mutation" ? 1 : NODE_SNAPSHOT_SCHEMA_VERSION);
 			expect(after.names).toEqual(
-				target === "after-mutation"
-					? ["snapshot_chunks", "snapshot_scopes"]
-					: ["snapshot_chunks_v2", "snapshot_owner_v2", "snapshot_scopes_v2"]
+				target === "after-mutation" ? ["snapshot_chunks", "snapshot_scopes"] : NODE_SNAPSHOT_TABLES
 			);
 			expect(after.scopes).toEqual(before.scopes);
 			expect(after.chunks).toEqual(before.chunks);

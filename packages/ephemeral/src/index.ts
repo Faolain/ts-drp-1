@@ -113,8 +113,12 @@ const CODE_TO_CLASS = new Map<number, EphemeralDeliveryClass>(
 );
 const FRAME_VERSION = 1;
 const AUTHORITY_FRAME_VERSION = 2;
+// Version 3 is version 2 plus the sender's immediately preceding installed context (epoch - 1),
+// carried only while the sender holds that context and is a writer under its current one.
+const ADJACENT_AUTHORITY_FRAME_VERSION = 3;
 const HEADER_BYTES = 16;
 const AUTHORITY_HEADER_BYTES = 73;
+const ADJACENT_AUTHORITY_HEADER_BYTES = AUTHORITY_HEADER_BYTES + 64;
 const KEY_BYTES_LIMIT = 128;
 const MESSAGE_BYTES_LIMIT = 65_536;
 const SEQUENCED_KEYS_LIMIT = 4_096;
@@ -127,6 +131,10 @@ const RECEIVE_MESSAGE_CAPACITY = 120;
 const RECEIVE_REFILL_MS = 1_000;
 const WRITER_BUCKET_CAPACITY = 128;
 const WRITER_BUCKET_IDLE_MS = 60_000;
+// Per-sender context floors are bounded like writer buckets; past the bound a sender without a
+// floor gets no adjacent-epoch window (the pre-window single-context rule). Making room by dropping
+// non-writers' floors runs at most once per refill interval.
+const SENDER_CONTEXT_CAPACITY = 128;
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
 
@@ -164,6 +172,13 @@ interface AuthorityBoundTransportPort extends EphemeralTransportPort {
 	currentAuthority(): EphemeralAuthorityContext | undefined;
 	isCurrentWriter(author: string): boolean;
 	onPeerDisconnect(listener: (peerId: string) => void): () => void;
+}
+
+interface Watermark {
+	/** Highest delivered sequence for one sender and key. */
+	readonly sequence: number;
+	/** Context epoch the sender tagged that frame with (0 for legacy channels). */
+	readonly epoch: number;
 }
 
 interface ReceiveBucket {
@@ -277,6 +292,9 @@ export function inspectEphemeralDeliveryClass(bytes: Uint8Array): EphemeralDeliv
 		if (bytes[0] === AUTHORITY_FRAME_VERSION && bytes.byteLength > AUTHORITY_HEADER_BYTES) {
 			return decodeEphemeralFrame(bytes.subarray(AUTHORITY_HEADER_BYTES)).class;
 		}
+		if (bytes[0] === ADJACENT_AUTHORITY_FRAME_VERSION && bytes.byteLength > ADJACENT_AUTHORITY_HEADER_BYTES) {
+			return decodeEphemeralFrame(bytes.subarray(ADJACENT_AUTHORITY_HEADER_BYTES)).class;
+		}
 	} catch {
 		// Preserve malformed-frame accounting in the channel's single canonical decoder.
 	}
@@ -355,43 +373,101 @@ function sameAuthority(left: EphemeralAuthorityContext, right: EphemeralAuthorit
 	);
 }
 
-function encodeAuthorityFrame(frame: EphemeralFrame, authority: EphemeralAuthorityContext): Uint8Array {
+/**
+ * Encode one authority-bound frame: version 2 carries the sender's current context; version 3 also
+ * carries the sender's immediately preceding installed context (always epoch - 1, so only its two
+ * digests are encoded).
+ * @param frame Closed frame value.
+ * @param authority Sender's current installed context.
+ * @param previous Sender's installed context of epoch - 1, when it holds one and may claim it.
+ * @returns Canonical detached bytes.
+ */
+function encodeAuthorityFrame(
+	frame: EphemeralFrame,
+	authority: EphemeralAuthorityContext,
+	previous?: EphemeralAuthorityContext
+): Uint8Array {
 	const inner = encodeEphemeralFrame(frame);
 	const anchorDigest = hexBytes(authority.anchorDigest);
 	const aclDigest = hexBytes(authority.aclDigest);
 	if (anchorDigest === undefined || aclDigest === undefined || !Number.isSafeInteger(authority.epoch)) {
 		throw new TypeError("ephemeral authority differs");
 	}
-	const output = new Uint8Array(AUTHORITY_HEADER_BYTES + inner.byteLength);
+	let previousAnchor: Uint8Array | undefined;
+	let previousAcl: Uint8Array | undefined;
+	if (previous !== undefined) {
+		previousAnchor = hexBytes(previous.anchorDigest);
+		previousAcl = hexBytes(previous.aclDigest);
+		if (
+			previousAnchor === undefined ||
+			previousAcl === undefined ||
+			previous.objectId !== authority.objectId ||
+			previous.epoch + 1 !== authority.epoch
+		) {
+			throw new TypeError("ephemeral previous authority differs");
+		}
+	}
+	const headerBytes = previous === undefined ? AUTHORITY_HEADER_BYTES : ADJACENT_AUTHORITY_HEADER_BYTES;
+	const output = new Uint8Array(headerBytes + inner.byteLength);
 	const view = new DataView(output.buffer, output.byteOffset, output.byteLength);
-	view.setUint8(0, AUTHORITY_FRAME_VERSION);
+	view.setUint8(0, previous === undefined ? AUTHORITY_FRAME_VERSION : ADJACENT_AUTHORITY_FRAME_VERSION);
 	view.setUint32(1, Math.floor(authority.epoch / 0x1_0000_0000), false);
 	view.setUint32(5, authority.epoch >>> 0, false);
 	output.set(anchorDigest, 9);
 	output.set(aclDigest, 41);
-	output.set(inner, AUTHORITY_HEADER_BYTES);
+	if (previousAnchor !== undefined && previousAcl !== undefined) {
+		output.set(previousAnchor, AUTHORITY_HEADER_BYTES);
+		output.set(previousAcl, AUTHORITY_HEADER_BYTES + 32);
+	}
+	output.set(inner, headerBytes);
 	return output;
 }
 
-function decodeAuthorityFrame(
-	bytes: Uint8Array,
-	authority: EphemeralAuthorityContext
-): { readonly contextMatches: boolean; readonly frame: EphemeralFrame } {
-	if (bytes.byteLength <= AUTHORITY_HEADER_BYTES || bytes[0] !== AUTHORITY_FRAME_VERSION) {
+interface DecodedAuthorityFrame {
+	/** Sender's current context epoch: the context in which it sent the frame. */
+	readonly epoch: number;
+	readonly frame: EphemeralFrame;
+	/** Whether the frame's current context is exactly this installed context. */
+	matchesCurrent(context: EphemeralAuthorityContext): boolean;
+	/** Whether the frame's carried preceding context (epoch - 1) is exactly this installed context. */
+	matchesPrevious(context: EphemeralAuthorityContext): boolean;
+}
+
+function sameTag(bytes: Uint8Array, epoch: number, offset: number, context: EphemeralAuthorityContext): boolean {
+	const expectedAnchor = hexBytes(context.anchorDigest);
+	const expectedAcl = hexBytes(context.aclDigest);
+	if (expectedAnchor === undefined || expectedAcl === undefined) throw new TypeError("ephemeral authority differs");
+	return (
+		epoch === context.epoch &&
+		sameBytes(bytes.subarray(offset, offset + 32), expectedAnchor) &&
+		sameBytes(bytes.subarray(offset + 32, offset + 64), expectedAcl)
+	);
+}
+
+function decodeAuthorityFrame(bytes: Uint8Array): DecodedAuthorityFrame {
+	const version = bytes[0];
+	const headerBytes =
+		version === AUTHORITY_FRAME_VERSION
+			? AUTHORITY_HEADER_BYTES
+			: version === ADJACENT_AUTHORITY_FRAME_VERSION
+				? ADJACENT_AUTHORITY_HEADER_BYTES
+				: undefined;
+	if (headerBytes === undefined || bytes.byteLength <= headerBytes) {
 		throw new TypeError("ephemeral authority frame differs");
 	}
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	const epoch = view.getUint32(1, false) * 0x1_0000_0000 + view.getUint32(5, false);
 	if (!Number.isSafeInteger(epoch)) throw new TypeError("ephemeral authority epoch differs");
-	const expectedAnchor = hexBytes(authority.anchorDigest);
-	const expectedAcl = hexBytes(authority.aclDigest);
-	if (expectedAnchor === undefined || expectedAcl === undefined) throw new TypeError("ephemeral authority differs");
+	if (version === ADJACENT_AUTHORITY_FRAME_VERSION && epoch < 1) {
+		throw new TypeError("ephemeral previous authority epoch differs");
+	}
+	const frame = decodeEphemeralFrame(bytes.subarray(headerBytes));
 	return {
-		contextMatches:
-			epoch === authority.epoch &&
-			sameBytes(bytes.subarray(9, 41), expectedAnchor) &&
-			sameBytes(bytes.subarray(41, AUTHORITY_HEADER_BYTES), expectedAcl),
-		frame: decodeEphemeralFrame(bytes.subarray(AUTHORITY_HEADER_BYTES)),
+		epoch,
+		frame,
+		matchesCurrent: (context): boolean => sameTag(bytes, epoch, 9, context),
+		matchesPrevious: (context): boolean =>
+			version === ADJACENT_AUTHORITY_FRAME_VERSION && sameTag(bytes, epoch - 1, AUTHORITY_HEADER_BYTES, context),
 	};
 }
 
@@ -477,7 +553,7 @@ export function createEphemeralChannel(
 	const unreliableQueue: QueueEntry[] = [];
 	const retainedEntryCount = (): number => activeEntries + reliableQueue.length + unreliableQueue.length;
 	const localSequencedKeys = new Set<string>();
-	const remoteWatermarks = new Map<string, Map<string, number>>();
+	const remoteWatermarks = new Map<string, Map<string, Watermark>>();
 	const writerBuckets = new Map<string, ReceiveBucket>();
 	const deleteWriterBucket = (author: string): void => {
 		writerBuckets.delete(author);
@@ -486,6 +562,90 @@ export function createEphemeralChannel(
 		writerBuckets.clear();
 	};
 	let rejectedBucket = newReceiveBucket(monotonicNow());
+	// Adjacent-epoch window. A frame is valid in the context it was sent under and, when it carries
+	// one, in the sender's immediately preceding installed context. A receiver accepts it only if one
+	// of those equals a context the receiver itself installed: its current one, or the one it held
+	// immediately before (epoch - 1). Writer authorization always uses the receiver's current
+	// authority, so a sender removed by an installed successor is refused at once.
+	let previousAuthority: EphemeralAuthorityContext | undefined;
+	// Per sender: the latest receiver-installed context epoch an accepted frame of it matched. Once a
+	// sender has been accepted under the receiver's current context, its frames that match only the
+	// previous context are outside its window (reordered or replayed) and are refused.
+	const senderContexts = new Map<string, number>();
+	let lastSenderPrune = Number.NEGATIVE_INFINITY;
+	const forgetSender = (sender: string): void => {
+		senderContexts.delete(sender);
+		remoteWatermarks.delete(sender);
+	};
+	const pruneSenders = (): void => {
+		lastSenderPrune = monotonicNow();
+		for (const sender of new Set([...senderContexts.keys(), ...remoteWatermarks.keys()])) {
+			let writer = false;
+			try {
+				const author = v3Port?.authorForPeer(sender);
+				writer = author !== undefined && v3Port?.isCurrentWriter(author) === true;
+			} catch {
+				// Uncertain roster evidence retains no window state.
+			}
+			if (!writer) forgetSender(sender);
+		}
+	};
+	const senderContextRoom = (): boolean => {
+		if (senderContexts.size < SENDER_CONTEXT_CAPACITY) return true;
+		if (monotonicNow() - lastSenderPrune < RECEIVE_REFILL_MS) return false;
+		pruneSenders();
+		return senderContexts.size < SENDER_CONTEXT_CAPACITY;
+	};
+	const observeAuthority = (authority: EphemeralAuthorityContext): void => {
+		if (installedAuthority !== undefined && sameAuthority(installedAuthority, authority)) return;
+		const adjacent =
+			installedAuthority !== undefined &&
+			installedAuthority.objectId === authority.objectId &&
+			installedAuthority.epoch + 1 === authority.epoch;
+		previousAuthority = adjacent ? installedAuthority : undefined;
+		installedAuthority = authority;
+		clearWriterBuckets();
+		rejectedBucket = newReceiveBucket(monotonicNow());
+		if (!adjacent) {
+			// Any other change (jump, same-epoch replacement, rollback, other object) keeps no window.
+			remoteWatermarks.clear();
+			senderContexts.clear();
+			return;
+		}
+		// Every frame that can still match is tagged epoch - 1 or later. Floors and replay state that
+		// only describe earlier contexts can no longer refuse anything and are dropped; the rest is kept,
+		// so nothing delivered under a context still inside the window can be delivered again.
+		const oldest = authority.epoch - 1;
+		for (const [sender, epoch] of senderContexts) if (epoch < oldest) senderContexts.delete(sender);
+		for (const [sender, watermarks] of remoteWatermarks) {
+			let newest = Number.NEGATIVE_INFINITY;
+			for (const { epoch } of watermarks.values()) newest = Math.max(newest, epoch);
+			if (newest < oldest) remoteWatermarks.delete(sender);
+		}
+		pruneSenders();
+	};
+	const fitsEnvelope = (byteLength: number, deliveryClass: EphemeralDeliveryClass): boolean => {
+		if (byteLength > maxMessageBytes) return false;
+		try {
+			const bound = port.maxEnvelopeBytes(deliveryClass);
+			return Number.isSafeInteger(bound) && byteLength <= bound;
+		} catch {
+			return false;
+		}
+	};
+	// The preceding context is claimed only while this peer is still a writer under its current one and
+	// some recipient has not yet been accepted here under that current context (it may still hold only
+	// the preceding one). A recipient accepted under the current context has installed it.
+	const claimsPrevious = (authority: EphemeralAuthorityContext, recipients: "all" | readonly string[]): boolean => {
+		try {
+			const author = v3Port?.authorForPeer(port.localPeerId);
+			if (author === undefined || v3Port?.isCurrentWriter(author) !== true) return false;
+			const peers = recipients === "all" ? port.authorizedPeers() : recipients;
+			return peers.some((peerId) => (senderContexts.get(peerId) ?? -1) < authority.epoch);
+		} catch {
+			return false;
+		}
+	};
 	const subscribers = new Set<(frame: DeliveredEphemeralFrame) => void>();
 	const counters: MutableStats = {
 		authorityMismatch: 0,
@@ -511,12 +671,7 @@ export function createEphemeralChannel(
 				counters.authorityMismatch += 1;
 				return;
 			}
-			if (installedAuthority === undefined || !sameAuthority(installedAuthority, authority)) {
-				installedAuthority = authority;
-				remoteWatermarks.clear();
-				clearWriterBuckets();
-				rejectedBucket = newReceiveBucket(monotonicNow());
-			}
+			observeAuthority(authority);
 			const now = monotonicNow();
 			const author = v3Port.authorForPeer(sender);
 			if (author === undefined || !v3Port.isCurrentWriter(author)) {
@@ -558,22 +713,47 @@ export function createEphemeralChannel(
 			return;
 		}
 		let frame: EphemeralFrame;
+		let tagEpoch = 0;
+		let matchedEpoch: number | undefined;
+		let senderFloor: number | undefined;
 		try {
 			if (v3Port === undefined) {
 				frame = decodeEphemeralFrame(bytes);
 			} else {
 				if (authority === undefined) throw new TypeError("ephemeral authority differs");
-				const decoded = decodeAuthorityFrame(bytes, authority);
-				if (!decoded.contextMatches) {
+				const decoded = decodeAuthorityFrame(bytes);
+				const exact = decoded.matchesCurrent(authority);
+				const ahead = !exact && decoded.matchesPrevious(authority);
+				const behind = !exact && !ahead && previousAuthority !== undefined && decoded.matchesCurrent(previousAuthority);
+				if (!exact && !ahead && !behind) {
 					counters.authorityMismatch += 1;
 					return;
 				}
+				matchedEpoch = behind ? authority.epoch - 1 : authority.epoch;
+				senderFloor = senderContexts.get(sender);
+				// Only a frame matching the previous context can be below the floor.
+				if (senderFloor !== undefined && matchedEpoch < senderFloor) {
+					counters.authorityMismatch += 1;
+					return;
+				}
+				if ((ahead || behind) && senderFloor === undefined && !senderContextRoom()) {
+					// No floor can be kept for this sender, so it gets no adjacent-epoch window.
+					counters.authorityMismatch += 1;
+					return;
+				}
+				tagEpoch = decoded.epoch;
 				frame = decoded.frame;
 			}
 		} catch {
 			counters.malformed += 1;
 			return;
 		}
+		// A sender first accepted under a later receiver context than before: its replay state for frames
+		// tagged with earlier contexts is retired (the floor refuses those from now on), which also lets a
+		// reopened sender start a new monotonic sequence there.
+		const advancing = matchedEpoch !== undefined && senderFloor !== undefined && matchedEpoch > senderFloor;
+		const retired = (watermark: Watermark | undefined): boolean =>
+			watermark !== undefined && advancing && matchedEpoch !== undefined && watermark.epoch < matchedEpoch;
 		if (v3Port === undefined && !port.isAuthorized(sender)) {
 			counters.unauthorized += 1;
 			return;
@@ -584,7 +764,8 @@ export function createEphemeralChannel(
 				return;
 			}
 			let senderWatermarks = remoteWatermarks.get(sender);
-			const previous = senderWatermarks?.get(frame.key);
+			const watermark = senderWatermarks?.get(frame.key);
+			const previous = retired(watermark) ? undefined : watermark?.sequence;
 			if (previous !== undefined && frame.sequence <= previous) {
 				counters.stale += 1;
 				return;
@@ -598,7 +779,9 @@ export function createEphemeralChannel(
 					senderWatermarks = new Map();
 					remoteWatermarks.set(sender, senderWatermarks);
 				}
-				if (senderWatermarks.size >= maxSequencedKeys) {
+				let liveKeys = 0;
+				for (const retained of senderWatermarks.values()) if (!retired(retained)) liveKeys += 1;
+				if (liveKeys >= maxSequencedKeys) {
 					counters.overLimit += 1;
 					return;
 				}
@@ -607,7 +790,19 @@ export function createEphemeralChannel(
 				counters.malformed += 1;
 				return;
 			}
-			senderWatermarks.set(frame.key, frame.sequence);
+			if (advancing) for (const [key, retained] of senderWatermarks) if (retired(retained)) senderWatermarks.delete(key);
+			senderWatermarks.set(frame.key, { epoch: tagEpoch, sequence: frame.sequence });
+		} else if (advancing) {
+			const senderWatermarks = remoteWatermarks.get(sender);
+			if (senderWatermarks !== undefined) {
+				for (const [key, retained] of senderWatermarks) if (retired(retained)) senderWatermarks.delete(key);
+				if (senderWatermarks.size === 0) remoteWatermarks.delete(sender);
+			}
+		}
+		if (matchedEpoch !== undefined && (senderFloor === undefined || matchedEpoch > senderFloor)) {
+			if (senderFloor !== undefined || senderContexts.size < SENDER_CONTEXT_CAPACITY) {
+				senderContexts.set(sender, matchedEpoch);
+			}
 		}
 		if (subscribers.size === 0) return;
 		counters.delivered += 1;
@@ -751,13 +946,15 @@ export function createEphemeralChannel(
 		} else {
 			const authority = authoritySnapshot(v3Port.currentAuthority());
 			if (authority === undefined) return Promise.resolve(false);
-			if (installedAuthority === undefined || !sameAuthority(installedAuthority, authority)) {
-				installedAuthority = authority;
-				remoteWatermarks.clear();
-				clearWriterBuckets();
-				rejectedBucket = newReceiveBucket(monotonicNow());
+			observeAuthority(authority);
+			// Claim the preceding context only while still a writer under the current one, and only
+			// when the larger frame fits; otherwise send the single-context frame.
+			const previous =
+				previousAuthority !== undefined && claimsPrevious(authority, recipients) ? previousAuthority : undefined;
+			encoded = encodeAuthorityFrame(frame, authority, previous);
+			if (previous !== undefined && !fitsEnvelope(encoded.byteLength, frame.class)) {
+				encoded = encodeAuthorityFrame(frame, authority);
 			}
-			encoded = encodeAuthorityFrame(frame, authority);
 		}
 		const encodedSize = encoded.byteLength;
 		if (encodedSize > maxMessageBytes) {
@@ -887,6 +1084,8 @@ export function createEphemeralChannel(
 			localSequencedKeys.clear();
 			remoteWatermarks.clear();
 			clearWriterBuckets();
+			senderContexts.clear();
+			previousAuthority = undefined;
 			subscribers.clear();
 			try {
 				port.close?.();

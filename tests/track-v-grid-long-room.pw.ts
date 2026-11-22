@@ -25,6 +25,17 @@ import {
 // recent console lines (TRACK_V_GRID_STUCK). Track V found that on the settlement profile
 // the creator's blocks stop reaching the Writer after four successors (see
 // docs/realtime-latency/tracks/32-track-v-settlement-for-grid-and-chat/RESULT.md).
+//
+// The Grid page rolls its own zone over and delivers successor offers over its own node (its
+// rollover policy and successor delivery), and its policy publishes any successor its room
+// adopted outside the policy as soon as a member pulls from behind it. So the harness never
+// exports or installs beside the page: it joins a rollover the page started by itself, seals
+// and adopts through the zone API, and hands the export and announcement to the page's policy
+// (one export, the page's); the Writer's page installs through its own delivery and the harness
+// waits for its room's epoch. "install" is the time from the creator's export start to the
+// Writer's room at the successor epoch. The zone API has no call for the policy or the room's
+// epoch, so the harness adds three to the served /src/v3-zone.ts (rolloverSettled,
+// publishCurrentSuccessor, roomEpoch) that delegate to the zone's own policy and room.
 const EPOCHS = Number(process.env.TRACK_V_GRID_EPOCHS ?? 16);
 const MOVES = 2;
 const SETTLE_MS = 300;
@@ -89,7 +100,10 @@ interface LullResult {
 	readonly end: number;
 }
 
-async function exposeZoneLull(context: BrowserContext): Promise<void> {
+// Adds harness-only delegations to the served /src/v3-zone.ts, next to its sealEpoch(): the zone's
+// own rollover policy (join a rollover in flight; export and announce the adopted successor) and its
+// room's epoch; with TRACK_Z_LULL=explicit also maintainRecoveryPool(). Nothing else in the page changes.
+async function exposeZoneHarness(context: BrowserContext, lull: boolean): Promise<void> {
 	await context.route(
 		(url) => url.port === "4174" && url.pathname === "/src/v3-zone.ts",
 		async (route) => {
@@ -98,11 +112,20 @@ async function exposeZoneLull(context: BrowserContext): Promise<void> {
 			const anchor = /\n([ \t]*)sealEpoch\(\) \{\n/gu;
 			const found = [...body.matchAll(anchor)];
 			if (found.length !== 1) throw new Error("TRACK_Z_ZONE_SEAL_ANCHOR_ABSENT");
+			if (!/\blet rollover\b/u.test(body)) throw new Error("TRACK_V_ZONE_ROLLOVER_BINDING_ABSENT");
 			const indent = found[0]?.[1] ?? "";
-			const method =
-				`\n${indent}maintainRecoveryPool() {\n${indent}  const selected = room;\n` +
+			const policy =
+				`\n${indent}rolloverSettled() {\n${indent}  return rollover?.settled() ?? Promise.resolve();\n${indent}},` +
+				`\n${indent}publishCurrentSuccessor() {\n${indent}  const selected = rollover;\n` +
 				`${indent}  if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));\n` +
-				`${indent}  return selected.maintainRecoveryPool();\n${indent}},`;
+				`${indent}  return selected.publishCurrent();\n${indent}},` +
+				`\n${indent}roomEpoch() {\n${indent}  return room?.authority()?.epoch ?? 0;\n${indent}},`;
+			const method = !lull
+				? policy
+				: policy +
+					`\n${indent}maintainRecoveryPool() {\n${indent}  const selected = room;\n` +
+					`${indent}  if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));\n` +
+					`${indent}  return selected.maintainRecoveryPool();\n${indent}},`;
 			const headers = { ...response.headers() };
 			delete headers["content-length"];
 			await route.fulfill({
@@ -211,7 +234,10 @@ interface Census {
 }
 
 async function openGrid(page: Page): Promise<void> {
-	await page.goto("/");
+	// Grid hosts its zone in a room worker by default; this suite drives the main-thread zone it was
+	// written against (its synchronous snapshot and the page's own node), so it opts out with
+	// `?mainThread`. The worker default is covered by tests/room-worker-grid.pw.ts and the FPS gate.
+	await page.goto("/?mainThread");
 	await page.waitForFunction(() => Reflect.get(window, "__TS_DRP_GRID_SESSION__") !== undefined);
 	await expect(page.locator("#loadingMessage")).toBeHidden();
 	await page.waitForFunction(() => Reflect.get(window, "__TS_DRP_V3_ZONE__") !== undefined, undefined, {
@@ -334,7 +360,10 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 	await installGridRoomHeadAuthority([receiverContext], "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__", "create");
 	if (PHASES || process.env.TRACK_Z_PAGE_GLOBALS !== undefined)
 		await Promise.all([installPhaseProbe(creatorContext), installPhaseProbe(receiverContext)]);
-	if (LULL === "explicit") await Promise.all([exposeZoneLull(creatorContext), exposeZoneLull(receiverContext)]);
+	await Promise.all([
+		exposeZoneHarness(creatorContext, LULL === "explicit"),
+		exposeZoneHarness(receiverContext, LULL === "explicit"),
+	]);
 	const creator = await creatorContext.newPage();
 	const receiver = await receiverContext.newPage();
 	const records: unknown[] = [];
@@ -364,7 +393,7 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 	};
 	try {
 		await Promise.all([openGrid(creator), openGrid(receiver)]);
-		const [creatorEnrollment, receiverEnrollment] = await Promise.all([zone(creator), zone(receiver)]);
+		const receiverEnrollment = await zone(receiver);
 		await creator.fill("#zoneMemberEnrollment", receiverEnrollment.enrollment);
 		await creator.click("#createGrid");
 		await expect.poll(async () => (await zone(creator)).ready).toBe(true);
@@ -460,19 +489,39 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 			};
 			const play = PLAY_THROUGH ? playThrough(receiver, epoch) : undefined;
 			const transition = async () => {
+				// The Writer's page installs the successor through its own delivery; this watch records
+				// (absolute page time) when its room first reaches the successor epoch. It starts before
+				// the creator's rollover so a fast install is not missed.
+				const installEvaluation = receiver.evaluate(
+					async ({ successorEpoch, bound }) => {
+						const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as { roomEpoch(): number };
+						const started = performance.now();
+						while (api.roomEpoch() < successorEpoch) {
+							if (performance.now() - started > bound) throw new Error("TRACK_V_WRITER_NOT_INSTALLED");
+							await new Promise((resolve) => setTimeout(resolve, 5));
+						}
+						return { end: performance.timeOrigin + performance.now() };
+					},
+					{ successorEpoch: epoch + 1, bound: 60_000 }
+				);
+				void installEvaluation.catch(() => undefined);
 				const rolloverEvaluation = creator.evaluate(async () => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
 						sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
-						exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 						adoptCreatorSuccessor(): Promise<unknown>;
+						rolloverSettled(): Promise<void>;
+						publishCurrentSuccessor(): Promise<void>;
 					};
+					const step = (name: string): void => {
+						Reflect.set(globalThis, "__TRACK_Z_STEP__", { name, at: Math.round(performance.now()) });
+					};
+					// A rollover the page started by itself finishes first (the room takes one close at a time).
+					step("settle");
+					await api.rolloverSettled();
 					// Absolute page times of the step boundaries (Track Z's windows).
 					const marks: number[] = [];
 					const mark = (): void => {
 						marks.push(performance.timeOrigin + performance.now());
-					};
-					const step = (name: string): void => {
-						Reflect.set(globalThis, "__TRACK_Z_STEP__", { name, at: Math.round(performance.now()) });
 					};
 					let started = performance.now();
 					mark();
@@ -482,28 +531,21 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 					mark();
 					if (!close.ok) throw new Error("TRACK_V_HEALTHY_CLOSE_REFUSED");
 					started = performance.now();
-					step("export");
-					const offer = await api.exportCreatorSuccessor();
-					const exported = performance.now() - started;
-					mark();
-					started = performance.now();
 					step("adopt");
 					await api.adoptCreatorSuccessor();
 					const adoption = performance.now() - started;
+					mark();
+					// The page's policy exports the adopted successor and announces it over the page's delivery.
+					started = performance.now();
+					step("export");
+					await api.publishCurrentSuccessor();
+					const exported = performance.now() - started;
 					mark();
 					step("done");
 					return {
 						close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 						ms: { seal, export: exported, adoption },
 						marks,
-						offer: Object.fromEntries(
-							[
-								"exactCanonicalCutValueBytes",
-								"exactCanonicalCommitQcBytes",
-								"exactCanonicalTrustStateRecordBytes",
-								"exactCanonicalSnapshotManifestBytes",
-							].map((key) => [key, Array.from(offer[key] ?? [])])
-						),
 					};
 				});
 				// A timed-out evaluation is abandoned; its later rejection (the page closing) is not unhandled.
@@ -513,27 +555,14 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				const rollover = (rolloverResult as NonNullable<typeof rolloverResult>).value;
 				expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
 				if (play !== undefined) play.phase = "install";
-				const installEvaluation = receiver.evaluate(
-					async ({ offer, peer }) => {
-						const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
-							installCreatorSuccessor(input: unknown): Promise<unknown>;
-						};
-						const started = performance.now();
-						const start = performance.timeOrigin + started;
-						await api.installCreatorSuccessor({
-							peers: [peer],
-							offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
-						});
-						const ended = performance.now();
-						return { ms: ended - started, start, end: performance.timeOrigin + ended };
-					},
-					{ offer: rollover.offer, peer: creatorEnrollment.localPeerId }
-				);
-				void installEvaluation.catch(() => undefined);
 				const installResult = await bounded(installEvaluation, ROLLOVER_TIMEOUT_MS);
 				if (installResult === undefined) await hung("recipient install");
-				const installed = (installResult as NonNullable<typeof installResult>).value;
-				const install = installed.ms;
+				// From the start of the creator's export and announcement to the Writer's room at the successor epoch.
+				const installed = {
+					start: rollover.marks[2] as number,
+					end: (installResult as NonNullable<typeof installResult>).value.end,
+				};
+				const install = installed.end - installed.start;
 				return { rollover, installed, install };
 			};
 			const { rollover, installed, install } = await transition().catch(async (error: unknown) => {
@@ -590,15 +619,17 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				: [skipped, skipped];
 			if (PHASES) {
 				const takenAt = await pageNow(creator);
-				const [sealAt, exportAt, adoptAt, adoptedAt] = rollover.marks as [number, number, number, number];
+				// The page's policy exports after adoption: seal, adopt, then export and announce.
+				const [sealAt, adoptAt, exportAt, exportedAt] = rollover.marks as [number, number, number, number];
+				// The Writer may reach the successor while the announcement is still being sent.
+				const installedAt = Math.max(exportedAt, installed.end);
 				const windows: PhaseWindow[] = [
 					{ name: "play", start: phaseFrom, end: sealAt },
-					{ name: "seal", start: sealAt, end: exportAt },
-					{ name: "export", start: exportAt, end: adoptAt },
-					{ name: "adopt", start: adoptAt, end: adoptedAt },
-					{ name: "handoff", start: adoptedAt, end: installed.start },
-					{ name: "install", start: installed.start, end: installed.end },
-					{ name: "converge", start: installed.end, end: lull?.creator.start ?? convergedAt },
+					{ name: "seal", start: sealAt, end: adoptAt },
+					{ name: "adopt", start: adoptAt, end: exportAt },
+					{ name: "export", start: exportAt, end: exportedAt },
+					{ name: "install", start: exportedAt, end: installedAt },
+					{ name: "converge", start: installedAt, end: lull?.creator.start ?? convergedAt },
 					...(lull === undefined
 						? []
 						: [

@@ -174,10 +174,22 @@ it.each(["begin", "publish", "commit", "recovery", "activate"] as const)(
 			expect(creator.room.authority()?.epoch).toBe(1);
 			expect(creator.room.projection().blocks).toEqual(beforeProjection);
 			const afterAdoption = delivered,
-				mismatches = creatorChannel.stats().authorityMismatch;
+				before = creatorChannel.stats();
 			network.raw.inject(creator.peerId, stale.routeId, writer.peerId, stale.bytes);
-			expect(delivered).toBe(afterAdoption);
-			expect(creatorChannel.stats().authorityMismatch).toBe(mismatches + 1);
+			// The Writer has not installed epoch 1 and stays a writer under it, so its epoch-0 frame is
+			// inside the adjacent window (the epoch the creator just left): replay is what is refused.
+			if (boundary === "activate") {
+				// Never delivered (it arrived while the creator had no bound authority): delivered once,
+				// and the same bytes again are refused by the carried replay watermark.
+				expect(delivered).toBe(afterAdoption + 1);
+				network.raw.inject(creator.peerId, stale.routeId, writer.peerId, stale.bytes);
+				expect(delivered).toBe(afterAdoption + 1);
+			} else {
+				// Already delivered under epoch 0: the replay into epoch 1 is refused.
+				expect(delivered).toBe(afterAdoption);
+			}
+			expect(creatorChannel.stats().stale).toBe(before.stale + 1);
+			expect(creatorChannel.stats().authorityMismatch).toBe(before.authorityMismatch);
 			unsubscribe();
 		} finally {
 			gate.release();

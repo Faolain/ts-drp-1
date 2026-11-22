@@ -90,9 +90,19 @@ describe("D.110c-0c1f5b0v replayable callback contract", () => {
 			visit(source);
 			if (callbacks.length > 0) inventory.push({ path, callbacks });
 		}
+		// The pages' rollover policies (examples/<app>/src/rollover.ts over the shared
+		// createV3RoomRolloverPolicy) count each accepted vertex in memory, per author and epoch; they
+		// reconstruct nothing, and a replayed vertex at most brings the next rollover forward.
 		expect(inventory).toEqual([
-			{ path: "examples/grid/src/v3-zone.ts", callbacks: ["onAcceptedVertex: () => undefined"] },
-			{ path: "examples/v3-chat/src/index.ts", callbacks: ["onAcceptedVertex: () => undefined"] },
+			// Canvas's and Chat's rooms moved from their page entries into canvas-room.ts and chat-room.ts (run
+			// by the main-thread page and the room worker alike); the callbacks are the same.
+			{
+				path: "examples/canvas/src/canvas-room.ts",
+				callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"],
+			},
+			{ path: "examples/chat/src/chat-room.ts", callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"] },
+			{ path: "examples/grid/src/v3-zone.ts", callbacks: ["onAcceptedVertex: (vertex) => policy.observe(vertex)"] },
+			{ path: "examples/v3-chat/src/index.ts", callbacks: ["onAcceptedVertex: (vertex) => policy?.observe(vertex)"] },
 			{
 				path: "examples/v3-room/src/index.ts",
 				callbacks: [

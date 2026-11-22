@@ -28,7 +28,7 @@ export const BACKGROUND_IDLE_POLL_MS = 10;
 export const BACKGROUND_DEFERRAL_BOUND_MS = 1_000;
 
 type Lane = "background" | undefined;
-type Waiter = { readonly cohort: Set<object>; wake(): void };
+type Waiter = { readonly cohort: Set<object>; wake(reason: "released" | "idle" | "bound"): void };
 
 const foreground = new Set<object>();
 const waiters = new Set<Waiter>();
@@ -36,6 +36,19 @@ let running: Lane;
 // Advanced by every resumed turn outside the background lane. Registered
 // foreground runs through such turns, so an idle window observes none.
 let progress = 0;
+// Measurement only (never read by scheduling): background host turns, and how
+// each deferred one resumed.
+const laneCounts = { backgroundTurns: 0, deferred: 0, released: 0, idle: 0, bound: 0 };
+
+/** Background-lane host turn counts since load; for tests and diagnostics only. */
+export type BackgroundLaneCounts = Readonly<typeof laneCounts>;
+/**
+ * Reads the background-lane counters. Scheduling never reads them.
+ * @returns A frozen copy: resumed background turns, how many deferred, and how each deferral ended.
+ */
+export function readBackgroundLaneCounts(): BackgroundLaneCounts {
+	return Object.freeze({ ...laneCounts });
+}
 
 // Clears a restored lane once the resumed drain ends. Without a process tick
 // there is no such boundary, so the lane is not restored at all there.
@@ -63,10 +76,12 @@ function deferBehindForeground(): Promise<void> | undefined {
 		let seen = progress;
 		let idle = 0;
 		let timer: ReturnType<typeof setTimeout> | undefined;
+		laneCounts.deferred++;
 		const waiter: Waiter = {
 			cohort: new Set(foreground),
-			wake: (): void => {
+			wake: (reason: "released" | "idle" | "bound"): void => {
 				if (!waiters.delete(waiter)) return;
+				laneCounts[reason]++;
 				clearTimeout(timer);
 				// Resume in a host task of its own, never inside the releasing turn.
 				setTimeout(resolve, 0);
@@ -76,7 +91,7 @@ function deferBehindForeground(): Promise<void> | undefined {
 			idle = progress === seen ? idle + 1 : 0;
 			seen = progress;
 			if (idle >= BACKGROUND_IDLE_POLLS || performance.now() - started >= BACKGROUND_DEFERRAL_BOUND_MS) {
-				waiter.wake();
+				waiter.wake(idle >= BACKGROUND_IDLE_POLLS ? "idle" : "bound");
 				return;
 			}
 			timer = setTimeout(poll, BACKGROUND_IDLE_POLL_MS);
@@ -94,6 +109,7 @@ function hostTurn(lane: Lane): Promise<void> {
 			running = undefined;
 			return undefined;
 		}
+		laneCounts.backgroundTurns++;
 		const deferred = deferBehindForeground();
 		if (deferred === undefined) {
 			restore(lane);
@@ -122,7 +138,7 @@ export function beginForegroundWork(): () => void {
 		foreground.delete(ticket);
 		for (const waiter of [...waiters]) {
 			waiter.cohort.delete(ticket);
-			if (waiter.cohort.size === 0) waiter.wake();
+			if (waiter.cohort.size === 0) waiter.wake("released");
 		}
 	};
 }

@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { installRtcObserver, resetRtcObserver, rtcObservations } from "./fixtures/e4-aoi/rtc-observer.js";
 import type { RtcObservation } from "./fixtures/e4-aoi/rtc-observer.js";
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+import { GRID_ROLLOVER_BUDGET } from "../examples/grid/src/rollover.js";
 
 const OWNER_READY = existsSync("packages/ephemeral/src/aoi-projection.ts");
 const LOSS_PERCENT = 30;
@@ -51,6 +52,7 @@ interface ZoneSnapshot {
 	readonly enrollment: string;
 	readonly invite: string;
 	readonly localPeerId: string;
+	readonly outcomeContext: Readonly<{ readonly epoch: number }> | null;
 	readonly rawTransport: Readonly<{
 		readonly fallbackCount: 0;
 		readonly links: readonly Readonly<{ readonly peerId: string }>[];
@@ -160,7 +162,10 @@ function projectionPackets(
 }
 
 async function openGrid(page: Page): Promise<void> {
-	await page.goto("/");
+	// Grid hosts its zone in a room worker by default; this suite drives the main-thread zone it was
+	// written against (its synchronous snapshot and the page's own node), so it opts out with
+	// `?mainThread`. The worker default is covered by tests/room-worker-grid.pw.ts and the FPS gate.
+	await page.goto("/?mainThread");
 	await page.waitForFunction(() => window.__TS_DRP_V3_ZONE__ !== undefined);
 	await expect(page.locator("#loadingMessage")).toBeHidden();
 }
@@ -212,7 +217,14 @@ test("three real clients recover targeted AOI state after raw loss without durab
 	const creatorContext = await browser.newContext();
 	const observerContext = await browser.newContext();
 	const excludedContext = await browser.newContext();
-	await installGridRoomHeadAuthority([creatorContext, observerContext, excludedContext]);
+	// Three distinct players, each with its own external account (Track X's and d9346's setup): one
+	// account shared by three devices advances its floor with whichever device installs a successor
+	// first, and the product rightly refuses the other devices behind that floor. The observer
+	// leaves and joins again, so a join reopens the floor its own account created.
+	const HEAD_FACTORY = "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__";
+	await installGridRoomHeadAuthority([creatorContext], HEAD_FACTORY);
+	await installGridRoomHeadAuthority([observerContext], HEAD_FACTORY, "create-then-reopen");
+	await installGridRoomHeadAuthority([excludedContext], HEAD_FACTORY, "create-then-reopen");
 	await Promise.all([
 		creatorContext.addInitScript(installRtcObserver),
 		observerContext.addInitScript(installRtcObserver),
@@ -243,6 +255,17 @@ test("three real clients recover targeted AOI state after raw loss without durab
 		]);
 		const observerPeerId = (await zone(observer)).localPeerId;
 		const excludedPeerId = (await zone(excluded)).localPeerId;
+		// The shipped creator closes an epoch an idle period after its last admitted vertex (the
+		// joins' vertices here); the campaign below admits none, so it runs in the epoch after that
+		// rollover, once every client has installed it and the raw links are back. Otherwise the
+		// rollover lands mid-campaign and resets the targeted state and the durable baseline.
+		const epochOf = async (page: Page): Promise<number> => (await zone(page)).outcomeContext?.epoch ?? -1;
+		const joinedEpoch = await epochOf(creator);
+		await expect
+			.poll(async () => Promise.all([epochOf(creator), epochOf(observer), epochOf(excluded)]), {
+				timeout: GRID_ROLLOVER_BUDGET.idleMs + 60_000,
+			})
+			.toEqual([joinedEpoch + 1, joinedEpoch + 1, joinedEpoch + 1]);
 		await expect
 			.poll(async () => (await zone(creator)).rawTransport.links.map(({ peerId }) => peerId).sort())
 			.toEqual([excludedPeerId, observerPeerId].sort());

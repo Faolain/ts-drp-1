@@ -486,6 +486,7 @@ pass, and the Canvas and Chat long rooms reopen after epoch 4 on the Node and ro
 - **Option B, `createIncrementalProjection`:** not supplied. It would move every Canvas and Chat ordinary move onto
   the prepared finishing path, which would call the reader by value. That needs its own per-move evidence, review
   of both bounds, and probably a tighter Chat footprint.
+  Taken in track 44 (decision row 79), with the bounds unchanged and Chat's projection gated on its admission policy.
 - **Chat bound depends on the admission policy:** stated in the reader. A host that composes the shipping Chat
   without `createShippingChatCapacityAdmissionPolicy` already breaks Chat's own invariant.
 - **examples/v3-chat:** no ceiling; it would need a Grid-like material theorem. Track V is moving that demo to

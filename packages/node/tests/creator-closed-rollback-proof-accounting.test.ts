@@ -30,7 +30,7 @@ import {
 	type LiveJournalRetirementControl,
 } from "@ts-drp/live-journal";
 import { describe, expect, it } from "vitest";
-import { ISSUANCE_RETIREMENT_LIMITS } from "../../issuance-store/src/retirement.js";
+import { ISSUANCE_RETIREMENT_LIMITS, closeIssuanceRetirementProtectedRecords, issuanceRetirementFloor } from "../../issuance-store/src/retirement.js";
 
 import {
 	createCreatorClosedRollbackProofAccounting,
@@ -40,12 +40,13 @@ import {
 } from "../src/internal/creator-closed-rollback-data.js";
 import { canonicalCreatorDataRecord, createCreatorCanonicalSyntaxReader } from "../src/internal/creator-snapshot-data.js";
 import { creatorAuthenticatedEpochVertexFields } from "../src/internal/runtime-reclamation.js";
-import { uniqueCreatorTransitionCandidate } from "../src/internal/creator-transition-advance.js";
+import { resolveCreatorNativeCheckpointRecoveryTransfer, uniqueCreatorTransitionCandidate } from "../src/internal/creator-transition-advance.js";
 import {openReceivedCertificate} from "../src/creator-adoption.js";
 import {capturePromotionRecord, capturePromotionArray, capturePromotionBytes} from "@ts-drp/protocol-v3/internal/creator-forward-promotion";
 import {LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES} from "@ts-drp/live-journal";
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership } from "../src/internal/creator-close-membership.js";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 describe("private issuance hole selection", () => {
 	it("classifies exact terminal coverage only after publication and outside open settlement work", () => {
@@ -81,8 +82,10 @@ describe("private issuance hole selection", () => {
 		expect(run({authenticatedSettlementSourceRow: () => ({digest: "altered"})}).covered).toBe(false);
 	});
 	it("requires covered published work, physical absence and complete replay exclusion; preserves SAME-intent and permanent holes", () => {
-		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nclosedIssuanceProtectedRecordsForRetirement;`, {
-			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");},
+		// fix/maintenance-image-capacity: the selection returns {floorEpoch?, protectedRecords} and
+		// selects only rows at or below the retirement floor (closedIssuanceRetirementFloor).
+		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\n(input) => closedIssuanceProtectedRecordsForRetirement(input).protectedRecords;`, {
+			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");}, issuanceRetirementFloor,
 			closeIssuanceRetirementProtectedRecords: (input: {protectedRecords: readonly unknown[]}) => input.protectedRecords,
 		});
 		const digest = new Uint8Array(32).fill(3), scope = {objectId: "room", author: "author"};
@@ -640,6 +643,13 @@ describe("synchronous maintenance syntax ownership", () => {
 		expect(reader.record(bytes)).toEqual({ kind: "two", epoch: 4 });
 		expect(first).toEqual({ kind: "one", epoch: 3 });
 		expect(reader.record(new Uint8Array(bytes))).not.toBe(reader.record(bytes));
+		// ea4eb158: a distinct array holding identical bytes shares this owner's
+		// exact-byte capture (fresh native readers detach their buffers), so it is
+		// not a third parse. Authority stays exact bytes: the in-place mutation
+		// above reparsed, and a same-length copy with different bytes reparses.
+		expect(counts()).toEqual({ parses: 2, roundtrips: 2 });
+		const other = Uint8Array.from(bytes); other.set(encodeCanonical({ kind: "one", epoch: 3 }));
+		expect(reader.record(other)).toEqual({ kind: "one", epoch: 3 });
 		expect(counts()).toEqual({ parses: 3, roundtrips: 3 });
 		bytes[0] = 255;
 		expect(reader.record(bytes)).toBeUndefined();
@@ -904,13 +914,16 @@ describe("single immutable journal plan native proof charges", () => {
 			native[0]!.controlBytes.byteLength, native[0]!.planBytes!.byteLength]);
 	});
 
-	it("preserves the complete original semantic PRE wrapper without embedding the newly exposed carrier array", () => {
+	it("preserves the semantic PRE wrapper (its drain plan by digest, C1) without embedding the newly exposed carrier array", () => {
 		const original = {control: controls[0], image: plan.sourceImage, canonicalRows: [Uint8Array.of(1, 2)]};
 		const value = {...original, exactCanonicalControlCarriers: [native[0]!.controlBytes, native[0]!.planBytes!]};
 		const wrappers = execute<readonly unknown[]>(`${declaration("creatorIssuanceMaintenanceObservationCarriers")}
 			creatorIssuanceMaintenanceObservationCarriers({journal: value, snapshot: null, ahe: null,
 				floor: null, floorImage: null, snapshotInventory: null});`, {value});
-		expect(encodeCanonical(wrappers[0])).toEqual(encodeCanonical(original));
+		// The wrapper holds the plan by digest; the exact plan is the separately charged native carrier above.
+		expect(encodeCanonical(wrappers[0])).toEqual(encodeCanonical({...original, control: closedJournalObservationControl(controls[0])}));
+		expect(Object.keys(wrappers[0] as object)).toEqual(["control", "image", "canonicalRows"]);
+		expect(encodeCanonical(wrappers[0]).byteLength).toBeLessThan(encodeCanonical(original).byteLength);
 	});
 });
 
@@ -933,6 +946,8 @@ describe("native census consumes the certificate's complete authenticated anchor
 				certificates: pending ? [] : [certificate], ...(pending ? {pending:{trust:{currentEpoch:7,currentAnchorDigest:"anchor-7"},installed:[],certificates:[certificate]}} : {}) },
 			facts: { summary: { cuts: [{ epoch: 4, closedAnchorDigest: "anchor-4", successorAnchorDigest: "anchor-5" }] } },
 			child: { dependencyAnchors: dependencies },
+			// The known chain also names the pinned genesis anchor at epoch 0.
+			pin: { trust: { currentAnchorDigest: "anchor-0" } },
 			requireLaw: (value: unknown, reason: string) => { if (!value) throw new Error(reason); },
 		});
 	};
@@ -2000,7 +2015,12 @@ describe("optional native borrowing describes captured replacement custody", () 
 	}
 	async function proof(f:ReturnType<typeof fixture>) {
 		const observations=new WeakMap(),frames=new WeakMap(),ledgers=new WeakMap(),requirements=new WeakMap(),observation={},reader={generations:[],blobs:[],release:async()=>{f.events.push("reader-release");}};
-		const snapshot={image:{scopes:[]},control:null},inventory={scopes:[],owner:{migration:"ready"}},head={stable:{objectId:f.trust.objectId,epoch:4,currentAnchorDigest:f.trust.currentAnchorDigest},pending:null};
+		// 4c4f192c: a lifetime without replacement/source custody may detach native
+		// preparation, but only for a "ready" snapshot owner. This test owns the
+		// independent fallback, so the owner still requires classification (a real
+		// production decline). ea4eb158: the qualified inventory must be complete
+		// against the native image (scopeCount === scopes.length).
+		const snapshot={image:{scopes:[],scopeCount:0},control:null},inventory={scopes:[],owner:{migration:"classification-required"}},head={stable:{objectId:f.trust.objectId,epoch:4,currentAnchorDigest:f.trust.currentAnchorDigest},pending:null};
 		const input={objectId:f.trust.objectId,pinnedGenesisAnchorDigest:"genesis",store:Object.assign(f.store,{readRetirementAdmissionImage:async()=>({ok:true,value:{control:null}})}),
 			liveJournalStore:Object.assign(f.journal,{readRetirementImage:async()=>({ok:true,value:{exactCanonicalControlCarriers:[],canonicalRows:[],control:null}})}),
 			roomHeadAuthority:Object.assign(f.floor,{readRetirementImage:async()=>({state:head})}),
@@ -2009,7 +2029,7 @@ describe("optional native borrowing describes captured replacement custody", () 
 		// authentication and owner floor reads are deterministic controlled seams;
 		// this does not claim native SQLite/IndexedDB or cryptographic acceptance.
 		return execute<Promise<{beginWrite():Promise<void>;release():Promise<void>;accounting:typeof f.accounting}>>(
-			`${declaration("joinSourceReleases")}\n${declaration("acquireCreatorIssuanceMaintenanceProof").replace(/^export /,"")}\nacquireCreatorIssuanceMaintenanceProof(value,closeHold,currentTrust);`,{
+			`${declaration("joinSourceReleases")}\n${declaration("closedRetirementEqual")}\n${declaration("completeSnapshotRecoveryInventoryIsPresent")}\n${declaration("acquireCreatorIssuanceMaintenanceProof").replace(/^export /,"")}\nacquireCreatorIssuanceMaintenanceProof(value,closeHold,currentTrust);`,{
 			value:input,closeHold:f.hold,currentTrust:f.trust,capture:(value:unknown)=>value,
 			resolveCreatorSnapshotRecoveryCloseHold:f.resolve,observations,frames,ledgers,requirements,maintenanceTerminalCustody:new WeakMap(),
 			bindMethod:(object:Record<string,unknown>,name:string)=>(object[name] as (...args:unknown[])=>unknown).bind(object),ownJournalHeaderHold:(_owner:unknown,reservation:Reservation)=>reservation,
@@ -2335,11 +2355,13 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		expect(same(value, decodeCanonical(encodeCanonical(value, {maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes})))).toBe(true);
 		const altered = rows.map(r => r.slice()); altered[17]![5] ^= 1;
 		expect(same(value, {...value, canonicalRows: altered})).toBe(false);
-		expect(same(value, {...value, drainSource: {...value.drainSource, canonicalRows: altered}})).toBe(false);
+		// drainSource is the adapter's reconstruction from this same (control, image, rows): those compare.
+		expect(same(value, {...value, drainSource: {...value.drainSource, canonicalRows: altered}})).toBe(true);
 		expect(same(value, {...value, control: {...control, revision: 1}})).toBe(false);
 		expect(same(value, {...value, exactCanonicalControlCarriers: [Uint8Array.of(0)]})).toBe(false);
 		expect(same(value, {...value, extra: true})).toBe(false);
-		expect(same(value, {...value, drainSource: undefined})).toBe(false);
+		// The reconstruction's presence follows control.drain, compared above; it is not compared itself.
+		expect(same(value, {...value, drainSource: undefined})).toBe(true);
 		const reordered = [...rows]; [reordered[0], reordered[1]] = [reordered[1]!, reordered[0]!];
 		expect(same(value, {...value, canonicalRows: reordered})).toBe(false);
 		let invoked = false;
@@ -2357,7 +2379,7 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 				lifetime: {captureClassificationMetadataOwners: () => ({signing: {acquireEvidence: async () => ({
 					readExactCanonicalRows: () => bytes, check: async () => {checked = true; if (failure) throw Error(failure);},
 					release: async () => {released = true;},
-				})}})}, frame: {accounting: {}}, forward: {currentTrust: trusts[8]}, input: {objectId: "room"},
+				})}})}, frame: {accounting: {}}, work: {accounting: {}}, forward: {currentTrust: trusts[8]}, input: {objectId: "room"},
 				chargeProofObservation: (_: unknown, value: Uint8Array) => {charged.push(value); return true;},
 				requireLaw: (value: unknown, reason: string) => {if (!value) throw Error(reason);},
 			});
@@ -2379,20 +2401,26 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		const selected = ["retirementJournal", "journalHeaders"].map(name => unique((node): node is ts.VariableDeclaration =>
 			ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name && node.pos >= owner.pos && node.end <= owner.end));
 		const old = {canonicalRows: ["obsolete-header", "old-detail"]}, residual = {canonicalRows: []};
-		for (const summaries of [undefined, {}]) {
+		// 4c4f192c: a detachable lifetime prepares headers from captured scopes
+		// (prepareClosedJournalHeaders) instead of the live classifier. Both header
+		// selectors must consume the SAME residual journal.
+		for (const detachedClassification of [false, true]) for (const summaries of [undefined, {}]) {
 			let headerInput: unknown;
 			const value = execute<unknown>(`${selected.map(n => `const ${n.getText(parsed)};`).join("\n")}\nretirementJournal;`, {
 				signingSummaries: summaries, journalProof: old, journal: {value: residual},
 				sourceFrame: {closeDependencies: {dependencyAnchors: []}}, forward: {}, roles: {floor: {}},
 				closeUnion: {snapshotScopes: []}, roleProofs: [], unclassifiedSigning: false,
+				detachedClassification, journalReconstructed: false, capturedHeaderScopes: [], input: {pinnedGenesisAnchorDigest: "genesis"},
+				classificationAccounting: {},
 				classifyClosedJournalHeaders: (input: {journal: unknown}) => {headerInput = input.journal; return undefined;},
+				prepareClosedJournalHeaders: (input: {journal: unknown}) => {headerInput = input.journal; return undefined;},
 			});
 			expect(value).toBe(summaries === undefined ? old : residual); expect(headerInput).toBe(value);
 		}
 		const fields: ts.PropertyAssignment[] = [];
 		const visit = (node: ts.Node): void => {if (ts.isPropertyAssignment(node) && node.name.getText(parsed) === "journal" &&
 			node.initializer.getText(parsed) === "retirementJournal") fields.push(node); ts.forEachChild(node, visit);};
-		visit(owner); expect(fields).toHaveLength(2); // Header selector and returned source, one owner.
+		visit(owner); expect(fields).toHaveLength(3); // Both header selectors and the returned source, one owner.
 	});
 	it("keeps exact received generation consumers protected without treating receipt syntax as authority", () => {
 		const equal = (a: unknown, b: unknown) => Buffer.from(encodeCanonical(a)).equals(Buffer.from(encodeCanonical(b)));
@@ -2421,6 +2449,9 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 			closedGenerationCertificateCoverage: () => coverage,
 			view: (_: unknown, index: number) => [previous, next][index], uniqueCreatorTransitionCandidate,
 			deriveCreatorCloseHistory: () => history,
+			// 1515daab: a native-checkpoint transfer may make the generation the
+			// historical point; this proof carries no such transfer (genuine resolver).
+			resolveCreatorNativeCheckpointRecoveryTransfer,
 		});
 		const frame = {input: {objectId, pinnedGenesisAnchorDigest: certificate.pinnedGenesisAnchorDigest},
 			reader: {generations: [old, current]}, authenticatedExcludedGenerations: []};
@@ -2732,8 +2763,18 @@ function unique<T extends ts.Node>(predicate: (node: ts.Node) => node is T): T {
 	if (found.length !== 1) throw Error(`PRIVATE_STATEMENT_NOT_UNIQUE:${found.length}:${predicate.toString()}`);
 	return found[0]!;
 }
+// The source is read and parsed once, so an extracted declaration's text is fixed for the run. Each
+// lookup walks the whole owner file (26k lines, ~18 ms per walk on the sandbox), and harnesses that
+// rebuild their program per case (sizing widths, CURRENT phase maps) looked the same names up
+// hundreds of times: that, not the code under test, took them past the 10 s test timeout.
+const declarations = new Map<string, string>();
 function declaration(name: string): string {
-	return unique((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name).getText(parsed);
+	let text = declarations.get(name);
+	if (text === undefined) {
+		text = unique((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name).getText(parsed);
+		declarations.set(name, text);
+	}
+	return text;
 }
 function maintenanceProofMaxBytes(): number {
 	return CREATOR_MAINTENANCE_PROOF_MAX_BYTES;
@@ -2760,9 +2801,23 @@ const consume = unique((node): node is ts.VariableDeclaration => ts.isVariableDe
 	ts.isIdentifier(node.name) && node.name.text === "signingData" &&
 	node.initializer?.getText(parsed).includes("precloseControls?.signingPhysicalRows") === true);
 const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpoch", "closedSigningSummaryResidualRows"].map(declaration).join("\n");
+// Transpiling is a pure function of the program text; each call still evaluates a fresh program.
+const transpiled = new Map<string, string>();
+// The owner's journal observation projection (C1): a drain control's plan rides in the carrier by digest.
+const { closedJournalObservationControl } = compileClosedJournalObservationOwner();
+// The owner's own capture-journal detach: the charged carrier (plan by digest), its in-memory drainSource never encoded.
+const detachClosedCaptureJournal = Function("decodeCanonical", "closedWarmSourceBytes", "closedJournalObservationControl",
+	`"use strict"; ${ts.transpile(declaration("detachClosedCaptureJournal"), { target: ts.ScriptTarget.ES2022 })}; return detachClosedCaptureJournal;`)(
+	decodeCanonical, encodeCanonical, closedJournalObservationControl);
 function execute<T>(code: string, context: Record<string, unknown>): T {
-	const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+	let js = transpiled.get(code);
+	if (js === undefined) {
+		js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+		transpiled.set(code, js);
+	}
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
+		closedObservationCarrierBytes: encodeCanonical, closedWarmSourceBytes: encodeCanonical, detachClosedCaptureJournal,
+		closedJournalObservationControl,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
 	// Execute in the codec's realm. A separate VM realm would produce foreign
@@ -3365,7 +3420,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 	function owner() {
 		let calls = 0;
 		const recipe = unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
-			ts.isIdentifier(node.name) && node.name.text === "journal" && ts.isCallExpression(node.initializer!) &&
+			ts.isIdentifier(node.name) && node.name.text === "journal" && node.initializer !== undefined && ts.isCallExpression(node.initializer) &&
 			node.initializer!.expression.getText(parsed) === "journalFutureAppendPostimageWidths" &&
 			node.initializer!.getText(parsed).includes("successorJournalAppend")).getText(parsed);
 		const reader = createCreatorCanonicalSyntaxReader();
@@ -3375,6 +3430,10 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 				immediateJournalAppend: f.args[1], unsignedJournalSuccessor: f.args[2], successorJournalAppend: f.args[3],
 				currentContinuationAppends: f.args[4], preclose, closedMembershipByteLength: f.args[5]?.closedMembershipByteLength,
 				received: f.args[5]?.localIssuerBasis === undefined ? undefined : {localIssuerBasis: f.args[5].localIssuerBasis},
+				// The fence horizon's successor membership width has its own owner (creator-fence-horizon-membership.test.ts).
+				creatorFenceHorizonMembershipWidthForSizing: () => HORIZON_MEMBERSHIP, successorNativeJobPhases: undefined,
+				capacityDimensions: undefined, input: {exactCanonicalCurrentLatchedAclBytes: new Uint8Array(1),
+					exactCanonicalSuccessorLatchedAclBytes: new Uint8Array(1), exactCanonicalUnsignedVertexBytes: new Uint8Array(1)},
 				journalFutureAppendPostimageWidths: (...args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
 					calls++; return journalFutureAppendPostimageWidths(...args);
 				},
@@ -3382,13 +3441,21 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 	}
 	const outcome = (run: () => unknown) => {try {return {value: run()};} catch (error) {
 		return {error: (error as Error).message, cause: (error as Error & {cause?: Error}).cause?.message};}};
+	const HORIZON_MEMBERSHIP = 2_048;
+	// An ordinary (non-preclose) quote also asks for the successor fence's horizon (j22, fix/maintenance-image-capacity)
+	// and the membership row that successor's own close writes (sdiag d4/d5).
+	const ordinary = (args: Parameters<typeof journalFutureAppendPostimageWidths>) => {
+		const withHorizon = [...args] as Parameters<typeof journalFutureAppendPostimageWidths>;
+		withHorizon[5] = {...args[5], fenceHorizon: true, successorClosedMembershipByteLength: HORIZON_MEMBERSHIP};
+		return journalFutureAppendPostimageWidths(...withHorizon);
+	};
 	it("validates complete CURRENT separately and freshly computes every FUTURE recipe across cardinality/backend shapes", () => {
 		for (const sql of [false, true]) for (const count of [0, 127]) {
 			const f = fixture(sql, count), o = owner();
 			const currentArgs = [...f.args] as Parameters<typeof journalFutureAppendPostimageWidths>;
 			currentArgs[5] = {control: null};
 			expect(o.run({...f, args: currentArgs}, true)).toEqual(journalFutureAppendPostimageWidths(...currentArgs));
-			const expected = journalFutureAppendPostimageWidths(...f.args), first = o.run(f);
+			const expected = ordinary(f.args), first = o.run(f);
 			expect(first).toEqual(expected);
 			for (let schedule = 0; schedule < 8; schedule++) {const fresh = o.run(f); expect(fresh).toEqual(first); expect(fresh).not.toBe(first);}
 			expect(o.calls()).toBe(10); // Full PRE freshly validated by each original producer invocation.
@@ -3409,7 +3476,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 		];
 		for (const change of mutations) {
 			const f = fixture(), o = owner(); o.run(f); change(f);
-			expect(outcome(() => o.run(f))).toEqual(outcome(() => journalFutureAppendPostimageWidths(...f.args)));
+			expect(outcome(() => o.run(f))).toEqual(outcome(() => ordinary(f.args)));
 			expect(o.calls()).toBe(2);
 		}
 		const f = fixture(), a = owner(), b = owner();
@@ -3444,7 +3511,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 			node.expression.getText(parsed).includes("forward.wholeFloor === undefined") && !node.expression.getText(parsed).includes("currentFacts"));
 		const inspect = () => execute<any>(`(() => {${guard.getText(parsed)} return effect();})();`,
 			{frame, capture, forward, facts: {}, input: {proof: {accounting}}, ledgers, effect: () => o.run(f)});
-		expect(inspect()).toEqual(journalFutureAppendPostimageWidths(...f.args));
+		expect(inspect()).toEqual(ordinary(f.args));
 		frame.alive = false;
 		expect(inspect()).toEqual({ok: false, reason: "MAINTENANCE_SOURCE_UNAVAILABLE"});
 		frame.alive = true; capture.currentTrust = {};
@@ -3477,8 +3544,16 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 });
 
 describe("CURRENT job phases reuse only identical same-schedule journal widths", () => {
-	const variable = (name: string) => unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) && node.name.text === name);
+	const variables = new Map<string, ts.VariableDeclaration>();
+	const variable = (name: string) => {
+		let found = variables.get(name);
+		if (found === undefined) {
+			found = unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
+				ts.isIdentifier(node.name) && node.name.text === name);
+			variables.set(name, found);
+		}
+		return found;
+	};
 	const journalReuse = unique((node): node is ts.IfStatement => ts.isIfStatement(node) &&
 		node.expression.getText(parsed) === "currentJobJournal?.jobIndex !== jobIndex");
 	const assignment = (journalReuse.thenStatement as ts.ExpressionStatement).expression as ts.BinaryExpression;
@@ -3515,6 +3590,7 @@ describe("CURRENT job phases reuse only identical same-schedule journal widths",
 				const ${map}; currentJobProofEnvelopeByteLengths;`, {
 				currentContinuation: inputPhases === undefined ? undefined : {nativeJobPhases: inputPhases},
 				currentContinuationAppends, nativeObservations, AHE_BOUNDED_READ_LIMITS, LIVE_JOURNAL_RETIREMENT_LIMITS,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 				capture: {journal: {canonicalRows: Uint8Array.of(seed), control: {revision: seed}}, snapshot: {}, ahe: {},
 					floorImage: {}, snapshotInventory: {scopes: [], owner: "owner"}, signingRows: [new Uint8Array(17), new Uint8Array(29)]},
 				immediateJournalAppend: {immediate: seed}, unsignedJournalSuccessor: {successor: seed},
@@ -3942,13 +4018,14 @@ describe("issuance journal postimages stay native-point bounds, not current proo
 			maintenanceEncodedWidth: (width: number) => new Uint8Array(width),
 			maintenanceCanonicalWidth: (value: unknown) => encodeCanonical(value).byteLength,
 			LIVE_JOURNAL_RETIREMENT_LIMITS,
+			CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 		});
 		expect(immediate).toEqual([101]);
 		expect(nativeObservations).toEqual([4,5,6].map((rowCount, index) => ({width: encodeCanonical({
 			control: { revision: 10 + index },
 			image: { imageDigest: "d".repeat(64), scopeCount: 3, rowCount, byteCharge: 900 + rowCount },
 			canonicalRows: new Uint8Array(300 + rowCount),
-		}).byteLength, maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes})));
+		}).byteLength, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}))); // The journal carrier's encode cap.
 		// This executes the original routing/constructor, not native lifetime or
 		// complete forecast conformance. The affected persistent-worker test owns that evidence.
 	});
@@ -4613,26 +4690,33 @@ const sizingProtectedRecords = unique(
 		node.name.text === "protectedRecords" &&
 		node.getText(parsed).includes("vertexDigest")
 );
+// fix/maintenance-image-capacity: the native statement destructures {floorEpoch, protectedRecords}.
 const nativeProtectedRecords = unique(
 	(node): node is ts.VariableDeclaration =>
 		ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) &&
-		node.name.text === "protectedRecords" &&
+		(ts.isIdentifier(node.name)
+			? node.name.text === "protectedRecords"
+			: ts.isObjectBindingPattern(node.name) &&
+				node.name.elements.some((element) => element.name.getText(parsed) === "protectedRecords")) &&
 		node.getText(parsed).includes("closedIssuanceProtectedRecordsForRetirement")
 );
 function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 	forecast: unknown;
 	native: unknown;
+	floored: unknown;
 	before: Uint8Array;
 	after: Uint8Array;
 } {
-	const unsigned = { objectId: "room", author: "alice", authorSequence: 4, epoch: 5 };
+	// 8f21d1fd: protected records now close over durable rows, whose preimage
+	// header must classify (drp-vertex, protocol 3) before any hole is selected.
+	const header = { kind: "drp-vertex", protocolMajor: 3 };
+	const unsigned = { ...header, objectId: "room", author: "alice", authorSequence: 4, epoch: 5 };
 	const issued = [4, 5, 6].map((epoch, index) => ({
 		objectId: "room",
 		author: "alice",
 		authorSequence: index + 1,
 		digest: new Uint8Array(32).fill(index + 1),
-		canonicalPreimageBytes: encodeCanonical({ objectId: "room", author: "alice", authorSequence: index + 1, epoch }),
+		canonicalPreimageBytes: encodeCanonical({ ...header, objectId: "room", author: "alice", authorSequence: index + 1, epoch }),
 	}));
 	const before = encodeCanonical(issued);
 	const vertexDigest = "04".repeat(32);
@@ -4645,15 +4729,28 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 		received: undefined,
 		currentContinuationAppends: [],
 		record: decodeCanonical,
+		// 974f78d0/3a28ab80: FUTURE (non-preclose) local work also protects the
+		// retained-fence reserve, but only for a successor journal append. This
+		// chronology fixture has none, so the reserve contributes no record.
+		preclose: sourceEpoch === 4,
+		successorJournalAppend: undefined,
+		input: {},
+		digest: vertexDigest,
+		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE: 2,
 	});
-	const native = execute(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
-		nativeIssuance: {rows: {
+	const native = execute(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
+		issuanceRetirementFloor,
+		// 8f21d1fd/07252cc7: retirement reads the (possibly restored) issuanceRows
+		// and the exact retirement intent labels, not nativeIssuance.rows.
+		issuanceRows: {
 			issued: [
 				...issued,
 				{ ...unsigned, digest: new Uint8Array(32).fill(4), canonicalPreimageBytes: encodeCanonical(unsigned) },
 			],
 			outbox: [],
-		}},
+			plans: [],
+		},
+		labels: undefined, closeIssuanceRetirementProtectedRecords,
 		input: {objectId: "room"}, issuanceControl: null, census: {rows: []},
 		source: {journalDetails: {protectedReplayScopes: []}, journalPhysical: {canonicalRows: []}},
 		record: decodeCanonical,
@@ -4662,23 +4759,29 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 			if (!condition) throw Error("native-control-input");
 		},
 	});
-	return { forecast, native, before, after: encodeCanonical(issued) };
+	// fix/maintenance-image-capacity: retirement selects protected records only at or below its floor
+	// (no completed control: two epochs behind the Cut); rows above it stay physically retained, so the
+	// sizing forecast, which protects every row through the source epoch, over-reserves them.
+	const epochOf = new Map([[1, 4], [2, 5], [3, 6], [unsigned.authorSequence, unsigned.epoch]]);
+	const floor = Math.max(0, sourceEpoch - 2);
+	const floored = (forecast as { authorSequence: number }[]).filter((entry) => (epochOf.get(entry.authorSequence) ?? Infinity) <= floor);
+	return { forecast, native, floored, before, after: encodeCanonical(issued) };
 }
 describe("R8 source-floor issuance metadata chronology affected controls", () => {
 	it("CURRENT uses original Cut4 protection while retaining every physical issued input", () => {
 		const result = issuanceProtectedRecordsForSource(4);
-		expect(result.forecast).toEqual(result.native);
+		expect(result.native).toEqual(result.floored);
 		expect((result.forecast as unknown[]).length).toBe(1);
 		expect(result.after).toEqual(result.before);
 	});
 	it("FUTURE Cut5 includes the original new epoch5 candidate exactly once", () => {
 		const result = issuanceProtectedRecordsForSource(5);
-		expect(result.forecast).toEqual(result.native);
+		expect(result.native).toEqual(result.floored);
 		expect((result.forecast as unknown[]).length).toBe(3);
 		expect(result.after).toEqual(result.before);
 	});
 	it("the selected protection feeds complete PRE and completed controls without changing the prior descriptor", () => {
-		const { forecast, native } = issuanceProtectedRecordsForSource(4);
+		const { floored: forecast, native } = issuanceProtectedRecordsForSource(4);
 		const old = { revision: 7, sequence: 3, active: null, completed: { fullPriorDescriptor: ["all", "PRE"] } };
 		const controls = (protectedRecords: unknown): unknown[] => {
 			const preparation = {
@@ -5066,6 +5169,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 			turnoverControl: null,
 			closedRetirementEqual: (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b),
 			AHE_BOUNDED_READ_LIMITS: { maxUnionBytes: 262144 },
+			CLOSED_RETIREMENT_BYTES: { maxBytes: 262144, maxItems: 65_536, maxDepth: 128 },
 		});
 		expect(result.selection).toBeDefined();
 		expect(result.projected.revision).toBe(8);
@@ -5179,6 +5283,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 				finalJournalCapacity: undefined,
 				AHE_BOUNDED_READ_LIMITS,
 				LIVE_JOURNAL_RETIREMENT_LIMITS,
+				CLOSED_RETIREMENT_BYTES: {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128},
 				objectId: "room",
 				futureSnapshotTurnover: { retiringScopes: [snapshotScope75(3)] },
 				futureSnapshotPriorWrapperWidth: beforeWidth,
@@ -5204,6 +5309,14 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 				aheOriginal: {},
 				observe: () => undefined,
 				maintenanceWidthSum: (values: number[]) => values.reduce((sum, value) => sum + value, 0),
+				// ea4eb158: source widths take the sizing compiler's maximum; with no
+				// compiler it is exactly Math.max (the production fallback).
+				maximumWidth: (widths: readonly number[]) => Math.max(...widths),
+				// ea4eb158: each fresh source also charges the ready snapshot
+				// inventory (retained or cold-projected), the larger of the two.
+				retainedInventory: snapshotPairs75.map((pair) => pair.scope),
+				retainedOwner: { migration: "ready", recoveryScopes: 3, recoveryContentBytes: 100 },
+				coldSnapshotInventoryWidths: [],
 			}
 		);
 		expect(result.first[0]).toBe(beforeWidth);
@@ -6097,16 +6210,31 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 	type Reservation = {check(): Promise<void>; release(): Promise<void>};
 	type Held = {store: object; objectId: string; available(): boolean; read(consume: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>};
 	type Lifetime = {acquireNativeIssuanceReservation(): Promise<Reservation>; check(): Promise<void>; release(): Promise<void>};
-	function seam() {
+	// Parsing v3-live.ts and walking it are pure functions of the source text, so
+	// the seam and its lookups are memoized per describe. Every case still builds
+	// its own state, registration and execute() bindings in fixture() or inline.
+	let seamCache: ReturnType<typeof readSeam> | undefined;
+	const seam = () => seamCache ??= readSeam();
+	function readSeam() {
 		const path = new URL("../src/v3-live.ts", import.meta.url);
 		const file = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const one = <T extends ts.Node>(root: ts.Node, predicate: (node: ts.Node) => node is T): T => {
 			const found: T[] = []; const visit = (node: ts.Node): void => {if (predicate(node)) found.push(node); ts.forEachChild(node, visit);}; visit(root);
 			if (found.length !== 1) throw Error(`HELD_ISSUANCE_SEAM_NOT_UNIQUE:${found.length}`); return found[0]!;
 		};
-		const fn = (name: string) => one(file, (node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name);
+		const functions = new Map<string, ts.FunctionDeclaration>(), variables = new Map<ts.Node, Map<string, string>>();
+		const fn = (name: string) => {
+			let found = functions.get(name);
+			if (found === undefined) functions.set(name, found = one(file, (node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name));
+			return found;
+		};
 		const seal = fn("sealCreatorRecoveryDependencies"), census = fn("readCreatorRecoveryDependencyCensus");
-		const variable = (root: ts.Node, name: string) => one(root, (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name).getText(file);
+		const variable = (root: ts.Node, name: string) => {
+			let byName = variables.get(root); if (byName === undefined) variables.set(root, byName = new Map());
+			let text = byName.get(name);
+			if (text === undefined) byName.set(name, text = one(root, (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name).getText(file));
+			return text;
+		};
 		const factory = one(seal, (node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText(file) === "ownIssuanceReservation");
 		const check = one(factory.parent, (node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText(file) === "check" && ts.isArrowFunction(node.initializer));
 		return {file, census, fn, variable, factory: factory.getText(file), check: check.getText(file)};
@@ -6118,7 +6246,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		const s = seam(), capability = {}, registry = new WeakMap(), store = {}, journal = {}, events: string[] = [];
 		const trust = {objectId: "room", currentEpoch: 4, currentAnchorDigest: "anchor"};
 		const bytes = encodeCanonical({completeCensus: "sealed"});
-		const state = {live: true, checks: 0, captures: 0, releases: 0, acquisitions: 0,
+		const state = {live: true, checks: 0, captures: 0, releases: 0, acquisitions: 0, prepared: 0,
 			failCheck: 0, changed: false, capture: undefined as (() => Promise<void>) | undefined,
 			acquire: undefined as (() => Promise<void>) | undefined, release: undefined as (() => Promise<void>) | undefined};
 		const original: Reservation = {check: async () => {state.checks++; events.push("native-check"); if (state.checks === state.failCheck) throw Error("native-currentness-failed");},
@@ -6133,6 +6261,10 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		// native storage acceptance. Production live() is not replaced in source.
 		const owner = execute<{facts: {pending: Set<Promise<unknown>>; releasing: boolean}; lifetime: Lifetime; held(): Held | undefined}>(`
 			let issuanceRead: CreatorHeldIssuanceCensusRead | undefined;
+			// ea4eb158: check/ownIssuanceReservation also own the unchanged-held fast
+			// cell and the optional current-journal enrollment (closure state).
+			let unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
@@ -6142,6 +6274,12 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			ObjectFreeze: Object.freeze, registration, currentTrust: trust, capability, recoveryCloseHolds: registry,
 			owners: {store, liveJournalStore: journal, currentTrust: trust}, sealed: bytes, live: () => state.live,
 			sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			// No source/branch/migration dependency: enrollment may prepare the fast
+			// cell after its first full held check. The controlled preparer declines
+			// (undefined), so every check stays the original full held walk.
+			sourceDependencies: undefined, activeSource: undefined, runtime: {nativeBranchSource: undefined, migrationSource: undefined},
+			replay: undefined, readJournalCurrent: undefined,
+			prepareCreatorUnchangedHeldCensusRead: (..._args: unknown[]) => {state.prepared++; return undefined;},
 			captureCensus: async (held?: Held) => {state.captures++; events.push(held === undefined ? "unheld-census" : "held-census");
 				if (held !== undefined) expect(held.store).toBe(issuanceStore); await state.capture?.(); return state.changed ? encodeCanonical({completeCensus: "changed"}) : bytes;},
 		});
@@ -6152,6 +6290,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		const acquiring = f.lifetime.acquireNativeIssuanceReservation(); await acquired.promise; expect(f.facts.pending.size).toBe(1); expect(f.held()).toBeUndefined();
 		resume.resolve(); const child = await acquiring; expect(child).not.toBe(f.original); expect(f.held()?.available()).toBe(true); expect(f.facts.pending.size).toBe(0);
 		await f.lifetime.check(); expect(f.events).toEqual(["native-check", "held-census", "native-check"]);
+		expect(f.state.prepared).toBe(1); // Only after the first complete held check.
 		f.state.changed = true; await expect(f.lifetime.check()).rejects.toThrow("stale or unclassified"); expect(f.state.checks).toBe(4);
 		f.state.changed = false; f.state.failCheck = 5; const before = f.state.captures;
 		await expect(f.lifetime.check()).rejects.toThrow("native-currentness-failed"); expect(f.state.captures).toBe(before);
@@ -6309,6 +6448,258 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		await f.lifetime.check(); expect(f.events.at(-1)).toBe("unheld-census"); expect(f.state.captures).toBe(before.captures + 1);
 		await f.lifetime.release(); expect(f.state.releases).toBe(1);
 	});
+	// D1: a dependency turn enrolls its own issuance reservation in the turn's close hold
+	// (facts.ownIssuanceReservation), so the hold's later checks in that turn use the unchanged-held
+	// census. Actual check, enrollment factory and unchanged-held cell; only the complete census read,
+	// the native reservation and the storage currency probe are controlled. Every input the cell binds,
+	// changed between two checks of one turn, makes the next check the complete census again.
+	let turnSeam: ReturnType<typeof seam> | undefined;
+	function turnHold() {
+		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
+		const state = {captures: 0, probes: 0, probeCurrent: true};
+		const probe = Object.freeze({checkCurrent: async () => {state.probes++; return state.probeCurrent;}});
+		const original: Reservation = {check: async () => {}, release: async () => {}};
+		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
+			prepareCreatorUnchangedHeldCensusRead;`, cell.bindings);
+		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			${s.fn("censusReuseDebug").getText(s.file)}
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = false, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
+			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
+			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
+			recoveryCloseHolds.set(capability, facts);
+			${s.fn("fullRecoveryCloseHoldFacts").getText(s.file)}
+			({facts});`, {
+			ObjectFreeze: Object.freeze, registration: cell.registration, currentTrust: cell.trust, capability, recoveryCloseHolds: registry, sealed,
+			live: () => true, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			sourceDependencies: undefined, activeSource: undefined, runtime: cell.runtime, replay: {verify: async () => true}, readJournalCurrent: undefined,
+			prepareCreatorUnchangedHeldCensusRead: prepare,
+			// The complete held walk, as readCreatorRecoveryDependencyCensus does it: it fills the
+			// captured input view (pages read, the storage census probe) and returns the sealed bytes.
+			captureCensus: async (_held: unknown, captured?: {pages: unknown[]; retainedBytes: number; nativeCurrent?: unknown}) => {
+				state.captures++;
+				if (captured !== undefined) {captured.pages.push({afterKey: null, bytes: encodeCanonical(cell.pages)}); captured.retainedBytes = 1; captured.nativeCurrent = probe;}
+				return sealed;
+			},
+		});
+		owner.facts.ownIssuanceReservation(original);
+		return {facts: owner.facts, state, cell};
+	}
+	function cellInputs() {
+		const native = {rows: {issued: [{preimage: Uint8Array.of(7), signature: new Uint8Array(64)}], lineages: [], plans: [], outbox: []}, image: {digest: "actual"}, control: null};
+		const pages: unknown[] = [], state = {identity: {}, key: {format: "raw", bytes: new Uint8Array(32).fill(4)}};
+		const reads = {native: 0, pages: 0, probe: undefined as unknown};
+		const store = Object.freeze({readOutboxPage: async () => {reads.pages++; return pages;}, acquireNativeReadReservation: async () => undefined});
+		// The storage owner's read enrolls a currency probe on its own observation (captureCurrentProbe).
+		const readBoundedRecoveryCensus = Object.freeze(Object.assign(async () => {reads.native++; return native;},
+			{captureCurrentProbe: () => reads.probe}));
+		const maintenance = Object.freeze({readBoundedRecoveryCensus});
+		const floors = new WeakMap(), trust = {objectId: "room", currentEpoch: 3}, counted = new Set([1]);
+		const registration: any = {issuanceStore: store, liveJournalStore: Object.freeze({readiness: () => {}, readPage: () => {}}),
+			closeVertices: new Map([["vertex", {kind: "drp-vertex", hash: "vertex", operation: {bytes: Uint8Array.of(3)}}]]),
+			closeCharges: new Map([["vertex", 80]]), closeAuthors: new Map([["vertex", {author: "writer", authorSequence: 1}]]),
+			pendingIngress: new Map(), pendingIngressBytes: 0,
+			payload: {trust: {trust}, provenance: {epoch: 3}, parameters: {maxEpochVertices: 64},
+				exactProjectionBytes: Uint8Array.of(1), catalog: {canonicalBlueprintPackageBytes: Uint8Array.of(2), exactArtifactBytes: Uint8Array.of(3)}},
+			authorization: {kind: "latched-acl", value: {writers: ["writer"]}}, issuanceScope: {objectId: "room", author: "writer"},
+			historicalIssuance: {capability: {}, originalIssuanceStore: store, count: 1, countedSequences: counted, maxEpochVertices: 64, scopeAuthorMatches: true}};
+		const bindings = {ObjectIsFrozen: Object.isFrozen, ObjectFreeze: Object.freeze, Uint8ArrayConstructor: Uint8Array,
+			v3SettlementWorkCounts: {recoveryCensusReuses: 0},
+			ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values, SetIteratorNext: Object.getPrototypeOf(new Set().values()).next,
+			ISSUANCE_RETIREMENT_LIMITS: {maxRows: 4096}, AHE_BOUNDED_READ_LIMITS, preparedMigrationTargetFloors: floors,
+			creatorOriginalIssuanceStore: () => store, durableIssuancePruningMaintenanceForStore: (value: unknown) => value === store ? maintenance : undefined,
+			creatorOrdinaryIssuanceSourceIdentity: () => state.identity, resolveVerifiedCreatorHistoricalIssuance: () => Object.freeze({closedEpoch: 2, author: "writer"}),
+			resolveV3AuthorizedAuthor: () => state.key,
+			captureCreatorOrdinaryDimensionIntegrity: (value: unknown) => {
+				const bytes = encodeCanonical(value);
+				return () => {try {return Buffer.compare(encodeCanonical(value), bytes) === 0;} catch {return false;}};
+			}, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0};
+		return {sealed: encodeCanonical({nativeIssuance: native}), registration, trust, runtime: {currentTrust: trust, sourceBound: true,
+			nativeBranchSource: undefined, migrationSource: undefined}, pages, state, floors, counted, bindings, native, reads};
+	}
+	// A close hold runs several issuance leases, and checks between them with no lease. Each lease used
+	// to start with a complete census (the full outbox walk, every row's signature and classification),
+	// and each unheld check was one too: about 4 complete censuses per hold and 19-20 per retiring seal
+	// (.logs/realtime-resume-2026-11-10/lull/trace1). The census is a pure function of its inputs: the
+	// complete native census, the outbox pages, the replay rows and the bound registration context. A
+	// later check that reads all of them again, byte for byte equal, needs no new classification.
+	function holdLeases() {
+		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
+		const state = {captures: 0, probes: 0, probeCurrent: true, replays: 0, replayCurrent: true, diverge: false,
+			byProbe: new Map<object, number>()};
+		// Each storage read enrolls a fresh probe object; byProbe counts each one's currency checks.
+		const newProbe = () => {
+			const value: object = Object.freeze({checkCurrent: async () => {state.probes++; state.byProbe.set(value, (state.byProbe.get(value) ?? 0) + 1); return state.probeCurrent;}});
+			return value;
+		};
+		const probe = newProbe();
+		cell.reads.probe = probe;
+		const original: Reservation = {check: async () => {}, release: async () => {}};
+		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
+			prepareCreatorUnchangedHeldCensusRead;`, {...cell.bindings,
+			ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor});
+		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			${s.fn("censusReuseDebug").getText(s.file)}
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent, unchangedCensusBytes, unchangedCensusInputs;
+			const censusBytesEligible = true, emptyCensusInputs = () => ({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
+			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
+			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
+			recoveryCloseHolds.set(capability, facts);
+			${s.fn("fullRecoveryCloseHoldFacts").getText(s.file)}
+			({facts});`, {
+			ObjectFreeze: Object.freeze, registration: cell.registration, currentTrust: cell.trust, capability, recoveryCloseHolds: registry, sealed,
+			live: () => true, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			sourceDependencies: undefined, activeSource: undefined, runtime: cell.runtime, readJournalCurrent: undefined,
+			replay: {verify: async () => {state.replays++; return state.replayCurrent;}},
+			prepareCreatorUnchangedHeldCensusRead: prepare,
+			// The complete walk, as readCreatorRecoveryDependencyCensus does it: it fills the captured input
+			// view (the pages it read; the storage probe only under a lease) and returns the sealed bytes.
+			captureCensus: async (held: unknown, captured?: {pages: unknown[]; retainedBytes: number; nativeCurrent?: unknown}) => {
+				state.captures++;
+				if (captured !== undefined) {
+					captured.pages.push({afterKey: null, bytes: encodeCanonical(cell.pages)}); captured.retainedBytes = 1;
+					if (held !== undefined) captured.nativeCurrent = probe;
+				}
+				return !state.diverge && state.replayCurrent && Buffer.compare(encodeCanonical({nativeIssuance: cell.native}), sealed) === 0
+					? sealed : encodeCanonical({changed: true});
+			},
+		});
+		return {facts: owner.facts, state, cell, newProbe, lease: () => owner.facts.ownIssuanceReservation(original)};
+	}
+	it("a later lease and an unheld check of the same hold reuse the classification after reading every input again, byte for byte", async () => {
+		const hold = holdLeases(), {state, cell} = hold;
+		let lease = hold.lease();
+		await hold.facts.check(); for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.captures, "first lease: one complete census, then storage currency").toBe(1); expect(state.probes).toBe(3);
+		await lease.release();
+		const native = cell.reads.native, pages = cell.reads.pages, replays = state.replays;
+		await hold.facts.check();
+		expect(state.captures, "unheld check: no new classification").toBe(1);
+		expect(cell.reads.native - native, "unheld check: an actual complete native census read").toBe(1);
+		expect(cell.reads.pages - pages, "unheld check: every outbox page read again").toBe(1);
+		expect(state.replays - replays, "unheld check: the original replay verification").toBe(1);
+		lease = hold.lease();
+		await hold.facts.check();
+		expect(state.captures, "second lease: no new classification").toBe(1);
+		expect(cell.reads.native - native, "second lease: an actual complete native census read").toBe(2);
+		const probes = state.probes;
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.captures).toBe(1); expect(state.probes - probes, "second lease: storage currency after its first check").toBe(3);
+		await lease.release();
+	});
+	it("a changed input between leases, or without a lease, makes the next check the complete census", async () => {
+		const changes: Record<string, (hold: ReturnType<typeof holdLeases>) => void> = {
+			"native census bytes": hold => {(hold.cell.native.rows.issued[0]!.preimage as Uint8Array)[0] ^= 1;},
+			"outbox page bytes": hold => {hold.cell.pages.push({foreign: 1});},
+			"replay rows": hold => {hold.state.replayCurrent = false;},
+			"authorization": hold => {hold.cell.registration.authorization.value.writers.push("foreign");},
+			"pending ingress": hold => {hold.cell.registration.pendingIngress.set("foreign", {});},
+			"source identity": hold => {hold.cell.state.identity = {};},
+			"carrier artifact bytes": hold => {hold.cell.registration.payload.catalog.exactArtifactBytes[0] ^= 1;},
+			"rebase snapshot": hold => {hold.cell.registration.rebaseSnapshot = [{}];},
+			"rebase cursor": hold => {hold.cell.registration.rebaseCursor = 0;},
+			"retained source custody": hold => {hold.cell.registration.historicalIssuance.retainedSources = new Map();},
+			"history counters": hold => {hold.cell.counted.add(2);},
+		};
+		for (const [change, apply] of Object.entries(changes)) for (const leased of [false, true]) {
+			const hold = holdLeases(), lease = hold.lease(), label = `${change} (${leased ? "new lease" : "unheld"})`;
+			await hold.facts.check(); await lease.release();
+			expect(hold.state.captures, `${label}: before`).toBe(1);
+			apply(hold);
+			const next = leased ? hold.lease() : undefined;
+			if (change === "native census bytes" || change === "replay rows") {
+				// A changed native census or replay row is stale: the hold is refused, as the complete census would refuse it.
+				await expect(hold.facts.check(), label).rejects.toThrow("stale or unclassified");
+			} else {
+				// Any other changed binding is decided by the complete census again.
+				await hold.facts.check();
+				expect(hold.state.captures, `${label}: the next check is complete`).toBe(2);
+			}
+			await next?.release();
+		}
+	}, 120_000);
+	it("a lease's storage probe never serves another lease; each lease enrolls its own on an actual complete read", async () => {
+		const hold = holdLeases(), {state, cell} = hold;
+		const first = cell.reads.probe as object;
+		let lease = hold.lease();
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.byProbe.get(first), "first lease uses its own probe").toBe(2);
+		await lease.release();
+		const second = hold.newProbe(); cell.reads.probe = second;
+		lease = hold.lease();
+		const native = cell.reads.native;
+		for (let k = 0; k < 3; k++) await hold.facts.check();
+		expect(state.byProbe.get(first), "the first lease's probe is never consulted again").toBe(2);
+		expect(state.byProbe.get(second), "the second lease's own probe, after its first complete read").toBe(2);
+		expect(cell.reads.native - native, "one actual complete native read starts the second lease").toBe(1);
+		expect(state.captures).toBe(1);
+		await lease.release();
+	});
+	it("debug mode classifies every reuse afresh and refuses a divergence", async () => {
+		const prior = process.env.TS_DRP_DEBUG_CENSUS_REUSE;
+		process.env.TS_DRP_DEBUG_CENSUS_REUSE = "1";
+		try {
+			const hold = holdLeases(), {state} = hold;
+			let lease = hold.lease();
+			await hold.facts.check(); await hold.facts.check();
+			expect(state.captures, "the lease reuse was also classified").toBe(2);
+			await lease.release();
+			await hold.facts.check();
+			expect(state.captures, "the unheld reuse was also classified").toBe(3);
+			state.diverge = true;
+			await expect(hold.facts.check()).rejects.toThrow("diverged from a complete census");
+			lease = hold.lease();
+			await expect(hold.facts.check()).rejects.toThrow("diverged from a complete census");
+			await lease.release();
+		} finally {
+			if (prior === undefined) delete process.env.TS_DRP_DEBUG_CENSUS_REUSE; else process.env.TS_DRP_DEBUG_CENSUS_REUSE = prior;
+		}
+	});
+	it("the census reads no input outside the compared set (purity inventory)", () => {
+		// Every external read of readCreatorRecoveryDependencyCensus. Each is either compared byte for byte by the
+		// hold's cell (native census, outbox pages, replay), bound by identity or exact bytes in its context
+		// (prepareCreatorUnchangedHeldCensusRead owners()/context()/carriers()), required absent (pending ingress,
+		// rebase state, migration floor, source dependencies, active source), or a projection of the native census
+		// through a bound facade (plans, issued rows, lineages, own fences). A new read must join one of these.
+		const s = seam(), text = s.census.getText(s.file);
+		const calls = [...new Set([...text.matchAll(/await ([A-Za-z_.]+)\(/gu)].map(match => match[1]))].sort();
+		expect(calls).toEqual(["authenticatedOutboxRow", "checkpoint", "maintenance.readBoundedRecoveryCensus", "ownSourceSettlementIsComplete",
+			"readPlan", "registration.issuanceStore.readIssued", "registration.issuanceStore.readLineage",
+			"registration.issuanceStore.readOutboxPage", "registration.issuanceStore.readSettlementPlan", "replacementChainLive", "replay.verify",
+			"selectedStore.readIssued", "settledFences"].sort());
+		const fields = [...new Set([...text.matchAll(/registration\.([A-Za-z]+)/gu)].map(match => match[1]))].sort();
+		expect(fields).toEqual(["authorization", "displacedSource", "exactCanonicalPinnedGenesisBootstrapOperationBytes", "historicalIssuance",
+			"index", "issuanceScope", "issuanceStore", "payload"].sort());
+		// The prepared migration floor (preparedTargetFloor?.read()) is required absent by the cell.
+		expect(text).toContain("await preparedTargetFloor?.read()");
+		// No clock, randomness or counters.
+		for (const ambient of ["Date.", "performance.", "Math.random", "getRandomValues"]) expect(text).not.toContain(ambient);
+	});
+	it("a turn's checks after enrollment use the unchanged-held census; a bound input changed between checks forces the complete census", async () => {
+		// Positive control: first check after enrollment is complete (prepares the cell), later checks are not.
+		const control = turnHold();
+		await control.facts.check(); expect(control.state.captures, "first check after enrollment").toBe(1);
+		for (let k = 0; k < 3; k++) await control.facts.check();
+		expect(control.state.captures, "later checks of the same turn").toBe(1); expect(control.state.probes).toBe(3);
+		const changes: Record<string, (cell: ReturnType<typeof cellInputs>, state: {probeCurrent: boolean}) => void> = {
+			"storage census probe (issuance store moved)": (_cell, state) => {state.probeCurrent = false;},
+			"source identity": cell => {cell.state.identity = {};},
+			"authorization": cell => {cell.registration.authorization.value.writers.push("foreign");},
+			"history counters": cell => {cell.counted.add(2);},
+			"epoch parameters": cell => {cell.registration.payload.parameters = {maxEpochVertices: 63};},
+			"issuance scope": cell => {cell.registration.issuanceScope = {objectId: "foreign", author: "writer"};},
+			"prepared migration floor": cell => {cell.floors.set(cell.registration, {});},
+			"carrier artifact bytes": cell => {cell.registration.payload.catalog.exactArtifactBytes[0] ^= 1;},
+		};
+		for (const [change, apply] of Object.entries(changes)) {
+			const turn = turnHold();
+			await turn.facts.check(); await turn.facts.check(); expect(turn.state.captures, `${change}: before`).toBe(1);
+			apply(turn.cell, turn.state);
+			await turn.facts.check(); expect(turn.state.captures, `${change}: the next check is complete`).toBe(2);
+		}
+	}, 120_000);
 });
 
 describe("transition inspect-tree synchronous syntax reuse affected controls", () => {
@@ -6984,6 +7375,8 @@ describe("ordinary finishing scalar codec capacity affected controls", () => {
 		};
 		const owner = execute<(input: Input) => Capacity>(`${constant("invalid")}\n${constant("unsignedEncodingLimits")}\n${[
 			"unsignedCanonicalShape", "unsignedArrayShape", "unsignedRecordShape", "unsignedVaruintWidth", "unsignedRecordWidth", "unsignedArrayWidth", "unsignedNativeImageWidth", "unsignedNativePhaseWidths",
+			// 1515daab: source-custody plan sizing and its native read bound joined the owner.
+			"sourceCustodyPlanWidths", "checkSourceCustodyNativeWidths",
 			"issuanceOrdinaryFinishingCapacityWidths",
 		].map(extract).join("\n")}\nissuanceOrdinaryFinishingCapacityWidths;`, {...codec, ...contract});
 		const scope = {objectId: "room", author: "1".repeat(64)}, foreignScope = {...scope, author: "2".repeat(64)};
@@ -7338,17 +7731,34 @@ describe("ordinary runtime-only nominal custody affected controls", () => {
 		borrowCurrentNativeReservation?(owner: "ahe" | "journal" | "floor"): Promise<Native | undefined>;
 		acquireNativeIssuanceReservation(): Promise<Native>; release(): Promise<void>};
 	function gate() {let resolve!: () => void; const promise = new Promise<void>(done => {resolve = done;}); return {promise, resolve};}
-	function fixture(received = false, epoch = 3) {
-		const path = new URL("../src/v3-live.ts", import.meta.url), file = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-		const kernelPath = new URL("../src/internal/runtime-reclamation.ts", import.meta.url), kernelFile = ts.createSourceFile(kernelPath.pathname,
-			readFileSync(kernelPath, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-		const rollbackPath = new URL("../src/internal/creator-closed-rollback-data.ts", import.meta.url), rollbackFile = ts.createSourceFile(rollbackPath.pathname,
-			readFileSync(rollbackPath, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	// The extracted helper text is a pure function of the three source files, so it
+	// is parsed and extracted once per describe. fixture() still builds fresh state,
+	// registration, registries and execute() bindings for every case.
+	let helperCache: {live: string; rollback: string; kernel: string} | undefined;
+	function helpers() {
+		if (helperCache !== undefined) return helperCache;
+		const parse = (relative: string) => {
+			const path = new URL(relative, import.meta.url);
+			return ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+		};
+		const file = parse("../src/v3-live.ts"), kernelFile = parse("../src/internal/runtime-reclamation.ts");
+		const rollbackFile = parse("../src/internal/creator-closed-rollback-data.ts");
 		const extract = (input: ts.SourceFile, name: string) => {
 			const matches = input.statements.filter((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name);
 			if (matches.length !== 1) throw Error(`ORDINARY_RUNTIME_HELPER:${name}:${matches.length}`);
 			return matches[0]!.getText(input).replace(/^export /, "");
 		};
+		return helperCache = {
+			live: ["currentRegistration", "sameScope", "creatorOriginalIssuanceStore", "nativeBranchDisplacedSource", "receivedAppendFacts",
+				"fullRecoveryCloseHoldFacts", "captureCreatorRecoveryRuntime", "creatorOrdinaryIssuanceRetainedSourceBindings", "creatorOrdinaryIssuanceSourceIdentity", "sealCreatorOrdinaryIssuanceRuntime", "resolveOrdinaryIssuanceRuntimeHold",
+				"resolveRecoveryCloseHold", "prospectiveAppendCandidate"].map(name => extract(file, name)).join("\n"),
+			rollback: extract(rollbackFile, "creatorOrdinaryIssuanceProofFacts"),
+			kernel: ["installV3RuntimeReclamationKernel", "resolveCreatorOrdinaryIssuanceRuntimeHold", "resolveCreatorSnapshotRecoveryCloseHold",
+				"installCreatorCloseRuntimeRelease", "borrowCreatorCloseSigningDependencies"].map(name => extract(kernelFile, name)).join("\n"),
+		};
+	}
+	function fixture(received = false, epoch = 3) {
+		const source = helpers();
 		const state: {member: boolean; signingAcquire?: () => Promise<void>; signingRelease?: () => Promise<void>;
 			nativeAcquire?: () => Promise<void>; nativeRelease?: () => Promise<void>; currentBorrow?: () => Promise<void>} = {member: true};
 		const calls = {signingAcquires: 0, signingChecks: 0, signingReleases: 0, nativeAcquires: 0, nativeChecks: 0, nativeReleases: 0, currentBorrows: 0,
@@ -7386,12 +7796,9 @@ describe("ordinary runtime-only nominal custody affected controls", () => {
 			fullFacts(value: object): unknown; proofFacts(value: object): unknown;
 			prospective(registration: any, bytes: Uint8Array, hold: object): unknown}>(`
 			let runtimeKernel, creatorCloseReleaseOwner;
-			${["currentRegistration", "sameScope", "creatorOriginalIssuanceStore", "nativeBranchDisplacedSource", "receivedAppendFacts",
-				"fullRecoveryCloseHoldFacts", "captureCreatorRecoveryRuntime", "creatorOrdinaryIssuanceRetainedSourceBindings", "creatorOrdinaryIssuanceSourceIdentity", "sealCreatorOrdinaryIssuanceRuntime", "resolveOrdinaryIssuanceRuntimeHold",
-				"resolveRecoveryCloseHold", "prospectiveAppendCandidate"].map(name => extract(file, name)).join("\n")}
-			${extract(rollbackFile, "creatorOrdinaryIssuanceProofFacts")}
-			${["installV3RuntimeReclamationKernel", "resolveCreatorOrdinaryIssuanceRuntimeHold", "resolveCreatorSnapshotRecoveryCloseHold",
-				"installCreatorCloseRuntimeRelease", "borrowCreatorCloseSigningDependencies"].map(name => extract(kernelFile, name)).join("\n")}
+			${source.live}
+			${source.rollback}
+			${source.kernel}
 			const owner = Object.assign(async () => {throw Error("UNEXPECTED_RECLAMATION");}, {resolveRecoveryCloseHold, resolveOrdinaryIssuanceRuntimeHold});
 			if (!installV3RuntimeReclamationKernel(owner) || installV3RuntimeReclamationKernel(owner)) throw Error("ORDINARY_RUNTIME_KERNEL_NOT_SINGLE");
 			if (!installCreatorCloseRuntimeRelease(Object.assign(() => undefined, {borrowSigningDependencies: controlledSigningBorrow}))) throw Error("ORDINARY_SIGNING_KERNEL_MISSING");
@@ -7736,7 +8143,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 		expect(read({...forward, predecessorIndex: 1}, frame)).toBeUndefined();
 		frame.alive = false; expect(read(forward, frame)).toBeUndefined();
 	});
-	function fixture() {
+	function fixture(maxApplicationStateBytes = 32_768) {
 		const runtimePath = new URL("../src/v3-live.ts", import.meta.url);
 		const runtimeFile = ts.createSourceFile(runtimePath.pathname, readFileSync(runtimePath, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const runtimeDeclaration = (name: string) => {
@@ -7802,7 +8209,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 			const machine = {snapshot: () => ({blueprintDigest: "b".repeat(64), stateDigest: "d".repeat(64), exactCanonicalStateBytes: state.baseBytes})};
 			const machineIdentity = {machine, expectedStateDigest: "d".repeat(64)};
 			const registration = {blueprintMachine: machine, blueprintMachineIdentity: machineIdentity,
-				payload: {provenance: {blueprintDigest: "b".repeat(64)}, parameters: {maxDependencies: 4, maxSnapshotBytes: 268435456, snapshotChunkBytes: 65536},
+				payload: {provenance: {blueprintDigest: "b".repeat(64)}, parameters: {maxApplicationStateBytes: ${maxApplicationStateBytes}, maxDependencies: 4, maxSnapshotBytes: 268435456, snapshotChunkBytes: 65536},
 					catalog: {blueprintDigest: "b".repeat(64), artifactId: "grid", artifactDigest: "e".repeat(64), catalogDigest: "f".repeat(64),
 						runtimeProfile: "ecmascript-2024-sync-v1", exactArtifactBytes: Uint8Array.of(9), canonicalBlueprintPackageBytes: Uint8Array.of(8)}},
 				closeVertices: new Map([["a".repeat(64), {hash: "a".repeat(64), kind: "drp-epoch-anchor", objectId: "room", epoch: 3, dependencies: []}]]),
@@ -7851,7 +8258,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 			TypedArrayBufferGetter: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), "buffer")!.get,
 			ObjectGetPrototypeOf: Object.getPrototypeOf, ObjectPrototype: Object.prototype, ReflectOwnKeys: Reflect.ownKeys,
 			ObjectCreate: Object.create, ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
-			settlementProfileFor, APPLICATION_BATCH_ACTION: "applicationBatch", APPLICATION_BATCH_LIMITS: {maxBytes: 65536, maxDepth: 8, maxItems: 1024},
+			settlementProfileFor, APPLICATION_BATCH_ACTION: "applicationBatch", APPLICATION_BATCH_LIMITS: {maxBytes: 65536, maxDepth: 8, maxItems: 1024}, ROOM_APPLICATION_STATE_BYTES: 32_768,
 			ordinaryPreviewAppendCandidate: (_registration: unknown, bytes: Uint8Array) => ({bytes: bytes.slice(), digest: new Uint8Array(32),
 				scope: {objectId: "room", epoch: 3, anchorDigest: "a".repeat(64), author: "1".repeat(64)}, sequence: 1}),
 			isDigestHex: (value: string) => /^[a-f0-9]{64}$/u.test(value), detachedCanonicalOperation: (value: unknown) => value,
@@ -8040,8 +8447,11 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 		expect(readout).toBeDefined(); expect(Object.keys(readout!)).toEqual([]); expect(Object.isFrozen(readout)).toBe(true);
 		const facts = f.resolve(readout, f.proof, f.unsignedBytes)!;
 		expect(facts.current.candidate.exactCanonicalUnsignedVertexBytes).toEqual(f.unsignedBytes);
-		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(268435456); // No fixture-size theorem.
+		expect(facts.current.blueprint.maxApplicationStateBytes).toBe(32_768); // The room's application state limit, never the snapshot bound.
 		expect(facts.current.parameters.snapshotChunkBytes).toBe(65536); // Exact supplied original parameter, never a fixed inferred chunk size.
+		// G22 sizing charges the room's own limit (a per-room parameter, owner decision 2026-11-21).
+		const wide = fixture(131_072), wideReadout = await wide.proof.readCurrentDimensions(wide.unsignedBytes);
+		expect(wide.resolve(wideReadout, wide.proof, wide.unsignedBytes)!.current.blueprint.maxApplicationStateBytes).toBe(131_072);
 		expect(facts.current.successorFenceCount).toBe(0); expect(facts.current.nativeCounts.lineages).toBe(1);
 		expect(facts.current.blueprint.catalog.exactArtifactBytes).toEqual(Uint8Array.of(9));
 		expect(facts.current.currentEpochVertexCount).toBe(1); expect(facts.current.currentSignedPreimageByteLengths).toEqual([]);
@@ -8277,7 +8687,10 @@ describe("ordinary preimage and expanded-container capacity affected controls", 
 			width(bytes: number, shape?: {items: number; maxDepth: number}): object; array(count: number, child: object): object;
 			bytes(length: number): object; measure(value: unknown): number}>(`const ${symbol.getText(parsed)};\n${[
 			"maintenanceEncodedWidth", "maintenanceEncodedArrayCapacity", "maintenanceVarUintWidth", "maintenanceWidthSum", "maintenanceCanonicalWidth",
-			"maintenanceEncodedBytes", "readCreatorOrdinaryPreimageCapacityForSizing"].map(name => declaration(name).replace(/^export /, "")).join("\n")}\n
+			// ea4eb158: the reader delegates its field geometry to
+			// creatorOrdinaryPreimageResourceGeometryForSizing (its catch would
+			// otherwise turn the missing binding into a silent undefined).
+			"maintenanceEncodedBytes", "creatorOrdinaryPreimageResourceGeometryForSizing", "readCreatorOrdinaryPreimageCapacityForSizing"].map(name => declaration(name).replace(/^export /, "")).join("\n")}\n
 			({preimage: readCreatorOrdinaryPreimageCapacityForSizing, width: maintenanceEncodedWidth,
 			array: maintenanceEncodedArrayCapacity, bytes: maintenanceEncodedBytes, measure: maintenanceCanonicalWidth});`, {canonicalCreatorDataRecord, AHE_BOUNDED_READ_LIMITS});
 	}
@@ -8441,8 +8854,11 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 				scope: {...input.currentScope, epoch: maximum}, rows});
 			const rows = Array(input.maxIssuerDescriptors + (input.futureRows?.issuerDescriptorGrowth ?? 1)).fill(descriptor), debt = Array(input.maxDebtDescriptors + 1).fill({scope: input.scope,
 				lineageIndex: maximum, planIndex: maximum}), anchors = Array(input.maxDependencyAnchors).fill({epoch: maximum, anchorDigest: digest});
+			// 1515daab: a fence-issuing successor reserves one future manual-review
+			// unsettled source per issuer descriptor in activeUnsettled.sources; the
+			// actual carrier holds exactly those maximal entries (none without a fence).
 			const active = api.active({pendingRoots, wireByteCharge: pendingRoots.length === 0 ? 0 : maximum,
-				unsettledSources: [], cursor: null, cacheSourceSequences: [], epoch: input.currentScope.epoch + 1});
+				unsettledSources: futureUnsettledSources(input), cursor: null, cacheSourceSequences: [], epoch: input.currentScope.epoch + 1});
 			const optionalPending = input.receivedPendingIngressByteLength === undefined ? {} : {pendingIngress: active.pendingIngress};
 			const current = api.runtime(currentJournal(Array(input.maxCurrentJournalRows + (input.maxAdditionalCurrentJournalRows ?? 1)).fill(received ? remote : local)), rows, debt, maximum, anchors);
 			const precursor = api.runtime(currentJournal([]), rows, debt, maximum, anchors);
@@ -8456,6 +8872,12 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 				successorReserved: noFence ? {...final, ...optionalPending, nativeIssuance: false} : {...precursor, ...active, nativeIssuance: false},
 				successorEntered: noFence ? {...final, ...optionalPending, nativeIssuance: false} : {...precursor, ...active, nativeIssuance: false},
 				successorFinal: {...final, ...optionalPending, nativeIssuance: false}, pending: active.pendingIngress, local, remote};
+		}
+		function futureUnsettledSources(input: Input) {
+			if (input.successorFenceCount === 0) return [];
+			return Array(input.maxIssuerDescriptors + (input.futureRows?.issuerDescriptorGrowth ?? 1)).fill({
+				scope: {objectId: input.scope.objectId, author: input.scope.author}, disposition: "manual-review",
+				replacementProgress: null, sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8Array(32)});
 		}
 		function dominates(bound: Capacity, values: ReturnType<typeof actual>) {
 			for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
@@ -8805,7 +9227,14 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 		const f = await fixture(), input = {...f.input, successorFenceCount: 0 as const, successorFencePreimageByteLength: 0};
 		const zero = f.api.capacity(input), one = f.api.capacity(f.input);
 		for (const received of [false, true]) f.dominates(zero, f.actual(input, received));
-		expect(zero.currentClose).toBe(one.currentClose);
+		// 1515daab: without a successor fence no future manual-review source is
+		// reserved, so the zero-fence close is exactly its own carrier and differs
+		// from the one-fence close by exactly those source entries, never by an
+		// invented descriptor or journal row.
+		expect(zero.currentClose).toBe(encodeCanonical(f.actual(input, true).currentClose).byteLength - 1);
+		const zeroActive = f.actual(input, true).currentClose as Record<string, unknown>, oneActive = f.actual(f.input, true).currentClose as Record<string, unknown>;
+		expect(encodeCanonical({...oneActive, activeUnsettled: zeroActive.activeUnsettled})).toEqual(encodeCanonical(zeroActive));
+		expect(one.currentClose - zero.currentClose).toBe(encodeCanonical(oneActive).byteLength - encodeCanonical(zeroActive).byteLength);
 		expect(zero.successorFinal).toBe(encodeCanonical(f.actual(input, true).successorFinal).byteLength - 1);
 		expect(zero.successorFinal).toBeLessThan(one.successorFinal);
 		expect(zero.successorReserved).toBe(zero.successorFinal);
@@ -8865,6 +9294,9 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 			readOrdinaryRuntimeCapacityWidths: (input: Input) => {calls.push(input); return f.api.capacity(input);}};
 		const census: Record<string, unknown> = {...f.actual(f.input, false).currentClose};
 		census.currentJournal = {...census.currentJournal as object, scope: f.input.currentScope};
+		// The consumer reads the PRESENT census, which holds no unsettled source;
+		// the maximal future manual-review entries are only the sizing carrier.
+		census.activeUnsettled = {...census.activeUnsettled as object, sources: []};
 		const phase = (phase: "reserved" | "entered", bytes: number) => ({phase, canonicalUnsignedVertexByteLength: bytes,
 			runtimeCensusOverheadByteLength: 1, nativeRowsByteLength: 1, nativeImageByteLength: 1, nativeControlRevisionDelta: 1});
 		const variant = (bytes: number) => ({runtimeCensusOverheadByteLength: 1, nativeRowsByteLength: 1, nativeImageByteLength: 1,

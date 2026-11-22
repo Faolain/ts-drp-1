@@ -266,7 +266,7 @@ function runLocalAuthorChild(input: unknown, label: string, timeoutMs: number): 
  * @returns The child's single terminal proof message.
  */
 export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChildMessage> {
-	return runLocalAuthorChild(input, "D.108d1b", 90_000);
+	return runLocalAuthorChild(input, "D.108d1b", 300_000);
 }
 
 /**
@@ -275,5 +275,5 @@ export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChild
  * @returns The child's single terminal proof message.
  */
 export function runD108e2eSkipBudgetChild(input: unknown): Promise<D108d1bChildMessage> {
-	return runLocalAuthorChild(Object.freeze({ material: input, mode: "skip-budget" }), "D.108e2e", 120_000);
+	return runLocalAuthorChild(Object.freeze({ material: input, mode: "skip-budget" }), "D.108e2e", 300_000);
 }

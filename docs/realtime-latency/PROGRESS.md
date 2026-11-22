@@ -8,6 +8,46 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
+## Member lull settling and receipt-only halts — 2026-11-11 (on integration-7)
+
+Decision rows 76 and 77; branch `fix/int7-turnover-skip-bounds`.
+- **Lull skip kept within the settlement window** (row 76). After 7125cdb1 a silent Writer's own work
+  outlived the 4-epoch window by one epoch (unsettled 5), and a delivering Writer kept one epoch more of
+  committed rows. 84917587 settles the lull with a further received-turnover pass; bcdbf6b5 runs that pass
+  only while a just-drained scope still holds one of the member's own settlement sources.
+  Passes per steady lull, 2d825dec / 84917587 / bcdbf6b5: delivering Writer 2 / 3 / 3, receive-only 2 / 3 / 2,
+  silent Writer 2 / 3 / 3 (max unsettled 5 / 4 / 4). The Writer's third pass releases its committed rows
+  (own rows 9 and plan entries 4 instead of 11 and 5). Dropping it for committed rows failed the
+  skip-member retention test, so it stays. It costs 20-50% more lull wall and CPU time in paired
+  sandbox runs, off the per-move path, with the longest block and install unchanged. Making it cheaper is a
+  retirement-order change (issuance decided on the post-drain journal within one pass) that needs a model.
+  Cost guard `tests/member-lull-turnover-cost-native.test.ts` (receive-only; RED c6ffb7f9).
+- **Receipt-only retirement halt** (row 77). A creator or member killed right after its snapshot store commits
+  a pool turnover reopened halted by the receipt alone. Creator fix aee798e3 (already merged); member RED
+  ed6147e6 (5/5 stall), fix f185fc0f (3/3).
+
+## Creator restore currency — 2026-11-10 (on integration-7)
+
+User decision: a creator that reopens from storage asks its members for their creator-signed view and waits a
+bounded time (5 s) before signing anything; verified newer state refuses it for the session
+(`V3RoomNotYetCurrent` "creator-superseded"), silence proceeds. Decision row 75; branch
+`fix/creator-restore-currency` (model, RED, fix). Active only where the application wires `creatorMemberView`.
+Sandbox runs: RED on `efe4d128` fails (a) and (b) (the restored copy re-signs authorSequence 3) with the three
+controls passing; GREEN on head 5/5. Grid endurance smoke (12 epochs, reopen at 5) passes on head and on base with
+`TMPDIR=/dev/shm`; on the sandbox disk base fails the same member-starvation bound, so that is the environment.
+Wait cut (user decision 2026-11-11): the wait follows connected members (all answered, or a round-trip grace;
+silent peers at most 1 s); with no peer connected the creator signs moves at once and holds only the finality key
+(5 s or a member's attested view); late members are still asked and refuse it. Open to first signature p50: lone
+5072 -> 110 ms, 1 member 120 -> 171 ms, 3 members 132 -> 150 ms (in-memory channel; noise about +-50 ms).
+Connectivity hold (lead review 2026-11-11): the zero-wait lone rule signed moves a member connecting a moment later
+would refuse. Unless the stored roster is solo, the first move now waits for a peer's answer, the transport
+reporting it reached nobody (`DRPNetworkNode.initialReach`), or 1.5 s from open; each asked peer gets its own 1 s
+answer window (the round-trip grace could end the round before a slower member's newer view). The lost first ask
+(~40% of the scorecard's connected reopens) was the member's 500 ms answer rate limit dropping a reopened creator's
+request; it now answers when the limit passes and a new connection resets it. RED `1a6c46ff` (3 fail), GREEN 14/14.
+Open to first signature p50 (20 ms delay): nobody reachable 154 -> 1576 ms, solo roster 117 ms, member 300 ms late
+398 ms (nothing signed before its view), 1 member 116 ms, 3 members 144 ms.
+
 ## Integration-5 — 2026-10-26 evening (current)
 
 **All four 300-epoch runs pass on `f9a1f33c`**, merged into this root as `38682519`.

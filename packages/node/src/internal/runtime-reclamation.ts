@@ -19,6 +19,8 @@ import type { V3RoomRetirementSession } from "./room-retirement.js";
 export type CreatorIssuanceRetirementOwner = (() => Promise<DurableIssuanceRetirementControlRead>) & {
 	/** Slice 14a: the same owner's original read through a room retirement session. */
 	readonly acquireIn?: (session: V3RoomRetirementSession) => Promise<DurableIssuanceRetirementControlRead>;
+	/** Rule A: the native plan-before side row, read only to reconstruct a committed source. */
+	readonly readPlanBefore?: () => Promise<Uint8Array | null>;
 };
 
 const INPUT_KEYS = Object.freeze(["aheReceipt", "issuanceReceipt", "successor"] as const);
@@ -248,12 +250,24 @@ export type CreatorOrdinaryApplicationResourceProjectionInput = Readonly<{
 	catalog: CreatorOrdinaryApplicationResourceBoundInput["catalog"];
 	material: Omit<CreatorOrdinaryApplicationResourceBoundInput["material"], "candidateOperation">;
 }>;
+/** The resumable form of createIncrementalProjection over the SAME input: step consumes at most about
+ * `byteBudget` more base bytes per call (true once the whole material is captured), and finish returns
+ * exactly the projection createIncrementalProjection returns for that input (undefined where it does).
+ * A seed that throws, or is abandoned, grants nothing. */
+export type CreatorOrdinaryApplicationResourceProjectionSeed = Readonly<{
+	step(byteBudget: number): boolean;
+	finish(): CreatorOrdinaryApplicationResourceProjection | undefined;
+}>;
 export type CreatorOrdinaryApplicationResourceBoundReader =
 	((input: CreatorOrdinaryApplicationResourceBoundInput) => CanonicalResourceFootprint | undefined) & Readonly<{
 		/** Optional SAME catalog-bound resource theorem; absent/unsupported always
 		 * uses the original complete-material callback. No wire/profile change. */
 		createIncrementalProjection?: (input: CreatorOrdinaryApplicationResourceProjectionInput) =>
 			CreatorOrdinaryApplicationResourceProjection | undefined;
+		/** Optional resumable form of createIncrementalProjection (same input, same result), so a room
+		 * seeds its state bound in bounded turns. Absent: the room seeds with createIncrementalProjection. */
+		beginIncrementalProjection?: (input: CreatorOrdinaryApplicationResourceProjectionInput) =>
+			CreatorOrdinaryApplicationResourceProjectionSeed | undefined;
 	}>;
 export type CreatorOrdinaryIssuanceRuntimeLifetime = Readonly<{
 	readonly plane: object;
@@ -329,7 +343,8 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	readClosedJournalAuthority?(input: ReceivedClosedJournalAuthorityRead): ReceivedClosedJournalAuthority | undefined;
 	/** This hold's own registration reads a terminally covered, locally settled source.
 	 * Its exact policy, digest-matched plan and completed replacement chunks are rechecked. */
-	readSettledLocalSource?(source: CreatorSettledLocalSource): Promise<CreatorSettledLocalSourceRead | undefined>;
+	/** `walk`: one classification's token; its reads share one own-fence scan (see v3-live). */
+	readSettledLocalSource?(source: CreatorSettledLocalSource, walk?: object): Promise<CreatorSettledLocalSourceRead | undefined>;
 	/** Private owner geometry only: this lifetime retains no replacement or
 	 * displaced-source physical custody. It is not currency or authorization. */
 	canDetachNativePreparation?: true;
@@ -361,7 +376,7 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	 * composition. Active hold remains read-only for completeRetirement. These
 	 * factories are not narrowed grants: the original planner must select no drains. */
 	captureClassificationMetadataOwners(): Readonly<{signing: CreatorSigningRetirementOwners;
-		issuance: () => Promise<DurableIssuanceRetirementControlRead>}>;
+		issuance: CreatorIssuanceRetirementOwner}>;
 	check(): Promise<void>;
 	acquireNativeIssuanceReservation(): Promise<NativeReadReservation>;
 	completeRetirement(observation: object): Promise<void>;

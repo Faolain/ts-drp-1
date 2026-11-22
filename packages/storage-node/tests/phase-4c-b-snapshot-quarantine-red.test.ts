@@ -113,7 +113,9 @@ describe.skipIf(!ownerExists)("Phase 4c-b genuine Node SQLite quarantine RED", (
 		expect(rawCounts(primaryFilename)).toEqual({ chunks: 0, scopes: 1 });
 		const database = new DatabaseSync(databaseFilename(primaryFilename), { readOnly: true });
 		try {
-			expect(database.prepare("PRAGMA user_version").get()?.user_version).toBe(2);
+			// ea4eb158 migrated the Node snapshot schema v2 -> v6 (retirement controls, dependency
+			// slots, received certificate bytes). The shared contract keeps the v2 common image.
+			expect(database.prepare("PRAGMA user_version").get()?.user_version).toBe(6);
 			expect(database.prepare("PRAGMA journal_mode").get()?.journal_mode).toBe("wal");
 			expect(database.prepare("PRAGMA synchronous").get()?.synchronous).toBe(2);
 			expect(
@@ -121,13 +123,19 @@ describe.skipIf(!ownerExists)("Phase 4c-b genuine Node SQLite quarantine RED", (
 					.prepare("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")
 					.all()
 					.map(({ name }) => name)
-			).toEqual(["snapshot_chunks_v2", "snapshot_owner_v2", "snapshot_scopes_v2"]);
+			).toEqual([
+				"snapshot_chunks_v2",
+				"snapshot_dependency_slots",
+				"snapshot_owner_v2",
+				"snapshot_retirement_controls",
+				"snapshot_scopes_v2",
+			]);
 			expect(
 				database
 					.prepare("PRAGMA table_xinfo(snapshot_scopes_v2)")
 					.all()
 					.map(({ name }) => name)
-			).toEqual(SNAPSHOT_QUARANTINE_SCHEMA.node.scopeColumns);
+			).toEqual([...SNAPSHOT_QUARANTINE_SCHEMA.node.scopeColumns, "received_certificate_bytes"]);
 			expect(
 				database
 					.prepare("PRAGMA table_xinfo(snapshot_chunks_v2)")

@@ -27,8 +27,10 @@ function load(names: string[], bindings: Record<string, unknown>) {
 function ingressFixture() {
 	const calls: string[] = [], registration: any = {blueprintClosing: false};
 	class InputCaptureCapacityError extends Error {}
-	const enqueue = load(["enqueueV3Ingress"], {
+	const enqueue = load(["enqueueCapturedV3Ingress", "settleIngressJob", "enqueueV3Ingress"], {
 		currentRegistration: () => true, InputCaptureCapacityError,
+		// Same-epoch carry bookkeeping (no carry is open in this fixture).
+		ingressJobsInFlight: new WeakMap(), pendingIngressCarries: new WeakMap(), deletePendingIngressCarry: () => undefined,
 		ingressFailureLog: (reason: string) => {calls.push(`log:${reason}`);},
 		captureV3Ingress: () => ({exactWireBytes: Uint8Array.of(1), sender: "peer", transport: "gossip"}),
 		authenticateV3Ingress: async () => {calls.push("authenticate");},

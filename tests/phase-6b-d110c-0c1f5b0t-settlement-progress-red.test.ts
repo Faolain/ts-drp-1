@@ -384,7 +384,12 @@ describe("D.110c-0c1f5b0t Node pre-reservation and split RED", () => {
 		expect(result.issued).toHaveLength(0);
 	});
 
-	it("refuses malformed and stale progress before signing, while a valid exact prefix issues", async () => {
+	// ea4eb158: a replacement plan effect is honoured only in the private receiver-bound source
+	// turn (V3RebaseSource.issueReplacement); `settlementSource` is "never captured from public
+	// input". Public issueLocal therefore can no longer issue even a valid exact prefix: after the
+	// shape check, every replacement effect fails closed for lack of its owning source, before
+	// signing and without touching lineage.
+	it("refuses malformed, stale and valid public progress before signing without its owning source", async () => {
 		const opened = await openSettlementNode();
 		activeNodes.push(opened);
 		await opened.issuanceStore.transactWriteSettlementPlan({
@@ -396,8 +401,9 @@ describe("D.110c-0c1f5b0t Node pre-reservation and split RED", () => {
 		const before = await opened.issuanceStore.readLineage(opened.scope);
 		for (const [effect, expected, attempts] of [
 			[{ ...progressEffect(0, 1), extra: true }, "malformed-input", 1],
-			[{ ...progressEffect(0, 1), intentDigest: new Uint8Array(32).fill(1) }, "issuance-rejected", 3],
-			[progressEffect(1, 2), "issuance-rejected", 3],
+			[{ ...progressEffect(0, 1), intentDigest: new Uint8Array(32).fill(1) }, "authorization-rejected", 3],
+			[progressEffect(1, 2), "authorization-rejected", 3],
+			[progressEffect(0, 1), "authorization-rejected", 3],
 		] as const) {
 			for (let attempt = 0; attempt < attempts; attempt += 1) {
 				const signer = vi.fn(opened.fixture.signRegisteredVertexDigest);
@@ -411,10 +417,10 @@ describe("D.110c-0c1f5b0t Node pre-reservation and split RED", () => {
 				expect.soft(await opened.issuanceStore.readLineage(opened.scope)).toEqual(before);
 			}
 		}
+		// The same plane still issues ordinary work: the refusals above are not a halted plane.
 		const signer = vi.fn(opened.fixture.signRegisteredVertexDigest);
 		const issued = await opened.plane.issueLocal({
 			operations: [operation],
-			planEffect: progressEffect(0, 1),
 			signRegisteredVertexDigest: signer,
 		} as never);
 		expect(issued).toMatchObject({ ok: true });
@@ -426,7 +432,8 @@ describe("D.110c-0c1f5b0t Node pre-reservation and split RED", () => {
 			readFile("packages/issuance-store/src/types.ts", "utf8"),
 			readFile("packages/issuance-store/src/contract.ts", "utf8"),
 			readFile("packages/node/src/v3-live.ts", "utf8"),
-			readFile("examples/v3-room/src/index.ts", "utf8"),
+			// The shared room moved from the example into @ts-drp/node (ea4eb158); the example re-exports it.
+			readFile("packages/node/src/v3-room.ts", "utf8"),
 			readFile("packages/storage-browser/src/internal/browser-issuance-store.ts", "utf8"),
 			readFile("packages/storage-node/src/internal/node-issuance-store.ts", "utf8"),
 		]);
@@ -452,7 +459,8 @@ describe("D.110c-0c1f5b0t Node pre-reservation and split RED", () => {
 		expect.soft(room.includes("split-required")).toBe(true);
 		expect.soft(browser.includes("replacementProgress")).toBe(true);
 		expect.soft(storageNode.includes("replacementProgress")).toBe(true);
-		expect.soft(browser.includes("const DATABASE_VERSION = 2")).toBe(true);
-		expect.soft(storageNode.includes("const SCHEMA_VERSION = 3")).toBe(true);
+		// The progress-carrying schemas (browser 2, node 3) have since been migrated forward (ea4eb158).
+		expect.soft(browser.includes("const DATABASE_VERSION = 3")).toBe(true);
+		expect.soft(storageNode.includes("const SCHEMA_VERSION = 5")).toBe(true);
 	});
 });

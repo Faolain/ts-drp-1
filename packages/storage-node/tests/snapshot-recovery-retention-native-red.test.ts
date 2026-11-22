@@ -7,6 +7,8 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
+
 import { fixture, outcome, receiptFor, stable } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import { createNodeSnapshotQuarantineStore } from "../src/snapshot-transfer.js";
 
@@ -257,7 +259,8 @@ describe("1a-1 native retention transaction fault evidence", () => {
 					const scope = await store.openScope(selected.declaration);
 					await scope.complete(await receiptFor(scope, selected));
 					expect(rawImage(primaryFilename).scopes[0]?.state).toBe("verified");
-					const raw = new DatabaseSync(`${primaryFilename}${suffix}`);
+					// Out-of-band damage (ea4eb158 fences raw writers; see out-of-band-sqlite.ts).
+					const raw = allowOutOfBandWrites(new DatabaseSync(`${primaryFilename}${suffix}`));
 					try {
 						const injected = representation === "text" ? "0x1" : Uint8Array.of(0);
 						raw.prepare(`UPDATE snapshot_owner_v2 SET ${column}=?`).run(injected);

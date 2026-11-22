@@ -153,14 +153,16 @@ describe("Phase 2l-c genuine Node issuance process death", () => {
 	});
 
 	it("hard-kills all exact 18 statement tuples and reopens old XOR exact-new without deleting WAL", async () => {
+		// ea4eb158: inside the one IMMEDIATE transaction the writer reads lineage state twice
+		// (commit guard, then the retirement-row check) before any write or rollback.
 		const expectedTrace: Record<Phase2lCDeathTuple["edge"], readonly string[]> = {
 			"begin": ["begin"],
-			"commit": ["begin", "state-select", "lineage-write", "issued-insert", "outbox-insert", "commit"],
-			"issued-insert": ["begin", "state-select", "lineage-write", "issued-insert"],
-			"lineage-write": ["begin", "state-select", "lineage-write"],
-			"outbox-insert": ["begin", "state-select", "lineage-write", "issued-insert", "outbox-insert"],
+			"commit": ["begin", "state-select", "state-select", "lineage-write", "issued-insert", "outbox-insert", "commit"],
+			"issued-insert": ["begin", "state-select", "state-select", "lineage-write", "issued-insert"],
+			"lineage-write": ["begin", "state-select", "state-select", "lineage-write"],
+			"outbox-insert": ["begin", "state-select", "state-select", "lineage-write", "issued-insert", "outbox-insert"],
 			"postbuild": ["postbuild"],
-			"rollback": ["begin", "state-select", "rollback"],
+			"rollback": ["begin", "state-select", "state-select", "rollback"],
 			"state-select": ["begin", "state-select"],
 			"suspended-build": ["suspended-build"],
 		};
@@ -200,7 +202,8 @@ describe("Phase 2l-c genuine Node issuance process death", () => {
 					expect
 						.soft(message.sql?.trim().replace(/\s+/gu, " "), `${tuple.id}/exact-prior-sql`)
 						.toMatch(
-							/^UPDATE lineages SET next\s*=\s*\?,\s*exhausted\s*=\s*\? WHERE object_id\s*=\s*\? AND author\s*=\s*\? AND next\s*=\s*\? AND exhausted\s*=\s*\?$/iu
+							// The CAS also clears the unsigned intent it consumes (ea4eb158).
+							/^UPDATE lineages SET next\s*=\s*\?,\s*exhausted\s*=\s*\?,\s*pending_unsigned\s*=\s*NULL WHERE object_id\s*=\s*\? AND author\s*=\s*\? AND next\s*=\s*\? AND exhausted\s*=\s*\?$/iu
 						);
 					expect
 						.soft(message.parameters, `${tuple.id}/exact-prior-parameters`)

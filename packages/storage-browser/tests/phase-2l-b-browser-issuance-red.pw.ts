@@ -45,6 +45,8 @@ test("exact two-symbol surface, closed options and opaque identity are promise-o
 		"readOutboxPage",
 		"readSettlementPlan",
 		"transactIssue",
+		// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+		"transactIssueBatch",
 		"transactWriteSettlementPlan",
 	]);
 	expect(value.prototypeKeys).toEqual([]);

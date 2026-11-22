@@ -35,6 +35,7 @@ export type {
 	BlueprintPreparationInput,
 	BlueprintRuntimePreparationInput,
 	BuildAndSign,
+	BuildAndSignBatch,
 	CurrentAnchorTrust,
 	CertifiedAnchorTrust,
 	ExtractAdmittedReceivedVertexFailureReason,
@@ -47,6 +48,8 @@ export type {
 	IssueCommit,
 	IssuedVertexRecord,
 	IssueScope,
+	LocalVertexBatchEntry,
+	LocalVertexBatchInput,
 	LocalVertexInput,
 	OpenCurrentAnchorTrustInput,
 	OpenCurrentAnchorTrustResult,
@@ -59,4 +62,6 @@ export type {
 	SignedVertexEnvelope,
 	TransactionalVertexIssuer,
 	TransactIssue,
+	TransactIssueBatch,
+	UnsignedVertexBatchSignAdmission,
 } from "./index.js";

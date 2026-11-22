@@ -6,7 +6,7 @@ import { type GossipSub, type GossipsubMessage } from "@libp2p/gossipsub";
 import { type DRPNetworkNodeConfig, Message, MessageType } from "@ts-drp/types";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { DRP_MESSAGE_PROTOCOL, DRPNetworkNode } from "../src/node.js";
+import { DRP_MESSAGE_SESSION_RT_PROTOCOL, DRPNetworkNode } from "../src/node.js";
 
 const config: DRPNetworkNodeConfig = {
 	bootstrap_peers: [],
@@ -79,7 +79,8 @@ describe("Phase 1k authenticated transport attribution", () => {
 		if (first === undefined || second === undefined) throw new TypeError("missing direct messages");
 		expect(Reflect.apply(claim, receiver, [first])).toMatchObject({
 			message: { objectId: "phase-1k-direct-spoof", sender: sender.peerId },
-			transport: { kind: "authenticated-stream", protocol: DRP_MESSAGE_PROTOCOL, sender: sender.peerId },
+			// Track 46: a small direct message now arrives on the realtime session stream.
+			transport: { kind: "authenticated-stream", protocol: DRP_MESSAGE_SESSION_RT_PROTOCOL, sender: sender.peerId },
 		});
 		expect(Reflect.apply(claim, receiver, [first])).toBeUndefined();
 		second.objectId = "mutated-after-authentication";

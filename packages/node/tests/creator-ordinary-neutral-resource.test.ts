@@ -30,10 +30,14 @@ describe("room-local finishing-window preparation policy", () => {
 	const selectOwner = roomTree.statements.find((node): node is ts.FunctionDeclaration =>
 		ts.isFunctionDeclaration(node) && node.name?.text === "roomOrdinaryFinishingWindowForEpoch");
 	if (selectOwner === undefined) throw new Error("missing original room-local finishing policy owner");
-	const select = execute<(application: any, context: any) => any>(selectOwner.getText(roomTree) +
+	// The room's application state limit is a per-room parameter (owner decision 2026-11-21): the
+	// owner is handed it. These cases are a room created without the setting (32,768 bytes).
+	const selectIn = execute<(application: any, context: any, roomStateLimitBytes: number) => any>(selectOwner.getText(roomTree) +
 		"\nreturn roomOrdinaryFinishingWindowForEpoch;", {});
+	const select = (application: any, context: any): any => selectIn(application, context, 32_768);
 	it("keeps static/absent configuration and selects startup versus genuine successor/reopen context only at preparation", () => {
-		const startup = Object.freeze({local: 8, received: 192}), successor = Object.freeze({local: 5, received: 128});
+		const startup = Object.freeze({local: 8, received: 192, maxApplicationBytes: 32_768}),
+			successor = Object.freeze({local: 5, received: 128, maxApplicationBytes: 16_384});
 		expect(select({}, {objectId: "room", epoch: 0})).toBeUndefined();
 		expect(select({ordinaryFinishingWindow: startup}, {objectId: "room", epoch: 3})).toBe(startup);
 		const calls: any[] = [], configured = {ordinaryFinishingWindow(this: unknown, context: any) {
@@ -48,6 +52,15 @@ describe("room-local finishing-window preparation policy", () => {
 		expect(select(application, {objectId: "room", epoch: 3})).toBe(successor);
 		expect(select(application, {objectId: "room", epoch: 3})).toBe(successor); // persisted reopen
 		expect(calls).toHaveLength(3);
+	});
+	it("refuses a window past the room's application state limit, fixed or selected", () => {
+		const wide = Object.freeze({local: 8, received: 192, maxApplicationBytes: 32_769});
+		expect(() => select({ordinaryFinishingWindow: wide}, {objectId: "room", epoch: 0})).toThrow("application state limit");
+		expect(() => select({ordinaryFinishingWindow: () => wide}, {objectId: "room", epoch: 3})).toThrow("application state limit");
+		// A room created with a 128 KiB limit takes the same window; past its own limit it refuses.
+		expect(selectIn({ordinaryFinishingWindow: wide}, {objectId: "room", epoch: 0}, 131_072)).toBe(wide);
+		const wider = Object.freeze({local: 8, received: 192, maxApplicationBytes: 131_073});
+		expect(() => selectIn({ordinaryFinishingWindow: () => wider}, {objectId: "room", epoch: 3}, 131_072)).toThrow("application state limit");
 	});
 	it("does not turn an absent/throwing selector result into disabled enforcement", () => {
 		expect(() => select({ordinaryFinishingWindow: () => undefined}, {objectId: "room", epoch: 0})).toThrow("did not return limits");
@@ -254,7 +267,7 @@ describe("explicit unchanged-APP numerical query (no operation authority)", () =
 		const zoneTree = ts.createSourceFile("v3-zone.ts", zoneSource, ts.ScriptTarget.Latest, true);
 		const owner = zoneTree.statements.find((value): value is ts.FunctionDeclaration => ts.isFunctionDeclaration(value) && value.name?.text === "createV3ZoneApplication");
 		if (owner === undefined || owner.body === undefined) throw new Error("missing original Grid resource wrapper");
-		const names = ["kernel", "resolved", "expectedResourceCatalog", "captureResourceMaterial", "resourceFootprint", "resourceBoundReader"];
+		const names = ["kernel", "resolved", "expectedResourceCatalog", "captureResourceMaterial", "resourceFootprint", "projectionFacade", "resourceBoundReader"];
 		const statements = owner.body.statements.filter(value => ts.isVariableStatement(value) && value.declarationList.declarations.some(declaration =>
 			ts.isIdentifier(declaration.name) && names.includes(declaration.name.text)));
 		expect(statements).toHaveLength(names.length);

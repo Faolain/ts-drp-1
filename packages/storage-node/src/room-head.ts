@@ -31,6 +31,7 @@ import { SqliteNativeReadReservationOwner } from "./internal/native-read-reserva
 import type { LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import { acquireSnapshotDependencyLock } from "./internal/snapshot-dependency-lock.js";
 import { consumeLocalSessionCleanupReceipt, resolveLocalSessionPreparedTerminal } from "./internal/local-session-catalog.js";
+import { connectionRevision } from "./internal/sqlite-revision.js";
 import { cachedStatement } from "./internal/sqlite-statement-cache.js";
 import { resolveOwnedLocalSessionTerminalAdmission } from "@ts-drp/node/v3-room";
 
@@ -255,8 +256,23 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		cachedStatement(database, "INSERT INTO room_head(id,image) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET image=excluded.image")
 			.run(encodeCanonical(image, ROOM_HEAD_IMAGE_LIMITS));
 	}
+	// Revision memo of readRetirementImage, keyed on this connection's exact revision
+	// (sqlite-revision.ts: total_changes, data_version, schema_version). An equal revision proves no
+	// row and no schema changed: another connection's commit moves data_version, any own write
+	// (rolled back too) moves total_changes, any DDL moves schema_version. The memo is recorded only
+	// inside readRetirementImage's own read transaction, whose body only reads; write transactions
+	// also clear it explicitly. The memo belongs to this authority's one connection and scope.
+	let retirementMemo: { revision: string; objectId: string; pinned: string; value: unknown } | undefined;
+	const revisionOf = (): string => {
+		try {
+			return connectionRevision(database);
+		} catch {
+			throw new Error("ROOM_HEAD_UNEXPECTED_ROWS");
+		}
+	};
 	function transact<T>(write: boolean, action: () => T): T {
 		ensureOpen();
+		if (write) retirementMemo = undefined;
 		database.exec(write ? "BEGIN IMMEDIATE" : "BEGIN");
 		try {
 			ensureOpen(); // Native admission may have waited behind an independent fence writer.
@@ -271,6 +287,8 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 				/* Preserve the original native failure. */
 			}
 			throw cause;
+		} finally {
+			if (write) retirementMemo = undefined;
 		}
 	}
 	function inputScope(
@@ -350,16 +368,29 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		// eslint-disable-next-line @typescript-eslint/require-await
 		readRetirementImage: async (input) => {
 			const { scope } = inputScope(input, ["scope"]);
+			ensureOpen();
+			const memo = retirementMemo;
+			// Same scope and no commit by any connection since the memo's read transaction.
+			if (
+				memo !== undefined &&
+				memo.objectId === scope.objectId &&
+				memo.pinned === scope.pinnedGenesisAnchorDigest &&
+				memo.revision === revisionOf()
+			)
+				return memo.value as never;
 			return transact(false, () => {
+				const revision = revisionOf();
 				const image = load(scope);
 				if (image === null || !sameRoomHeadValue(image.scope, scope)) throw new Error("ROOM_HEAD_CONTROL_CONFLICT");
-				return Object.freeze({
+				const value = Object.freeze({
 					scope: image.scope,
 					state: image.state,
 					control: image.control,
 					imageDigest: roomHeadImageDigest(image),
 					metadataBytes: encodeCanonical(image, ROOM_HEAD_IMAGE_LIMITS).byteLength,
 				});
+				retirementMemo = { revision, objectId: scope.objectId, pinned: scope.pinnedGenesisAnchorDigest, value };
+				return value;
 			});
 		},
 		acquireRetirementControl: async (input) => {

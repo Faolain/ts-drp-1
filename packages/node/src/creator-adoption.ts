@@ -3,6 +3,11 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 import { type CloseSetHistoryCommitment, CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import { copySettlementPlan, type DurableIssuanceStore, type DurableIssueScope } from "@ts-drp/issuance-store";
+import {
+	durableIssuancePruningMaintenanceForStore,
+	ISSUANCE_RETIREMENT_LIMITS,
+	issuanceRetirementFloor,
+} from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { type CurrentAnchorTrust, openCurrentAnchorTrust, type SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
@@ -122,6 +127,10 @@ import {
 } from "./internal/creator-successor-live.js";
 import {
 	type CreatorSuccessorAuxiliaryMaterial,
+	captureCreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedScope,
+	receiveCreatorSuccessorDepartedCarrier,
 	receiveCreatorSuccessorMaterial,
 } from "./internal/creator-successor-transport.js";
 import {
@@ -130,14 +139,16 @@ import {
 	inspectCreatorCheckpointTransition,
 	inspectCreatorTransitionAdvance,
 	openCreatorCheckpointAttachment,
+	openVerifiedCreatorHistoricalIssuance,
 	resolveCreatorCheckpointAttachment,
 	resolveCreatorForwardPromotion,
+	resolveVerifiedCreatorHistoricalIssuance,
 	uniqueCreatorTransitionCandidate,
 	type VerifiedCreatorForwardPromotion,
 	type VerifiedCreatorCheckpointAttachment,
 } from "./internal/creator-transition-advance.js";
 import { createV3SnapshotTransferOwner } from "./snapshot-transfer.js";
-import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle } from "./v3-live.js";
+import { CreatorRecoveryHoldUnavailable, sealCreatorReceivedRecoveryReplay, type V3PlaneHandle, V3LocalLineageBehindFrontier } from "./v3-live.js";
 import { reconcileCreatorReceivedSnapshotRecoveryRoles, reconcileCreatorSnapshotRecoveryRoles } from "./internal/creator-closed-rollback-data.js";
 import { acquireCreatorPendingClassificationCustody, resolveCreatorSnapshotRecoveryCloseHold } from "./internal/runtime-reclamation.js";
 import type { CreatorRecoveryPoolResult } from "./internal/creator-recovery-pool.js";
@@ -146,7 +157,85 @@ export {
 	captureCreatorSuccessorPeers,
 	createCreatorSuccessorMaterialServer,
 	consumeOwnedCreatorTransportSigningRequest,
+	type CreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedScope,
 } from "./internal/creator-successor-transport.js";
+
+/**
+ * The departed-scope carrier an export supplies (fix/skip-scope-carrier): the scope its Cut closes
+ * and the Cut, QC, successor trust record and closed membership a member skipping past that epoch
+ * needs to retire it. Undefined when the export carries no membership (a sparse close).
+ * @param exported - A creator successor export.
+ * @returns The scope and its carrier, or undefined.
+ */
+export function creatorSuccessorDepartedCarrierOf(exported: CreatorSuccessorExport):
+	Readonly<{ scope: CreatorSuccessorDepartedScope; carrier: CreatorSuccessorDepartedCarrier }> | undefined {
+	const cut = canonicalRecord(exported.offer.exactCanonicalCutValueBytes);
+	if (cut === undefined || typeof cut.epoch !== "number" || typeof cut.previousAnchor !== "string") return undefined;
+	const carrier = captureCreatorSuccessorDepartedCarrier({
+		exactCanonicalCutValueBytes: exported.offer.exactCanonicalCutValueBytes,
+		exactCanonicalCommitQcBytes: exported.offer.exactCanonicalCommitQcBytes,
+		exactCanonicalTrustStateRecordBytes: exported.offer.exactCanonicalTrustStateRecordBytes,
+		exactCanonicalCloseMembershipBytes: exported.material.exactCanonicalCloseMembershipBytes,
+	});
+	return carrier === undefined ? undefined
+		: Object.freeze({ scope: Object.freeze({ epoch: cut.epoch, anchorDigest: cut.previousAnchor }), carrier });
+}
+
+/**
+ * fix/skip-scope-carrier: one past close's departed-scope carrier, rebuilt from durable state when
+ * the creator's in-memory list misses it (a restarted creator). The Cut, its commit QC and the
+ * successor trust record come from a native generation the store still retains (the recovery
+ * census), Adopted or Superseded only: a close whose successor this creator adopted, never one it
+ * may still abandon. The closed membership comes from this creator's journal, read exactly as the
+ * successor export reads it. Undefined when that close is no longer retained or its membership is
+ * absent; a miss leaves the member's departed scope with today's retention.
+ * @param input - The room's native store and journal, and the departed scope.
+ * @returns The carrier, or undefined.
+ */
+export async function readCreatorSuccessorDepartedCarrier(input: Readonly<{
+	store: AheDurableStore;
+	journalStore?: DurableLiveJournalStore;
+	objectId: StorageObjectId;
+	pinnedGenesisAnchorDigest: string;
+	scope: CreatorSuccessorDepartedScope;
+}>): Promise<CreatorSuccessorDepartedCarrier | undefined> {
+	const journalStore = input.journalStore;
+	if (journalStore?.readClosedMembership === undefined) return undefined;
+	const close = await withCreatorRecoveryCensus(input.store, input.objectId, async (reader) => {
+		for (const generation of reader.generations) {
+			if (generation.state !== "Adopted" && generation.state !== "Superseded") continue;
+			const candidates = recoveryCensusClosure(reader, generation.closure);
+			if (candidates === undefined) continue;
+			const cut = uniqueCandidateByKind(candidates, "drp-hard-epoch-cut");
+			const qc = uniqueCandidateByKind(candidates, "drp-seal-qc");
+			const trust = uniqueCandidateByKind(candidates, "drp-anchor-trust-state");
+			if (cut === undefined || qc === undefined || trust === undefined) continue;
+			if (cut.record.epoch !== input.scope.epoch || cut.record.previousAnchor !== input.scope.anchorDigest ||
+				trust.record.genesisAnchorDigest !== input.pinnedGenesisAnchorDigest ||
+				trust.record.currentEpoch !== input.scope.epoch + 1) continue;
+			return Object.freeze({ cut, qc, trust });
+		}
+		return undefined;
+	});
+	const parameters = close?.cut.record.parameters as Readonly<{ maxEpochVertices?: unknown }> | undefined;
+	if (close === undefined || typeof parameters?.maxEpochVertices !== "number") return undefined;
+	const observed = await journalStore.readClosedMembership({
+		scope: { objectId: input.objectId, epoch: input.scope.epoch, anchorDigest: input.scope.anchorDigest },
+		maxBytes: CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES,
+	});
+	if (!observed.ok || observed.kind === "missing") return undefined;
+	const membership = await rewriteCreatorCloseMembershipWitnesses({
+		bytes: observed.exactCanonicalMembershipBytes, exactCanonicalCutValueBytes: close.cut.bytes,
+		maxEpochVertices: parameters.maxEpochVertices, localVertexWitnesses: [],
+	});
+	return captureCreatorSuccessorDepartedCarrier({
+		exactCanonicalCutValueBytes: close.cut.bytes,
+		exactCanonicalCommitQcBytes: close.qc.bytes,
+		exactCanonicalTrustStateRecordBytes: close.trust.bytes,
+		exactCanonicalCloseMembershipBytes: membership,
+	});
+}
 
 const PROFILE = Object.freeze({
 	maxManifestBytes: 212_387,
@@ -556,8 +645,24 @@ async function readCreatorSuccessorExportMaterial(
 				break;
 			}
 		}
-		if (predecessor === undefined || predecessorTrustCandidate === undefined)
+		if (predecessor === undefined || predecessorTrustCandidate === undefined) {
+			// A head installed from a reattachment checkpoint (an install more than one epoch ahead)
+			// holds only the compact point proof of its own transition, never a predecessor generation
+			// ("not a second current trust or a native intermediate generation"), so the transition it
+			// would serve cannot be re-verified here. It is not a successor-material source: nothing to
+			// serve, which every caller already treats as such (startup serving opens and serves nothing).
+			// The creator and any adjacent installer still serve; this head's next adjacent install has
+			// it as predecessor and is a source again.
+			const point = uniqueCandidateByKind(current.candidates, "creator-reattachment-proof-1");
+			const pointTrust = point?.record.exactCanonicalPredecessorTrustStateRecordBytes;
+			const pointEpoch =
+				pointTrust instanceof Uint8Array ? canonicalRecord(pointTrust)?.currentEpoch : undefined;
+			if (pointEpoch !== undefined && pointEpoch === cut.record.epoch)
+				throw new CreatorSuccessorExportUnavailable(
+					"creator successor export from a reattachment checkpoint head is unavailable"
+				);
 			throw new TypeError("creator successor native predecessor is unavailable");
+		}
 		const genesis =
 			Number(cut.record.epoch) === 0
 				? openCurrentAnchorTrust({
@@ -983,17 +1088,200 @@ async function receivedRecoveryTurnoverDue(source: CreatorRecipientSource,
 		(inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes || classifiedPresent);
 }
 
+/** What a recipient lull's complete received turnover reconciled: the room head, the
+ * exact current Cut it classified from, the recovery-role inventory it left (all but
+ * the single-use custody) and the member's own settlement plan (its held unresolved
+ * work, which the journal classification reads: an abandonment or a settlement
+ * resolution rewrites it without moving the head, the Cut or the inventory), as the
+ * turnover reads it (receivedTurnoverPlanInput: a hand-back's reissue between the lull
+ * and the install leaves the boundary standing). Keyed by
+ * the live plane handle, so a successor plane, a recovery reopen (including a
+ * retirement-halt discharge) and a new session never see it; a lull clears it on entry
+ * and an install consumes it. Scheduling only: it lets an install skip a turnover whose
+ * every input is unchanged, never grants admission, and a full pool, a promotion, a
+ * checkpoint install or a retained scope at the received window's edge never skips. */
+type ReceivedTurnoverBoundary = Readonly<{ objectId: string; epoch: number; anchorDigest: string; cut: Uint8Array; inventory: string;
+	plan: Uint8Array }>;
+const reconciledReceivedTurnovers = new WeakMap<object, ReceivedTurnoverBoundary>();
+
+/** The settlement plan as a received turnover reads it: every field but the plan's revision
+ * and each hand-back record's consumption mark. A hand-back is offered again by its own new
+ * row, whose issuance transaction (plan effect "hand-back") only sets that record's
+ * `reissueSequence` and bumps the revision. No turnover decision reads either: a resolution
+ * merges its new records by (sourceSequence, intent) under the record bound, which counts
+ * consumed records too, and writes against the plan it reads then. The closed journal's
+ * custody sizing (issuanceSourceCustodyPlanResourceForSizing) charges the revision at its
+ * widest and an unconsumed record at its consumed width (a maximum reissueSequence), so the
+ * sizing the lull's turnover did already holds the reissued plan (G22, sized >= written;
+ * pinned in source-custody-capacity.test.ts). So a member whose lull's turnover gave a move back, and
+ * whose application offered it again before the next install, keeps that install's skip.
+ * The same transaction also adds the reissue's origin entry (reissueOrigins, track 46): an
+ * entry whose reissueSequence is a record's consumption mark is that mark's companion and is
+ * read the same way (only when that reissued row is later given back, which no turnover in the
+ * boundary does: the row is newer than the turnover's Cut); the sizing's origin reserve already
+ * holds it (one entry per record that can still be consumed). An entry no record names (a
+ * record pruned while its entry stays) is compared as it is.
+ * Every other plan change (an entry, a source context, the fence, a record added, pruned or
+ * changed in any other field) still ends the boundary. */
+function receivedTurnoverPlanInput(plan: Awaited<ReturnType<DurableIssuanceStore["readSettlementPlan"]>>): unknown {
+	if (plan === null) return null;
+	const { revision: _revision, handBacks, reissueOrigins, ...read } = plan;
+	const marks = new Set((handBacks ?? []).map((record) => record.reissueSequence));
+	const origins = reissueOrigins?.filter((entry) => !marks.has(entry.reissueSequence));
+	return {
+		...read,
+		...(handBacks === undefined
+			? {}
+			: { handBacks: handBacks.map(({ reissueSequence: _reissueSequence, ...record }) => record) }),
+		...(origins === undefined || origins.length === 0 ? {} : { reissueOrigins: origins }),
+	};
+}
+
+async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+	currentCandidates: Awaited<ReturnType<typeof inspectHead>>["candidates"]): Promise<ReceivedTurnoverBoundary | undefined> {
+	const epoch = source.currentTrust.currentEpoch;
+	const cut = uniqueCreatorTransitionCandidate(currentCandidates, "drp-hard-epoch-cut", epoch - 1);
+	const inventory = await snapshotStore.captureRecoveryRoleInventory?.({objectId: source.objectId});
+	if (epoch < 2 || cut === undefined || inventory === undefined || inventory.owner.migration !== "ready" ||
+		inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
+	const { custody: _custody, ...observed } = inventory;
+	const plan = encodeCanonical(receivedTurnoverPlanInput(await source.issuanceStore.readSettlementPlan(source.issuanceScope)));
+	return Object.freeze({objectId: source.objectId, epoch, anchorDigest: source.currentTrust.currentAnchorDigest,
+		cut: Uint8Array.from(cut.bytes), inventory: JSON.stringify(observed), plan});
+}
+
+function sameReceivedTurnoverBoundary(left: ReceivedTurnoverBoundary, right: ReceivedTurnoverBoundary): boolean {
+	return left.objectId === right.objectId && left.epoch === right.epoch && left.anchorDigest === right.anchorDigest &&
+		sameBytes(left.cut, right.cut) && left.inventory === right.inventory && sameBytes(left.plan, right.plan);
+}
+
+/** The install's own input, which no lull boundary can carry: the received successor
+ * takes one slot of the bounded recovery window (AHE_BOUNDED_READ_LIMITS
+ * .maxObjectGenerations), so the install's classification authenticates one historical
+ * source generation fewer than a lull's at the same head. A closed journal scope at or
+ * below the received epoch minus that bound that nothing else protects (the retirement
+ * control's protected scopes) loses its header's protection inside the install's
+ * turnover, which retires it. While the journal holds one, the install turns over.
+ * Observation only; an unavailable read turns over. */
+async function receivedWindowEdgeScopeRetained(source: CreatorRecipientSource): Promise<boolean> {
+	const edge = source.currentTrust.currentEpoch + 1 - AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
+	if (edge < 1) return false;
+	try {
+		const read = await source.liveJournalStore.readRetirementImage?.({objectId: source.objectId});
+		if (read === undefined || !read.ok) return true;
+		const protectedScopes = read.value.control?.completed?.protectedScopes ?? [];
+		for (const bytes of read.value.canonicalRows) {
+			const frame = decodeCanonical(bytes);
+			if (!Array.isArray(frame) || frame[0] !== "scopes") continue;
+			const key: unknown = frame[1];
+			if (!Array.isArray(key) || typeof key[1] !== "number" || typeof key[2] !== "string") return true;
+			const epoch = key[1];
+			if (epoch >= 1 && epoch <= edge && !protectedScopes.some(scope =>
+				scope.objectId === key[0] && scope.epoch === epoch && scope.anchorDigest === key[2])) return true;
+		}
+		return false;
+	} catch {
+		return true;
+	}
+}
+
+/** The closed journal scopes that still hold accepted entries (the physical replay detail
+ * the issuance classification reads: closedIssuanceProtectedRecordsForRetirement keeps an
+ * own issued row while its epoch's scope holds any). Observation only; undefined when
+ * unreadable. */
+async function journalDetailScopes(source: CreatorRecipientSource): Promise<ReadonlySet<string> | undefined> {
+	try {
+		const read = await source.liveJournalStore.readRetirementImage?.({objectId: source.objectId});
+		if (read === undefined || !read.ok) return undefined;
+		const scopes = new Set<string>();
+		for (const bytes of read.value.canonicalRows) {
+			const frame = decodeCanonical(bytes);
+			if (Array.isArray(frame) && (frame[0] === "acceptedEntries" || frame[0] === "accepted_entries") && Array.isArray(frame[1]))
+				scopes.add(JSON.stringify(frame[1].slice(0, 3)));
+		}
+		return scopes;
+	} catch {
+		return undefined;
+	}
+}
+
+/** Whether a further settling pass can release one of the member's own rows: an entry of
+ * its own settlement plan whose source row is still a protected issuance hole and whose
+ * journal scope is among `removed` (drained after the issuance decision that kept the
+ * hole). A member that issues nothing (receive-only) has an empty plan and ends at the
+ * first read. A delivering Writer's committed rows of the drained scope are such rows:
+ * the further pass releases them, as the install's turnover did before the skip, which
+ * keeps its own rows and plan entries at that level. Observation only; an unreadable
+ * state answers true, so the passes go on settling as before. */
+async function settlementSourceHeldIn(source: CreatorRecipientSource, removed: ReadonlySet<string>): Promise<boolean> {
+	try {
+		const plan = await source.issuanceStore.readSettlementPlan(source.issuanceScope);
+		if (plan === null || plan.entries.length === 0) return false;
+		const census = await durableIssuancePruningMaintenanceForStore(source.issuanceStore)?.readBoundedRecoveryCensus?.(
+			{objectId: source.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+		if (census === undefined) return true;
+		const completed = census.control?.completed;
+		const holes = new Set((completed?.protectedRecords ?? []).map(hole =>
+			JSON.stringify([hole.author, hole.authorSequence, hole.digest])));
+		for (const entry of plan.entries) {
+			const row = census.rows.issued.find(issued => issued.author === source.issuanceScope.author &&
+				issued.authorSequence === entry.sourceSequence);
+			if (row === undefined) continue;
+			const digest = Array.from(row.digest, byte => byte.toString(16).padStart(2, "0")).join("");
+			const value = decodeCanonical(row.canonicalPreimageBytes) as {epoch?: unknown; anchor?: unknown};
+			// Rule H: a row above the completed floor is held without a listed hole.
+			const aboveFloor = completed != null && typeof value.epoch === "number" && value.epoch > issuanceRetirementFloor(completed) &&
+				value.epoch <= completed.throughEpoch;
+			if (!aboveFloor && !holes.has(JSON.stringify([row.author, row.authorSequence, digest]))) continue;
+			if (removed.has(JSON.stringify([source.objectId, value.epoch, value.anchor]))) return true;
+		}
+		return false;
+	} catch {
+		return true;
+	}
+}
+
 /** The original bounded received turnover: one signing census bounds the passes;
- * each pass seals the received dependencies, reconciles, and joins its hold. */
-async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
+ * each pass seals the received dependencies, reconciles, and joins its hold.
+ *
+ * With `settle` (a lull: its boundary lets the next install skip its own turnover) the
+ * passes run to the fixpoint of the journal drain, and each pass acknowledges its completed
+ * drain, as the creator's own readiness and pool boundaries do. A pass that drains a
+ * closed journal scope decided the issuance holes from the journal as it was before that
+ * drain, so the member's own issued rows of the drained scope stay protected. While the
+ * drain is unacknowledged, a further pass at the same boundary resumes the drain's
+ * reconstruction, re-derives the same decision and keeps those holes. Before the skip,
+ * the install's turnover was that further pass (its received closed membership changes
+ * the source, so it decides afresh on the physical journal and releases the rows before
+ * the install's cleanup and settlement write); with the skip, the release waited for the
+ * next lull, and the rows, their settlement entries and the unsettled epoch they carry
+ * outlived the settlement window by one epoch. A further pass runs only when a drained
+ * scope still holds an own settlement source as a protected hole (settlementSourceHeldIn):
+ * a member with no own held row (receive-only) pays no extra pass.
+ * `settled`: no such source remains. An unreadable journal or the pass bound leaves it
+ * false, so the caller records no boundary and the install turns over as before. */
+type ReceivedTurnoverPassInput = Readonly<{
 	source: CreatorRecipientSource;
 	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 	catalog: TrustedBlueprintCatalog;
 	context: CreatorRecipientRecoveryContext;
 	signing: ReceivedSigningOwner;
 	requireClosedWorkflowCompletion?: boolean;
-}>, seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<readonly GenerationRecord[]> {
-	const { source, context } = input;
+	settle?: boolean;
+}>;
+/** The original turnover passes' progress, carried across passes (and, for a lull, across lulls). */
+type ReceivedTurnoverPassState = {
+	readonly maxPasses: number;
+	pass: number;
+	detail: ReadonlySet<string> | undefined;
+	settled: boolean;
+	drained: boolean;
+	done: boolean;
+	readonly retired: GenerationRecord[];
+};
+
+async function beginReceivedRecoveryTurnoverPasses(input: ReceivedTurnoverPassInput): Promise<ReceivedTurnoverPassState> {
 	const census = await input.signing.captureRetirementOwners().acquireEvidence();
 	const epochs = new Set<number>();
 	let censusFailed = false, censusPrimary: unknown;
@@ -1005,34 +1293,77 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 		await census.check();
 	} catch (error) {censusFailed = true; censusPrimary = error; throw error;}
 	finally {await releaseCreatorRecoveryReader(census, censusFailed, censusPrimary, "creator recipient signing census cleanup failed");}
-	const retired: GenerationRecord[] = [];
-	const maxPasses = 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
-	for (let pass = 0; pass < maxPasses; pass++) {
-		const sealed = await seal();
-		if (sealed === undefined) throw new TypeError("creator recipient recovery dependencies unavailable");
-		const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
-			{store: source.store, liveJournalStore: source.liveJournalStore, currentTrust: source.currentTrust});
-		if (lifetime === undefined) throw new TypeError("creator recipient recovery dependency custody differs");
-		let checkpoint: "complete" | "fresh-summary-required";
-		let retirementFailed = false, retirementPrimary: unknown;
-		try {
-			// A recipient runs no other maintenance inside the journal membership
-			// window, so a generation drain that suppressed this pass's collectible
-			// journal prefixes requests one more fresh pass (still bounded below).
-			checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
-				...(context.signal === undefined ? {} : {signal: context.signal}),
-				roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
-				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
-				catalog: input.catalog,
-				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-				liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true);
-			retired.push(...sealed.readRetiredGenerations());
-		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
-		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
-		if (checkpoint === "complete") break;
-		if (pass === maxPasses - 1) throw new TypeError("creator recipient bounded retirement did not stabilize");
+	return {maxPasses: 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations, pass: 0,
+		detail: input.settle === true ? await journalDetailScopes(input.source) : undefined,
+		settled: input.settle !== true, drained: false, done: false, retired: []};
+}
+
+/** One original turnover pass (one sealed census, one reconciliation). Sets `state.done` at the end. */
+async function runReceivedRecoveryTurnoverPass(input: ReceivedTurnoverPassInput, state: ReceivedTurnoverPassState,
+	seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<void> {
+	const { source, context } = input;
+	const pass = state.pass;
+	state.pass = pass + 1;
+	const sealed = await seal();
+	if (sealed === undefined) throw new CreatorRecoveryHoldUnavailable("creator recipient recovery dependencies unavailable");
+	const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
+		{store: source.store, liveJournalStore: source.liveJournalStore, currentTrust: source.currentTrust});
+	if (lifetime === undefined) throw new TypeError("creator recipient recovery dependency custody differs");
+	let checkpoint: "complete" | "fresh-summary-required";
+	let retirementFailed = false, retirementPrimary: unknown;
+	try {
+		// A recipient runs no other maintenance inside the journal membership
+		// window, so a generation drain that suppressed this pass's collectible
+		// journal prefixes requests one more fresh pass (still bounded below).
+		checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
+			...(context.signal === undefined ? {} : {signal: context.signal}),
+			roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+			catalog: input.catalog,
+			objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
+			liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true,
+			input.settle === true);
+		state.retired.push(...sealed.readRetiredGenerations());
+	} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
+	finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
+	if (checkpoint === "complete") {
+		if (input.settle !== true) { state.done = true; return; }
+		const after = await journalDetailScopes(source);
+		if (state.detail === undefined || after === undefined) { state.done = true; return; }
+		const detail = state.detail;
+		const removed = new Set([...detail].filter(scope => !after.has(scope)));
+		// Settled unless a drained scope still holds an own settlement source (the
+		// member's own rows a further pass would release).
+		if (removed.size === 0 || !(await settlementSourceHeldIn(source, removed))) { state.settled = true; state.done = true; return; }
+		// One more pass decides the issuance on the drained journal.
+		state.detail = after;
+		state.drained = true;
+		if (pass === state.maxPasses - 1) state.done = true;
+		return;
 	}
-	return retired;
+	// After a completed pass, the bound ends the settling unsettled; it is never a failure.
+	if (pass === state.maxPasses - 1) {
+		if (state.drained) { state.done = true; return; }
+		throw new TypeError("creator recipient bounded retirement did not stabilize");
+	}
+}
+
+function observeTurnoverSettle(input: ReceivedTurnoverPassInput, state: ReceivedTurnoverPassState): void {
+	if (input.settle !== true) return;
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({kind: "recipient-lull-turnover-settle", epoch: input.source.currentTrust.currentEpoch, passes: state.pass,
+				settled: state.settled});
+	} catch { /* Diagnostics never alter the original owner outcome. */ }
+}
+
+async function runReceivedRecoveryTurnoverPasses(input: ReceivedTurnoverPassInput,
+	seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<Readonly<{ retired: readonly GenerationRecord[]; settled: boolean }>> {
+	const state = await beginReceivedRecoveryTurnoverPasses(input);
+	while (!state.done && state.pass < state.maxPasses) await runReceivedRecoveryTurnoverPass(input, state, seal);
+	observeTurnoverSettle(input, state);
+	return Object.freeze({retired: state.retired, settled: state.settled});
 }
 
 /**
@@ -1047,10 +1378,13 @@ export function creatorRecipientRetirementResumeRequested(plane: V3PlaneHandle):
 
 /**
  * Explicit opt-in early recipient turnover at a caller-chosen quiescent lull.
- * Because the install's predicate is state-based, the SAME original passes run
- * now make it false at the next install; inline install turnover remains the
- * backstop. This grants no authority: an unavailable or busy boundary is
- * reported before entry, never forced. After entry, any failure is recovery work.
+ * The SAME original passes run now; when they complete, the boundary they
+ * reconciled is recorded for this plane, and the next install skips its own
+ * turnover only if that boundary is still exactly current and its received successor
+ * pushes no retained scope out of the bounded window (the install's
+ * predicate alone stays due while the current Cut classifies a retained scope).
+ * Inline install turnover remains the backstop. This grants no authority: an
+ * unavailable or busy boundary is reported before entry, never forced. After entry, any failure is recovery work.
  * With `resume`, the SAME passes instead discharge a durable reopen's halt on a
  * retirement this copy completed at its current epoch (a creator's readiness
  * boundary does this for the creator): they must reach the original terminal
@@ -1068,6 +1402,8 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	resume?: true;
 }>): Promise<CreatorRecoveryPoolResult> {
 	const resume = input.resume === true;
+	// Any lull entry, even one that defers, ends the previous lull's boundary.
+	reconciledReceivedTurnovers.delete(input.plane);
 	const source = resolveCreatorRecipientRegistration(input.plane, resume);
 	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
 		return Object.freeze({kind: "deferred", reason: "unsupported"});
@@ -1085,13 +1421,16 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 		voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
 	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
 	let outcome: "ran" | "deferred";
+	// A lull runs its passes to the journal-drain fixpoint, since its boundary lets the next
+	// install skip its own turnover; a resume records no boundary and keeps the original passes.
+	let settled = false;
 	try {
 		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, (seal, requireClosedWorkflowCompletion) => {
 			// These generations belong to this stable boundary. The next install's
 			// own turnover (if any) classifies from the state it then observes.
 			const passes = async (): Promise<"complete"> => {
-				await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
-					context, signing: opened.owner, requireClosedWorkflowCompletion}, seal);
+				settled = (await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
+					context, signing: opened.owner, requireClosedWorkflowCompletion, settle: !resume}, seal)).settled;
 				return "complete";
 			};
 			// A lull is background: its walks defer host turns behind co-located
@@ -1101,7 +1440,166 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	} finally {
 		await opened.owner.stop();
 	}
+	// Record what the completed passes reconciled (a resume discharges a halt; it records nothing;
+	// passes that did not settle record nothing either, and the install turns over).
+	if (outcome === "ran" && !resume && settled) {
+		try {
+			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
+				(await source.inspectQueuedNativeHead()).candidates);
+			if (boundary !== undefined) reconciledReceivedTurnovers.set(input.plane, boundary);
+		} catch { /* No boundary: the next install turns over as before. */ }
+	}
 	return Object.freeze(outcome === "deferred" ? {kind: "deferred", reason: "busy"} : {kind: "maintained"});
+}
+
+/** One recipient lull's turnover progress, resumed by the next step while the epoch is unchanged. */
+const recipientLullProgress = new WeakMap<object, Readonly<{epoch: number; state: ReceivedTurnoverPassState}>>();
+
+/**
+ * One bounded step of the recipient lull (lull "A"): the SAME original turnover passes as
+ * maintainCreatorRecipientRecoveryPool, one pass per queued quiescent boundary. Between steps the
+ * caller releases the lifecycle FIFO and the issue barrier, so an install or a local move waits for at
+ * most one pass, never the whole turnover. The pass state is kept for this plane and epoch: "more"
+ * means the next step continues it; an epoch change (an install, which runs its own turnover when no
+ * current boundary was recorded) drops it. "deferred" means the boundary was unavailable before entry
+ * (nothing ran). A failure after entry is recovery work, exactly as for the whole lull.
+ * @param input - The recipient's genuine live plane, catalog, current room head and native ports.
+ * @returns The step's progress and, when done, the lull's result.
+ */
+export async function stepCreatorRecipientRecoveryPool(input: Readonly<{
+	plane: V3PlaneHandle;
+	catalog: TrustedBlueprintCatalog;
+	expectedRoomHead: Readonly<{ objectId: string; epoch: number; currentAnchorDigest: string }>;
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+	recoveryContext: CreatorRecipientRecoveryContext;
+}>): Promise<Readonly<{step: "done" | "more" | "deferred"; result: CreatorRecoveryPoolResult}>> {
+	const deferredBusy = Object.freeze({step: "deferred" as const, result: Object.freeze({kind: "deferred" as const, reason: "busy" as const})});
+	const recorded = reconciledReceivedTurnovers.get(input.plane);
+	// Any lull entry, even one that defers, ends the previous lull's boundary (unless it is
+	// still current, below).
+	reconciledReceivedTurnovers.delete(input.plane);
+	const source = resolveCreatorRecipientRegistration(input.plane, false);
+	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
+		return Object.freeze({step: "done", result: Object.freeze({kind: "deferred", reason: "unsupported"})});
+	if (!sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust)) return deferredBusy;
+	const epoch = source.currentTrust.currentEpoch;
+	// A fresh lull at the exact boundary this plane's previous lull settled (same head, current
+	// Cut, recovery inventory and own settlement plan): those passes already reached the
+	// journal-drain fixpoint from these inputs, which is what lets the install skip its own
+	// turnover. Running them again reconciles nothing, so the lull keeps that boundary.
+	if (recorded !== undefined && !recipientLullProgress.has(input.plane)) {
+		try {
+			const current = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
+				(await source.inspectQueuedNativeHead()).candidates);
+			if (current !== undefined && sameReceivedTurnoverBoundary(current, recorded)) {
+				reconciledReceivedTurnovers.set(input.plane, recorded);
+				return Object.freeze({step: "done", result: Object.freeze({kind: "not-needed"})});
+			}
+		} catch { /* Unreadable: the lull runs its passes as before. */ }
+	}
+	// Written inside the boundary's callback, so held in an object (not narrowed across it).
+	const run: {progress?: Readonly<{epoch: number; state: ReceivedTurnoverPassState}>; input?: ReceivedTurnoverPassInput} = {};
+	run.progress = recipientLullProgress.get(input.plane);
+	if (run.progress !== undefined && run.progress.epoch !== epoch) {
+		recipientLullProgress.delete(input.plane);
+		run.progress = undefined;
+	}
+	if (run.progress === undefined &&
+		!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, (await source.inspectQueuedNativeHead()).candidates)))
+		return Object.freeze({step: "done", result: Object.freeze({kind: "not-needed"})});
+	const context = input.recoveryContext;
+	const opened = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
+		voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
+	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
+	let outcome: "ran" | "deferred";
+	try {
+		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, (seal, requireClosedWorkflowCompletion) =>
+			runInBackgroundLane(async (): Promise<"complete"> => {
+				const passInput: ReceivedTurnoverPassInput = {source, snapshotStore: input.snapshotStore, catalog: input.catalog,
+					context, signing: opened.owner, requireClosedWorkflowCompletion, settle: true};
+				run.input = passInput;
+				const progress = run.progress ?? Object.freeze({epoch, state: await beginReceivedRecoveryTurnoverPasses(passInput)});
+				run.progress = progress;
+				await runReceivedRecoveryTurnoverPass(passInput, progress.state, seal);
+				return "complete";
+			}), {deferrable: true});
+	} catch (error) {
+		recipientLullProgress.delete(input.plane);
+		throw error;
+	} finally {
+		await opened.owner.stop();
+	}
+	const progress = run.progress, passInput = run.input;
+	if (outcome === "deferred") {
+		if (progress !== undefined) recipientLullProgress.set(input.plane, progress);
+		return deferredBusy;
+	}
+	if (progress === undefined || passInput === undefined) throw new TypeError("creator recipient lull pass did not run");
+	const state = progress.state;
+	if (!state.done && state.pass < state.maxPasses) {
+		recipientLullProgress.set(input.plane, progress);
+		return Object.freeze({step: "more", result: Object.freeze({kind: "maintained"})});
+	}
+	recipientLullProgress.delete(input.plane);
+	observeTurnoverSettle(passInput, state);
+	if (state.settled) {
+		try {
+			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
+				(await source.inspectQueuedNativeHead()).candidates);
+			if (boundary !== undefined) reconciledReceivedTurnovers.set(input.plane, boundary);
+		} catch { /* No boundary: the next install turns over as before. */ }
+	}
+	return Object.freeze({step: "done", result: Object.freeze({kind: "maintained"})});
+}
+
+/**
+ * D.108d1b at the install boundary (G6). The successor's settlement capability carries the
+ * creator-signed frontier of this author: the highest of its sequences the room admitted. That
+ * frontier is held outside this origin, so a local store whose lineage is at or below it is an
+ * older copy (a restored backup, a clone) whatever its own rows say. Such a store is refused here,
+ * once the successor is authenticated and before anything is retained, adopted or written to the
+ * settlement plan; the signing-time check alone ran after the plan was already rewritten. A store
+ * whose lineage is above the frontier is unaffected, as is a receive-only member (no own lineage).
+ * Model: packages/node/formal/own-fence-freshness.qnt (MINIMAL).
+ * @param source - The recipient's current registration (its issuance store and scope).
+ * @param closure - The authenticated successor closure.
+ * @param successorTrust - The authenticated successor trust.
+ * @param closedTrust - The closed epoch's trust (the checkpoint predecessor for a checkpoint).
+ * @param closedAclBytes - The closed epoch's latched ACL (this member's current one, or the
+ * checkpoint predecessor's): the received closure does not carry it until staging, and the
+ * historical issuance binds the settlement's ACL digest to it.
+ */
+async function assertReceivedLineageAboveAdmittedFrontier(
+	source: CreatorRecipientSource,
+	received: CreatorTransitionClosure,
+	successorTrust: CurrentAnchorTrust,
+	closedTrust: CurrentAnchorTrust | undefined,
+	closedAclBytes: Uint8Array | undefined
+): Promise<void> {
+	if (closedAclBytes === undefined) return;
+	const aclDigest = digestBlob(closedAclBytes);
+	if (!aclDigest.ok) return;
+	const acl = Object.freeze({ bytes: Uint8Array.from(closedAclBytes),
+		ref: Object.freeze({ digest: aclDigest.value, byteLength: closedAclBytes.byteLength }) });
+	const kept = received.candidates.filter(candidate => canonicalRecord(candidate.bytes)?.kind !== "drp-v3-latched-acl");
+	const closure: CreatorTransitionClosure = { candidates: [...kept, acl], closure: [...received.closure.filter(ref =>
+		kept.some(candidate => sameRef(candidate.ref, ref))), acl.ref] };
+	if (source.receiveOnly || closedTrust === undefined) return;
+	const scope = source.issuanceScope;
+	const historical = openVerifiedCreatorHistoricalIssuance({ author: scope.author, closure, floorTrust: successorTrust,
+		sourceTrust: closedTrust });
+	const identity = historical === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(historical);
+	if (
+		identity === undefined ||
+		identity.admittedAuthorSequence === null ||
+		identity.author !== scope.author ||
+		identity.objectId !== scope.objectId ||
+		identity.successorEpoch !== successorTrust.currentEpoch
+	)
+		return;
+	const lineage = await source.issuanceStore.readLineage(scope);
+	if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next <= identity.admittedAuthorSequence)
+		throw new V3LocalLineageBehindFrontier(scope.author, lineage.next, identity.admittedAuthorSequence);
 }
 
 // Receive-time currency is the native head record alone: its closure digest binds
@@ -1142,6 +1640,9 @@ export async function receiveCreatorSuccessorAdoption(
 		retryUntil?: AbortSignal;
 	}>
 ): Promise<ReceivedCreatorSuccessorAdoption> {
+	// Every install attempt consumes the plane's lull boundary.
+	const reconciledBoundary = reconciledReceivedTurnovers.get(input.plane);
+	reconciledReceivedTurnovers.delete(input.plane);
 	const source = resolveCreatorRecipientRegistration(input.plane);
 	if (source === undefined || !sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust))
 		throw new TypeError("creator recipient current authority is unavailable");
@@ -1220,8 +1721,29 @@ export async function receiveCreatorSuccessorAdoption(
 			cleanupErrors.push(error);
 		}
 	};
+	const observeReceivedTurnover = (outcome: "not-due" | "reconciled" | "ran"): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({kind: "recipient-received-turnover", epoch: source.currentTrust.currentEpoch, outcome});
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+	};
 	const prepareReceivedRecoveryTurnover = async (): Promise<boolean> => {
-		if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates))) return false;
+		if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates))) {
+			observeReceivedTurnover("not-due");
+			return false;
+		}
+		// This plane's own lull already ran the SAME passes at this exact boundary (head,
+		// current Cut, recovery inventory, own settlement plan) and nothing has reconciled or
+		// retained since, and the received successor pushes no retained scope out of the window.
+		if (reconciledBoundary !== undefined && !promoted && !checkpointRequested) {
+			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore, current.candidates);
+			if (boundary !== undefined && sameReceivedTurnoverBoundary(boundary, reconciledBoundary) &&
+				!(await receivedWindowEdgeScopeRetained(source))) {
+				observeReceivedTurnover("reconciled");
+				return false;
+			}
+		}
 		const context = input.recoveryContext;
 		if (context === undefined) throw new TypeError("creator recipient turnover native owners are unavailable");
 		const openedCustody = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
@@ -1234,10 +1756,78 @@ export async function receiveCreatorSuccessorAdoption(
 			await promotionSource.release();
 			promotionSource = undefined;
 		}
-		retiredGenerations.push(...await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore,
+		retiredGenerations.push(...(await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore,
 			catalog: input.catalog, context, signing: openedCustody.owner},
-			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore)));
+			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore))).retired);
+		observeReceivedTurnover("ran");
 		return true;
+	};
+	// fix/skip-scope-carrier: a skip install's material authenticates the target from the Cut before
+	// it, so the scope this member departs from (its current epoch) closes on a Cut it never received.
+	// The departed carrier supplies that Cut, its QC, the successor trust record and the closed
+	// membership; it is authenticated here against this member's own current trust exactly as an
+	// adjacent offer is, and recorded below through the adjacent path. Optional: an older creator, a
+	// creator that no longer holds it, or any failure yields none, and that scope keeps today's
+	// retention (the journal retirement re-verifies a recorded carrier on every classification).
+	let departed: CreatorSuccessorDepartedCarrier | undefined;
+	// Observation only (the "__warmProofEvent" proof hook): what each skip install did with the
+	// departed scope's carrier. Never alters the install's outcome.
+	const observeDeparted = (outcome: string, detail?: string): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "recipient-departed-carrier", departedEpoch: source.currentTrust.currentEpoch, outcome,
+					...(detail === undefined ? {} : { detail }) });
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+	};
+	const receiveDepartedCarrier = async (): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
+		const departedScope = Object.freeze({ epoch: source.currentTrust.currentEpoch, anchorDigest: source.currentTrust.currentAnchorDigest });
+		const carrier = await receiveCreatorSuccessorDepartedCarrier({
+			transport: input.transport,
+			peers: input.peers,
+			manifestDigest: manifest.manifestDigest,
+			departed: departedScope,
+			identity: {
+				author: input.author,
+				sign: input.signRegisteredVertexDigest,
+				isAuthorizedAuthor: (author) => {
+					const currentAuthority = input.plane.currentEphemeralAuthority();
+					return currentAuthority !== undefined && currentAuthority.objectId === source.objectId &&
+						currentAuthority.epoch === source.currentTrust.currentEpoch &&
+						currentAuthority.anchorDigest === source.currentTrust.currentAnchorDigest &&
+						(author === creatorSourceAuthor || currentAuthority.isCurrentWriter(author));
+				},
+			},
+		}).catch(() => undefined);
+		if (carrier === undefined) {
+			observeDeparted("none");
+			return undefined;
+		}
+		const departedCut = canonicalRecord(carrier.exactCanonicalCutValueBytes);
+		if (departedCut === undefined || departedCut.epoch !== departedScope.epoch || departedCut.previousAnchor !== departedScope.anchorDigest) {
+			observeDeparted("rejected", "cut-scope");
+			return undefined;
+		}
+		const authority = (Object.hasOwn(departedCut, "forwardPromotion") ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
+			currentTrust: source.currentTrust,
+			exactCanonicalCutValueBytes: carrier.exactCanonicalCutValueBytes,
+			exactCanonicalCommitQcBytes: carrier.exactCanonicalCommitQcBytes,
+			exactCanonicalTrustStateRecordBytes: carrier.exactCanonicalTrustStateRecordBytes,
+		});
+		if (!authority.ok || authority.trust.currentEpoch !== departedScope.epoch + 1) {
+			observeDeparted("rejected", "authority");
+			return undefined;
+		}
+		const membership = await openCreatorCloseMembership({ bytes: carrier.exactCanonicalCloseMembershipBytes,
+			exactCanonicalCutValueBytes: carrier.exactCanonicalCutValueBytes,
+			maxEpochVertices: (departedCut.parameters as { maxEpochVertices: number } | undefined)?.maxEpochVertices ?? 0 }).catch(() => undefined);
+		if (membership === undefined || membership.localVertexWitnesses.length !== 0 ||
+			!sameBytes(membership.exactCanonicalLatchedAclBytes, source.exactCanonicalLatchedAclBytes)) {
+			observeDeparted("rejected", "membership");
+			return undefined;
+		}
+		observeDeparted("authenticated");
+		return carrier;
 	};
 	try {
 		transfer = createV3SnapshotTransferOwner({ transport: input.transport });
@@ -1281,6 +1871,7 @@ export async function receiveCreatorSuccessorAdoption(
 				currentPoint.predecessorTrust.currentAnchorDigest !== manifest.manifest.anchor)
 				throw new TypeError("creator checkpoint current authority is invalid");
 			opened = {ok: true, trust: currentPoint.currentTrust};
+			departed = await receiveDepartedCarrier();
 		}
 		if (!opened?.ok) throw new TypeError("creator successor authority is invalid");
 		const receivedTrust = opened.trust;
@@ -1511,6 +2102,11 @@ export async function receiveCreatorSuccessorAdoption(
 			receivedCandidates: Object.freeze([...advance.proposed.candidates]),
 			proposedReferences: advance.proposed.closure,
 		});
+		// Before any native custody below: a store behind its creator-signed frontier is refused.
+		const remoteCheckpoint = checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(checkpoint)?.remoteCheckpoint;
+		await assertReceivedLineageAboveAdmittedFrontier(source, advance.proposed, receivedTrust,
+			checkpoint === undefined ? source.currentTrust : remoteCheckpoint?.predecessorTrust,
+			checkpoint === undefined ? source.exactCanonicalLatchedAclBytes : remoteCheckpoint?.exactCanonicalPredecessorAclBytes);
 		// Native custody may already exist after a lost acknowledgement. An unknown
 		// lookup outcome cannot release the predecessor receive gate either.
 		const retained = await input.snapshotStore.lookupReceivedRecoveryCertificate(selector);
@@ -1577,6 +2173,14 @@ export async function receiveCreatorSuccessorAdoption(
 			});
 		if (auxiliary.exactCanonicalCloseMembershipBytes !== undefined && !membershipRecorded)
 			throw new TypeError("creator received close membership persistence refused");
+		// A skip install records the departed scope's authenticated carrier through the same path.
+		// Never fatal: a refusal leaves that scope with today's retention.
+		if (checkpoint !== undefined && departed !== undefined)
+			observeDeparted(await source.recordReceivedDepartedClosedMembership(departed.exactCanonicalCutValueBytes,
+				departed.exactCanonicalCloseMembershipBytes, {
+					exactCanonicalCommitQcBytes: departed.exactCanonicalCommitQcBytes,
+					exactCanonicalSuccessorTrustStateRecordBytes: departed.exactCanonicalTrustStateRecordBytes,
+				}).catch(() => false) ? "recorded" : "record-refused");
 		if (await prepareReceivedRecoveryTurnover()) {
 			if (promoted) {
 				if (receivedCloseSnapshot === undefined) throw new TypeError("creator received close snapshot unavailable after turnover");
@@ -2651,7 +3255,8 @@ async function authenticatedSuccessorIssuanceScope(
 	exactCanonicalLatchedAclBytes: Uint8Array,
 	expectedProfileId: string,
 	checkNativeCurrency: () => Promise<void>,
-	currentTrust: CurrentAnchorTrust
+	currentTrust: CurrentAnchorTrust,
+	successorClosure: CreatorTransitionClosure
 ): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
 	let lineageAuthors: readonly string[];
 	try {
@@ -2761,15 +3366,27 @@ async function authenticatedSuccessorIssuanceScope(
 			await assertEmptyReceiveOnlyIssuance(input.issuanceStore, scope);
 			return Object.freeze({ ok: true as const, scope });
 		}
+		// The room's authenticated closed frontier for the SELECTED author. A local
+		// lineage at or below it never issued work the room already admitted from this
+		// key: a stale copy or another store's clone, never this author's authority.
+		const historical = openVerifiedCreatorHistoricalIssuance({ author: input.author, closure: successorClosure,
+			floorTrust: currentTrust });
+		const identity = historical === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(historical);
+		const admitted = identity?.author === input.author && identity.objectId === objectId &&
+			identity.successorEpoch === expectedEpoch ? identity.admittedAuthorSequence : null;
 		for (const author of lineageAuthors) {
 			const scope = Object.freeze({ author, objectId });
 			const lineage = await input.issuanceStore.readLineage(scope);
 			if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next < 0) {
 				return Object.freeze({ ok: false as const, reason: "lineage" as const });
 			}
-			// Other authenticated writers can already have issued in this same object.
-			// Their watermarks are not the selected author's issuance authority: the
-			// scope below remains bound to that author's current ACL and possession.
+			if (author === input.author && admitted !== null && lineage.next <= admitted) {
+				return Object.freeze({ ok: false as const, reason: "lineage" as const });
+			}
+			// Other authenticated writers can already have issued in this same object
+			// (same-origin tabs share one room database). Their watermarks are not the
+			// selected author's issuance authority: the scope below remains bound to
+			// that author's current ACL, possession and authenticated frontier.
 		}
 		return Object.freeze({ ok: true as const, scope: Object.freeze({ author: input.author, objectId }) });
 	} catch {
@@ -2853,7 +3470,7 @@ async function reopenCreatorSuccessorMaterial(
 				const issuance = await authenticatedSuccessorIssuanceScope(input, objectId, String(chain.successorAnchor.aclDigest),
 					chain.successorEpoch, exactCanonicalLatchedAclBytes, chain.successorTrust.profileId, async () => {
 						if (!(await capturedReader.checkCurrency()).ok) throw new TypeError("creator checkpoint cold native census changed");
-					}, chain.successorTrust);
+					}, chain.successorTrust, {candidates: activeCandidates, closure: active.references});
 				if (!issuance.ok) return coldFailure("chain-invalid", `creator checkpoint issuance ${issuance.reason} is invalid`);
 				const material: CreatorSuccessorLiveMaterial = Object.freeze({checkpoint: context.checkpoint,
 					...(input.receiveOnly ? {receiveOnly: true as const} : {}), origin: "durable-reopen", catalog: factsForCatalog(resolved),
@@ -3189,7 +3806,8 @@ async function reopenCreatorSuccessorMaterial(
 				async () => {
 					if (!(await possessionReader.checkCurrency()).ok) throw new TypeError("creator possession native recovery census changed");
 				},
-				successorTrust
+				successorTrust,
+				{ candidates: activeCandidates, closure: active.references }
 			);
 			if (!issuance.ok) {
 				const detail =
@@ -4593,7 +5211,7 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			if (!digest.ok) throw new TypeError("creator retained recovery proof digest is invalid");
 			return Object.freeze({ bytes, ref: Object.freeze({ digest: digest.value, byteLength: bytes.byteLength }) });
 		});
-		const proposedCandidates = (attachmentIdentity === undefined ? [
+		const rawCandidates = (attachmentIdentity === undefined ? [
 			...current.filter(
 				({ ref, bytes }) =>
 					!sameRef(ref, oldTrust.ref) && !new Set(["drp-creator-author-settlement-state","drp-creator-issuance-retirement-state","drp-creator-author-issuance-frontiers-state"]).has(String(canonicalRecord(bytes)?.kind))
@@ -4601,6 +5219,30 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			...proof,
 		] : [...attachmentIdentity.proofCandidates, oldProjection, proof.find(candidate =>
 			sameBytes(candidate.bytes, certificate.exactCanonicalHistoryBytes))!]).sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+		// The live receive and the occupied-custody path stage this proposal (the retiring predecessor
+		// Cut/QC/ACL leave it) before retaining or adopting it; verification accepts only the staged
+		// closure. Re-derive it the same way (box m55: unstaged, every retained re-adoption refused
+		// chain-invalid).
+		let proposedCandidates = rawCandidates;
+		if (attachmentIdentity === undefined) {
+			const stagingSnapshot = await verifySnapshot({ snapshotDeclaration: observation.declaration, snapshotStore: input.snapshotStore },
+				{ cut, successorTrust: checkpoint.currentTrust }, proofAccounting);
+			if (stagingSnapshot === undefined) throw new TypeError("creator retained recovery snapshot is invalid");
+			const staged = inspectCreatorTransitionAdvance({
+				current: { candidates: current, closure: native.closure },
+				currentTrust: checkpoint.predecessorTrust,
+				mode: "stage",
+				proofRefs: [(proof[0] as (typeof proof)[number]).ref, (proof[1] as (typeof proof)[number]).ref],
+				proposed: { candidates: rawCandidates, closure: rawCandidates.map(({ ref }) => ref) },
+				successorTrust: checkpoint.currentTrust,
+				settlementAcl: {
+					current: oldAcl,
+					successor: stagingSnapshot.authorizedAclBytes ?? encodeCanonical(stagingSnapshot.payload.acl),
+				},
+			});
+			if (!staged.ok) throw new TypeError(`creator retained recovery transition is invalid: ${staged.reason}`);
+			proposedCandidates = [...staged.proposed.candidates].sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+		}
 		const owner = Object.freeze({});
 		let facts: SealedAdoptionFacts = Object.freeze({
 			...(attachment?.ok === true ? {checkpoint: attachment.capability} : {}),

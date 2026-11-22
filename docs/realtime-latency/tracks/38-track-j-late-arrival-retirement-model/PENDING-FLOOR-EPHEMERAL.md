@@ -1,5 +1,15 @@
 # Installed ephemeral authority across native floor transitions
 
+> **Superseded in part (track 43, ephemeral rollover continuity).** The receive rule this adjunct
+> models ("only the replacement's exact tuple is accepted"; "the receiver rejects the old tuple")
+> was widened to a one-epoch window: a receiver also accepts a frame whose tag equals the context it
+> held immediately before (epoch - 1), or whose carried preceding tag equals its current context,
+> always from a writer under its current authority. The replacement gap (no bound authority refuses
+> everything), the foreign-tuple refusal and the writer check are unchanged. The rule and its safety
+> properties are modeled in [`ephemeral-adjacent-authority.qnt`](../../../../packages/ephemeral/formal/ephemeral-adjacent-authority.qnt);
+> see [track 43](../43-ephemeral-rollover-continuity/README.md). This model's receive action and its
+> old-tuple test cases describe the earlier single-context rule and were not changed.
+
 An installed ephemeral context and a durable room floor answer different questions. E2 identifies the exact live object, epoch, anchor, and ACL under which a frame can be delivered. The floor controls fresh activation and native publication currency. A pending floor forbids activating either candidate; it does not, by itself, prove that an already installed old E2 context must disappear. The floor's eventual retirement of the old stable tuple is also not an explicit E2 deactivation rule.
 
 This distinction follows the existing contracts in [D.93.48 and D.110c-0b0](../../../production-hardening/production-hardening-tdd-plan-v2.md): the former makes the installed live owner authoritative for E2 and revokes its view on deactivation; the latter specifies pending recovery and exact dual-owner equality before new activation. This adjunct therefore permits old E2 traffic while the old registration and authority metadata remain installed, including the native commit-to-registration interval. It does not claim that such traffic is a shipped defect. A policy requiring every E2 callback to match the latest durable floor would be a stronger product decision.

@@ -42,6 +42,10 @@ const config = defineConfig({
 				__dirname,
 				"packages/protocol-v3/src/settlement-profile.ts"
 			),
+			"@ts-drp/protocol-v3/room-parameters": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/room-parameters.ts"
+			),
 			"@ts-drp/control-plane/creator-trust-checkpoint-advance": path.resolve(
 				__dirname,
 				"packages/control-plane/src/creator-trust-checkpoint-advance.ts"
@@ -67,6 +71,7 @@ const config = defineConfig({
 			"@ts-drp/node/v3-room": path.resolve(__dirname, "packages/node/src/v3-room.ts"),
 			"@ts-drp/node/v3-room-host": path.resolve(__dirname, "packages/node/src/v3-room-host.ts"),
 			"@ts-drp/node/applications/canvas": path.resolve(__dirname, "packages/node/src/applications/canvas.ts"),
+			"@ts-drp/node/rpc/v3-daemon": path.resolve(__dirname, "packages/node/src/rpc/v3-daemon.ts"),
 			"@ts-drp/seal/creator": path.resolve(__dirname, "packages/seal/src/creator.ts"),
 			"@ts-drp/seal/internal/creator-close-intent": path.resolve(
 				__dirname,
@@ -121,6 +126,7 @@ const config = defineConfig({
 			),
 			"@ts-drp/protocol-v3/latched-acl": path.resolve(__dirname, "packages/protocol-v3/src/latched-acl.ts"),
 			"@ts-drp/protocol-v3/snapshot-transfer": path.resolve(__dirname, "packages/protocol-v3/src/snapshot-transfer.ts"),
+			"@ts-drp/protocol-v3/instrumentation": path.resolve(__dirname, "packages/protocol-v3/src/instrumentation.ts"),
 			"@ts-drp/protocol-v3/registry/registry-v1.json": path.resolve(
 				__dirname,
 				"packages/protocol-v3/registry/registry-v1.json"
@@ -201,6 +207,7 @@ const config = defineConfig({
 			"packages/node/tests/post-commit-publication-0q-b2-red.test.ts",
 			"packages/node/tests/proptest/multi-node-convergence.test.ts",
 			"packages/node/tests/proptest/spawn.ts",
+			"packages/node/tests/proptest/spawn-scaling.test.ts",
 			"packages/node/tests/rejected-boundary-consumers-0q-b3-red.test.ts",
 			"packages/node/tests/sync-aggregate-acceptance-1n-d-red.test.ts",
 			"packages/node/tests/sync-aggregate-egress-entitlement-1o-b-red.test.ts",
@@ -221,6 +228,7 @@ const config = defineConfig({
 			"packages/node/tests/sync-recovery.test.ts",
 			"packages/node/tests/sync-request-attempt-lifecycle-1n-b-red.test.ts",
 			"packages/node/tests/sync-retry-owner-provenance-1n-d-i-red.test.ts",
+			"packages/node/tests/sync-state-heap-recharacterization-1o-f-ii-red.test.ts",
 			"packages/node/tests/sync-state-retention-1o-c-red.test.ts",
 			"packages/node/tests/sync-unmanaged-restore-1n-d-i-red.test.ts",
 			"packages/node/tests/update-batch-cap.test.ts",

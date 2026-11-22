@@ -15,6 +15,7 @@ import {
 	SNAPSHOT_PULL_INACTIVITY_MS,
 	SNAPSHOT_PULL_MAX_ATTEMPTS,
 	SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS,
+	SNAPSHOT_PULL_TOTAL_MS,
 	type SnapshotPeerAuthorization,
 } from "../snapshot-transfer.js";
 import { CREATOR_CLOSE_HISTORY_MAX_BYTES } from "./creator-close-history.js";
@@ -185,6 +186,104 @@ function auxiliary(record: Record<string, unknown>): CreatorSuccessorAuxiliaryMa
 	});
 }
 
+/** Why a creator's material server refused a request outright (it will never answer it). */
+export type CreatorSuccessorMaterialRefusalReason = "unauthorized" | "stale";
+const REFUSAL_REASONS: readonly string[] = ["unauthorized", "stale"];
+const REFUSAL_KEYS = ["kind", "nonce", "reason", "requesterPeer", "sourcePeer", "version"] as const;
+const REFUSAL_MAX_BYTES = 512;
+const REFUSAL_LIMITS = { maxBytes: REFUSAL_MAX_BYTES, maxDepth: 2, maxItems: 64 };
+
+/** The source refused this request explicitly: terminal for that source, never retried. */
+export class CreatorSuccessorMaterialRefused extends Error {
+	readonly code = "creator-successor-material-refused";
+	readonly retryClass = "terminal";
+	/**
+	 * @param reason - Why the creator refused.
+	 */
+	constructor(readonly reason: CreatorSuccessorMaterialRefusalReason) {
+		super(`creator material request was refused: ${reason}`);
+		this.name = "CreatorSuccessorMaterialRefused";
+	}
+}
+
+async function refuse(
+	stream: SnapshotChunkProtocolStream,
+	nonce: unknown,
+	reason: CreatorSuccessorMaterialRefusalReason,
+	sourcePeer: string
+): Promise<void> {
+	const controller = new AbortController();
+	const timer = setTimeout(
+		() => controller.abort(new Error("creator material refusal timed out")),
+		SNAPSHOT_PULL_INACTIVITY_MS
+	);
+	try {
+		await stream.write(
+			encodeCanonical(
+				{
+					kind: "creator-successor-material-refused",
+					version: 1,
+					reason,
+					nonce: nonce instanceof Uint8Array && nonce.byteLength === 32 ? Uint8Array.from(nonce) : new Uint8Array(0),
+					requesterPeer: stream.peerId,
+					sourcePeer,
+				},
+				REFUSAL_LIMITS
+			),
+			{ signal: controller.signal }
+		);
+		await stream.close();
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+/**
+ * The source's explicit refusal of this exact request, or undefined when the frame is not one.
+ * @param bytes - The response frame.
+ * @param nonce - This request's nonce.
+ * @param requesterPeer - This requester.
+ * @param sourcePeer - The source asked.
+ * @returns The refusal reason.
+ */
+function refusalOf(
+	bytes: Uint8Array,
+	nonce: Uint8Array,
+	requesterPeer: string,
+	sourcePeer: string
+): CreatorSuccessorMaterialRefusalReason | undefined {
+	if (bytes.byteLength > REFUSAL_MAX_BYTES) return undefined;
+	let value: unknown;
+	try {
+		value = decodeCanonical(bytes, REFUSAL_LIMITS);
+	} catch {
+		return undefined;
+	}
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const record = value as Record<string, unknown>;
+	if (
+		record.kind !== "creator-successor-material-refused" ||
+		Object.keys(record).sort().join(",") !== REFUSAL_KEYS.join(",") ||
+		record.version !== 1 ||
+		typeof record.reason !== "string" ||
+		!REFUSAL_REASONS.includes(record.reason) ||
+		record.requesterPeer !== requesterPeer ||
+		record.sourcePeer !== sourcePeer ||
+		!(record.nonce instanceof Uint8Array) ||
+		compareBytes(record.nonce, nonce) !== 0
+	)
+		return undefined;
+	return record.reason as CreatorSuccessorMaterialRefusalReason;
+}
+
+/**
+ * How long a member's serving session may sit idle (no request from it, nothing served to it) before a
+ * new requester meeting a full session table may take its place. A member pulls its chunks back to
+ * back right after its material, and its own reads time out after SNAPSHOT_PULL_INACTIVITY_MS, so a
+ * session idle this long has ended or failed on the member's side. An active session is never evicted.
+ */
+export const CREATOR_MATERIAL_SESSION_IDLE_MS = SNAPSHOT_PULL_INACTIVITY_MS;
+
 /**
  * Peer possession binds routing, while signed protocol carriers remain the only successor authority.
  * @param input Native source material, its current application identity and authenticated transport peers.
@@ -199,25 +298,68 @@ export function createCreatorSuccessorMaterialServer(
 		manifestDigest: string;
 		material: CreatorSuccessorAuxiliaryMaterial;
 		connectedPeers(): readonly string[];
+		/**
+		 * Optional gate before an authorized request's signed response (decision row 61: the room
+		 * holds it until the creator has adopted the successor it serves). A refusal never waits.
+		 */
+		admitResponse?(peerId: string, signal: AbortSignal): Promise<void>;
+		/**
+		 * The carrier of a closed epoch this creator still holds (in memory, or rebuilt from its
+		 * retained durable state), for a member's skip install from that epoch; undefined when it
+		 * holds none. A rejection is answered as unavailable.
+		 */
+		departed?(scope: CreatorSuccessorDepartedScope):
+			CreatorSuccessorDepartedCarrier | undefined | Promise<CreatorSuccessorDepartedCarrier | undefined>;
+		/**
+		 * The served snapshot's chunk count: a member's serving session ends once every chunk has been
+		 * served to it (see served). Without it a session ends only by its deadline, idleness or a
+		 * disconnect.
+		 */
+		chunkCount?: number;
+		/** Milliseconds clock for session deadlines and idleness (tests); default performance.now. */
+		clock?(): number;
 	}>
 ): Readonly<{
 	authorization: SnapshotPeerAuthorization;
 	control(stream: SnapshotChunkProtocolStream, bytes: Uint8Array): Promise<boolean>;
+	/** The snapshot owner served these chunk indices of the manifest to this peer (its session's progress). */
+	served(peerId: string, indices: readonly number[]): void;
 }> {
-	const authors = new Map<string, string>();
+	// One serving session per member: opened by its material response, it authorizes that member's
+	// manifest and chunk pulls. SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS bounds the CONCURRENT sessions, not
+	// the members served in an epoch: a session ends (and frees its place) when every chunk has been
+	// served to the member, when its pull deadline (SNAPSHOT_PULL_TOTAL_MS from the material
+	// response) passes, or when the member disconnects. Only a new requester meeting a full table may
+	// evict a session, and only one idle (no request, nothing served) for CREATOR_MATERIAL_SESSION_IDLE_MS.
+	const clock = input.clock ?? ((): number => performance.now());
+	const chunkCount =
+		input.chunkCount !== undefined && Number.isSafeInteger(input.chunkCount) && input.chunkCount > 0
+			? input.chunkCount
+			: undefined;
+	const sessions = new Map<string, { author: string; openedAt: number; activeAt: number; served: Set<number> }>();
+	const prune = (now: number, connected: ReadonlySet<string>): void => {
+		for (const [peer, session] of sessions)
+			if (!connected.has(peer) || now - session.openedAt >= SNAPSHOT_PULL_TOTAL_MS) sessions.delete(peer);
+	};
 	return Object.freeze({
 		authorization: Object.freeze({
 			authorForPeer: (peer: string) => {
-				if (!input.connectedPeers().includes(peer)) {
-					authors.delete(peer);
-					return undefined;
-				}
-				return authors.get(peer);
+				const now = clock();
+				prune(now, new Set(input.connectedPeers()));
+				const session = sessions.get(peer);
+				if (session === undefined) return undefined;
+				// A request from the member: its session is active.
+				session.activeAt = now;
+				return session.author;
 			},
 			isAuthorizedAuthor: input.isAuthorizedReader ?? input.identity.isAuthorizedAuthor,
 		}),
 		control: async (stream: SnapshotChunkProtocolStream, bytes: Uint8Array): Promise<boolean> => {
 			const first = decodeCanonical(bytes, FRAME_LIMITS) as Record<string, unknown>;
+			if (first?.kind === DEPARTED_REQUEST_KIND) {
+				await serveDeparted(input, stream, bytes);
+				return true;
+			}
 			if (first?.kind !== "creator-successor-material-request") return false;
 			const request = decode(bytes, [
 				"kind",
@@ -231,9 +373,12 @@ export function createCreatorSuccessorMaterialServer(
 			]);
 			const { signature, ...proof } = request;
 			const checkpointRequested = request.version === 2 && request.materialKind === "checkpoint";
-			if (
+			// A request this server will never answer gets an explicit refusal, so the requester stops
+			// instead of retrying an abort it must treat as transient. The refusal is unsigned: it is
+			// bound to the authenticated stream's peers and the request's nonce, grants nothing, and
+			// only ends the requester's attempts at this one peer.
+			const refusal: CreatorSuccessorMaterialRefusalReason | undefined =
 				!(checkpointRequested || (request.version === 1 && !Object.hasOwn(request, "materialKind"))) ||
-				request.manifestDigest !== input.manifestDigest ||
 				request.requesterPeer !== stream.peerId ||
 				request.sourcePeer !== input.localPeerId ||
 				!(request.nonce instanceof Uint8Array) ||
@@ -241,15 +386,34 @@ export function createCreatorSuccessorMaterialServer(
 				typeof request.author !== "string" ||
 				!(input.isAuthorizedReader ?? input.identity.isAuthorizedAuthor)(request.author) ||
 				!(await verify(request.author, signature, proof))
-			)
-				throw new TypeError("creator material requester is unauthorized");
-			// Routing possession is transient and bounded by the existing transfer session ceiling.
+					? "unauthorized"
+					: request.manifestDigest !== input.manifestDigest
+						? "stale"
+						: undefined;
+			if (refusal !== undefined) {
+				await refuse(stream, request.nonce, refusal, input.localPeerId);
+				return true;
+			}
+			// Routing possession is transient and bounded by the existing transfer session ceiling, counted
+			// in concurrent sessions. A full table admits a new requester only in place of an idle session
+			// (the least recently active); otherwise it is refused and retries by itself (row 61 pacing).
+			const now = clock();
 			const connected = new Set(input.connectedPeers());
-			for (const peer of authors.keys()) if (!connected.has(peer)) authors.delete(peer);
+			prune(now, connected);
 			if (!connected.has(stream.peerId)) throw new TypeError("creator material requester disconnected");
-			if (!authors.has(stream.peerId) && authors.size >= SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS)
-				throw new TypeError("creator material requester session limit reached");
-			authors.set(stream.peerId, request.author);
+			if (!sessions.has(stream.peerId) && sessions.size >= SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS) {
+				let idlest: string | undefined;
+				let idlestAt = Infinity;
+				for (const [peer, session] of sessions)
+					if (now - session.activeAt >= CREATOR_MATERIAL_SESSION_IDLE_MS && session.activeAt < idlestAt) {
+						idlest = peer;
+						idlestAt = session.activeAt;
+					}
+				if (idlest === undefined) throw new TypeError("creator material requester session limit reached");
+				sessions.delete(idlest);
+			}
+			// A string: any other author was refused above. A repeated request opens a fresh session.
+			sessions.set(stream.peerId, { author: request.author as string, openedAt: now, activeAt: now, served: new Set() });
 			const { exactCanonicalCloseMembershipBytes: membership,
 				exactCanonicalReattachmentCheckpointBytes: checkpoint, ...common } = auxiliary(input.material as unknown as Record<string, unknown>);
 			const unavailable = checkpointRequested && checkpoint === undefined;
@@ -277,6 +441,7 @@ export function createCreatorSuccessorMaterialServer(
 				SNAPSHOT_PULL_INACTIVITY_MS
 			);
 			try {
+				await input.admitResponse?.(stream.peerId, controller.signal);
 				await stream.write(
 					encodeCanonical({ ...response, signature: await signTransportFrame(input.identity, response, controller.signal) },
 						responseLimits),
@@ -287,6 +452,16 @@ export function createCreatorSuccessorMaterialServer(
 				clearTimeout(timer);
 			}
 			return true;
+		},
+		served: (peerId: string, indices: readonly number[]): void => {
+			const session = sessions.get(peerId);
+			if (session === undefined) return;
+			session.activeAt = clock();
+			for (const index of indices)
+				if (Number.isSafeInteger(index) && index >= 0 && (chunkCount === undefined || index < chunkCount))
+					session.served.add(index);
+			// Every chunk served: the member's pull is complete and its session ends.
+			if (chunkCount !== undefined && session.served.size >= chunkCount) sessions.delete(peerId);
 		},
 	});
 }
@@ -312,7 +487,8 @@ type ReceivedCreatorSuccessorMaterial = CreatorSuccessorAuxiliaryMaterial &
 /**
  * One material attempt's outcome. Transient: the attempt's own deadline or the caller's lifetime
  * ended it, or opening, writing or reading the stream failed (a reset, an ended stream, no
- * connection). Terminal: signing failed, or the response itself is unacceptable (malformed frame,
+ * connection). Terminal: signing failed, the source refused the request explicitly (an
+ * unauthorized reader, or a successor it no longer serves), or the response itself is unacceptable (malformed frame,
  * wrong kind, version, manifest, peers or nonce, unauthorized author, bad signature, invalid
  * bounds). Uncertain cleanup: the stream's release could not be confirmed.
  */
@@ -371,6 +547,8 @@ async function attemptCreatorSuccessorMaterial(
 		await stream.write(encodeCanonical({ ...request, signature }, FRAME_LIMITS), { signal: controller.signal });
 		const bytes = await stream.read(MAX_BYTES, { signal: controller.signal });
 		phase = "response";
+		const refused = refusalOf(bytes, nonce, input.transport.localPeerId, peer);
+		if (refused !== undefined) throw new CreatorSuccessorMaterialRefused(refused);
 		const response = decode(bytes, [
 			"kind",
 			"version",
@@ -531,5 +709,258 @@ export async function receiveCreatorSuccessorMaterial(
 		if (lifetime === undefined || peers.every((peer) => terminal.has(peer))) throw failure();
 		if (!(await pauseMaterialRetry(pause, lifetime))) throw failure();
 		pause = Math.min(pause * 2, CREATOR_SUCCESSOR_MATERIAL_RETRY_MAX_MS);
+	}
+}
+
+// ---------------------------------------------------------------------------------------------
+// The departed scope's carrier (fix/skip-scope-carrier).
+//
+// A skip install's material (a reattachment checkpoint) authenticates the target from the Cut before
+// it; the epoch the member departed from closes on a Cut the member never received, so its journal
+// scope (holding the creator's received rows) had no closed-membership carrier and was never
+// collectible. A member making a skip install asks for that epoch's carrier separately: the Cut
+// that closed it, the Cut's commit QC, the successor trust record it produced, and its closed
+// membership, exactly what an adjacent install's offer and material supply. The member
+// authenticates Cut/QC/trust against its own current trust (as an adjacent offer) and the membership
+// against the Cut, and records it through the adjacent path; the retirement re-verifies it on every
+// classification. The response frame is signed for its request (nonce, requester, manifest,
+// departed scope) under the transport's domain, as the material response.
+//
+// Versioning: a separate request kind, never a field of the material request. An older creator does
+// not know the kind and aborts the stream (the snapshot owner's protocol violation); an older member
+// never asks. Either way the member keeps today's behaviour (that scope keeps its retention).
+// Bounds: Cut, QC and trust record at most SEAL record size each (65,536 B), membership at most
+// CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES, in one frame under CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxResponseBytes;
+// not part of the offer, so the offer cap (V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES) is unchanged.
+// ---------------------------------------------------------------------------------------------
+
+const DEPARTED_REQUEST_KIND = "creator-successor-departed-request" as const;
+const DEPARTED_RESPONSE_KIND = "creator-successor-departed-response" as const;
+const DEPARTED_UNAVAILABLE_KIND = "creator-successor-departed-unavailable" as const;
+const DEPARTED_RECORD_MAX_BYTES = 65_536;
+const DEPARTED_REQUEST_KEYS = [
+	"author",
+	"departedAnchor",
+	"departedEpoch",
+	"kind",
+	"manifestDigest",
+	"nonce",
+	"requesterPeer",
+	"signature",
+	"sourcePeer",
+	"version",
+] as const;
+const DEPARTED_CARRIER_KEYS = [
+	"exactCanonicalCloseMembershipBytes",
+	"exactCanonicalCommitQcBytes",
+	"exactCanonicalCutValueBytes",
+	"exactCanonicalTrustStateRecordBytes",
+] as const;
+
+/** A closed epoch a member departs from by a skip install: its scope's epoch and anchor. */
+export interface CreatorSuccessorDepartedScope {
+	readonly epoch: number;
+	readonly anchorDigest: string;
+}
+/** The departed epoch's closing Cut, its authority and its closed membership. */
+export interface CreatorSuccessorDepartedCarrier {
+	readonly exactCanonicalCutValueBytes: Uint8Array;
+	readonly exactCanonicalCommitQcBytes: Uint8Array;
+	readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+	readonly exactCanonicalCloseMembershipBytes: Uint8Array;
+}
+
+function exactFrame(bytes: Uint8Array, limits: typeof FRAME_LIMITS, keys: readonly string[]): Record<string, unknown> {
+	const value = decodeCanonical(bytes, limits);
+	if (
+		value === null ||
+		typeof value !== "object" ||
+		Array.isArray(value) ||
+		compareBytes(bytes, encodeCanonical(value, limits)) !== 0 ||
+		Object.keys(value).sort().join(",") !== [...keys].sort().join(",")
+	)
+		throw new TypeError("creator departed frame is invalid");
+	return value as Record<string, unknown>;
+}
+function departedScopeOf(record: Record<string, unknown>): CreatorSuccessorDepartedScope | undefined {
+	const epoch = record.departedEpoch,
+		anchor = record.departedAnchor;
+	return typeof epoch === "number" &&
+		Number.isSafeInteger(epoch) &&
+		epoch >= 0 &&
+		typeof anchor === "string" &&
+		/^[0-9a-f]{64}$/u.test(anchor)
+		? Object.freeze({ epoch, anchorDigest: anchor })
+		: undefined;
+}
+/**
+ * Captures a departed carrier within its bounds (copies; no caller accessors).
+ * @param value - The untrusted carrier record.
+ * @returns The detached carrier, or undefined when any part is missing or out of bounds.
+ */
+export function captureCreatorSuccessorDepartedCarrier(value: unknown): CreatorSuccessorDepartedCarrier | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const output: Record<string, Uint8Array> = {};
+	for (const key of DEPARTED_CARRIER_KEYS) {
+		const field: unknown = Reflect.get(value, key);
+		const bound = key === "exactCanonicalCloseMembershipBytes" ? CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES : DEPARTED_RECORD_MAX_BYTES;
+		if (!(field instanceof Uint8Array) || field.byteLength === 0 || field.byteLength > bound) return undefined;
+		output[key] = Uint8Array.from(field);
+	}
+	return Object.freeze(output) as unknown as CreatorSuccessorDepartedCarrier;
+}
+
+async function serveDeparted(
+	input: Parameters<typeof createCreatorSuccessorMaterialServer>[0],
+	stream: SnapshotChunkProtocolStream,
+	bytes: Uint8Array
+): Promise<void> {
+	const request = exactFrame(bytes, REQUEST_LIMITS, DEPARTED_REQUEST_KEYS);
+	const { signature, ...proof } = request;
+	const scope = departedScopeOf(request);
+	const refusal: CreatorSuccessorMaterialRefusalReason | undefined =
+		request.version !== 1 ||
+		scope === undefined ||
+		request.requesterPeer !== stream.peerId ||
+		request.sourcePeer !== input.localPeerId ||
+		!(request.nonce instanceof Uint8Array) ||
+		request.nonce.byteLength !== 32 ||
+		typeof request.author !== "string" ||
+		!(input.isAuthorizedReader ?? input.identity.isAuthorizedAuthor)(request.author) ||
+		!(await verify(request.author, signature, proof))
+			? "unauthorized"
+			: request.manifestDigest !== input.manifestDigest
+				? "stale"
+				: undefined;
+	if (refusal !== undefined || scope === undefined) {
+		await refuse(stream, request.nonce, refusal ?? "unauthorized", input.localPeerId);
+		return;
+	}
+	const carrier = captureCreatorSuccessorDepartedCarrier(
+		await Promise.resolve().then(() => input.departed?.(scope)).catch(() => undefined)
+	);
+	const response = {
+		...(carrier === undefined ? { kind: DEPARTED_UNAVAILABLE_KIND } : { kind: DEPARTED_RESPONSE_KIND, ...carrier }),
+		version: 1,
+		nonce: request.nonce,
+		manifestDigest: input.manifestDigest,
+		requesterPeer: stream.peerId,
+		sourcePeer: input.localPeerId,
+		author: input.identity.author,
+		departedEpoch: scope.epoch,
+		departedAnchor: scope.anchorDigest,
+	};
+	encodeCanonical({ ...response, signature: new Uint8Array(64) }, FRAME_LIMITS);
+	const controller = new AbortController();
+	const timer = setTimeout(
+		() => controller.abort(new Error("creator departed response timed out")),
+		SNAPSHOT_PULL_INACTIVITY_MS
+	);
+	try {
+		await input.admitResponse?.(stream.peerId, controller.signal);
+		await stream.write(
+			encodeCanonical(
+				{ ...response, signature: await signTransportFrame(input.identity, response, controller.signal) },
+				FRAME_LIMITS
+			),
+			{ signal: controller.signal }
+		);
+		await stream.close();
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+/**
+ * Asks the listed peers, once each and one at a time, for the departed scope's carrier. Every
+ * failure (an older creator that aborts the unknown request kind, a refusal, an unavailable
+ * carrier, a timeout, an invalid or unsigned frame) returns undefined: the caller keeps today's
+ * behaviour. The returned carrier is only transport-authenticated; the caller authenticates its
+ * Cut/QC/trust against its own current trust and its membership against the Cut.
+ * @param input - The transport, signing identity, peers, served manifest and departed scope.
+ * @returns The carrier, or undefined.
+ */
+export async function receiveCreatorSuccessorDepartedCarrier(
+	input: Readonly<{
+		transport: SnapshotChunkProtocolPort;
+		identity: SigningIdentity;
+		peers: readonly string[];
+		manifestDigest: string;
+		departed: CreatorSuccessorDepartedScope;
+	}>
+): Promise<CreatorSuccessorDepartedCarrier | undefined> {
+	let peers: readonly string[];
+	try {
+		peers = captureCreatorSuccessorPeers(input.peers);
+	} catch {
+		return undefined;
+	}
+	const connected = new Set(input.transport.connectedPeers());
+	for (const peer of peers) {
+		if (!connected.has(peer)) continue;
+		const carrier = await attemptDeparted(input, peer).catch(() => undefined);
+		if (carrier !== undefined) return carrier;
+	}
+	return undefined;
+}
+
+async function attemptDeparted(
+	input: Parameters<typeof receiveCreatorSuccessorDepartedCarrier>[0],
+	peer: string
+): Promise<CreatorSuccessorDepartedCarrier | undefined> {
+	const nonce = crypto.getRandomValues(new Uint8Array(32));
+	const request = {
+		kind: DEPARTED_REQUEST_KIND,
+		version: 1,
+		nonce,
+		manifestDigest: input.manifestDigest,
+		requesterPeer: input.transport.localPeerId,
+		sourcePeer: peer,
+		author: input.identity.author,
+		departedEpoch: input.departed.epoch,
+		departedAnchor: input.departed.anchorDigest,
+	};
+	const controller = new AbortController();
+	const timer = setTimeout(
+		() => controller.abort(new Error("creator departed request timed out")),
+		SNAPSHOT_PULL_INACTIVITY_MS
+	);
+	let stream: SnapshotChunkProtocolStream | undefined;
+	let ok = false;
+	try {
+		stream = await input.transport.open(peer, { signal: controller.signal });
+		const signature = await signTransportFrame(input.identity, request, controller.signal);
+		await stream.write(encodeCanonical({ ...request, signature }, REQUEST_LIMITS), { signal: controller.signal });
+		const bytes = await stream.read(MAX_BYTES, { signal: controller.signal });
+		if (refusalOf(bytes, nonce, input.transport.localPeerId, peer) !== undefined) return undefined;
+		const kind = (decodeCanonical(bytes, FRAME_LIMITS) as Record<string, unknown> | null)?.kind;
+		const common = ["author", "departedAnchor", "departedEpoch", "kind", "manifestDigest", "nonce", "requesterPeer", "signature", "sourcePeer", "version"];
+		const response = exactFrame(bytes, FRAME_LIMITS, kind === DEPARTED_RESPONSE_KIND ? [...common, ...DEPARTED_CARRIER_KEYS] : common);
+		const { signature: responseSignature, ...proof } = response;
+		if (
+			(response.kind !== DEPARTED_RESPONSE_KIND && response.kind !== DEPARTED_UNAVAILABLE_KIND) ||
+			response.version !== 1 ||
+			response.manifestDigest !== input.manifestDigest ||
+			response.requesterPeer !== input.transport.localPeerId ||
+			response.sourcePeer !== peer ||
+			response.departedEpoch !== input.departed.epoch ||
+			response.departedAnchor !== input.departed.anchorDigest ||
+			!(response.nonce instanceof Uint8Array) ||
+			compareBytes(response.nonce, nonce) !== 0 ||
+			typeof response.author !== "string" ||
+			!input.identity.isAuthorizedAuthor(response.author) ||
+			!(await verify(response.author, responseSignature, proof))
+		)
+			return undefined;
+		ok = true;
+		return response.kind === DEPARTED_RESPONSE_KIND ? captureCreatorSuccessorDepartedCarrier(response) : undefined;
+	} finally {
+		clearTimeout(timer);
+		try {
+			if (!ok) stream?.abort();
+			await stream?.close();
+		} catch {
+			// The carrier is optional; a stream that cannot be closed cleanly yields none.
+		}
 	}
 }

@@ -491,12 +491,35 @@ describe("Phase 3a-0-C storage-node creator-trust process death RED", () => {
 			const failure = error as Readonly<{ stderr?: string; stdout?: string }>;
 			mutantDiagnostics = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
 		}
-		expect(mutantDiagnostics).toContain("TS2307");
+		// TS2307 stood for "this fixture imports @ts-drp/control-plane, which is not a storage-node
+		// dependency". Whether tsc reports it depends on the environment: the root `paths`
+		// mapping resolves @ts-drp/control-plane to packages/control-plane, so once that package's
+		// dist is built (root tests require built dists) the import resolves and only the
+		// rootDir/file-list errors remain. Pin the fact itself, and TS2307 when it can occur.
+		const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
+			dependencies?: Record<string, string>;
+		};
+		expect(Object.keys(manifest.dependencies ?? {})).not.toContain("@ts-drp/control-plane");
+		const controlPlaneTypes = new URL("../../control-plane/dist/src/index.d.ts", import.meta.url);
+		const controlPlaneBuilt = await readFile(controlPlaneTypes).then(
+			() => true,
+			() => false
+		);
+		if (!controlPlaneBuilt) expect(mutantDiagnostics).toContain("TS2307");
 		expect(mutantDiagnostics).toContain("TS6059");
 		expect(mutantDiagnostics).toContain("TS6307");
 		expect(mutantDiagnostics).toContain(exactPackageExcludedTest);
-		expect(packageTsconfig.exclude).toEqual(["dist", "./*.d.ts", exactPackageExcludedTest]);
-	});
+		// 408842f9 and 01420f98 excluded three more dedicated-compiler RED tests.
+		expect(packageTsconfig.exclude).toEqual([
+			"dist",
+			"./*.d.ts",
+			"tests/phase-4c-b-snapshot-quarantine-red.test.ts",
+			exactPackageExcludedTest,
+			"tests/phase-3a1b-p2-node-outbox-publication-death-red.test.ts",
+			"tests/phase-3a1b-p2-node-outbox-publication-red.test.ts",
+		]);
+		// Two whole-program tsc runs: minutes under load, not the 10 s default.
+	}, 600_000);
 
 	it.skipIf(RUN_LONG)("keeps the repeated real-death campaign explicitly nightly-only", () => {
 		expect(process.env.TS_DRP_PHASE_3A0_C_LONG_SIGKILL).not.toBe("1");

@@ -212,6 +212,9 @@ importers:
       "@ts-drp/node":
         specifier: 0.11.0
         version: link:../../packages/node
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/types":
         specifier: 0.11.0
         version: link:../../packages/types
@@ -249,6 +252,9 @@ importers:
       "@ts-drp/protocol-v3":
         specifier: workspace:*
         version: link:../../packages/protocol-v3
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/types":
         specifier: 0.11.0
         version: link:../../packages/types
@@ -301,6 +307,9 @@ importers:
       "@ts-drp/rendezvous":
         specifier: 0.11.0
         version: link:../../packages/rendezvous
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/routing-browser":
         specifier: 0.11.0
         version: link:../../packages/routing-browser
@@ -413,6 +422,9 @@ importers:
       "@ts-drp/ephemeral":
         specifier: workspace:*
         version: link:../../packages/ephemeral
+      "@ts-drp/errors":
+        specifier: workspace:*
+        version: link:../../packages/errors
       "@ts-drp/issuance-store":
         specifier: workspace:*
         version: link:../../packages/issuance-store
@@ -425,6 +437,9 @@ importers:
       "@ts-drp/protocol-v3":
         specifier: workspace:*
         version: link:../../packages/protocol-v3
+      "@ts-drp/room-worker":
+        specifier: workspace:*
+        version: link:../../packages/room-worker
       "@ts-drp/storage":
         specifier: workspace:*
         version: link:../../packages/storage
@@ -508,6 +523,34 @@ importers:
       "@noble/hashes":
         specifier: ^1.7.1
         version: 1.7.1
+
+  packages/cli:
+    dependencies:
+      "@grpc/grpc-js":
+        specifier: ^1.12.2
+        version: 1.13.2
+      "@ts-drp/node":
+        specifier: 0.11.0
+        version: link:../node
+      "@ts-drp/storage":
+        specifier: 0.11.0
+        version: link:../storage
+      "@ts-drp/storage-node":
+        specifier: 0.11.0
+        version: link:../storage-node
+      "@ts-drp/types":
+        specifier: 0.11.0
+        version: link:../types
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.0
+    devDependencies:
+      tsx:
+        specifier: 4.19.1
+        version: 4.19.1
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
 
   packages/compaction:
     dependencies:
@@ -667,6 +710,9 @@ importers:
       "@ts-drp/canonical":
         specifier: 0.11.0
         version: link:../canonical
+      "@ts-drp/protocol-v3":
+        specifier: 0.11.0
+        version: link:../protocol-v3
       "@ts-drp/storage":
         specifier: 0.11.0
         version: link:../storage
@@ -993,9 +1039,6 @@ importers:
       "@ts-drp/storage":
         specifier: 0.11.0
         version: link:../storage
-      "@ts-drp/storage-node":
-        specifier: 0.11.0
-        version: link:../storage-node
       "@ts-drp/tracer":
         specifier: 0.11.0
         version: link:../tracer
@@ -1011,9 +1054,6 @@ importers:
       "@types/node":
         specifier: ^22.5.4
         version: 22.14.0
-      commander:
-        specifier: ^14.0.0
-        version: 14.0.0
       dotenv:
         specifier: ^16.4.5
         version: 16.4.7
@@ -1156,6 +1196,12 @@ importers:
       vitest:
         specifier: ^3.0.5
         version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
+  packages/room-worker:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.8.2
 
   packages/routing-browser:
     dependencies:

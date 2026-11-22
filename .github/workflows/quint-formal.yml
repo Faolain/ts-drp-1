@@ -1,0 +1,48 @@
+name: Quint formal models
+
+# PR tier of scripts/quint/quint-ci.mjs: typecheck every .qnt, run every model's `run` tests,
+# check each runnable module's safety invariant by simulation, and check that each reviewed
+# pre-fix variant still violates the invariant its bug broke. Policy: scripts/quint/manifest.json.
+on:
+  push:
+    branches: [main, "perf/integration-*", "codex/*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quint-formal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quint-formal-pr:
+    name: Quint models (PR tier)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: "10.24.0"
+      # Only the pinned quint CLI is needed; skip the workspace build in postinstall.
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # quint downloads its Rust simulator into ~/.quint on first use; keep it between runs.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.quint
+          key: quint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Run the Quint PR tier
+        run: pnpm run formal --jobs 4 --json "$RUNNER_TEMP/quint-pr.json"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quint-pr-results
+          path: ${{ runner.temp }}/quint-pr.json
+          if-no-files-found: ignore

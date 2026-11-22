@@ -9,6 +9,7 @@ import {
 	resolveCreatorAnchorTrustMaterial,
 } from "./internal/seal-authority-custody.js";
 import { registerSealAuthorityIdentity } from "./internal/seal-authority-identity.js";
+import { isRegisteredRoomParameterExtension } from "./room-parameters.js";
 import { mintSealSigningRequest, type SealSigningRequest } from "./internal/seal-signing-request.js";
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
 
@@ -268,7 +269,13 @@ function validateRegisteredRecord(kindName: string, value: unknown): value is Re
 	const actualKeys = Reflect.ownKeys(value);
 	const allowedKeys = kind.fields.map(({ name }) => name);
 	if (
-		actualKeys.some((key) => typeof key !== "string" || !allowedKeys.includes(key)) ||
+		actualKeys.some(
+			(key) =>
+				typeof key !== "string" ||
+				(!allowedKeys.includes(key) &&
+					// The parameters record's one registered extension (room-parameters.ts), with a valid value.
+					!(kindName === "parameters" && isRegisteredRoomParameterExtension(key, value[key])))
+		) ||
 		kind.fields.some(({ name, required }) => required && !Object.hasOwn(value, name))
 	) {
 		return false;

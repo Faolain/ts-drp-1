@@ -113,7 +113,7 @@ class HeldReadView {
 	#release?: Promise<void>;
 	#inTurn = false;
 	#futureCheck?: Promise<void>;
-	readonly #queued: Array<{start: () => void; reject: (cause: unknown) => void}> = [];
+	readonly #queued: Array<{start: () => void; reject: (cause: unknown) => void; released?: () => void}> = [];
 	readonly #operations = new Set<Promise<unknown>>();
 
 	constructor(database: IDBDatabase) {
@@ -198,6 +198,9 @@ class HeldReadView {
 
 	needsTurn(): boolean { return !this.#inTurn; }
 
+	/** Released (or ended) without a native failure: the view no longer stands for anyone. */
+	gone(): boolean { return (this.#released || this.#ended) && !this.#failed; }
+
 	#admit<T>(operation: () => Promise<T>): Promise<T> {
 		const pending = operation();
 		this.#operations.add(pending);
@@ -208,7 +211,14 @@ class HeldReadView {
 		return pending;
 	}
 
-	run<T>(operation: () => Promise<T>): Promise<T> {
+	/**
+	 * Runs `operation` on a native turn of this view.
+	 * @param operation - The read.
+	 * @param outside - For a reader that does not hold this view: where the read runs instead
+	 * when the holder releases the view before the read's turn. Without it the read is refused.
+	 * @returns The read's result.
+	 */
+	run<T>(operation: () => Promise<T>, outside?: () => Promise<T>): Promise<T> {
 		try { this.assertOpen(); } catch (cause) { return Promise.reject(cause); }
 		if (this.#inTurn) return this.#admit(operation);
 		return new Promise<T>((resolve, reject) => {
@@ -217,6 +227,8 @@ class HeldReadView {
 					const pending = this.#admit(operation);
 					void pending.then(resolve, reject);
 				} catch (cause) { reject(cause); }
+			}, released: outside === undefined ? undefined : () => {
+				try { void outside().then(resolve, reject); } catch (cause) { reject(cause); }
 			}});
 		});
 	}
@@ -250,7 +262,13 @@ class HeldReadView {
 		this.#released = true;
 		this.#running = false;
 		this.#futureCheck = undefined;
-		this.#rejectQueued(new Error("NATIVE_READ_RESERVATION_RELEASED"));
+		// A reader that only borrowed this view lost nothing: it runs on its own transaction.
+		// The holder's own queued checks are refused.
+		const released = new Error("NATIVE_READ_RESERVATION_RELEASED");
+		for (const job of this.#queued.splice(0)) {
+			if (job.released === undefined) job.reject(released);
+			else job.released();
+		}
 		if (abort && !this.#ended) {
 			this.#intentionalAbort = true;
 			try { this.transaction.abort(); } catch { /* original terminal owns outcome */ }
@@ -291,10 +309,12 @@ export class NativeReadReservationOwner {
 		}
 	}
 
+	/** The held view a read joins; none once its holder released it, even while it completes. */
 	view(): IDBTransaction | undefined {
-		if (this.#held === undefined) return undefined;
-		this.#held.assertOpen();
-		return this.#held.transaction;
+		const held = this.#held;
+		if (held === undefined || held.gone()) return undefined;
+		held.assertOpen();
+		return held.transaction;
 	}
 
 	readTransaction(stores: string | string[]): IDBTransaction {
@@ -302,11 +322,17 @@ export class NativeReadReservationOwner {
 		return this.view() ?? this.#database.transaction(stores, "readonly");
 	}
 
-	needsReadTurn(): boolean { return this.#held?.needsTurn() ?? false; }
+	needsReadTurn(): boolean {
+		const held = this.#held;
+		return held !== undefined && !held.gone() && held.needsTurn();
+	}
 
 	runRead<T>(operation: () => Promise<T>): Promise<T> {
 		if (this.#closed) return Promise.reject(new Error("STORE_CLOSED"));
-		return this.#held === undefined ? operation() : this.#held.run(operation);
+		const held = this.#held;
+		if (held === undefined || held.gone()) return operation();
+		// Re-entered after the release, `operation` finds no view and opens its own transaction.
+		return held.run(operation, operation);
 	}
 
 	async #release(held: HeldReadView, abort = false): Promise<void> {

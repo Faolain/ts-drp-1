@@ -31,9 +31,15 @@ describe("Phase 2l-c literal Node issuance authorities", () => {
 		expect(manifest.dependencies?.["@ts-drp/issuance-store"]).toBe("0.11.0");
 		expect(manifest.dependencies?.["@ts-drp/live-journal"]).toBe("0.11.0");
 		expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
+			// ea4eb158: canonical, keychain, node, protocol-v3 and seal for the room-head/seal/room-host subpaths.
+			"@ts-drp/canonical",
 			"@ts-drp/compaction",
 			"@ts-drp/issuance-store",
+			"@ts-drp/keychain",
 			"@ts-drp/live-journal",
+			"@ts-drp/node",
+			"@ts-drp/protocol-v3",
+			"@ts-drp/seal",
 			"@ts-drp/storage",
 		]);
 		expect(Object.keys(manifest.exports ?? {}).sort()).toEqual([
@@ -42,11 +48,19 @@ describe("Phase 2l-c literal Node issuance authorities", () => {
 			"./issuance-maintenance",
 			"./live-journal",
 			...(Object.hasOwn(manifest.exports ?? {}, "./maintenance") ? ["./maintenance"] : []),
+			// ea4eb158: room-head, seal evidence/vote and the shared v3 room host.
+			"./room-head",
+			"./seal-evidence",
+			"./seal-vote",
 			"./snapshot-transfer",
+			"./v3-room-host",
 		]);
-		const root = fs.readFileSync(path.join(packageDirectory, "src/index.ts"));
+		// The root changed for other owners (a116318a bounded role reader, ea4eb158 archive and
+		// native read port); issuance itself still never reaches the root entry.
+		const root = fs.readFileSync(path.join(packageDirectory, "src/index.ts"), "utf8");
+		expect(root).not.toMatch(/issuance|Issuance/u);
 		expect(createHash("sha256").update(root).digest("hex")).toBe(
-			"14688ec0442cf331f329a5cb944bfa893f6a6ef08eeedd8bb6352651283d7211"
+			"3048a62cce8e5519ccb3cfadc70f1bffbca1dde3dd9719a4d7d56b343d88cdc2"
 		);
 	});
 

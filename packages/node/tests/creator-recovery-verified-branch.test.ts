@@ -5,6 +5,7 @@ import {AHE_BOUNDED_READ_LIMITS, digestBlob} from "@ts-drp/storage";
 import ts from "typescript";
 import {describe, expect, it} from "vitest";
 import {createCreatorCanonicalSyntaxReader} from "../src/internal/creator-snapshot-data.js";
+import {reconstructCreatorReattachmentCheckpoint} from "../src/internal/creator-transition-advance.js";
 
 const path = new URL("../src/internal/creator-transition-advance.ts", import.meta.url);
 const ast = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
@@ -74,6 +75,10 @@ function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 		genuineRecoveryTrust: (value: unknown, bytes: Uint8Array) => value !== null && typeof value === "object" &&
 			genuineTrusts.has(value) && compareBytes(bytes, pinBytes) === 0,
 		createCreatorCanonicalSyntaxReader,
+		// 1515daab: the source owner first reconstructs a received reattachment
+		// point from the closure. The genuine reconstructor finds none in these
+		// four-candidate closures, so the original anchor-chain path runs.
+		reconstructCreatorReattachmentCheckpoint,
 		createCreatorClosedRollbackProofAccounting: () => {
 			const charges: Uint8Array[] = []; proofCharges.push(charges);
 			return {charge: (bytes: Uint8Array) => {charges.push(bytes.slice()); return bytes.byteLength <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes;}};

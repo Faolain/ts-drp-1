@@ -29,12 +29,15 @@ const context = { digest: hashDomain("ts-drp/settlement-source-context/v1", cont
 const born: DurableIssuanceRetirementControl = { kind: "v3-issuance-retirement-control-1", objectId: scope.objectId,
 	incarnation: "c".repeat(64), revision: 0, sequence: 0, active: null, completed: null };
 
+/** Rows 0 and 1 are already pruned: their completed entries are the rewrite's drops (a
+ * completed entry whose source the store still holds is custody and stays). */
 function rows(): IssuanceRetirementRows {
 	const commits = Array.from({ length: 5 }, (_, sequence) => d109bCommit(scope, sequence, sequence));
+	const held = commits.filter((commit) => commit.authorSequence > 1);
 	return {
-		lineages: [{ ...scope, next: 5, exhausted: false, prunedThroughAuthorSequence: null }],
-		issued: commits.map((commit) => ({ ...scope, authorSequence: commit.authorSequence, ...commit.envelope })),
-		outbox: commits.map((commit) => ({ ...scope, authorSequence: commit.authorSequence,
+		lineages: [{ ...scope, next: 5, exhausted: false, prunedThroughAuthorSequence: 1 }],
+		issued: held.map((commit) => ({ ...scope, authorSequence: commit.authorSequence, ...commit.envelope })),
+		outbox: held.map((commit) => ({ ...scope, authorSequence: commit.authorSequence,
 			digest: commit.envelope.digest, publishState: "published" as const })),
 		plans: [{ scope, revision: 7, fenceSequence: 4, sourceContexts: [context], entries: [0, 1, 2].map((sequence) => ({
 			sourceContextDigest: context.digest, sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,

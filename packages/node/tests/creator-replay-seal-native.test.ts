@@ -401,7 +401,9 @@ describe("ordinary runtime candidate-free readiness producer", () => {
 		};
 		const f = make(), accounting = {}, staged = await f.method.call(f.lifetime, accounting);
 		expect(staged.preparation).toBe(f.preparation);
-		expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.facts, f.registration, f.state.identity, f.state.native.rows, null, accounting);
+		// ea4eb158: the capture's control parameter is DurableIssuanceRetirementControl | undefined;
+		// the producer normalizes an absent native control (null) to undefined.
+		expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.facts, f.registration, f.state.identity, f.state.native.rows, undefined, accounting);
 		expect(staged.commit()).toBe(true);
 		f.state.identity = {}; expect(staged.commit()).toBe(false);
 		const changed = make(), pending = await changed.method.call(changed.lifetime, accounting);
@@ -450,7 +452,10 @@ describe("mandatory fence immutable source handoff", () => {
 		const f = make(), result = await f.run();
 		expect(f.events.slice(0, 3)).toEqual(["cold-proof", "capture-hint", "charge-UNKNOWN"]);
 		expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.proof, f.unsignedBytes);
-		expect(f.charge.mock.calls[0]!.at(-1)).toBeUndefined();
+		// No ordinary source reaches the compiler on the fence path (the source argument), and the
+		// fence capture is not the retained source, so no first compile is deferred.
+		expect(f.charge.mock.calls[0]![3]).toBeUndefined();
+		expect(f.charge.mock.calls[0]![4]).toBe(false);
 		expect(result.ordinaryProofSource).toBe(f.hint); expect(result.ordinaryTemplateReady).toBe(false);
 		for (const unsupported of ["replacement", "received", "archive", "no-bound"] as const) {
 			const g = make();
@@ -512,7 +517,7 @@ describe("same-held census immutable input reuse", () => {
 		const runtime = {currentTrust: trust, sourceBound: true}, held = Object.freeze({store, objectId: "room", available: () => state.alive});
 		const captured = {pages: [{afterKey: null, bytes: encodeCanonical(state.pages)}], applicationPolicyRead: false, retainedBytes: 1, overCapacity: false};
 		const prepare = executeLiveOwner<any>(["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
-			"prepareCreatorUnchangedHeldCensusRead"], "prepareCreatorUnchangedHeldCensusRead", {
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"], "prepareCreatorUnchangedHeldCensusRead", {
 			ObjectIsFrozen: Object.isFrozen, ObjectFreeze: Object.freeze, Uint8ArrayConstructor: Uint8Array,
 			ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values,
 			SetIteratorNext: Object.getPrototypeOf(new Set().values()).next,
@@ -771,11 +776,12 @@ describe("same adoption verification facts through original close custody", () =
 					"releaseIdleEgressAdmissionOwner",
 					"retireRetainedReplay",
 					"releaseRetainedReplayPrefix",
+					"closePendingIngressCarriesTo",
 				],
 				"deactivateRegistration(registration)",
 				{
 			registration: value, ordinaryRuntimeCapacityGeometry: new WeakMap(), v3PlaneRegistrations: new WeakMap(),
-					v3EgressAdmissionOwners: new WeakMap(),
+					v3EgressAdmissionOwners: new WeakMap(), carriesForwardingTo: new WeakMap(),
 			topicMembership: () => false, hasQueueGuarded: () => false});
 		deactivate(registration({vertexFacts: old.facts}));
 		expect(predecessorValidation.vertexFacts).toBe(successorRuntime.vertexFacts);

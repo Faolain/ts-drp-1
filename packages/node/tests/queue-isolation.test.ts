@@ -1,5 +1,6 @@
 import { type Address, type PeerId } from "@libp2p/interface";
 import { MessageQueue, MessageQueueManager } from "@ts-drp/message-queue";
+import { DRPNetworkNode as NativeNetworkNode, type RawMessageStructure } from "@ts-drp/network";
 import {
 	type DRPNetworkNode,
 	type GroupPeerChangeHandler,
@@ -18,8 +19,27 @@ interface FakeNetworkControls {
 	subscribeToMessageQueue: ReturnType<typeof vi.fn>;
 }
 
+// ea4eb158 made DRPNode.dispatchMessage refuse any message without native raw-wire
+// provenance (MESSAGE_RAW_PROVENANCE_REQUIRED): only a native DRPNetworkNode can vouch
+// for the exact decoded Message. This suite is about the central-to-object queue
+// fanout behind that admission, so the fake vouches for exactly the messages it
+// emits, with the structure the native parser reports for one well-formed CUSTOM
+// message. Any other Message object stays unvouched and is refused as in production.
+const CUSTOM_WIRE_STRUCTURE: RawMessageStructure = Object.freeze({
+	kind: "drp-message-wire-structure-v1",
+	typeOccurrences: 1,
+	dataOccurrences: 1,
+	typeMask: 1 << MessageType.MESSAGE_TYPE_CUSTOM,
+	outsideKnownTypes: false,
+	conflictingTypes: false,
+	invalidCriticalWire: false,
+	malformed: false,
+	contextualField2Present: false,
+});
+
 function createFakeNetwork(): FakeNetworkControls {
 	const central = new MessageQueue<Message>({ id: "network-central", maxSize: 4 });
+	const emitted = new WeakSet<Message>();
 	let wasClosed = false;
 	const subscribeToMessageQueue = vi.fn((handler: IMessageQueueHandler<Message>) => central.subscribe(handler));
 	const groupHandlers = new Set<GroupPeerChangeHandler>();
@@ -65,7 +85,21 @@ function createFakeNetwork(): FakeNetworkControls {
 			};
 		}),
 	} satisfies DRPNetworkNode;
-	return { emit: (message) => central.enqueue(message), networkNode, subscribeToMessageQueue };
+	Object.assign(networkNode, {
+		unreliableWebRtcOwner: null,
+		installMessageStructuralAdmission: vi.fn(),
+		rawMessageStructureFor: (message: Message): RawMessageStructure | undefined =>
+			emitted.has(message) ? CUSTOM_WIRE_STRUCTURE : undefined,
+	});
+	Object.setPrototypeOf(networkNode, NativeNetworkNode.prototype);
+	return {
+		emit: (message) => {
+			emitted.add(message);
+			return central.enqueue(message);
+		},
+		networkNode,
+		subscribeToMessageQueue,
+	};
 }
 
 function message(objectId: string, sequence: number): Message {

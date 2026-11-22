@@ -794,7 +794,8 @@ async function rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number):
 			genesisAnchorDigest: trust.genesisAnchorDigest,
 			lifecycle: "active",
 			objectId: trust.objectId,
-			profileId: "creator-trusted-v1",
+			// The profile the room's own genesis signed, as its trust state records it.
+			profileId: trust.profileId,
 		});
 	} finally {
 		database.close();
@@ -2352,6 +2353,10 @@ async function d110cFloorMatrix(): Promise<Readonly<Record<string, unknown>>> {
 		regression: await directAdoptionSettlement("d110c-regression", { mutateStagedDescriptor: true }),
 	});
 }
+
+// This harness seals, adopts and installs by hand, so it opens the product room without the demo's
+// automatic rollover and successor delivery (v3-chat's test override, read when a room opens).
+Reflect.set(globalThis, "__TS_DRP_V3_CHAT_ROLLOVER__", "manual");
 
 function productApi(): ProductApi {
 	const selected = Reflect.get(globalThis, "d9336V3Chat");

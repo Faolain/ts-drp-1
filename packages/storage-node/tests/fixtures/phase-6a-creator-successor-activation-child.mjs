@@ -172,6 +172,16 @@ export async function seedAhe(material, effects, suffix = "") {
 	let adoptionSwapCount = 0;
 	const store = new Proxy(raw, {
 		get(target, property, receiver) {
+			// ea4eb158: a cold creator reopen reads its native AHE recovery census through the
+			// bounded recovery-role read (creator-adoption.ts acquireCreatorRecoveryCensus), not
+			// the unbounded recoverActiveGeneration (specs/bounded-storage-lifecycle 02e-1). Both
+			// are one native AHE recovery read.
+			if (property === "acquireBoundedRecoveryRoleRead") {
+				return (...args) => {
+					effects.aheRecoverCount += 1;
+					return target.acquireBoundedRecoveryRoleRead(...args);
+				};
+			}
 			if (property === "recoverActiveGeneration") {
 				return (...args) => {
 					effects.aheRecoverCount += 1;

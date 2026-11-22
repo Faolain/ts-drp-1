@@ -13,15 +13,21 @@ import { creatorCloseMembershipSubsetFields, creatorCloseMembershipSubsetMemberF
 import { openReceivedCloseMembership, RECEIVED_CLOSE_AUTHORITY_MAX_RECORD_BYTES } from "./creator-received-close-membership.js";
 import {creatorQ1SealQcFields, creatorQ1SealVoteFields} from "@ts-drp/seal/creator";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with {type: "json"};
-import { creatorSourceExpiryFields, verifyCreatorSourceExpiryReceipt, type CreatorSourceExpiryReceipt } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
+import { ROOM_APPLICATION_STATE_CEILING_BYTES, ROOM_APPLICATION_STATE_LIMIT_PARAMETER, roomApplicationStateLimit } from "@ts-drp/protocol-v3/room-parameters";
+import { creatorReplacedSourceFields, creatorSourceExpiryFields, verifyCreatorReplacedSourceReceipt, verifyCreatorSourceExpiryReceipt,
+	type CreatorReplacedSourceReceipt, type CreatorSourceExpiryReceipt } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
 
 const KIND = "creator-settlement-source-context-1";
 const DOMAIN = "ts-drp/settlement-source-context/v1";
 const COMPLETION_KIND = "creator-settlement-source-completion-1";
 const EXPIRY_KIND = "creator-settlement-source-expiry-1";
-export { creatorSourceExpiryFields };
-const MAX_PARAMETERS = encodeCanonical(Object.fromEntries(registry.kinds.parameters.fields.map(field =>
-	[field.name, field.constraints.maximum]))).byteLength;
+// A replaced-source frontier resolution carrier: never an expiry (distinct carrier and receipt kinds).
+const REPLACED_KIND = "creator-settlement-replaced-source-1";
+export { creatorReplacedSourceFields, creatorSourceExpiryFields };
+// The parameters record's registered complete domain: every registry field at its maximum and the record's one
+// registered extension (protocol-v3 room-parameters: the room's application state limit) at the library ceiling.
+const MAX_PARAMETERS = encodeCanonical({...Object.fromEntries(registry.kinds.parameters.fields.map(field =>
+	[field.name, field.constraints.maximum])), [ROOM_APPLICATION_STATE_LIMIT_PARAMETER]: ROOM_APPLICATION_STATE_CEILING_BYTES}).byteLength;
 // Exact existing anchor, ACL and registered parameter-schema bounds, with canonical field overhead.
 export const CREATOR_SOURCE_CONTEXT_MAX_BYTES = encodeCanonical({kind: KIND, version: 1,
 	anchorPreimage: new Uint8Array(8192), anchorSignature: new Uint8Array(64), aclBytes: new Uint8Array(65536),
@@ -52,6 +58,33 @@ const verified = new WeakMap<object, CreatorSourceCustodyIdentity>();
  * add no issued row on this issuer, so the reserve does not scale with the
  * writer count. A fence keeps only its own single successor reserve. */
 export const CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE = 2;
+
+/**
+ * Exact widths of the last-member frontier records member installs authenticated, by successor anchor.
+ * The record is the same for every author of that install (anchor, settlement record, Cut and commit QC
+ * of the close), so the width is a fact of the anchor. Sizing charges it (G21) and a removing close
+ * persists a frontier only when its width is registered here, so nothing uncharged is ever written. Every
+ * plane open re-registers it (install and recovery both open the member capability). Bounded: the oldest
+ * entry is dropped past the limit; a dropped anchor then persists no frontier (the removed author's
+ * later install refuses, closed), it never under-charges.
+ */
+const MEMBER_FRONTIER_WIDTHS_LIMIT = 4096;
+const memberFrontierWidths = new Map<string, number>();
+const memberFrontierWidthKey = (trust: CurrentAnchorTrust): string => `${trust.objectId}\n${trust.currentAnchorDigest}`;
+
+/** Registers the exact width of the member frontier authenticated under `trust` (its successor anchor). */
+export function recordCreatorMemberFrontierWidth(trust: CurrentAnchorTrust, width: number): void {
+	if (!Number.isSafeInteger(width) || width < 1) return;
+	const key = memberFrontierWidthKey(trust);
+	memberFrontierWidths.delete(key);
+	memberFrontierWidths.set(key, width);
+	while (memberFrontierWidths.size > MEMBER_FRONTIER_WIDTHS_LIMIT) memberFrontierWidths.delete(memberFrontierWidths.keys().next().value!);
+}
+
+/** The registered member frontier width for `trust`'s anchor, or undefined when none was authenticated. */
+export function creatorMemberFrontierWidth(trust: CurrentAnchorTrust): number | undefined {
+	return memberFrontierWidths.get(memberFrontierWidthKey(trust));
+}
 
 /** The current source anchor and ACL are immutable, so their actual widths
  * bound custody for any accepted operation in this epoch. Parameters use the
@@ -103,13 +136,28 @@ export function creatorSourceCustodyGeometryForSizing(trust: CurrentAnchorTrust,
 	const expiry = record(creatorSourceExpiryFields({objectId: trust.objectId, pinnedGenesisAnchorDigest: digest,
 		sourceAuthor: digest, sourceSequence: integer, sourceDigest: bytes(32), sourceContextDigest: bytes(32),
 		signingEpoch: integer, signingAnchorDigest: digest, signingNativeHeadDigest: bytes(32), signingFloorDigest: bytes(32)}));
-	const maxExpiryByteLength = record({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: bytes(expiry.byteLength),
-		detachedSignature: bytes(64)}).byteLength;
+	// One receipt context per resolvable source: an expiry or a replaced-source resolution, the wider.
+	const replaced = record(creatorReplacedSourceFields({objectId: trust.objectId, pinnedGenesisAnchorDigest: digest,
+		sourceAuthor: digest, sourceSequence: integer, sourceDigest: bytes(32), sourceEpoch: integer, replacementSequence: integer,
+		frontierCurrentEpoch: integer, frontierAdmissionEpoch: integer, frontierTerminalThrough: integer, guardSequence: integer,
+		signingEpoch: integer, signingAnchorDigest: digest, signingNativeHeadDigest: bytes(32), signingFloorDigest: bytes(32)}));
+	const maxExpiryByteLength = Math.max(record({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: bytes(expiry.byteLength),
+		detachedSignature: bytes(64)}).byteLength, record({kind: REPLACED_KIND, version: 1,
+		exactCanonicalReceiptBytes: bytes(replaced.byteLength), detachedSignature: bytes(64)}).byteLength);
 	const varuintWidth = (value: number): number => { let width = 1; while (value >= 128) { value = Math.floor(value / 128); width++; } return width; };
 	const emptyParameters = encodeCanonical({kind: KIND, version: 1, ...anchor, aclBytes: exactCanonicalAclBytes,
 		parametersBytes: new Uint8Array()}).byteLength;
+	// The last-member frontier a removing close may persist once: exactly the record this epoch's member
+	// install authenticated (registered below), so its exact width; none when this epoch has none.
+	const maxMemberFrontierByteLength = creatorMemberFrontierWidth(trust);
 	return Object.freeze({maxContextByteLength: emptyParameters + MAX_PARAMETERS + varuintWidth(MAX_PARAMETERS) - 1,
-		maxCompletionByteLength, maxCompletionMemberByteLength, maxExpiryByteLength, maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+		maxCompletionByteLength, maxCompletionMemberByteLength, maxExpiryByteLength, ...(maxMemberFrontierByteLength === undefined ? {} : {maxMemberFrontierByteLength}),
+		maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes,
+		// Rule B (issuance-image-capacity.qnt): a plan write for a close adds entries only for own rows
+		// signed in that closed epoch, and the plane of epoch E exists only after the close of E-1 was
+		// applied (retainCreatorAcceptedSourceCustody runs inside that transition). So only rows of the
+		// current epoch or later can still become new sources.
+		minSourceEpoch: trust.currentEpoch});
 }
 
 /** Historical authority only: no inclusion, noninclusion, current Writer grant or native currency. */
@@ -143,9 +191,12 @@ export function openCreatorSourceCustody(input: Readonly<{
 			Array.from(hashDomain("ts-drp/parameters/v3", decoded.parametersBytes), value => value.toString(16).padStart(2, "0")).join("") !==
 				anchor.parametersDigest) return undefined;
 		const parameters = decodeCanonical(decoded.parametersBytes);
-		if (!isClosedDurableIssuanceRecord(parameters, registry.kinds.parameters.fields
+		const hasExtension = parameters !== null && typeof parameters === "object" && Object.hasOwn(parameters, ROOM_APPLICATION_STATE_LIMIT_PARAMETER);
+		if (!isClosedDurableIssuanceRecord(parameters, [...registry.kinds.parameters.fields
 			.filter(field => field.required || parameters !== null && typeof parameters === "object" && Object.hasOwn(parameters, field.name))
-			.map(field => field.name)) ||
+			.map(field => field.name), ...(hasExtension ? [ROOM_APPLICATION_STATE_LIMIT_PARAMETER] : [])]) ||
+			// The record's one registered extension, judged by its owner: absent, or a limit in [default, ceiling].
+			roomApplicationStateLimit(parameters) === undefined ||
 			registry.kinds.parameters.fields.some(field => (field.required || Object.hasOwn(parameters, field.name)) &&
 				(!Number.isSafeInteger(parameters[field.name]) || Number(parameters[field.name]) < field.constraints.minimum ||
 					Number(parameters[field.name]) > field.constraints.maximum))) return undefined;
@@ -181,6 +232,27 @@ export function captureCreatorSourceContext(trust: CurrentAnchorTrust, exactCano
 	const identity = capability === undefined ? undefined : resolveCreatorSourceCustody(capability);
 	if (identity === undefined) throw new TypeError("creator source context is not authenticated");
 	return identity.context;
+}
+
+/**
+ * Opens a settlement source-authority record's bytes (SettlementSourceAuthority): exactly one creator
+ * source context of a closed source epoch, re-authenticated here on every use (G5) against the plane's
+ * current trust: its anchor by the fixed creator signer, its ACL by that anchor's aclDigest.
+ * @param currentTrust - The plane's authenticated current trust.
+ * @param exactCanonicalAuthorityBytes - The record's exact bytes.
+ * @param expectedBlueprintDigest - The plane's blueprint (the record's source must share it).
+ * @returns The source epoch's trust and ACL, and the bytes as that epoch's source context (custody of an
+ * unresolved row of that epoch takes it, as captureCreatorSourceContext would), or undefined.
+ */
+export function openCreatorSourceAuthority(currentTrust: CurrentAnchorTrust, exactCanonicalAuthorityBytes: Uint8Array,
+	expectedBlueprintDigest: string): Readonly<{trust: CurrentAnchorTrust; acl: LatchedAclSnapshot;
+		context: SettlementSourceContext}> | undefined {
+	if (!(exactCanonicalAuthorityBytes instanceof Uint8Array)) return undefined;
+	const capability = openCreatorSourceCustody({currentTrust, expectedBlueprintDigest, context: {
+		digest: hashDomain(DOMAIN, exactCanonicalAuthorityBytes), exactCanonicalContextBytes: exactCanonicalAuthorityBytes}});
+	const identity = capability === undefined ? undefined : verified.get(capability);
+	return identity === undefined ? undefined : Object.freeze({trust: identity.trust, acl: identity.acl, context: Object.freeze({
+		digest: new Uint8Array(identity.context.digest), exactCanonicalContextBytes: new Uint8Array(identity.context.exactCanonicalContextBytes)})});
 }
 
 /** Exact inclusion is immutable historical DATA. It grants no current role,
@@ -243,6 +315,45 @@ export function captureCreatorSourceExpiry(exactCanonicalReceiptBytes: Uint8Arra
 	const bytes = encodeCanonical({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: new Uint8Array(exactCanonicalReceiptBytes),
 		detachedSignature: new Uint8Array(detachedSignature)}, expiryLimits);
 	return {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
+}
+
+/** Wraps the exact signed replaced-source receipt as one plan context (no authority). */
+export function captureCreatorReplacedSourceResolution(exactCanonicalReceiptBytes: Uint8Array, detachedSignature: Uint8Array): SettlementSourceContext {
+	if (!(exactCanonicalReceiptBytes instanceof Uint8Array) || !(detachedSignature instanceof Uint8Array) || detachedSignature.byteLength !== 64)
+		throw new TypeError("creator replaced source carrier is invalid");
+	const bytes = encodeCanonical({kind: REPLACED_KIND, version: 1, exactCanonicalReceiptBytes: new Uint8Array(exactCanonicalReceiptBytes),
+		detachedSignature: new Uint8Array(detachedSignature)}, expiryLimits);
+	return {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
+}
+
+/**
+ * Exact signed replaced-source frontier resolution of one completed plan entry: the carrier, the source
+ * author's signature, the receipt's internal frontier statement, and its binding to this room, this
+ * author's entry (source sequence and digest, replacement) and an epoch no later than the current one.
+ * DATA only: the installed frontier's monotone consistency is the native resolver's check.
+ * @param context - The retained receipt context.
+ * @param expected - The room, the plan entry and the current epoch.
+ * @param windowEpochs - The settlement window.
+ * @returns The receipt, or undefined.
+ */
+export function openCreatorReplacedSourceResolution(context: SettlementSourceContext, expected: Readonly<{objectId: string;
+	pinnedGenesisAnchorDigest: string; sourceAuthor: string; sourceSequence: number; sourceDigest: Uint8Array;
+	replacementSequence: number; currentEpoch: number}>, windowEpochs: number): CreatorReplacedSourceReceipt | undefined {
+	try {
+		const bytes = new Uint8Array(context.exactCanonicalContextBytes);
+		if (!(context.digest instanceof Uint8Array) || compareBytes(hashDomain(DOMAIN, bytes), context.digest) !== 0) return undefined;
+		const value = decodeCanonical(bytes, expiryLimits);
+		if (!isClosedDurableIssuanceRecord(value, ["kind", "version", "exactCanonicalReceiptBytes", "detachedSignature"]) ||
+			value.kind !== REPLACED_KIND || value.version !== 1 || !(value.exactCanonicalReceiptBytes instanceof Uint8Array) ||
+			!(value.detachedSignature instanceof Uint8Array) || value.detachedSignature.byteLength !== 64 ||
+			compareBytes(bytes, encodeCanonical(value, expiryLimits)) !== 0) return undefined;
+		const receipt = verifyCreatorReplacedSourceReceipt(value.exactCanonicalReceiptBytes, value.detachedSignature, windowEpochs);
+		if (receipt === undefined || receipt.objectId !== expected.objectId || receipt.pinnedGenesisAnchorDigest !== expected.pinnedGenesisAnchorDigest ||
+			receipt.sourceAuthor !== expected.sourceAuthor || receipt.sourceSequence !== expected.sourceSequence ||
+			!(expected.sourceDigest instanceof Uint8Array) || compareBytes(receipt.sourceDigest, expected.sourceDigest) !== 0 ||
+			receipt.replacementSequence !== expected.replacementSequence || receipt.signingEpoch > expected.currentEpoch) return undefined;
+		return receipt;
+	} catch { return undefined; }
 }
 
 /** Exact signed local-author abandonment of one retained source. Historical

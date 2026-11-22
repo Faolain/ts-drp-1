@@ -21,8 +21,11 @@ import {
 	D108E5_BROWSER_BEHAVIORS,
 	d108e5SourceOwnership,
 	isD108d2Authority,
+	LEGACY_DIRECT_ROOM_PROFILE_ID,
+	PRODUCT_ROOM_PROFILE_ID,
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
 import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
+import { V3_CHAT_GENESIS_PROFILE } from "../examples/v3-chat/src/profile.js";
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
@@ -139,7 +142,7 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 			genesisAnchorDigest: "c".repeat(64),
 			lifecycle: "active",
 			objectId: "d108d2-object",
-			profileId: "creator-trusted-v1",
+			profileId: PRODUCT_ROOM_PROFILE_ID,
 		});
 		expect(D108D2_AUTHORITY_KEYS).toEqual([
 			"aclDigest",
@@ -150,10 +153,19 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 			"objectId",
 			"profileId",
 		]);
-		expect(isD108d2Authority(authority)).toBe(true);
-		expect(isD108d2Authority({ ...authority, epoch: 0 })).toBe(false);
-		expect(isD108d2Authority({ ...authority, capability: {} })).toBe(false);
-		expect(isD108d2Authority(null)).toBe(false);
+		expect(isD108d2Authority(authority, PRODUCT_ROOM_PROFILE_ID)).toBe(true);
+		expect(isD108d2Authority({ ...authority, epoch: 0 }, PRODUCT_ROOM_PROFILE_ID)).toBe(false);
+		expect(isD108d2Authority({ ...authority, capability: {} }, PRODUCT_ROOM_PROFILE_ID)).toBe(false);
+		expect(isD108d2Authority(null, PRODUCT_ROOM_PROFILE_ID)).toBe(false);
+		// Each room is checked against the profile its own genesis signed: the product room signs the
+		// v3-chat demo's export, the legacy direct room creator-trusted-v1; neither passes as the other.
+		expect(PRODUCT_ROOM_PROFILE_ID).toBe(V3_CHAT_GENESIS_PROFILE.profileId);
+		expect(LEGACY_DIRECT_ROOM_PROFILE_ID).toBe("creator-trusted-v1");
+		expect(PRODUCT_ROOM_PROFILE_ID).not.toBe(LEGACY_DIRECT_ROOM_PROFILE_ID);
+		expect(isD108d2Authority(authority, LEGACY_DIRECT_ROOM_PROFILE_ID)).toBe(false);
+		expect(
+			isD108d2Authority({ ...authority, profileId: LEGACY_DIRECT_ROOM_PROFILE_ID }, LEGACY_DIRECT_ROOM_PROFILE_ID)
+		).toBe(true);
 	});
 
 	it("keeps node-root and chat authority closed while assigning the room as sole node consumer", () => {

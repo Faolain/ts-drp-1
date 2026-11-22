@@ -17,6 +17,7 @@
 		"@ts-drp/example-browser-network": "workspace:*",
 		"@ts-drp/example-v3-room": "workspace:*",
 		"@ts-drp/node": "0.11.0",
+		"@ts-drp/room-worker": "workspace:*",
 		"@ts-drp/types": "0.11.0"
 	},
 	"devDependencies": {

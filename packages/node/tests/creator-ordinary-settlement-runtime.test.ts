@@ -3,6 +3,8 @@ import * as canonical from "@ts-drp/canonical";
 import {copySettlementPlan, settlementReplacementLastLogicalTimeFromPreimage} from "../../issuance-store/src/contract.js";
 import * as contract from "../../issuance-store/src/contract.js";
 import * as issuanceTypes from "../../issuance-store/src/types.js";
+import * as preimageHeader from "../../issuance-store/src/preimage-header.js";
+import * as verifiedOnce from "../../issuance-store/src/verified-once.js";
 import {captureIssuanceNativeSignInput, issuanceUnsignedSuccessorFenceRevisionDeltas,
 	issuanceUnsignedSuccessorFenceWidths} from "../../issuance-store/src/retirement.js";
 import {readCreatorOrdinaryPreimageCapacityForSizing} from "../src/internal/creator-closed-rollback-data.js";
@@ -164,7 +166,12 @@ describe("same-owner V1 ordinary settlement scalar preparation", () => {
 		const oracleSource=(file.slice(0,start)+old+file.slice(end)).replace("const controlRevisionDelta = revisionDeltas[phase];",
 			"const controlRevisionDelta = beforeFenceDelta + (phase === 'reserved' ? 1 : phase === 'entered' ? 2 : 3);");
 		const compiled=ts.transpileModule(oracleSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
-		const exports:any={};new Function("exports","require",compiled)(exports,(name:string)=>name==="@ts-drp/canonical"?canonical:name==="./contract.js"?contract:issuanceTypes);
+		// 8d5fdaf5: retirement.ts also imports ./preimage-header.js and ./verified-once.js;
+		// the oracle resolves them to the genuine modules (unknown modules refuse).
+		const modules:Record<string,unknown>={"@ts-drp/canonical":canonical,"./contract.js":contract,"./types.js":issuanceTypes,
+			"./preimage-header.js":preimageHeader,"./verified-once.js":verifiedOnce};
+		const exports:any={};new Function("exports","require",compiled)(exports,(name:string)=>{
+			if(!Object.hasOwn(modules,name))throw Error(`oracle module unavailable:${name}`);return modules[name];});
 		for(const sequence of [0,127,128]) for(const received of [false,true]) {
 			const bytes=preimage(sequence),digest=hashDomain("ts-drp/vertex/v3",bytes),plan={scope,revision:0,fenceSequence:null,entries:[]},
 				rows={lineages:[{...scope,next:sequence+Number(received),exhausted:false,prunedThroughAuthorSequence:sequence===0?null:sequence-1}],

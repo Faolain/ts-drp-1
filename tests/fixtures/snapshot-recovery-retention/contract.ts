@@ -290,6 +290,99 @@ export async function runTemporaryAdmissionCase(
 	}
 }
 
+export const ORPHANED_CLOSE_SCOPE_CASES = ["open", "verified", "retained"] as const;
+export type OrphanedCloseScopeCase = (typeof ORPHANED_CLOSE_SCOPE_CASES)[number];
+
+/**
+ * A creator's close of epoch 2 dies right after its own snapshot scope write:
+ * the scope is opened (temporary), verified, or retained for recovery, beside
+ * the adopted epoch-1 recovery scope and another room's epoch-2 scope. The owner
+ * closes with no release, cancel or sweep (process death), then reopens. The
+ * reopened owner's retirement admission image must still list the orphaned
+ * scope with its exact incarnation: a creator reopen reads its interrupted close
+ * there (a scope of this room at or above the current epoch).
+ * @param name Which committed close-scope write the death followed.
+ * @param env Existing native fixture environment.
+ * @returns Native observations for the scenario.
+ */
+export async function runOrphanedCloseScopeCase(
+	name: OrphanedCloseScopeCase,
+	env: RetentionEnvironment
+): Promise<unknown> {
+	const objectId = "orphaned-close-scope";
+	type Listed = { objectId: string; epoch: number; manifestDigest: string; incarnation: string };
+	const admissionImage = async (store: Awaited<ReturnType<RetentionEnvironment["open"]>>): Promise<Listed[]> => {
+		const read = (store as unknown as SnapshotRecoveryStore<SnapshotVerificationReceipt>).readRetirementAdmissionImage;
+		if (read === undefined) throw new Error("native retirement admission image port absent");
+		return (await read({ objectId })).image.scopes.map((pair) => ({
+			objectId: pair.scope.objectId,
+			epoch: pair.scope.epoch,
+			manifestDigest: pair.scope.manifestDigest,
+			incarnation: pair.incarnation,
+		}));
+	};
+	const interruptedAt = (listed: readonly { objectId: string; epoch: number }[], epoch: number): boolean =>
+		listed.some((entry) => entry.objectId === objectId && entry.epoch >= epoch);
+	let store = await env.open();
+	try {
+		const adopted = createSnapshotQuarantineFixture({ objectId, epoch: 1, chunks: [Uint8Array.of(1)] });
+		const adoptedScope = await store.openScope(adopted.declaration);
+		await adoptedScope.complete(await receiptFor(adoptedScope, adopted));
+		await adoptedScope.retainForRecovery();
+		const neighbor = createSnapshotQuarantineFixture({
+			objectId: `${objectId}-neighbor`,
+			epoch: 2,
+			chunks: [Uint8Array.of(2)],
+		});
+		await store.openScope(neighbor.declaration);
+		const before = await admissionImage(store);
+		const closing = createSnapshotQuarantineFixture({ objectId, epoch: 2, chunks: [Uint8Array.of(3)] });
+		const closeScope = await store.openScope(closing.declaration);
+		if (name !== "open") await closeScope.complete(await receiptFor(closeScope, closing));
+		if (name === "retained") await closeScope.retainForRecovery();
+		const atDeath = await admissionImage(store);
+		await store.close();
+		store = await env.open();
+		const reopened = await admissionImage(store);
+		const orphan = (listed: readonly Listed[]): Listed[] =>
+			listed.filter((entry) => entry.epoch === 2 && entry.manifestDigest === closing.declaration.scope.manifestDigest);
+		return {
+			epochsBefore: before.map((entry) => entry.epoch),
+			epochsReopened: reopened.map((entry) => entry.epoch),
+			orphanListedAtDeath: orphan(atDeath).length,
+			orphanListedReopened: orphan(reopened).length,
+			sameIncarnation: JSON.stringify(orphan(atDeath)) === JSON.stringify(orphan(reopened)),
+			otherRoomListed: reopened.some((entry) => entry.objectId !== objectId),
+			interruptedBefore: interruptedAt(before, 2),
+			interruptedReopened: interruptedAt(reopened, 2),
+			interruptedAtNextEpoch: interruptedAt(reopened, 3),
+			recoveryScopes: (await store.recoveryStatus()).recoveryScopes,
+		};
+	} finally {
+		await store.close();
+	}
+}
+
+/**
+ * Expected observations: the orphaned scope survives the death in the image.
+ * @param name Which committed close-scope write the death followed.
+ * @returns Exact expected observations.
+ */
+export function expectedOrphanedCloseScopeCase(name: OrphanedCloseScopeCase): unknown {
+	return {
+		epochsBefore: [1],
+		epochsReopened: [1, 2],
+		orphanListedAtDeath: 1,
+		orphanListedReopened: 1,
+		sameIncarnation: true,
+		otherRoomListed: false,
+		interruptedBefore: false,
+		interruptedReopened: true,
+		interruptedAtNextEpoch: false,
+		recoveryScopes: name === "retained" ? 2 : 1,
+	};
+}
+
 /**
  * Expected native observations under the approved aggregate temporary policy.
  * @param name Focused admission scenario.

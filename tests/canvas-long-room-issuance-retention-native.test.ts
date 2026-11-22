@@ -187,6 +187,7 @@ async function canvasLongRoomFixture() {
 	});
 	const host = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
 	// A persisted reopen recreates the owner over the SAME databases and external floor.
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (index: number, options: { reopen?: boolean } = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
@@ -242,6 +243,14 @@ async function canvasLongRoomFixture() {
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. This
+		// harness has no successor delivery, so it hands over the creator's statement as the delivery
+		// does on bind.
+		if (index === 0) creatorRoom = room;
+		else if (options.reopen === true && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		// Delivers authenticated signed rows of the other peer in issue order; the final row's
 		// application acceptance joins the delivery.
 		const receive = async (rows: readonly DurableIssuanceOutboxRecord[], sender: number) => {

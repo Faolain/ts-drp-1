@@ -166,6 +166,14 @@ export interface RoleEndpoint {
 	/** Recipient: installs the offered successor (material through the environment relay). */
 	install(offer: WireOffer): Promise<number>;
 	authorityEpoch(): Promise<number | null>;
+	/**
+	 * Decision B (sync before sending): the creator's currency statement (its epoch, anchor and
+	 * admitted frontiers), or null where the room has none. A harness that passes offers by hand
+	 * also hands this statement to a reopened Writer, as the pages' successor delivery does.
+	 */
+	currencyStatement?(): Promise<unknown>;
+	/** Decision B: a reopened Writer confirms the creator's statement; returns the room's verdict. */
+	confirmCurrent?(statement: unknown): Promise<string>;
 	/** `maintainRecoveryPool()`: wall time and result kind. */
 	lull(): Promise<Readonly<{ ms: number; kind: string }>>;
 	/** Creator: `maintainRecoveryPool()` with `rows` delivered and one local move (`ordinal`)
@@ -373,6 +381,11 @@ export async function driveLongRoom(
 				if (hooks.reopen === undefined) throw new TypeError("CANVAS_CHAT_LULL_REOPEN_UNSUPPORTED");
 				const started = now();
 				[creator, recipient] = await hooks.reopen();
+				// Decision B: the reopened Writer signs nothing until it is current; this harness passes
+				// offers by hand, so it also hands over the creator's statement (as the page delivery does).
+				const verdict = await recipient.confirmCurrent?.(await creator.currencyStatement?.());
+				if (verdict !== undefined && verdict !== "current" && verdict !== "unsupported")
+					throw new TypeError(`CANVAS_CHAT_LULL_REOPEN_NOT_CURRENT ${label} ${verdict}`);
 				const ms = now() - started;
 				const [left, right] = await Promise.all([creator.state(), recipient.state()]);
 				const authorityAfter = await recipient.authorityEpoch();

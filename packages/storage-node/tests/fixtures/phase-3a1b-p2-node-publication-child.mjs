@@ -42,6 +42,11 @@ async function run() {
 	if (tuple.scenario === "already-published") {
 		await store.close();
 		const database = new DatabaseSync(`${primaryFilename}.drp-issuance-v1.sqlite`);
+		// Out-of-band setup: ea4eb158 fences every issuance table behind connection-local
+		// predicates; this raw fixture connection admits its own writes only (as
+		// ./out-of-band-sqlite.ts does for TypeScript tests).
+		database.function("issuance_retirement_connection", { varargs: true }, () => 1);
+		database.function("issuance_retirement_record", { varargs: true }, () => 1);
 		database
 			.prepare(
 				"UPDATE issuance_outbox SET publish_state='published' WHERE object_id=? AND author=? AND author_sequence=?"

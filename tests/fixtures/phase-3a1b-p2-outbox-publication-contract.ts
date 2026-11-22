@@ -25,17 +25,25 @@ export const PHASE_3A1B_P2_METHODS = Object.freeze([
 	"readOutboxPage",
 	"readSettlementPlan",
 	"transactIssue",
+	// The batched issuance of a settlement drain chunk (perf/settlement-batch-transaction).
+	"transactIssueBatch",
 	"transactWriteSettlementPlan",
 ] as const);
 
+// ea4eb158: each lineage point read is preceded by its pending_unsigned size probe, and the
+// writer re-reads the lineage (retirement-row check) before its one outbox UPDATE.
 export const PHASE_3A1B_P2_NODE_TRACE = Object.freeze([
 	"begin-immediate",
+	"lineage-size",
 	"lineage-select",
 	"issued-read",
 	"outbox-read",
+	"lineage-size",
+	"lineage-select",
 	"outbox-update",
 	"mutation-commit",
 	"readonly-begin",
+	"lineage-size",
 	"lineage-select",
 	"issued-read",
 	"outbox-read",

@@ -1,5 +1,7 @@
 import {
 	advanceJournalRetirementMutationControl,
+	type AppendAcceptedLocalBatchInput,
+	type AppendAcceptedLocalBatchResult,
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
 	captureJournalRetirementObject,
@@ -15,6 +17,8 @@ import {
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
 	captureSourceBoundJournalAppendInput,
+	captureLocalBatchJournalAppendInput,
+	classifyLiveJournalBatchAppendObservation,
 	classifyLiveJournalMutationObservation,
 	createJournalRetirementControlCodec,
 	createJournalRetirementImageCapture,
@@ -61,6 +65,9 @@ import {
 	type LiveJournalSignedAnchorReadResult,
 	type LiveJournalSnapshotToken,
 	reconstructJournalRetirementDrainSource,
+	createJournalRetirementDrainSourceMemo,
+	type JournalRetirementDrainItem,
+	journalResidualImageDebug,
 } from "@ts-drp/live-journal";
 import { compareBytes, encodeCanonical } from "@ts-drp/canonical";
 import type { NativeReadReservation } from "@ts-drp/storage";
@@ -69,11 +76,30 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { SqliteNativeReadReservationOwner } from "./internal/native-read-reservation.js";
 import { iterateSqliteRows } from "./internal/sqlite-iterator.js";
-import { journalImageRowKey, journalImageRowMatches, type JournalImageRowKey, journalRetirementImageMemo } from "./internal/journal-image-memo.js";
+import {
+	beginJournalTransaction,
+	journalConnectionCurrency,
+	type JournalImageCurrency,
+	type JournalImageEntry,
+	journalImageCurrency,
+	JournalRetirementImageMemo,
+	journalImageRowKey,
+	journalImageRowMatches,
+	type JournalImageRowKey,
+	journalRetirementImageMemo,
+} from "./internal/journal-image-memo.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
+import {
+	countResidualCrossCheck,
+	deriveResidual,
+	drainValidated,
+	extendsDrainValidation,
+	rememberDrainValidated,
+} from "./internal/journal-residual-image.js";
+export { journalResidualImageCounts, type JournalResidualImageCounts } from "./internal/journal-residual-image.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import type { NodeNativeReadPort } from "./index.js";
-import { configuredStatement } from "./internal/sqlite-statement-cache.js";
+import { configuredStatement, iterationStatement } from "./internal/sqlite-statement-cache.js";
 
 export interface NodeDurableLiveJournalStoreOptions {
 	readonly primaryFilename: string;
@@ -205,10 +231,9 @@ function captureOptions(value: unknown): { primaryFilename: string; initializati
 	}
 }
 
+/** A readBigInts=false statement for one iterateSqliteRows iteration (exclusively checked out). */
 function statement(database: DatabaseSync, sql: string): StatementSync {
-	const result = database.prepare(sql);
-	result.setReadBigInts(false);
-	return result;
+	return iterationStatement(database, sql);
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
@@ -350,10 +375,14 @@ function readRetirementNativeCarriers(
 	if (row.has_plan === 1 && row.plan_record === null) throw new Error("store-poisoned");
 	return {record: row.record, planRecord: row.plan_record === null ? undefined : row.plan_record};
 }
+/**
+ * @param read - When defined, receives the exact plan carrier bytes the returned control's plan was decoded from.
+ */
 function readRetirementControl(
 	database: DatabaseSync,
 	objectId: string,
-	codec?: ReturnType<typeof createJournalRetirementControlCodec>
+	codec?: ReturnType<typeof createJournalRetirementControlCodec>,
+	read?: { planBytes?: Uint8Array }
 ): LiveJournalRetirementControl | null {
 	const row = readRetirementNativeCarriers(database, objectId);
 	if (row === undefined) {codec?.clear(); return null;}
@@ -362,6 +391,7 @@ function readRetirementControl(
 		row.planRecord
 	);
 	if (control.objectId !== objectId) throw new Error("store-poisoned");
+	if (read !== undefined && row.planRecord instanceof Uint8Array) read.planBytes = row.planRecord;
 	return control;
 }
 function writeRetirementControl(database: DatabaseSync, value: LiveJournalRetirementControl): void {
@@ -391,15 +421,49 @@ function sameRetirementNativeCarriers(
 			: sameBytes(a.planBytes, b.planBytes))
 	);
 }
+type JournalMembershipWrite = Readonly<{
+	scope: LiveJournalScope;
+	bytes: Uint8Array;
+	clearScopes: readonly LiveJournalScope[];
+}>;
 function retirementImage(
 	database: DatabaseSync,
 	objectId: string,
 	frames?: Uint8Array[],
-	membershipWrite?: Readonly<{
-		scope: LiveJournalScope;
-		bytes: Uint8Array;
-		clearScopes: readonly LiveJournalScope[];
-	}>
+	membershipWrite?: JournalMembershipWrite
+): LiveJournalRetirementImage {
+	// Read first: it fixes the transaction's snapshot that every row below is read from.
+	const currency = membershipWrite === undefined ? journalImageCurrency(database) : undefined,
+		memo = journalRetirementImageMemo(database);
+	const unchanged = memo.unchanged(objectId, frames !== undefined, currency);
+	if (unchanged !== undefined) {
+		if (frames !== undefined) for (const frame of unchanged.frames!) frames.push(frame.slice());
+		return unchanged.image;
+	}
+	if (frames !== undefined) return captureRetirementImage(database, objectId, memo, currency, frames, true, membershipWrite);
+	// A frameless capture also keeps its rows' frames for a later point read of the same rows (which
+	// would otherwise capture and hash every row again). Frames add only their own byte ceiling: a
+	// capture refused there is redone exactly as a frameless capture, so it charges and refuses as before.
+	try {
+		return captureRetirementImage(database, objectId, memo, currency, [], false, membershipWrite);
+	} catch (error) {
+		if (!(error instanceof Error) || error.message !== "retirement-fenced") throw error;
+		return captureRetirementImage(database, objectId, memo, currency, undefined, false, membershipWrite);
+	}
+}
+/**
+ * One scan and capture of the object's native rows (see retirementImage).
+ * @param frames - Receives the rows' frames, when defined: the caller's, or a private array only the memo keeps.
+ * @param framesRequested - Whether the caller requested the frames (a remembered capture must then have them).
+ */
+function captureRetirementImage(
+	database: DatabaseSync,
+	objectId: string,
+	memo: ReturnType<typeof journalRetirementImageMemo>,
+	currency: JournalImageCurrency | undefined,
+	frames: Uint8Array[] | undefined,
+	framesRequested: boolean,
+	membershipWrite: JournalMembershipWrite | undefined
 ): LiveJournalRetirementImage {
 	const count = (table: string): number => {
 		const row = configuredStatement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId);
@@ -420,8 +484,7 @@ function retirementImage(
 	// scanned row matches it exactly and in order. Matched rows wait, bounded by
 	// that already-charged image, and are captured in their original order as
 	// soon as any row differs, so a changed image is charged exactly as before.
-	const memo = journalRetirementImageMemo(database),
-		known = memo.candidate(objectId, frames !== undefined),
+	const known = memo.candidate(objectId, framesRequested),
 		firstFrame = frames?.length ?? 0,
 		keys: JournalImageRowKey[] = [],
 		deferred: [table: "scopes" | "accepted_entries", row: Record<string, unknown>, key: unknown[] | undefined][] = [];
@@ -503,13 +566,13 @@ function retirementImage(
 		collect("scopes");
 		collect("accepted_entries");
 		if (matching && keys.length === known!.rows.length) {
-			memo.touch(objectId);
-			if (frames !== undefined) for (const frame of known!.frames!) frames.push(frame.slice());
+			memo.touch(objectId, currency);
+			if (framesRequested) for (const frame of known!.frames!) frames!.push(frame.slice());
 			return known!.image;
 		}
 		if (matching) diverge();
 		const image = capture.finish();
-		if (keyable) memo.remember(objectId, keys, image, frames?.slice(firstFrame));
+		if (keyable) memo.remember(objectId, keys, image, frames?.slice(firstFrame), currency);
 		return image;
 	} finally { capture.release(); }
 }
@@ -556,9 +619,90 @@ function retirementFrame(selected: JournalRetirementDrainRow): Uint8Array {
 	});
 }
 
-function validateDrainNativeRows(database: DatabaseSync, control: LiveJournalRetirementControl): void {
+/**
+ * Inside the drain CAS, after its exact deletions (see internal/journal-residual-image.ts): the residual
+ * entry derived from the verified entry, remembered for the rows now visible to this transaction (no
+ * currency: the rows are uncommitted). Debug mode also captures the residual in full and refuses a divergence.
+ * @returns The remembered residual entry, or undefined when it cannot be derived (the caller captures in full).
+ */
+function deriveResidualEntry(
+	database: DatabaseSync,
+	objectId: string,
+	verified: Readonly<JournalImageEntry>,
+	deletions: readonly JournalRetirementDrainItem[]
+): Readonly<JournalImageEntry> | undefined {
+	const derived = deriveResidual(verified, deletions);
+	if (derived === undefined) return undefined;
+	if (journalResidualImageDebug()) {
+		const frames: Uint8Array[] = [];
+		const full = captureRetirementImage(database, objectId, new JournalRetirementImageMemo(1, Number.MAX_SAFE_INTEGER),
+			undefined, frames, true, undefined);
+		if (full.imageDigest !== derived.image.imageDigest || full.scopeCount !== derived.image.scopeCount ||
+			full.rowCount !== derived.image.rowCount || full.byteCharge !== derived.image.byteCharge ||
+			frames.length !== derived.frames.length || frames.some((frame, index) => {
+				const kept = derived.frames[index];
+				return kept === undefined || !sameBytes(frame, kept);
+			}))
+			throw new Error("journal residual image diverged from a full native capture");
+		countResidualCrossCheck();
+	}
+	return journalRetirementImageMemo(database).remember(objectId, derived.rows, derived.image, derived.frames);
+}
+/**
+ * After the drain CAS commits: the committed rows are exactly the rows `verified` captured, so it answers
+ * later unchanged-database reads without a scan (journal-image-memo.ts). That holds when no other
+ * connection committed since the transaction began (data_version is unchanged: it moves on every other
+ * connection's commit and never on this connection's own), no DDL ran, and the only change after the rows
+ * were last verified is the one control carrier row (total_changes() moved by exactly 1 to `written`, and
+ * not again since the COMMIT). Under BEGIN IMMEDIATE no other writer could commit in between.
+ * @param verified - The entry verified for the transaction's rows at `proved`.
+ * @param opened - The currency at the transaction's start.
+ * @param proved - The currency when `verified` was last proved for the transaction's rows.
+ * @param written - The currency after the carrier write, before COMMIT.
+ */
+function adoptCommittedImage(
+	database: DatabaseSync,
+	objectId: string,
+	verified: Readonly<JournalImageEntry> | undefined,
+	opened: JournalImageCurrency | undefined,
+	proved: JournalImageCurrency | undefined,
+	written: JournalImageCurrency
+): void {
+	if (verified === undefined || opened === undefined || proved === undefined) return;
+	if (written.schemaVersion !== proved.schemaVersion || written.totalChanges - proved.totalChanges !== 1) return;
+	let committed: JournalImageCurrency;
+	try { committed = journalConnectionCurrency(database); } catch { return; }
+	if (committed.dataVersion !== opened.dataVersion || committed.schemaVersion !== opened.schemaVersion ||
+		committed.totalChanges !== written.totalChanges) return;
+	journalRetirementImageMemo(database).adopt(objectId, verified, committed);
+}
+/** The object's rows verified current in this transaction (an image memo entry), and the exact plan carrier bytes. */
+type DrainRowsProof = Readonly<{ entry: Readonly<JournalImageEntry>; planBytes: Uint8Array }>;
+/**
+ * The image memo entry that produced `image` in this transaction (its scan, match or unchanged answer), with frames.
+ * @returns The entry, or undefined when `image` did not come from a remembered entry with frames.
+ */
+function verifiedImageEntry(database: DatabaseSync, objectId: string, image: LiveJournalRetirementImage):
+	Readonly<JournalImageEntry> | undefined {
+	const entry = journalRetirementImageMemo(database).current(objectId);
+	return entry !== undefined && entry.image === image && entry.frames !== undefined ? entry : undefined;
+}
+function drainRowsProof(entry: Readonly<JournalImageEntry> | undefined, planBytes: Uint8Array | undefined): DrainRowsProof | undefined {
+	return entry === undefined || planBytes === undefined ? undefined : Object.freeze({ entry, planBytes });
+}
+/**
+ * Validates a drain's native rows against its plan at its cursor. With a proof, a validation already made
+ * for exactly that plan, cursor and verified rows answers without reading them again (see
+ * internal/journal-residual-image.ts); debug mode validates in full anyway.
+ */
+function validateDrainNativeRows(database: DatabaseSync, control: LiveJournalRetirementControl, proof?: DrainRowsProof): void {
 	const state = control.drain;
 	if (state == null) return;
+	if (proof !== undefined && drainValidated(database, proof.entry, proof.planBytes, state.cursor) && !journalResidualImageDebug()) return;
+	validateDrainNativeRowsInFull(database, state);
+	if (proof !== undefined) rememberDrainValidated(database, proof.entry, proof.planBytes, state.cursor);
+}
+function validateDrainNativeRowsInFull(database: DatabaseSync, state: NonNullable<LiveJournalRetirementControl["drain"]>): void {
 	let index = 0;
 	for (const prefix of state.plan.prefixes) {
 		const header = readScope(database, prefix.scope);
@@ -1002,7 +1146,7 @@ function readReplaySnapshotReadonly(
 }
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
-	return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
+	return left.byteLength === right.byteLength && compareBytes(left, right) === 0;
 }
 
 function sameInstalledScope(left: StoredScope, right: StoredScope): boolean {
@@ -1144,6 +1288,8 @@ export function createNodeDurableLiveJournalStore(
 	let retirementLeaseToken: object | undefined;
 	// One bounded detached image, valid only under this owner's exact native
 	// BEGIN IMMEDIATE reservation. It is never used by mutations or readback.
+	// The drain's original source, derived once per drain and reused while the residual frames match it exactly.
+	const drainSourceMemo = createJournalRetirementDrainSourceMemo();
 	let heldRetirementImage: Readonly<{
 		lease: NativeReadReservation;
 		objectId: string;
@@ -1345,7 +1491,7 @@ export function createNodeDurableLiveJournalStore(
 		let addressed = false;
 		let nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
 		try {
-			database.exec("BEGIN IMMEDIATE");
+			beginJournalTransaction(database, "BEGIN IMMEDIATE");
 			if (expectedNativeImage !== undefined) {
 				const image = retirementImage(database, candidate.scope.objectId),
 					control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
@@ -1558,7 +1704,7 @@ export function createNodeDurableLiveJournalStore(
 			if (nativeImage === undefined) return failed("internal-invariant");
 			let active = false;
 			try {
-				database.exec("BEGIN");
+				beginJournalTransaction(database, "BEGIN");
 				active = true;
 				const image = retirementImage(database, candidate.scope.objectId),
 					control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
@@ -1585,6 +1731,202 @@ export function createNodeDurableLiveJournalStore(
 			sourceKind: row.sourceKind,
 			...(nativeImage === undefined ? {} : { nativeImage }),
 			vertexDigest: row.vertexDigest,
+		});
+	};
+
+	// One drain chunk's freshly issued local rows in ONE BEGIN IMMEDIATE (each row appended exactly as its
+	// source-bound single would be: the same duplicate decision, sequence, fence admission and mutation
+	// advance), then ONE read of the header, the rows and the postimage. Whole or nothing.
+	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
+	const appendAcceptedLocalBatch = async (input: AppendAcceptedLocalBatchInput): Promise<AppendAcceptedLocalBatchResult> => {
+		verifiedReplay = undefined;
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let captured: ReturnType<typeof captureLocalBatchJournalAppendInput>;
+		try {
+			captured = captureLocalBatchJournalAppendInput(input);
+			if (!captured.ok) return failed(captured.kind);
+		} catch {
+			return failed("malformed-input");
+		}
+		const { scope: selected, rows: candidates, expectedNativeImage } = captured.value;
+		let before: StoredScope | undefined;
+		const appended: StoredRow[] = [];
+		let rejected: LiveJournalFailureKind | undefined;
+		let writeVersion: number | undefined;
+		let nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+		try {
+			beginJournalTransaction(database, "BEGIN IMMEDIATE");
+			const image = retirementImage(database, selected.objectId),
+				control = readRetirementControl(database, selected.objectId, retirementCodec);
+			if (
+				image.imageDigest !== expectedNativeImage.imageDigest ||
+				!sameNativeControl(control === null ? null : encodeJournalRetirementControl(control), expectedNativeImage.controlBytes)
+			) {
+				database.exec("ROLLBACK");
+				return failed("retirement-stale");
+			}
+			admitJournalMutation(database, selected);
+			const scope = readScopeWriter(database, selected);
+			writeVersion = dataVersion(database);
+			const addressed = scope !== null && matchesWatermark(scope, writeVersion);
+			const storedRows = scope === null || !addressed ? readRows(database, selected) : undefined;
+			if (scope === null) {
+				invalidateWatermark(selected);
+				if (storedRows?.length !== 0) rejected = "store-poisoned";
+				else
+					rejected =
+						configuredStatement(database, "SELECT 1 AS present FROM main.scopes WHERE object_id=? AND epoch=? LIMIT 1").get(
+							selected.objectId,
+							selected.epoch
+						) === undefined
+							? "not-installed"
+							: "wrong-scope";
+			} else if (!addressed && captureAddressedClosure({ rows: storedRows ?? [], scope }, snapshotValidation) === undefined)
+				rejected = "store-poisoned";
+			else {
+				before = scope;
+				for (const candidate of candidates) {
+					const digestRow = addressed
+						? readRowByDigest(database, selected, candidate.vertexDigest)
+						: storedRows?.find(({ vertexDigest }) => vertexDigest === candidate.vertexDigest);
+					const referenceRow = addressed
+						? readRowByLocalReference(database, selected, candidate.author, candidate.authorSequence)
+						: storedRows?.find(
+								(item) =>
+									item.sourceKind === "local-issued" &&
+									item.author === candidate.author &&
+									item.authorSequence === candidate.authorSequence
+							);
+					const decision = decideLiveJournalDuplicate({
+						candidate,
+						digestRow: existingProbe(digestRow),
+						referenceRow: existingProbe(referenceRow),
+					} as never) as Readonly<Record<string, unknown>>;
+					if (decision.action !== "append") {
+						rejected = "evidence-conflict";
+						break;
+					}
+				}
+				for (let index = 0; rejected === undefined && index < candidates.length; index++) {
+					const candidate = candidates[index]!;
+					const retirement = admitJournalMutation(database, selected);
+					const journalSequence = scope.nextJournalSequence + index;
+					database.exec(
+						`INSERT INTO accepted_entries(object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence) VALUES(${sqlText(selected.objectId)},${selected.epoch},${sqlText(selected.anchorDigest)},${journalSequence},'local-issued',${sqlText(candidate.vertexDigest)},NULL,NULL,${sqlText(candidate.author)},${candidate.authorSequence})`
+					);
+					const update = configuredStatement(
+						database,
+						"UPDATE scopes SET next_journal_sequence=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND next_journal_sequence=?"
+					).run(journalSequence + 1, ...scopeParameters(selected), journalSequence);
+					if (update.changes !== 1) rejected = "internal-invariant";
+					else {
+						advanceMutation(retirement);
+						appended.push({ ...candidate, journalSequence } as StoredRow);
+					}
+				}
+			}
+			if (rejected === undefined) {
+				const postimage = retirementImage(database, selected.objectId),
+					postControl = readRetirementControl(database, selected.objectId, retirementCodec);
+				nativeImage = Object.freeze({
+					imageDigest: postimage.imageDigest,
+					controlBytes: postControl === null ? null : encodeJournalRetirementControl(postControl),
+				});
+				database.exec("COMMIT");
+			} else database.exec("ROLLBACK");
+		} catch (error) {
+			try {
+				database.exec("ROLLBACK");
+			} catch {
+				// Preserve the substrate failure.
+			}
+			invalidateWatermark(selected);
+			return failed(
+				error instanceof Error && (error.message === "retirement-fenced" || error.message === "retirement-exhausted")
+					? error.message
+					: "substrate-failure"
+			);
+		}
+		if (rejected !== undefined) {
+			invalidateWatermark(selected);
+			let actual: DurableSnapshot | null | undefined;
+			try {
+				const observed = readVersionedSnapshotReadonly(database, selected);
+				actual = observed === UNSTABLE_VERSION ? undefined : observed.snapshot;
+			} catch {
+				actual = undefined;
+			}
+			if (rejected === "store-poisoned") poison();
+			if (actual === undefined && rejected !== "store-poisoned") return failed("outcome-unknown");
+			if (actual !== undefined && actual !== null && captureAddressedClosure(actual, snapshotValidation) === undefined) {
+				poison();
+				return failed("store-poisoned");
+			}
+			return failed(rejected);
+		}
+		if (before === undefined || nativeImage === undefined || appended.length !== candidates.length)
+			return failed("internal-invariant");
+		// The one readback: header, the batch's rows by sequence, and the postimage, in one snapshot.
+		let observed: Readonly<{ scope: StoredScope | null; rows: (StoredRow | null)[] }> | undefined;
+		let stableVersion: number | undefined;
+		let readImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+		let active = false;
+		try {
+			const versionBefore = dataVersion(database);
+			beginJournalTransaction(database, "BEGIN");
+			active = true;
+			const inside = dataVersion(database);
+			const storedScope = readScope(database, selected);
+			const rows = appended.map(({ journalSequence }) => readRowBySequence(database, selected, journalSequence));
+			const image = retirementImage(database, selected.objectId),
+				control = readRetirementControl(database, selected.objectId, retirementCodec);
+			database.exec("COMMIT");
+			active = false;
+			const versionAfter = dataVersion(database);
+			observed = { scope: storedScope, rows };
+			readImage = { imageDigest: image.imageDigest, controlBytes: control === null ? null : encodeJournalRetirementControl(control) };
+			if (versionBefore === inside && inside === versionAfter) stableVersion = versionAfter;
+		} catch {
+			if (active)
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					/* retain unknown debt */
+				}
+			observed = undefined;
+		}
+		let decision: unknown;
+		try {
+			decision = classifyLiveJournalBatchAppendObservation({ before, actual: observed, targets: appended });
+		} catch {
+			decision = "mixed";
+		}
+		if (decision !== "exact-new") {
+			invalidateWatermark(selected);
+			if (decision === "exact-old") return failed("substrate-failure");
+			if (decision === "unreadable") return failed("outcome-unknown");
+			poison();
+			return failed("store-poisoned");
+		}
+		if (
+			readImage === undefined ||
+			readImage.imageDigest !== nativeImage.imageDigest ||
+			!sameNativeControl(readImage.controlBytes, nativeImage.controlBytes)
+		) {
+			invalidateWatermark(selected);
+			return failed("outcome-unknown");
+		}
+		if (stableVersion !== undefined && stableVersion === writeVersion && observed?.scope != null)
+			establishWatermark(observed.scope, stableVersion);
+		else invalidateWatermark(selected);
+		return Object.freeze({
+			ok: true,
+			scope: Object.freeze({ ...selected }),
+			rows: Object.freeze(
+				appended.map((row) => Object.freeze({ journalSequence: row.journalSequence, vertexDigest: row.vertexDigest }))
+			),
+			nativeImage,
 		});
 	};
 
@@ -2107,6 +2449,8 @@ export function createNodeDurableLiveJournalStore(
 			}
 			const basis = heldRetirementImage;
 			let frames: Uint8Array[], image: LiveJournalRetirementImage, control: LiveJournalRetirementControl | null;
+			let verified: Readonly<JournalImageEntry> | undefined;
+			const carriers: { planBytes?: Uint8Array } = {};
 			if (basis !== undefined) {
 				frames = basis.frames.map(bytes => bytes.slice());
 				image = Object.freeze({...basis.image});
@@ -2114,14 +2458,16 @@ export function createNodeDurableLiveJournalStore(
 					retirementCodec.decode(basis.controlBytes.slice(), basis.planBytes?.slice());
 			} else {
 				frames = [];
-				database.exec("BEGIN");
+				beginJournalTransaction(database, "BEGIN");
 				active = true;
 				image = retirementImage(database, objectId, frames);
-				control = readRetirementControl(database, objectId, retirementCodec);
+				control = readRetirementControl(database, objectId, retirementCodec, carriers);
+				verified = verifiedImageEntry(database, objectId, image);
 			}
-			const drainSource = reconstructJournalRetirementDrainSource(control, image, frames, retirementFrame);
+			const drainSource = reconstructJournalRetirementDrainSource(control, image, frames, retirementFrame, drainSourceMemo, verified);
 			if (basis === undefined) {
-				if (drainSource !== undefined && control !== null) validateDrainNativeRows(database, control);
+				if (drainSource !== undefined && control !== null)
+					validateDrainNativeRows(database, control, drainRowsProof(verified, carriers.planBytes));
 				database.exec("COMMIT");
 				active = false;
 			}
@@ -2212,7 +2558,7 @@ export function createNodeDurableLiveJournalStore(
 				compareBytes(encodeCanonical(observation.image), encodeCanonical(basis.image)) !== 0) return undefined;
 			const control = basis.controlBytes === undefined ? null :
 					retirementCodec.decode(basis.controlBytes.slice(), basis.planBytes?.slice());
-			const drainSource = reconstructJournalRetirementDrainSource(control, basis.image, basis.frames, retirementFrame);
+			const drainSource = reconstructJournalRetirementDrainSource(control, basis.image, basis.frames, retirementFrame, drainSourceMemo);
 			if ((drainSource === undefined) !== (observation.drainSource === undefined) || drainSource !== undefined &&
 				compareBytes(encodeCanonical(drainSource), encodeCanonical(observation.drainSource)) !== 0) return undefined;
 		} catch { return undefined; }
@@ -2240,7 +2586,7 @@ export function createNodeDurableLiveJournalStore(
 		let active = false;
 		try {
 			// Fully join the native RO image before any control-birth RW attempt.
-			database.exec("BEGIN");
+			beginJournalTransaction(database, "BEGIN");
 			active = true;
 			image = retirementImage(database, objectId, frames);
 			if (image.scopeCount === 0) {
@@ -2248,9 +2594,12 @@ export function createNodeDurableLiveJournalStore(
 				active = false;
 				return failed("not-installed");
 			}
-			const prior = readRetirementControl(database, objectId, retirementCodec);
-			drainSource = reconstructJournalRetirementDrainSource(prior, image, frames, retirementFrame);
-			if (drainSource !== undefined && prior !== null) validateDrainNativeRows(database, prior);
+			const carriers: { planBytes?: Uint8Array } = {};
+			const prior = readRetirementControl(database, objectId, retirementCodec, carriers);
+			const verified = verifiedImageEntry(database, objectId, image);
+			drainSource = reconstructJournalRetirementDrainSource(prior, image, frames, retirementFrame, drainSourceMemo, verified);
+			if (drainSource !== undefined && prior !== null)
+				validateDrainNativeRows(database, prior, drainRowsProof(verified, carriers.planBytes));
 			database.exec("COMMIT");
 			active = false;
 			if (prior !== null) current = prior;
@@ -2323,10 +2672,15 @@ export function createNodeDurableLiveJournalStore(
 					if (blocked !== undefined) return blocked;
 					let active = false,
 						attempted = false;
+					// The rows verified current at the transaction's last row read (see adoptCommittedImage).
+					let verified: Readonly<JournalImageEntry> | undefined, opened: JournalImageCurrency | undefined,
+						proved: JournalImageCurrency | undefined;
 					try {
-						database.exec("BEGIN IMMEDIATE");
+						beginJournalTransaction(database, "BEGIN IMMEDIATE");
 						active = true;
-						const actual = readRetirementControl(database, objectId, retirementCodec),
+						opened = journalConnectionCurrency(database);
+						const carriers: { planBytes?: Uint8Array } = {};
+						const actual = readRetirementControl(database, objectId, retirementCodec, carriers),
 							nativeImage = retirementImage(database, objectId);
 						if (
 							actual === null ||
@@ -2337,8 +2691,11 @@ export function createNodeDurableLiveJournalStore(
 							active = false;
 							return failed("retirement-stale");
 						}
+						verified = verifiedImageEntry(database, objectId, nativeImage);
+						proved = journalConnectionCurrency(database);
 						if (deletions !== undefined && deletions.length > 0) {
-							validateDrainNativeRows(database, actual);
+							validateDrainNativeRows(database, actual, drainRowsProof(verified, carriers.planBytes));
+							const before = journalConnectionCurrency(database);
 							attempted = true;
 							for (const selected of deletions) {
 								try {
@@ -2360,17 +2717,33 @@ export function createNodeDurableLiveJournalStore(
 									deletingScope = undefined;
 								}
 							}
-							if (
-								next.drain == null ||
-								retirementImage(database, objectId).imageDigest !== next.drain.residualImageDigest
-							)
+							const after = journalConnectionCurrency(database), pre = verified;
+							// Exactly these rows changed (see internal/journal-residual-image.ts).
+							const exact = pre !== undefined && after.schemaVersion === before.schemaVersion &&
+								after.totalChanges - before.totalChanges === deletions.length;
+							const residual = exact ? deriveResidualEntry(database, objectId, pre, deletions) : undefined;
+							const residualImage = residual?.image ?? retirementImage(database, objectId);
+							if (next.drain == null || residualImage.imageDigest !== next.drain.residualImageDigest)
 								throw new Error("retirement-stale");
-							validateDrainNativeRows(database, next);
-						} else if (next.drain != null && actual.drain == null) validateDrainNativeRows(database, next);
+							const nextProof = drainRowsProof(residual ?? verifiedImageEntry(database, objectId, residualImage),
+								nextCarriers.planBytes);
+							if (residual !== undefined && pre !== undefined && nextProof !== undefined && carriers.planBytes !== undefined &&
+								actual.drain != null && sameBytes(carriers.planBytes, nextProof.planBytes) &&
+								extendsDrainValidation(actual, next, deletions) &&
+								drainValidated(database, pre, carriers.planBytes, actual.drain.cursor)) {
+								if (journalResidualImageDebug()) validateDrainNativeRowsInFull(database, next.drain);
+								rememberDrainValidated(database, residual, nextProof.planBytes, next.drain.cursor);
+							} else validateDrainNativeRows(database, next, nextProof);
+							verified = nextProof?.entry;
+							proved = journalConnectionCurrency(database);
+						} else if (next.drain != null && actual.drain == null)
+							validateDrainNativeRows(database, next, drainRowsProof(verified, nextCarriers.planBytes));
 						attempted = true;
 						writeRetirementNativeCarriers(database, objectId, nextCarriers);
+						const written = journalConnectionCurrency(database);
 						database.exec("COMMIT");
 						active = false;
+						adoptCommittedImage(database, objectId, verified, opened, proved, written);
 					} catch {
 						if (active)
 							try {
@@ -2382,7 +2755,7 @@ export function createNodeDurableLiveJournalStore(
 					}
 					// Delivery/COMMIT throws do not prove absence. Join a fresh whole native image.
 					try {
-						database.exec("BEGIN");
+						beginJournalTransaction(database, "BEGIN");
 						active = true;
 						const actual = readRetirementControl(database, objectId, retirementCodec),
 							nativeImage = retirementImage(database, objectId);
@@ -2455,6 +2828,7 @@ export function createNodeDurableLiveJournalStore(
 			}});
 		},
 		appendAccepted,
+		appendAcceptedLocalBatch,
 		close,
 		installEpochAnchor,
 		installGenesis,

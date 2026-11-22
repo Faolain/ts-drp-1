@@ -60650,6 +60650,36 @@ constructed or v3 live subscription, queue creation or journal installation
 can begin. Zero lineages are no longer ambiguous because the authenticated
 local signer selects one writer; two candidate lineages are never accepted.
 
+**Amended 2026-10-28 (owner decision; supersedes the foreign-writer clause
+above).** ea4eb158 made one browser origin host several identities (Web Lock
+slots, `examples/browser-network/src/identity.ts`) and named each chat and canvas
+room database by objectId alone. Two same-origin tabs, Alice in slot 0 and Bob
+in slot 1, therefore share one issuance store, and Bob's store legitimately
+holds Alice's nonzero lineage. The rule "every other writer must be fresh"
+would refuse every such reopen. ea4eb158 dropped it without a recorded
+decision, leaving no lineage bound at all. The owner chose the **frontier
+rule** instead:
+- Only the SELECTED author's local lineage is bound. When the successor
+  closure carries that author's authenticated closed frontier
+  (`openVerifiedCreatorHistoricalIssuance`, `admittedAuthorSequence = a`), the
+  reopen requires `next > a`. Otherwise it fails closed as "creator issuance
+  lineage is invalid".
+- A store at or below the frontier never issued work the room already
+  admitted from this key. It is a stale copy, or a fresh database beside a
+  copied seed, and issuing would re-sign an admitted slot.
+- Other writers' nonzero lineages are accepted. Their rows confer no authority
+  on the selected author: ACL, possession and the per-author lineage CAS still
+  bind it.
+- Concurrent same-key issuance that no close has admitted yet stays inherent.
+  The creator close detects it as "author slot is ambiguous".
+
+The gate now has the following cases:
+- `stale-same-author-clone` refuses before any live effect.
+- `two-nonzero-lineages` and `two-tab-shared-room-database` both reopen, and
+  only Bob's lineage gains a row.
+
+The model is `packages/node/formal/creator-successor-lineage-admission.qnt`.
+
 The causal GREEN gate derives the actual eight-member V3 chat ACL and local
 Ed25519 identities from its shipped deterministic client seeds rather than
 inventing placeholder writer names. In one fresh built-package child it proves:
@@ -61167,6 +61197,11 @@ refactor-clean review, retained gates and clean-checkout proof:
   late peer with no copied creator issuance identity can cold-reopen and issue
   as themselves. Copying creator issuance rows into another peer, selecting an
   arbitrary nonzero writer or accepting two candidate lineages is forbidden.
+  (Amended 2026-10-28, owner decision: other writers' nonzero lineages in a
+  shared same-origin room database are accepted, since ea4eb158 made them
+  legitimate. The selected author is instead bound to its authenticated closed
+  frontier, and a lineage at or below it refuses. See the D.108d1b amendment
+  above.)
   The exact authenticated kernel seam must be frozen before RED; if it cannot
   bind the room's already existing local author/signing authority without a new
   caller-selected product authority, the slice stops again.

@@ -1,6 +1,6 @@
 import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { CanonicalEncodingError, compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { canonicalRecordResourceForSizing,
 	canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, canonicalArrayResourceForSizing,
 	canonicalArrayResourcesForSizing, canonicalCarrierResourceForSizing, canonicalValueResourceForSizing,
@@ -27,6 +27,7 @@ import {
 	issuanceUnsignedContinuationWidths,
 	issuanceOrdinaryFinishingCapacityWidths,
 	issuanceRetirementControlFields,
+	issuanceRetirementFloor,
 	closeIssuanceRetirementProtectedRecords,
 	issuanceRetirementImage,
 	issuanceRetirementPreparationWithPlanRewrite,
@@ -299,7 +300,12 @@ import { type RoomRetentionLedger, type RoomRetentionLedgerRecord, roomRetention
 import type { CreatorPostAdoptionCensusSizing, CreatorPostAdoptionSettlementSizing, CreatorRoomSettlementPreview } from "../creator-close.js";
 import type { CreatorOrdinaryRuntimeCapacityWidthInput, creatorOrdinaryRuntimeCapacityWidths } from "../v3-live.js";
 import { openCreatorCloseMembership } from "./creator-close-membership.js";
-import type { ReceivedClosedJournalAuthority, ReceivedClosedJournalAuthorityRead } from "./creator-received-close-membership.js";
+import {
+	openReceivedCloseMembership,
+	verifyReceivedClosedJournalAuthority,
+	type ReceivedClosedJournalAuthority,
+	type ReceivedClosedJournalAuthorityRead,
+} from "./creator-received-close-membership.js";
 
 export type VerifiedCreatorClosedRollbackData = Readonly<Record<never, never>>;
 type VerifiedClosedAnchorDependency = Readonly<Record<never, never>>;
@@ -392,6 +398,8 @@ export type CreatorProtectedRecoveryRoleFailureKind =
 	| "proof-budget-exceeded"
 	| "aborted"
 	| "release-failed"
+	// A closed-data refusal of the same contention (see CreatorClosedRollbackDataFailureKind).
+	| "source-busy"
 	| "internal-invariant";
 export type CreatorProtectedRecoveryRoleDebt = Readonly<{
 	owner: "floor" | "ahe" | "snapshot";
@@ -466,6 +474,9 @@ export type CreatorClosedRollbackDataFailureKind =
 	| "blueprint-invalid"
 	| "aborted"
 	| "release-failed"
+	// Another holder had the single native read reservation of a source store.
+	// Contention, not a broken law: nothing was read, and the caller may retry.
+	| "source-busy"
 	| "internal-invariant";
 type Failure = Readonly<{
 	ok: false;
@@ -904,6 +915,12 @@ function settlementAdoptionReserveProtections(successorFenceCount: 0 | 1, localW
  * to ignore authentication/currency failures or a failed native join. */
 export function isCreatorOrdinarySourceCapacityRefusal(value: unknown): boolean {
 	return value instanceof Refusal && value.result.kind === "proof-budget-exceeded";
+}
+/** The storage owners' busy refusal of a second native read reservation, bare or as
+ * the primary of a failed acquisition's joined cleanup. Only that exact refusal. */
+function nativeReadReservationBusy(error: unknown): boolean {
+	const busy = (value: unknown): boolean => value instanceof Error && value.message === "NATIVE_READ_RESERVATION_BUSY";
+	return busy(error) || (error instanceof AggregateError && busy(error.cause));
 }
 function requireLaw(value: unknown, kind: CreatorClosedRollbackDataFailureKind = "chain-invalid"): asserts value {
 	if (!value) {
@@ -2113,6 +2130,22 @@ function recoveryCertificateRequiredGenerations(proof: RecoveryRoleCertificate):
 type CreatorConditionalGenerationResourceCertificate = Pick<RecoveryRoleCertificate,
 	"roles" | "supportGenerations" | "authenticatedSourceGenerations" | "retiredClassifiedSnapshotScopes">;
 
+/** The close hold's census names each held issuance dependency's anchor; the certificate must have
+ * authenticated every one. The refusal names the uncovered epochs: a stage label would only say how far
+ * the source loop got before this law ran.
+ * @param required - The close hold's dependency anchors.
+ * @param covered - The anchors this certificate authenticated.
+ */
+function requireRecoveryDependencyAnchorsCovered(
+	required: readonly Readonly<{epoch: number; anchorDigest: string}>[],
+	covered: readonly Readonly<{epoch: number; anchorDigest: string}>[]
+): void {
+	const uncovered = required.filter(anchor => !covered.some(actual =>
+		actual.epoch === anchor.epoch && actual.anchorDigest === anchor.anchorDigest));
+	if (uncovered.length !== 0) throw new Refusal(failure("chain-invalid", "snapshot",
+		`RECOVERY_DEPENDENCY_ANCHOR_UNCOVERED:${uncovered.map(anchor => anchor.epoch).join(",")}`));
+}
+
 async function acquireRecoveryRoleCertificate(
 	input: Captured,
 	expectedHead: PresentHead,
@@ -2228,6 +2261,7 @@ async function acquireRecoveryRoleCertificate(
 				snapshot: null | {exactCanonicalManifestBytes: Uint8Array; exactCanonicalPayloadBytes: Uint8Array}}[] = [];
 			const authenticatedSourceGenerations: {scope: SnapshotQuarantineScopeKey; generation: GenerationRecord}[] = [];
 			const sourceTrusts = new Set<CurrentAnchorTrust>([pin.trust, currentTrust, predecessorTrust]);
+			const linkAnchors: {epoch: number; anchorDigest: string}[] = [];
 			for (const generation of reader.generations) {
 				const closure = view(reader, reader.generations.indexOf(generation));
 				const carrier = readUnique(closure, "drp-anchor-trust-state"), carrierRecord = readRecord(carrier.bytes);
@@ -2252,6 +2286,8 @@ async function acquireRecoveryRoleCertificate(
 					requireLaw(sourceTrust !== undefined && sourceTrust.currentEpoch === epoch && epoch <= currentTrust.currentEpoch);
 					sourceTrusts.add(sourceTrust);
 					if (opened?.ok === true) requireLaw(accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
+					if (opened?.ok === true) linkAnchors.push({epoch: opened.predecessorTrust.currentEpoch, anchorDigest: opened.predecessorTrust.currentAnchorDigest});
+					if (historical !== undefined) linkAnchors.push({epoch: epoch - 1, anchorDigest: String(historical.binding.cut.previousAnchor)});
 					const cut = readRecord(readUnique(closure, "drp-hard-epoch-cut", epoch - 1).bytes);
 					const scope = Object.freeze({objectId: input.objectId, epoch: epoch - 1,
 						anchor: String(cut.previousAnchor), manifestDigest: String(cut.snapshotManifestDigest)});
@@ -2285,10 +2321,10 @@ async function acquireRecoveryRoleCertificate(
 					roles, currentTrust, certificateDigest, accounting, input.classificationRead, undefined, identity.historicalAbsenceBases,
 					identity.signedCertificateDigest);
 			const state = await retirementState();
-			const dependencyAnchors = Object.freeze([...sourceTrusts].map(trust => Object.freeze({
-				epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest})));
-			requireLaw(requiredDependencyAnchors.every(required => dependencyAnchors.some(actual =>
-				actual.epoch === required.epoch && actual.anchorDigest === required.anchorDigest)), "chain-invalid");
+			const dependencyAnchors = Object.freeze([...[...sourceTrusts].map(trust => ({
+				epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest})), ...linkAnchors].filter((anchor, index, all) =>
+				all.findIndex(other => other.epoch === anchor.epoch && other.anchorDigest === anchor.anchorDigest) === index).map(anchor => Object.freeze(anchor)));
+			requireRecoveryDependencyAnchorsCovered(requiredDependencyAnchors, dependencyAnchors);
 			const protectedScopes = Object.freeze([roles.currentClose, ...(roles.previousClose === null ? [] : [roles.previousClose]),
 				...roles.additionalRollbackSources.map(source => Object.freeze({objectId: input.objectId, epoch: source.closedEpoch,
 					anchor: source.closedAnchorDigest, manifestDigest: source.manifestRef.digest}))]);
@@ -2813,9 +2849,7 @@ async function acquireRecoveryRoleCertificate(
 				})
 			),
 		]);
-		requireLaw(requiredDependencyAnchors.every(required =>
-			required.epoch === 0 && required.anchorDigest === currentTrust.genesisAnchorDigest ||
-			dependencyAnchors.some(actual => actual.epoch === required.epoch && actual.anchorDigest === required.anchorDigest)), "chain-invalid");
+		requireRecoveryDependencyAnchorsCovered(requiredDependencyAnchors, dependencyAnchors);
 		const protectedScopes = Object.freeze([
 			resolved.currentClose,
 			resolved.previousClose,
@@ -4380,6 +4414,8 @@ interface CreatorOrdinaryIssuanceSourceFacts {
 	readonly journal: CreatorIssuanceMaintenanceProof["journal"];
 	/** Sole finite numerical expression; no retained original proof or credit. */
 	readonly capacity: { template?: object; material: CreatorOrdinaryFinishingMaterialIndex;
+		/** Roles whose cold quote has asked for a program on this source (no numbers). */
+		templateRequests?: Set<"local" | "received">;
 		readiness?: Readonly<{reader: CreatorOrdinaryApplicationResourceBoundReader; sourceIdentity: object;
 			geometry: CreatorOrdinaryReadinessGeometry;
 			window?: Readonly<{declaredLimits: CreatorOrdinaryFinishingWindowLimits; limits: CreatorOrdinaryFinishingWindowLimits;
@@ -4405,7 +4441,10 @@ interface CreatorOrdinaryReadinessGeometry {
 	readonly baseWitnessPayloadBytes: number; readonly acceptedCount: number; readonly localIssuedCount: number;
 	readonly acceptedWitnessPayloadBytes: number;
 	readonly runtimeWidths: ReturnType<typeof creatorOrdinaryRuntimeCapacityWidths>;
+	/** The journal observation carrier's fields; a drain control's plan rides by digest. */
 	readonly journalObservationFields: Readonly<Record<string, CanonicalResourceFootprint>>;
+	/** The source-bound append's FULL materialized journal control (0 when absent), charged on its own. */
+	readonly journalContextControlWidth: number;
 	readonly journal?: CreatorOrdinaryPreparedJournalGeometry;
 }
 
@@ -5749,7 +5788,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 	// from its already-detached corpus rather than copying the same bytes again.
 	// Native/snapshot/OBS annotations remain unchanged in the complete use vector.
 	const knownProtectedMaterial = Object.freeze(knownMaterial.filter((_, index) => knownMaterialUses[index]!.protected));
-	const journalObservation = closedRetirementBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
+	const journalObservation = closedWarmSourceBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
 		snapshot: capture.snapshot, ahe: capture.ahe, floor: capture.floorImage.state, floorImage: capture.floorImage,
 		snapshotInventory: {scopes: custody.snapshotInventory.scopes, owner: custody.snapshotInventory.owner}})[0]);
 	const replaceableJournalBytes = proofMaterialOwners.get(frame.accounting)?.captureObservationOnlyMaterial(journalObservation);
@@ -5762,7 +5801,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 		if (original === undefined || original.source !== frame.input.liveJournalStore) return decline("anchor-dependency-owner");
 		anchorPreimages.push(Object.freeze({scope: Object.freeze({...original.scope}), bytes: original.exactCanonicalAnchorPreimageBytes.slice()}));
 	}
-	const detach = <T>(value: T): T => decodeCanonical(closedRetirementBytes(value)) as T;
+	const detach = <T>(value: T): T => decodeCanonical(closedWarmSourceBytes(value)) as T;
 	const originalMaterial = resolveCreatorForwardPromotionSource(proof.observation, frame.input.store, frame.input.snapshotStore);
 	// Genesis has no closed source to promote. The same authenticated cold frame
 	// can spell that empty history, but cannot mint an empty forward capability.
@@ -5956,7 +5995,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 		headerScopes: Object.freeze(capture.protectedJournalHeaderScopes.map(scope => Object.freeze({...scope}))),
 		anchorPreimages: Object.freeze(anchorPreimages), snapshotMaterials, retiredClassifiedSnapshotScopes, material, maintenanceResourceFacts,
 		nativeIssuance: native,
-		journal: detach(capture.journal), capacity: {material: createCreatorOrdinaryFinishingMaterialIndex(knownMaterial, knownMaterialUses)},
+		journal: detachClosedCaptureJournal(capture.journal), capacity: {material: createCreatorOrdinaryFinishingMaterialIndex(knownMaterial, knownMaterialUses)},
 	}));
 	available();
 	let enrollReadiness: (() => void) | undefined;
@@ -6032,7 +6071,7 @@ export async function prepareCreatorOrdinaryIssuanceProofSourceReadiness(
 			knownMaterial.reduce((sum, bytes) => sum + bytes.byteLength, 0) !== proof.accounting.chargedBytes)
 			return decline("known-material-UNKNOWN-mismatch");
 		const capture = facts.capture, currentTrust = seed.currentTrust;
-		const journalObservation = closedRetirementBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
+		const journalObservation = closedWarmSourceBytes(creatorIssuanceMaintenanceObservationCarriers({journal: capture.journal,
 			snapshot: capture.snapshot, ahe: capture.ahe, floor: capture.floorImage.state, floorImage: capture.floorImage,
 			// The warm proof freshly compared this WHOLE exact inventory before
 			// enrollment. Decode only its private DATA; it is not native custody.
@@ -6040,7 +6079,7 @@ export async function prepareCreatorOrdinaryIssuanceProofSourceReadiness(
 		const replaceableJournalBytes = owner.captureObservationOnlyMaterial(journalObservation);
 		const {capacity: _oldCapacity, replaceableJournalObservation: _oldJournalObservation, adoptionFencePostimage: _joinedFencePostimage,
 			runtimeCensusObservation: oldRuntimeObservation, ...unchanged} = seed;
-		const detach = <T>(value: T): T => decodeCanonical(closedRetirementBytes(value)) as T;
+		const detach = <T>(value: T): T => decodeCanonical(closedWarmSourceBytes(value)) as T;
 		const sourceFacts: CreatorOrdinaryIssuanceSourceFacts = Object.freeze({...unchanged,
 			readinessRebased: true as const,
 			knownMaterial, knownMaterialUses,
@@ -6053,7 +6092,7 @@ export async function prepareCreatorOrdinaryIssuanceProofSourceReadiness(
 			// original metadata and COMPLETE use vector above.
 			...(oldRuntimeObservation === undefined || !knownMaterial.some(bytes => compareBytes(bytes, oldRuntimeObservation.bytes) === 0)
 				? {} : {runtimeCensusObservation: oldRuntimeObservation}),
-			nativeIssuance: detach(capture.nativeIssuance), journal: detach(capture.journal),
+			nativeIssuance: detach(capture.nativeIssuance), journal: detachClosedCaptureJournal(capture.journal),
 			capacity: {material: createCreatorOrdinaryFinishingMaterialIndex(knownMaterial, knownMaterialUses)},
 		});
 		const enroll = await prepareCreatorOrdinarySourceReadinessForSizing(sourceFacts, prepared.preparation,
@@ -6188,17 +6227,19 @@ async function prepareCreatorOrdinarySourceReadinessForSizing(source: CreatorOrd
 	const control = originalJournal.control === null ? null :
 		{...originalJournal.control, revision: Number.MAX_SAFE_INTEGER};
 	const image = {...originalJournal.image, scopeCount: Number.MAX_SAFE_INTEGER, rowCount: Number.MAX_SAFE_INTEGER, byteCharge: Number.MAX_SAFE_INTEGER};
+	// The carrier's control holds a drain plan by digest (closedJournalObservationControl); the source-bound append's
+	// FULL materialized control is its own separately charged occurrence (journalContextControlWidth).
 	const journalObservationFields = Object.freeze(creatorIssuanceMaintenanceObservationCarriers({journal: {
-		control: resource(control), image: resource(image), canonicalRows: resource(originalJournal.canonicalRows),
-		...(originalJournal.drainSource === undefined ? {} : {drainSource: resource(originalJournal.drainSource)})},
+		control: resource(closedJournalObservationControl(control)), image: resource(image), canonicalRows: resource(originalJournal.canonicalRows)},
 		snapshot: null, ahe: null, floor: null, floorImage: null, snapshotInventory: null})[0]) as Readonly<Record<string, CanonicalResourceFootprint>>;
+	const journalContextControlWidth = control === null ? 0 : resource(control).byteLength;
 	const geometry: CreatorOrdinaryReadinessGeometry = Object.freeze({
 		graphVersion: preparation.current.runtime.graphVersion, baseGraphCount: preparation.current.currentEpochVertexCount,
 		basePreimageCount: preparation.current.currentSignedPreimageByteLengths.length,
 		baseWitnessPayloadBytes: maintenanceWidthSum(preparation.current.currentSignedPreimageByteLengths.map(length =>
 			canonicalBytesResourceForSizing(length).byteLength)),
 		acceptedCount: 0, localIssuedCount: 0, acceptedWitnessPayloadBytes: 0,
-		runtimeWidths: preparation.nativeCapacity.runtimeWidths, journalObservationFields, journal});
+		runtimeWidths: preparation.nativeCapacity.runtimeWidths, journalObservationFields, journalContextControlWidth, journal});
 	await checkpoint();
 	if (!frame.alive || frame.headerConsumersRevoked) return;
 	const selectedWindow = windowLimits === undefined || windowApplication === undefined || windowObservation === undefined ? undefined :
@@ -6646,10 +6687,15 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		// Exact cold frames keep the authenticated closed-role source identity;
 		// current rows are checked through the original replay verifier below.
 		const currentScope = {objectId: input.objectId, epoch: currentTrust.currentEpoch, anchorDigest: currentTrust.currentAnchorDigest};
-		if (!sameOrdinaryControl(journal.value.control, seed.journal.control) ||
-			(journal.value.drainSource === undefined || seed.journal.drainSource === undefined
-				? journal.value.drainSource !== seed.journal.drainSource
-				: !closedRetirementEqual(journal.value.drainSource, seed.journal.drainSource)))
+		// A drain's reconstructed original is the adapter's deterministic function of (control, image,
+		// rows): while one is active, those inputs compare instead (an ordinary append cannot run mid-drain).
+		const draining = journal.value.control?.drain != null || seed.journal.control?.drain != null;
+		// The source holds its journal as the charged carrier (a drain plan by its rows' digest,
+		// detachClosedCaptureJournal); the present control compares through the same projection.
+		if (!sameOrdinaryControl(closedJournalObservationControl(journal.value.control) as typeof journal.value.control,
+			seed.journal.control) ||
+			draining && !(closedRetirementEqual(journal.value.image, seed.journal.image) &&
+				closedJournalRowsEqual(journal.value.canonicalRows, seed.journal.canonicalRows)))
 			throw unavailable;
 		journalProbe = captureCreatorOrdinaryJournalCurrentProbe(readJournal, journal.value);
 		const readinessAtCapture = seed.capacity.readiness;
@@ -6727,11 +6773,11 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		const signingRows = Object.freeze(signing.readExactCanonicalRows().map(bytes => bytes.slice()));
 		for (const bytes of signingRows) requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
 		for (const bytes of creatorIssuanceMaintenanceObservationCarriers({journal: journal.value, snapshot, ahe: ahe.value,
-			floor: floorImage.state, floorImage, snapshotInventory: {scopes: inventory.scopes, owner: inventory.owner}}).map(closedRetirementBytes))
-			requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+			floor: floorImage.state, floorImage, snapshotInventory: {scopes: inventory.scopes, owner: inventory.owner}}).map(closedObservationCarrierBytes))
+			requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 		for (const bytes of closedJournalNativeControlCarriers(journal.value))
 			requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
-		requireLaw(chargeProofObservation(accounting, closedRetirementBytes(nativeIssuance)), "proof-budget-exceeded");
+		requireLaw(chargeProofObservation(accounting, closedWarmSourceBytes(nativeIssuance)), "proof-budget-exceeded");
 		const replacedRuntimeCensusObservation = deferredRuntimeCensusObservation !== undefined &&
 			creatorOrdinaryRuntimeCensusHasFreshReplacement(seed, runtime, nativeIssuance, journalCorrespondence.currentRows)
 			? deferredRuntimeCensusObservation : undefined;
@@ -6859,7 +6905,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 				requireLaw(!released && capturedFrame.alive, "snapshot-unavailable"); writeStarted = true; });
 			return beginTask;
 		};
-		const detachResult = <T>(value: T): T => decodeCanonical(closedRetirementBytes(value)) as T;
+		const detachResult = <T>(value: T): T => decodeCanonical(closedWarmSourceBytes(value)) as T;
 		const proof: CreatorOrdinaryIssuanceMaintenanceProof = Object.freeze({kind: "ordinary" as const, source, accounting,
 			readJournalContext: function (this: CreatorOrdinaryIssuanceMaintenanceProof) {
 				if (this !== proof || creatorOrdinaryIssuanceProofFacts(proof)?.frame !== capturedFrame)
@@ -6975,26 +7021,119 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 	}
 }
 
+/** Record/array constructors for the drain-plan owner: identity for actual values and width trees; the resource
+ * program passes its footprint builders. */
+type ClosedJournalPlanBuild = Readonly<{
+	record: (fields: Readonly<Record<string, unknown>>) => unknown;
+	array: (items: readonly unknown[]) => unknown;
+}>;
+
+/**
+ * One owner for a live-journal drain plan's two encodings under the close's one encode cap (CLOSED_RETIREMENT_BYTES):
+ * - `plan`: the persisted plan's own fields. It is the native plan carrier (compared byte for byte by
+ *   closedJournalNativeObservationEqual, charged separately through closedJournalNativeControlCarriers) and the install
+ *   source's journalPrefixes, so it must itself fit the cap; readiness bounds one epoch's rows by its width
+ *   (closedJournalCurrentEpochPlanWidthForSizing and the resource program), so the plan codec's own per-row cost sets
+ *   how many collectible bytes one epoch may hold, not a factor written down here.
+ * - `observed`: the journal observation carrier's copy. Each prefix is {scope, highWatermark, rowsDigest}; the retired
+ *   empty headers are one digest. At beginDrain every planned frame is byte-equal to a row the same carrier still holds in
+ *   canonicalRows, so holding the frames again put the carrier at the rows plus about 1.22 times the collectible rows.
+ * Persisted bytes, labels and digests are unchanged: only the carrier's view of the plan is projected.
+ * @param plan - A drain plan's fields: actual values, maintenance width trees or resource footprints.
+ * @param digestOf - closedJournalObservationRowsDigest for actual values; a digest-width leaf for sizing.
+ * @param build - Record/array constructors for the caller's representation.
+ * @returns The persisted plan's fields and the carrier's projection of them.
+ */
+function closedJournalDrainPlanCarriers(plan: Readonly<{
+	baseControl?: unknown; sourceImage?: unknown;
+	prefixes: readonly Readonly<{ scope?: unknown; highWatermark?: unknown; rows: unknown }>[];
+	retiredEmptyHeaders?: unknown; protectedHeaderScopes?: unknown;
+}>, digestOf: (items: unknown) => unknown, build: ClosedJournalPlanBuild = {record: fields => fields, array: items => items}): Readonly<{
+	plan: unknown; observed: unknown;
+}> {
+	const {prefixes, retiredEmptyHeaders, ...fields} = plan;
+	return Object.freeze({
+		plan: build.record({...fields, prefixes: build.array(prefixes.map(prefix => build.record({...prefix}))),
+			...(retiredEmptyHeaders === undefined ? {} : {retiredEmptyHeaders})}),
+		// Every other field is kept as is (baseControl, sourceImage, protectedHeaderScopes, scope, highWatermark).
+		observed: build.record({...fields, prefixes: build.array(prefixes.map(({rows, ...prefix}) =>
+			build.record({...prefix, rowsDigest: digestOf(rows)}))),
+			...(retiredEmptyHeaders === undefined ? {} : {retiredEmptyHeadersDigest: digestOf(retiredEmptyHeaders)})}),
+	});
+}
+
+/** Digest of a plan's rows (or retired headers) over each item's own canonical bytes, in order. Canonical items are
+ * self-delimiting, so the concatenation binds their count and order; no item is encoded beside another under the cap.
+ * @param items - One prefix's rows or the retired empty headers.
+ * @returns Lowercase hex SHA-256 (the same width as every native digest field). */
+function closedJournalObservationRowsDigest(items: unknown): string {
+	requireLaw(Array.isArray(items), "malformed-input");
+	return closedRetirementDigest("ts-drp/closed-journal-observation-plan-items/v1",
+		...(items as readonly unknown[]).map(item => closedRetirementBytes(item)));
+}
+
+/**
+ * The journal observation carrier's control: a drain control holds its plan by digest (closedJournalDrainPlanCarriers);
+ * every other control, a width atom and a resource footprint are returned unchanged.
+ * @param control - A journal retirement control (actual value or width tree).
+ * @param digestOf - The rows digest; a digest-width leaf when sizing.
+ * @returns The carrier's control field.
+ */
+function closedJournalObservationControl(control: unknown,
+	digestOf: (items: unknown) => unknown = closedJournalObservationRowsDigest): unknown {
+	if (control === null || typeof control !== "object" || maintenanceWidthAtom in control) return control;
+	const drain = (control as Readonly<{ drain?: unknown }>).drain;
+	if (drain === null || drain === undefined || typeof drain !== "object" || maintenanceWidthAtom in drain) return control;
+	const {plan, ...progress} = drain as Readonly<{ plan: Parameters<typeof closedJournalDrainPlanCarriers>[0] }>;
+	return Object.freeze({...control, drain: Object.freeze({...progress,
+		plan: closedJournalDrainPlanCarriers(plan, digestOf).observed})});
+}
+
 /**
  * Shares the six complete observation shapes with their length-only projection.
  * @param input - Original native captures; width trees confer no authority.
+ * @param digestOf - The journal plan's rows digest: a digest-width leaf for width trees (actual by default).
  * @returns Complete wrappers in their original charge order.
  */
 function creatorIssuanceMaintenanceObservationCarriers(input: Readonly<{
 	journal: Readonly<{ control: unknown; image: unknown; canonicalRows: unknown; drainSource?: unknown }>;
 	snapshot: unknown; ahe: unknown; floor: unknown;
 	floorImage: unknown; snapshotInventory: unknown;
-}>): readonly unknown[] {
+}>, digestOf?: (items: unknown) => unknown): readonly unknown[] {
 	// Preserve the complete original materialized PRE wrapper. Native carrier
 	// exposure is charged separately, not copied into this semantic wrapper as
 	// a second embedded plan. The width projection uses this same field owner.
+	// A mid-drain read's drainSource is the adapter's reconstruction of the pre-drain journal from this
+	// same control (its plan carries the retired frames), image and residual rows: a deterministic
+	// function of the three fields below. Encoding it beside them held the journal about twice under
+	// this carrier's one encode cap; sites that need the original use the adapter's own read.drainSource.
+	// A drain control's plan rides by digest (closedJournalObservationControl): its frames duplicate rows this carrier
+	// still holds, and the exact plan is the separately charged, byte-compared native carrier.
 	const journal = {
-		control: input.journal.control,
+		control: closedJournalObservationControl(input.journal.control, digestOf),
 		image: input.journal.image,
 		canonicalRows: input.journal.canonicalRows,
-		...(input.journal.drainSource === undefined ? {} : { drainSource: input.journal.drainSource }),
 	};
 	return [journal, input.snapshot, input.ahe, input.floor, input.floorImage, input.snapshotInventory];
+}
+
+/** Detaches a maintenance capture's journal for a warm ordinary source in the one shape its acquisition charged:
+ * the journal observation carrier, whose drain control holds its plan by digest (closedJournalObservationControl).
+ * The plan's frames duplicate rows the carrier still holds, and the exact plan is the native control carrier,
+ * which acquisition charges on its own and which rides beside the carrier as copied bytes, never encoded with it.
+ * Encoded whole (the plan beside its rows, then its native carrier again) a mid-drain journal whose carrier fits
+ * the one encode cap exceeded it, and the codec's untyped failure refused the creator's own move. The capture's
+ * in-memory drainSource (the adapter's pre-drain journal, only for the raw supplement sizing) rides beside the
+ * detached fields, unencoded and never persisted. A carrier past the cap is the typed budget refusal. */
+function detachClosedCaptureJournal<T extends Readonly<{ control: unknown; drainSource?: unknown;
+	exactCanonicalControlCarriers?: readonly Uint8Array[] }>>(journal: T): T {
+	const { drainSource, exactCanonicalControlCarriers, ...observed } = journal;
+	const detached = decodeCanonical(closedWarmSourceBytes(Object.hasOwn(observed, "control")
+		? { ...observed, control: closedJournalObservationControl(observed.control) } : observed)) as Record<string, unknown>;
+	return { ...detached,
+		...(exactCanonicalControlCarriers === undefined ? {} : {
+			exactCanonicalControlCarriers: Object.freeze(exactCanonicalControlCarriers.map(bytes => bytes.slice())) }),
+		...(drainSource === undefined ? {} : { drainSource }) } as unknown as T;
 }
 
 /** Actual detached native control carriers; materialized controls are not
@@ -7127,13 +7266,32 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 		reservations.push(terminalFloor);
 		for (const reservation of reservations) await reservation.check();
 	};
+	// Observation only: brackets ONE complete acquisition so a test can attribute its
+	// native/snapshot reads. Diagnostics never grant, extend or replace custody.
+	const acquisitionPurpose = mandatoryAdoptionFence ? "adoption-fence" : terminalWithdrawal ? "terminal-withdrawal" :
+		maintenancePurpose ?? "issuance";
+	const reportAcquisition = (kind: string): void => {
+		try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind, epoch: currentTrust.currentEpoch, purpose: acquisitionPurpose});
+		} catch { /* Diagnostics cannot alter acquisition or cleanup. */ }
+	};
 	try {
+		reportAcquisition("closed-maintenance-acquisition-start");
 		await acquireReservations();
 		const snapshotInventoryRead = bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
 			input.snapshotStore, "captureRecoveryRoleInventory");
 		const snapshotInventory = await snapshotCall(() => snapshotInventoryRead({objectId: input.objectId}, {signal: input.signal}));
 		let nativePreparation: Parameters<typeof acquireClosedData>[12];
-		if (lifetime.canDetachNativePreparation === true && snapshotInventory.owner.migration === "ready" &&
+		// The mandatory adoption fence reads its retained closed data ONCE, under
+		// the custody it already holds: the original held path, with complete
+		// authentication of every byte, the same book and the same limits. The
+		// detached preparations below read every image and retained snapshot
+		// before custody only to read and byte-compare them all again under it;
+		// that moves CPU out of custody for long ordinary forecasts, but the fence
+		// already holds the issuance consumer exclusively and its forecast is
+		// short, so for the fence they only double its reads.
+		const singleCustody = mandatoryAdoptionFence && !terminalWithdrawal && maintenancePurpose === undefined;
+		if (!singleCustody && lifetime.canDetachNativePreparation === true && snapshotInventory.owner.migration === "ready" &&
 			(snapshotInventory.legacyScopes?.length ?? 0) === 0) {
 			// This is the ONE original proof lifetime. authenticate consumes this
 			// same book; it must not create/reset a second preparation allowance.
@@ -7142,8 +7300,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			let original: Awaited<ReturnType<typeof captureNativeImages>> | undefined = await captureNativeImages();
 			for (const bytes of creatorIssuanceMaintenanceObservationCarriers({journal: original.journal.value,
 				snapshot: original.snapshot, ahe: original.ahe.value, floor: original.floorImage.state, floorImage: original.floorImage,
-				snapshotInventory: {scopes: snapshotInventory.scopes, owner: snapshotInventory.owner}}).map(closedRetirementBytes))
-				requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+				snapshotInventory: {scopes: snapshotInventory.scopes, owner: snapshotInventory.owner}}).map(closedObservationCarrierBytes))
+				requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 			for (const reservation of reservations) await reservation.check();
 			await joinSourceReleases(reservations.map(reservation => () => reservation.release()));
 			reservations.length = 0; issuer = undefined; terminalFloor = undefined; journalHeaderHold = undefined;
@@ -7203,8 +7361,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				for (const bytes of creatorIssuanceMaintenanceObservationCarriers({
 					journal: actual.journal.value, snapshot: actual.snapshot, ahe: actual.ahe.value,
 					floor: actual.floorImage.state, floorImage: actual.floorImage,
-					snapshotInventory: {scopes: actualInventory.scopes, owner: actualInventory.owner}}).map(closedRetirementBytes))
-					requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+					snapshotInventory: {scopes: actualInventory.scopes, owner: actualInventory.owner}}).map(closedObservationCarrierBytes))
+					requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 				requireLaw(closedJournalNativeObservationEqual(actual.journal.value, prepared.journal.value), "anchor-unavailable");
 				requireLaw(closedRetirementEqual(actual.snapshot, prepared.snapshot), "snapshot-invalid");
 				requireLaw(closedRetirementEqual(actual.ahe.value, prepared.ahe.value), "ahe-rejected");
@@ -7220,7 +7378,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			}});
 		} else try { const observer = Reflect.get(globalThis, "__warmProofEvent");
 			if (typeof observer === "function") observer({kind: "closed-native-preparation-declined", epoch: currentTrust.currentEpoch,
-				reason: lifetime.canDetachNativePreparation === true ? "snapshot-classification-owner" : "retained-native-source-custody"});
+				reason: singleCustody ? "adoption-fence-single-custody" :
+					lifetime.canDetachNativePreparation === true ? "snapshot-classification-owner" : "retained-native-source-custody"});
 		} catch { /* Original supported safe path remains unchanged. */ }
 		const acquired = await acquireClosedData(
 			value,
@@ -7234,7 +7393,9 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			mandatoryAdoptionFence || terminalWithdrawal || maintenancePurpose === "archive-close",
 			journalHeaderHold,
 			undefined,
-			Object.freeze({inventory: snapshotInventory, read: snapshotInventoryRead, targets: []}),
+			// No snapshot preparation for the fence: each retained target is read
+			// once under its own protection, digest-verified (readTarget's held path).
+			singleCustody ? undefined : Object.freeze({inventory: snapshotInventory, read: snapshotInventoryRead, targets: []}),
 			nativePreparation
 		);
 		nativePreparation = undefined;
@@ -7296,8 +7457,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			floor: forward.wholeFloor,
 			floorImage,
 			snapshotInventory: { scopes: snapshotInventory.scopes, owner: snapshotInventory.owner },
-		}).map(closedRetirementBytes))
-			requireLaw(chargeProofObservation(frame.accounting, bytes), "proof-budget-exceeded");
+		}).map(closedObservationCarrierBytes))
+			requireLaw(bytes !== undefined && chargeProofObservation(frame.accounting, bytes), "proof-budget-exceeded");
 		// The SAME close owner may reuse the complete, already charged native
 		// journal observation for its original fresh currency checks. Enrollment
 		// supplies no authority and cannot replace the initial replay comparison.
@@ -7427,6 +7588,7 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				reservations.splice(index, 1); terminalFloor = undefined;
 			},
 		}));
+		reportAcquisition("closed-maintenance-acquisition-end");
 		return proof;
 	} catch (primary) {
 		try {
@@ -8361,7 +8523,9 @@ async function acquireClosedData(
 				? error.result
 				: protectedUnion && error instanceof RoleRefusal
 					? failure("chain-invalid", "ahe", error.result.kind)
-					: failure("internal-invariant");
+					: nativeReadReservationBusy(error)
+						? failure("source-busy")
+						: failure("internal-invariant");
 	} finally {
 		try {
 
@@ -9842,6 +10006,49 @@ function prepareClosedJournalHeaders(input: Readonly<{
 }
 
 /** Reuses the exact native scope identity already consumed by R4 preparation. */
+/**
+ * Whether a closed journal scope's own signed header, in this exact retirement image, re-verifies
+ * as that scope's closed authority: its kept received-close membership (Cut, commit QC, successor
+ * trust) and the header's anchor and signature, reopened against the immutable pinned genesis
+ * (verifyReceivedClosedJournalAuthority: the anchor signature under the genesis signer set, the
+ * Cut/QC successor equation, the Cut naming exactly this scope). It is the classifier's
+ * out-of-window authority (classifyClosedJournalDetails, fd342d90), recomputed by the installer
+ * from bytes the installer binds, never taken from the classifier's result.
+ * @param input - The retirement image, the scope and the source's pinned genesis.
+ * @returns Whether the scope's header authenticates it.
+ */
+export function closedJournalHeaderAuthenticates(input: Readonly<{
+	image: Pick<LiveJournalRetirementImageObservation, "canonicalRows">;
+	scope: LiveJournalScope;
+	exactCanonicalPinnedGenesisTrustStateRecordBytes: Uint8Array;
+	pinnedGenesisAnchorDigest: string;
+}>): boolean {
+	try {
+		const { scope } = input;
+		const headers = input.image.canonicalRows.map(bytes => decodeCanonical(bytes)).filter(frame =>
+			Array.isArray(frame) && frame[0] === "scopes" &&
+			closedRetirementEqual(frame[1], [scope.objectId, scope.epoch, scope.anchorDigest])) as unknown[][];
+		if (headers.length !== 1) return false;
+		const header = headers[0]![2] as Record<string, unknown>;
+		const carrier = header.closed_membership_bytes ?? header.closedMembershipBytes;
+		const preimage = header.exact_anchor_preimage ?? header.exactCanonicalAnchorPreimageBytes;
+		const signature = header.detached_anchor_signature ?? header.detachedAnchorSignature;
+		if (!(carrier instanceof Uint8Array) || !(preimage instanceof Uint8Array) || !(signature instanceof Uint8Array)) return false;
+		const genesis = record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes);
+		if (genesis.currentAnchorDigest !== input.pinnedGenesisAnchorDigest) return false;
+		const material = openReceivedCloseMembership(carrier);
+		if (material === undefined) return false;
+		const authority = verifyReceivedClosedJournalAuthority({
+			material: { ...material, scope },
+			header: { exactCanonicalAnchorPreimageBytes: preimage, detachedAnchorSignature: signature },
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+		});
+		return authority !== undefined && closedRetirementEqual(authority.scope, scope);
+	} catch {
+		return false;
+	}
+}
+
 function closedNativeJournalScopes(
 	objectId: string,
 	journal: LiveJournalRetirementImageObservation
@@ -10325,6 +10532,9 @@ async function prepareClosedJournalDetails(
 					(value.dependencyKind === "signed-settled-issuance" || value.dependencyKind === "source-committed-inclusion" ||
 						value.dependencyKind === "authenticated-covered-native-issuance") ||
 					value.classification === "displaced" && value.dependencyKind === "source-authenticated-expiry" ||
+					// A replaced source released by its authenticated replaced-source resolution (design (b)).
+					(value.classification === "displaced" || value.classification === "covered-historical") &&
+						value.dependencyKind === "source-replaced-release" ||
 					// The original pinned bootstrap verifier authenticates this exact
 					// epoch-zero control. Its journal consumer follows the same covered
 					// class as native retirement; publication still must be acknowledged.
@@ -10342,7 +10552,7 @@ async function prepareClosedJournalDetails(
 			paired === undefined ||
 			coverage === undefined ||
 			(paired.publishState !== "published" && coverage.dependencyKind !== "source-committed-inclusion" &&
-				coverage.dependencyKind !== "source-authenticated-expiry") ||
+				coverage.dependencyKind !== "source-authenticated-expiry" && coverage.dependencyKind !== "source-replaced-release") ||
 			!closedRetirementEqual(original.digest, paired.digest) ||
 			!closedRetirementEqual(original.digest, coverage.digest) ||
 			!closedRetirementEqual(original.digest, closedRetirementHex(row.vertexDigest))
@@ -10650,8 +10860,63 @@ const CLOSED_RETIREMENT_BYTES = Object.freeze({
 	maxDepth: 128,
 });
 function closedRetirementBytes(value: unknown): Uint8Array { return encodeCanonical(value, CLOSED_RETIREMENT_BYTES); }
+/**
+ * One maintenance observation carrier under the close's per-carrier encode cap. A wider carrier
+ * is the proof's typed budget refusal (callers charge undefined as "proof-budget-exceeded"), never
+ * an untyped codec failure. Readiness sizing charges the same carriers under the same cap, so
+ * admission refuses before one grows past it. Any other codec failure is rethrown unchanged.
+ * @param value - One carrier from creatorIssuanceMaintenanceObservationCarriers.
+ * @returns Its exact canonical bytes, or undefined past the cap.
+ */
+/**
+ * The close's encode of a value a warm ordinary source copies or charges (its detached journal, material and native
+ * issuance). Wider than the per-carrier cap it is the typed budget refusal ("proof-budget-exceeded"), which the warm
+ * source declines on (isCreatorOrdinarySourceCapacityRefusal) to keep the exact cold route; never the codec's untyped
+ * failure, which ended the creator's own local issue. Any other codec failure is rethrown unchanged.
+ * @param value - The value to encode.
+ * @returns Its exact canonical bytes under the cap.
+ */
+function closedWarmSourceBytes(value: unknown): Uint8Array {
+	const bytes = closedObservationCarrierBytes(value);
+	requireLaw(bytes !== undefined, "proof-budget-exceeded");
+	return bytes;
+}
+function closedObservationCarrierBytes(value: unknown): Uint8Array | undefined {
+	try { return closedRetirementBytes(value); }
+	catch (error) {
+		if (error instanceof CanonicalEncodingError &&
+			(error.message === "canonical value exceeds byte limit" || error.message === "string exceeds byte limit")) return undefined;
+		throw error;
+	}
+}
 function closedRetirementEqual(left: unknown, right: unknown): boolean {
 	return compareBytes(closedRetirementBytes(left), closedRetirementBytes(right)) === 0;
+}
+/**
+ * Canonical equality of two live-journal row arrays, row by row: equal length, then each row's
+ * canonical bytes. Exactly as strict as the whole-array closedRetirementEqual (a canonical array is
+ * its length and its elements' canonical bytes), without one encode of the whole journal under the
+ * close's per-carrier cap: a member's retained journal is bounded by the journal's own image bound
+ * (LIVE_JOURNAL_RETIREMENT_LIMITS), not by that carrier cap, and each row stays under it.
+ * @param left - One journal's exact canonical rows.
+ * @param right - The other's.
+ * @returns Whether both hold the same rows in the same order.
+ */
+function closedJournalRowsEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
+	if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index++) {
+		const a = left[index], b = right[index];
+		// A plain Uint8Array's canonical bytes are its tag, its varuint length and its bytes: equal
+		// encodings are equal bytes. Rows that could reach the encode cap take the encoder (and its refusal).
+		if (plainClosedRowBytes(a) && plainClosedRowBytes(b)) {
+			if (a.byteLength !== b.byteLength || compareBytes(a, b) !== 0) return false;
+		} else if (!closedRetirementEqual(a, b)) return false;
+	}
+	return true;
+}
+function plainClosedRowBytes(value: unknown): value is Uint8Array {
+	return value instanceof Uint8Array && Object.getPrototypeOf(value) === Uint8Array.prototype &&
+		value.byteLength + 16 <= CLOSED_RETIREMENT_BYTES.maxBytes;
 }
 
 /** Exact comparison of already captured native components, not a new enclosing
@@ -10677,8 +10942,7 @@ function closedJournalNativeObservationEqual(left: LiveJournalRetirementImageObs
 		return bytesEqual(closedJournalReconstructedControlCarriers(a), closedJournalReconstructedControlCarriers(b),
 			LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES);
 	};
-	const baseEqual = (a: LiveJournalRetirementImageObservation | NonNullable<LiveJournalRetirementImageObservation["drainSource"]>,
-		b: typeof a): boolean => controlEqual(a.control, b.control) && closedRetirementEqual(a.image, b.image) &&
+	const baseEqual = (a: LiveJournalRetirementImageObservation, b: LiveJournalRetirementImageObservation): boolean => controlEqual(a.control, b.control) && closedRetirementEqual(a.image, b.image) &&
 		bytesEqual(a.canonicalRows, b.canonicalRows, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes);
 	try {
 		const fields = ["control", "exactCanonicalControlCarriers", "image", "canonicalRows"];
@@ -10686,12 +10950,9 @@ function closedJournalNativeObservationEqual(left: LiveJournalRetirementImageObs
 			b = capturePromotionRecord(right, [...fields, ...(Object.hasOwn(right, "drainSource") ? ["drainSource"] : [])]);
 		if (a === undefined || b === undefined || !baseEqual(left, right) ||
 			!bytesEqual(left.exactCanonicalControlCarriers, right.exactCanonicalControlCarriers, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES)) return false;
-		const sourceA = Object.hasOwn(a, "drainSource"), sourceB = Object.hasOwn(b, "drainSource");
-		if (sourceA !== sourceB) return false;
-		if (!sourceA) return true;
-		return capturePromotionRecord(a.drainSource, ["control", "image", "canonicalRows"]) !== undefined &&
-			capturePromotionRecord(b.drainSource, ["control", "image", "canonicalRows"]) !== undefined &&
-			baseEqual(left.drainSource!, right.drainSource!);
+		// A present drainSource is the adapter's reconstruction from this same (control, image, rows), all
+		// compared above: equal inputs, equal reconstruction. Its presence follows control.drain.
+		return true;
 	} catch { return false; }
 }
 /** Row-only native drain plans omit BOTH header fields. Absence is not an
@@ -10937,6 +11198,32 @@ function authenticateClosedSigningSummaryEpoch(
 	});
 }
 
+/**
+ * The AHE coordinator a closed-signing classification reads. An ACTIVE preparation was derived while
+ * the coordinator had none (a derivation with one only resumes it: installClosedRetirementSource), on
+ * its completed decision, and preparing changes nothing else these classifiers read
+ * (boundPreparedFields keeps completed). Until the signing participant joins that preparation (staged
+ * it, completed it, or drains it), resuming it classifies on that same coordinator: reading the active
+ * labels instead turned a SAME-P summary or evidence decision into a fresh one, and the resumed source
+ * no longer re-derived the prepared proof (box m45 rcd5: a creator reopened between the AHE prepare and
+ * the signing stage refused chain-invalid; formal/closed-retirement-resume-classification.qnt).
+ * @param control - The signing participant's native control.
+ * @param coordinator - The AHE coordinator's native control.
+ * @returns The coordinator the active preparation was derived on, or the coordinator itself.
+ */
+function closedSigningClassificationCoordinator(
+	control: SigningRetirementControl | null,
+	coordinator: AheRetirementControl | null
+): AheRetirementControl | null {
+	const active = coordinator?.active?.preparation;
+	if (coordinator == null || active == null) return coordinator;
+	const joined = [control?.active?.preparation, control?.completed, control?.drain?.plan.baseControl.completed].some(
+		(labels) => labels != null && labels.decisionDigest === active.decisionDigest &&
+			labels.sourceProofDigest === active.sourceProofDigest
+	);
+	return joined ? coordinator : Object.freeze({ ...coordinator, active: null });
+}
+
 function classifyClosedSigningSummaries(
 	input: Readonly<{
 		objectId: string;
@@ -10952,7 +11239,8 @@ function classifyClosedSigningSummaries(
 ): ClosedRetirementSource["signingSummaries"] {
 	const control = closedSigningControl(input.rows, input.objectId);
 	if (control?.completed == null) return undefined;
-	const p = input.coordinator?.active?.preparation ?? input.coordinator?.completed;
+	const coordinator = closedSigningClassificationCoordinator(control, input.coordinator);
+	const p = coordinator?.active?.preparation ?? coordinator?.completed;
 	const preparation = control.active?.preparation ?? control.completed;
 	const stored = preparation.summarySource;
 	// A preparation has floorEpoch, a completion throughEpoch. Check the real
@@ -10999,7 +11287,7 @@ function classifyClosedSigningSummaries(
 		}
 		for (const bytes of [closedRetirementBytes(stored)])
 			requireLaw(input.accounting.charge(bytes), "proof-budget-exceeded");
-		if (control.active === null && input.coordinator?.active === null && drain != null &&
+		if (control.active === null && coordinator?.active === null && drain != null &&
 			isSigningSummaryRetirementPlan(drain.plan) && drain.cursor === drain.plan.entries.length) {
 			checkClosedSigningSummaryImage({ rows: input.rows, original: input.rows, objectId: input.objectId,
 				source: stored, control,
@@ -11033,7 +11321,7 @@ function classifyClosedSigningSummaries(
 		}
 		if (
 			control.active === null &&
-			input.coordinator?.active === null &&
+			coordinator?.active === null &&
 			drain != null &&
 			isSigningSummaryRetirementPlan(drain.plan) &&
 			drain.plan.baseControl.completed?.decisionDigest === preparation.decisionDigest &&
@@ -11060,7 +11348,7 @@ function classifyClosedSigningSummaries(
 		return stored;
 	}
 	if (control.drain != null && control.drain.cursor !== control.drain.plan.entries.length) return undefined;
-	const prior = input.coordinator?.completed;
+	const prior = coordinator?.completed;
 	if (
 		input.unclassified ||
 		prior == null ||
@@ -11226,7 +11514,8 @@ function classifyClosedSigningEvidence(
 	const frames = data.map((bytes) => ({ bytes, frame: decodeCanonical(bytes) as unknown[] }));
 	const control = closedSigningControl(input.rows, input.objectId);
 	const drain = control?.drain;
-	const p = input.coordinator?.active?.preparation ?? input.coordinator?.completed;
+	const coordinator = closedSigningClassificationCoordinator(control, input.coordinator);
+	const p = coordinator?.active?.preparation ?? coordinator?.completed;
 	const original = drain?.plan.baseControl.completed;
 	const same =
 		drain != null &&
@@ -11399,7 +11688,7 @@ async function drainClosedJournalDetails(input: Readonly<{
 			const state = read.control.drain;
 			if (state == null) {
 				requireLaw(closedRetirementEqual(read.image, source.journal.image) &&
-					closedRetirementEqual(read.readExactCanonicalRows(), source.journal.canonicalRows), "floor-stale");
+					closedJournalRowsEqual(read.readExactCanonicalRows(), source.journal.canonicalRows), "floor-stale");
 			} else {
 				requireLaw(closedRetirementEqual(state.plan.prefixes, prefixes) &&
 					closedJournalDrainHeadersEqual(state.plan, source.journalHeaders) &&
@@ -11407,7 +11696,7 @@ async function drainClosedJournalDetails(input: Readonly<{
 					read.drainSource !== undefined &&
 					closedRetirementEqual(read.drainSource.control, state.plan.baseControl) &&
 					closedRetirementEqual(read.drainSource.image, source.journal.image) &&
-					closedRetirementEqual(read.drainSource.canonicalRows, source.journal.canonicalRows), "floor-stale");
+					closedJournalRowsEqual(read.drainSource.canonicalRows, source.journal.canonicalRows), "floor-stale");
 			}
 			for (const bytes of [...read.readExactCanonicalRows(), ...closedJournalNativeControlCarriers(read)])
 				requireLaw(source.accounting.charge(bytes), "proof-budget-exceeded");
@@ -11514,7 +11803,7 @@ async function acknowledgeClosedJournalDrain(input: Readonly<{
 		await joinedClosedRetirementRead(read, async () => {
 			requireLaw(expected !== undefined && image !== undefined && rows !== undefined &&
 				closedRetirementEqual(read.control, expected) && read.control.drain == null && read.drainSource === undefined &&
-				closedRetirementEqual(read.image, image) && closedRetirementEqual(read.readExactCanonicalRows(), rows), "floor-stale");
+				closedRetirementEqual(read.image, image) && closedJournalRowsEqual(read.readExactCanonicalRows(), rows), "floor-stale");
 			for (const bytes of [...read.readExactCanonicalRows(), ...closedJournalNativeControlCarriers(read),
 				closedRetirementBytes(read.image)]) requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
 		});
@@ -11959,13 +12248,11 @@ function maintenanceEncodedWidth(value: number | undefined,
 	if (maximumBytes !== undefined && maximumBytes !== AHE_BOUNDED_READ_LIMITS.maxUnionBytes &&
 		maximumBytes !== ISSUANCE_RETIREMENT_LIMITS.maxBytes && maximumBytes !== LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes)
 		throw new TypeError("creator maintenance native field entitlement is invalid");
-	if (
-		typeof value !== "number" ||
-		!Number.isSafeInteger(value) ||
-		value < 1 ||
-		value > limit
-	)
+	if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
 		throw new TypeError("creator maintenance encoded width is invalid");
+	// A well-formed width past its bound is capacity (this epoch's maintenance carrier is full;
+	// a rollover clears it), not a malformed value.
+	if (value > limit) throw new TypeError("creator maintenance encoded width exceeds its bound");
 	if (expanded !== undefined && (!Number.isSafeInteger(expanded.items) || expanded.items < 1 ||
 		expanded.items > 65_536 || !Number.isSafeInteger(expanded.maxDepth) ||
 		expanded.maxDepth < 0 || expanded.maxDepth > 128))
@@ -13020,6 +13307,91 @@ function creatorOrdinaryJournalDescriptorGroupsForSizing(frames: ReturnType<type
 	current.pageCount = current.localPossible ? current.count : 0;
 	return groups;
 }
+/**
+ * Width of the membership row the successor epoch's close writes when that epoch holds only its adoption fence
+ * (creatorCloseMembershipFields' shape: one local witness, the fence). A refusal-triggered rollover closes such an
+ * epoch before the next adoption fence acquires the journal, so the fence horizon an admission reserves carries it
+ * (live-journal successorClosedMembershipByteLength). Conservative: the widest history start, the wider of the
+ * current and successor latched ACLs, and two packed close-set digests.
+ * @param input - The current journal scope, both latched ACL widths and the successor fence's preimage width.
+ * @returns The membership row's canonical width.
+ */
+function creatorFenceHorizonMembershipWidthForSizing(input: Readonly<{
+	currentScope: LiveJournalScope; latchedAclByteLength: number; fencePreimageByteLength: number;
+}>): number {
+	const packed = 2 * 32;
+	return maintenanceCanonicalWidth({ kind: "creator-close-membership-1", cutValueDigest: maintenanceEncodedWidth(66),
+		scope: { ...input.currentScope, epoch: input.currentScope.epoch + 1 }, historyStart: Number.MAX_SAFE_INTEGER,
+		exactCanonicalLatchedAclBytes: maintenanceEncodedBytes(input.latchedAclByteLength),
+		orderedVertexDigests: maintenanceEncodedWidth(1 + maintenanceVarUintWidth(packed) + packed),
+		localVertexWitnesses: [{ vertexDigest: maintenanceEncodedWidth(66),
+			exactCanonicalPreimageBytes: maintenanceEncodedBytes(input.fencePreimageByteLength),
+			detachedSignature: maintenanceEncodedBytes(64) }] });
+}
+
+/**
+ * A fence horizon phase's finishing capacity: afterSuccessorLocal's own finishing rectangle widened by what the
+ * horizon adds past it. One owner for the composer and the template evaluator's mirror.
+ * @param finalCapacity - afterSuccessorLocal's finishing capacity.
+ * @param horizonPhase - The horizon phase (live-journal fenceHorizon).
+ * @param local - afterSuccessorLocal's exact widths.
+ * @returns The horizon phase's canonical rows and native image capacity.
+ */
+function closedJournalFenceHorizonCapacityForSizing(
+	finalCapacity: Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }>,
+	horizonPhase: Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }>,
+	local: Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }>
+): Readonly<{ canonicalRowsBytes: number; nativeImageBytes: number }> {
+	return Object.freeze({
+		canonicalRowsBytes: finalCapacity.canonicalRowsBytes + horizonPhase.canonicalRowsBytes - local.canonicalRowsBytes,
+		nativeImageBytes: finalCapacity.nativeImageBytes + horizonPhase.nativeImageBytes - local.nativeImageBytes,
+	});
+}
+
+/** Typed refusal: an admission's journal postimage did not grow over its capture. */
+export const JOURNAL_POSTIMAGE_NOT_GROWN = "MAINTENANCE_JOURNAL_POSTIMAGE_NOT_GROWN";
+
+/**
+ * Width of the drain plan that will retire this epoch's own rows (closedJournalDrainPlanCarriers(...).plan), the
+ * single-epoch plan bound readiness checks against the close's one encode cap. The install source, the classifier
+ * result and the native plan carrier each hold a plan whole, with every received row's exact native frame. An epoch's
+ * rows become collectible together two closes later (the coverage lag), and a rollover cannot shrink a closed epoch, so
+ * an epoch whose own plan outgrew the cap could never retire: readiness refuses the admission that would make it so.
+ * Collectible journal bytes per plan byte is the plan codec's own per-row cost (descriptor metadata plus the frame),
+ * measured here on the same plan fields the carrier projects; no factor is written down.
+ * Conservative: every integer at its widest, every author at the wider of the local author and a 64-hex key, the
+ * widest completed preparation, and each new received row charged afterLocal's whole canonical growth.
+ * @param input - The captured journal, this admission's afterLocal frame widths and appends, and the local author.
+ * @returns The plan's canonical width (a width error past the codec's own bounds refuses, as every width does).
+ */
+export function closedJournalCurrentEpochPlanWidthForSizing(input: Readonly<{
+	canonicalRows: readonly Uint8Array[]; currentScope: LiveJournalScope; afterLocalCanonicalRowBytes: readonly number[];
+	appendCount: number; appendReceived: boolean; author: string;
+}>): number {
+	const scope = input.currentScope, key = JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]);
+	const before = input.canonicalRows.reduce((total, raw) => total + raw.byteLength, 0);
+	const after = input.afterLocalCanonicalRowBytes.reduce((total, length) => total + length, 0);
+	// An append only adds rows. A postimage no larger than its capture (an open drain checkpoint
+	// whose plan the postimage applies, or a capture that no longer describes the journal) is not a
+	// width this admission can bound: fail closed, typed, before any frame is read.
+	if (after <= before) throw new TypeError(`${JOURNAL_POSTIMAGE_NOT_GROWN}:${before}:${after}`);
+	const group = creatorOrdinaryJournalDescriptorGroupsForSizing(creatorOrdinaryNativeJournalFrames(input.canonicalRows), key,
+		{count: input.appendCount, frameByteLength: Math.max(0, after - before),
+			sourceKind: input.appendReceived ? "received" : "local-issued"}).get(key)!;
+	const digest = maintenanceEncodedWidth(66);
+	const author = maintenanceEncodedWidth(Math.max(closedRetirementBytes(input.author).byteLength, 66));
+	// The plan codec's descriptors (captureJournalRetirementDrainPlan): local rows by reference, received rows with
+	// their exact native frame.
+	const local = {journalSequence: 0, vertexDigest: digest, author, authorSequence: 0, nativeFrameDigest: digest};
+	const rows = [...Array<typeof local>(group.count - group.receivedFrameByteLengths.length).fill(local),
+		...group.receivedFrameByteLengths.map(length => ({...local, exactCanonicalNativeFrameBytes: maintenanceEncodedBytes(length)}))];
+	const baseControl = {kind: "v3-live-journal-retirement-control-2", objectId: scope.objectId, incarnation: digest,
+		revision: 0, sequence: 0, active: null, drain: null, completed: {decisionDigest: digest, sourceProofDigest: digest,
+			throughEpoch: 0, protectedScopes: Array<LiveJournalScope>(LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes).fill(scope)}};
+	return maintenanceCanonicalCapacityWidth(closedJournalDrainPlanCarriers({baseControl,
+		sourceImage: {imageDigest: digest, scopeCount: 0, rowCount: 0, byteCharge: 0},
+		prefixes: [{scope, highWatermark: 0, rows}]}, () => digest).plan);
+}
 function creatorOrdinaryJournalScopeCollectibleForSizing(source: CreatorOrdinaryIssuanceSourceFacts, key: string): 0 | 1 {
 	return source.maintenanceResourceFacts.ordinaryJournalReplayScopes?.some(scope =>
 		JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]) === key) === true ? 0 : 1;
@@ -13196,15 +13568,23 @@ function creatorOrdinaryFutureNativeResourceForSizing(facts: Readonly<{current: 
 	capacity: ReturnType<typeof creatorOrdinaryResourceNativeCapacityForSizing>, successorFenceFrameByteLength: number) {
 	const phases = facts.current.successorFenceCount === 0 ? ["ordinaryFinal" as const] :
 		["ordinaryFinal", "successorPending", "successorFinal"] as const;
-	const rows = Object.freeze({byteLength: Math.max(...phases.map(phase => capacity.issuance[phase].canonicalRowsBytes)),
-		items: Math.max(...phases.map(phase => capacity.issuance.canonicalRowsShape[phase].items)),
-		maxDepth: Math.max(...phases.map(phase => capacity.issuance.canonicalRowsShape[phase].maxDepth))});
+	const rowsOver = (selected: readonly ("ordinaryFinal" | "successorPending" | "successorFinal")[]) => Object.freeze({
+		byteLength: Math.max(...selected.map(phase => capacity.issuance[phase].canonicalRowsBytes)),
+		items: Math.max(...selected.map(phase => capacity.issuance.canonicalRowsShape[phase].items)),
+		maxDepth: Math.max(...selected.map(phase => capacity.issuance.canonicalRowsShape[phase].maxDepth))});
+	const rows = rowsOver(phases);
+	// The exact composer bounds the issuance census point image by the AHE union
+	// limit only with FINAL rows: ordinaryFinal before the close and successorFinal
+	// after it (its old/prepared/completed controls and its pre-close candidate
+	// image). Pending successor rows enter only the successor jobs' runtime census,
+	// whose bound is the proof envelope; `rows` above still covers that census.
+	const unionRows = rowsOver(facts.current.successorFenceCount === 0 ? ["ordinaryFinal"] : ["ordinaryFinal", "successorFinal"]);
 	const bytes = (length: number) => canonicalBytesResourceForSizing(length,
 		{maxBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES, maxItems: 65_536, maxDepth: 128}).byteLength;
 	const futureLeaf = facts.current.successorFenceCount === 0 ? 0 : maintenanceWidthSum([
 		bytes(capacity.fencePreimage), bytes(64), bytes(32), successorFenceFrameByteLength,
 	], "ordinary-settlement-leaf");
-	return Object.freeze({rows, futureLeaf});
+	return Object.freeze({rows, unionRows, futureLeaf});
 }
 
 /** A resumed close/serial source charges reconstructed RAW rows/native controls,
@@ -13375,7 +13755,7 @@ function deriveCreatorOrdinarySourceResourceProgramForSizing(profile: CreatorOrd
 			{receivedPreimages, preimage, fencePreimage, runtimeWidths, issuance}, journal.successorFenceFrameByteLength);
 		parameters.set("settlement.futureLeaf", futureNative.futureLeaf);
 		parameters.set("settlement.fencePreimage", fencePreimage);
-		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows);
+		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows); setResource("native.unionRows", futureNative.unionRows);
 		parameters.set("journal.rawSupplement", creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial));
 		setResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
@@ -13536,7 +13916,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 		const oldIssuedBytes = sum(...rows.issued.map(row => closedRetirementBytes(row).byteLength));
 		const oldNativeControlBytes = closedJournalNativeControlCarriers(capture.journal);
 		const nativeJournalControlBound = sum(...oldNativeControlBytes.map(raw => raw.byteLength + encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength));
-		const journalContextBound = capture.journal.control === null ? 0 : state.journalObservationFields.control!.byteLength;
+		const journalContextBound = capture.journal.control === null ? 0 : state.journalContextControlWidth;
 		// The ordinary domain has exactly the registered PRE fields and at most
 		// sixteen dependency digests. The ORIGINAL field owner inserts operation
 		// as an encoded VALUE, not BYTES: all other fields are independent of its
@@ -13663,7 +14043,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			parameters.set("journal.scopes", journal.scopeCount); parameters.set("journal.successor.count", fence);
 			parameters.set("journal.successor.frame", journal.successorFenceFrameByteLength);
 			parameters.set("journal.rawSupplement", creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial));
-			setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows);
+			setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows); setResource("native.unionRows", futureNative.unionRows);
 			setResource("native.image", {byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape});
 			for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
 				parameters.set(`runtime.${phase}.bytes`, runtimeWidths[phase]);
@@ -13688,6 +14068,11 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			const freshObservations = sum(freshJournal.byteLength, journalContextBound, nativeJournalControlBound, currentNativeUnknown);
 			const finishingJournal = canonicalRecordResourceForSizing({...state.journalObservationFields, canonicalRows: journal.canonicalRows}, resourceLimits);
 			const finishingObservations = sum(finishingJournal.byteLength, journalContextBound, nativeJournalControlBound, nativeUnknown);
+			// The close encodes this journal carrier with closedRetirementBytes: one per-carrier cap, so
+			// admission refuses (typed) before the carrier grows past what the close can encode.
+			if (Math.max(freshJournal.byteLength, finishingJournal.byteLength) > CLOSED_RETIREMENT_BYTES.maxBytes)
+				return decline(`${stage}:observation-carrier`, {freshJournal: freshJournal.byteLength,
+					finishingJournal: finishingJournal.byteLength, limit: CLOSED_RETIREMENT_BYTES.maxBytes});
 			for (const phase of ["currentTurnover", "closeAdopt", "successorJob", "serial", "cold"] as const)
 				parameters.set(`material.${phase}`, sum(lifetime[phase], protectedGrowth, phase === "closeAdopt" ? finishingObservations : 0));
 			parameters.set("material.priorUnknown", input.knownResourceTotals.unknownEncodedBytes);
@@ -13915,7 +14300,7 @@ function creatorOrdinarySuffixCapacityForSizing(facts: CreatorOrdinaryResourceDi
 		setResource("journal.headerDrain", headerDrain.descriptors);
 		parameters.set("journal.rowCount", journal.rowCount); parameters.set("journal.rawBytes", journal.canonicalRowByteLengthsTotal);
 		parameters.set("journal.scopes", journal.scopeCount); parameters.set("journal.successor.frame", journal.successorFenceFrameByteLength);
-		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows);
+		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows); setResource("native.unionRows", futureNative.unionRows);
 		parameters.set("journal.rawSupplement", creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial));
 		setResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		parameters.set("settlement.futureLeaf", futureNative.futureLeaf); parameters.set("settlement.fencePreimage", fencePreimage);
@@ -13939,9 +14324,10 @@ function creatorOrdinarySuffixCapacityForSizing(facts: CreatorOrdinaryResourceDi
 		const projectedI = sum(source.capacity.material.projectCurrentProtected(proof.accounting, source.replaceableJournalObservation?.bytes,
 			facts.proofFacts.capture.replacedRuntimeCensusObservation).whole,
 			facts.knownResourceTotals.unknownEncodedBytes, newRaw, freshJournalObservation.byteLength,
-			capture.journal.control === null ? 0 : state.journalObservationFields.control!.byteLength,
+			capture.journal.control === null ? 0 : state.journalContextControlWidth,
 			2 * nativeUnknown, runtimeWidths.currentClose);
 		if (projectedI > CREATOR_ORDINARY_PROOF_MAX_BYTES) return undefined;
+		if (freshJournalObservation.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes) return undefined; // The close's per-carrier encode cap.
 		const envelopes = Object.freeze([0, 1, 2, 3].map(index => Math.max(actual.capacity.fullFutureProofEnvelopeByteLengths[index]!, output(values, `envelope.${index}`))));
 		if (envelopes.some(value => value > CREATOR_MAINTENANCE_PROOF_MAX_BYTES)) return undefined;
 		const knownCarriers = Object.freeze([...actual.capacity.knownCarriers, encodedOperation.slice()]);
@@ -14374,7 +14760,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const summarySource = record({entries: summaryEntries, sourceDataDigest: digest, resumeBasisDigest: digest, eligibilityFence: signingPrep});
 		const summaryPrep = record({...labels, protectedEpochs: array(signingEpochCountTerm, integer), summarySource});
 		const participantPreps = [record({...labels, protectedScopes: array(protectedSnapshotCountTerm, pair)}), record({...labels, protectedScopes: protectedHeaders}),
-			record({...labels, protectedRecords, planRewrite: inputResource("issuance.planRewrite",
+			record({...labels, floorEpoch: integer, protectedRecords, planRewrite: inputResource("issuance.planRewrite",
 				issuance.planRewriteResource ?? nil)}), maximum(signingPrep, summaryPrep)];
 		const preparation = record({head, floorEpoch: integer, floorAnchor: digest, decisionDigest: digest, sourceProofDigest: digest,
 			generationRecordDigests: recordDigests, snapshotScopes: snapshotHoles, protectedIndices: array(snapshotCountTerm, integer),
@@ -14452,8 +14838,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		// protected prefixes too. Do not put impossible prefixes back into its
 		// observation wrapper. This positive subset is common to CURRENT and the
 		// ordinary FUTURE finishing horizon; absent proof keeps every group.
-		const groupRows = groupEntries.map(([, group], index) => {
-			const eligible = descriptorEligibility[index]!;
+		const descriptorRows = (index: number, eligible: number | CreatorNoneResourceNumber) => {
+			const group = groupEntries[index]![1];
 			const include = typeof eligible === "number" ? eligible : eligible.value;
 			const original = include === 0 ? tuple([]) : tuple([...Array<CanonicalResourceFootprint>(group.count - group.receivedFrameByteLengths.length).fill(localDescriptor),
 				...group.receivedFrameByteLengths.map(length => descriptor(length))]);
@@ -14468,7 +14854,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 				compiler.sum(compiler.product(count, compiler.references(localDescriptor).items),
 					compiler.product(receivedCount, compiler.subtract(compiler.references(descriptorTemplate).items, compiler.references(localDescriptor).items))),
 				compiler.references(descriptorTemplate).maxDepth);
-		});
+		};
+		const groupRows = groupEntries.map((_, index) => descriptorRows(index, descriptorEligibility[index]!));
 		const successorDescriptorCount = inputNumber("journal.successor.count", current.successorFenceCount);
 		const successorDescriptors = array(successorDescriptorCount,
 			descriptor(inputNumber("journal.successor.frame", journal.successorFenceFrameByteLength)));
@@ -14492,6 +14879,21 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			rowCount: integer, byteCharge: integer}), retiredEmptyHeaders, protectedHeaderScopes: protectedHeaders};
 		const journalPlan = record({...journalPlanFields, prefixes});
 		const journalHeaderPlan = record({...journalPlanFields, prefixes: tuple([])});
+		const footprintPlan = {record, array: (items: readonly unknown[]) => tuple(items as readonly CanonicalResourceFootprint[])};
+		// The journal observation carrier's copy of this plan: prefixes and retired headers by digest (the same owner as
+		// every carrier; journalPlan above stays the separately charged native plan carrier).
+		const observedJournalPlan = closedJournalDrainPlanCarriers({...journalPlanFields,
+			prefixes: [...groupRows, successorDescriptors].map(rows => ({scope: journalScope, highWatermark: integer, rows}))},
+		() => digest, footprintPlan).observed as CanonicalResourceFootprint;
+		// The single-epoch plan bound (closedJournalCurrentEpochPlanWidthForSizing in the exact composer): the candidate
+		// scope's own rows, whatever their eligibility now, must fit the plan that retires them two closes later.
+		const candidateGroup = groupEntries.findIndex(([key]) => key === candidateScopeKey);
+		if (candidateGroup < 0) throw new TypeError("ORDINARY_NONE_DESCRIPTOR_CURRENT_SCOPE_MISSING");
+		const currentEpochPlan = closedJournalDrainPlanCarriers({baseControl: completed[1],
+			sourceImage: journalPlanFields.sourceImage, prefixes: [{scope: journalScope, highWatermark: integer,
+				rows: descriptorRows(candidateGroup, 1)}]}, () => digest, footprintPlan).plan as CanonicalResourceFootprint;
+		compiler?.limit(compiler.references(currentEpochPlan).byteLength, CLOSED_RETIREMENT_BYTES.maxBytes, 1);
+		if (currentEpochPlan.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes) return undefined;
 		const nativeProgressFields = journalRetirementNativeProgressFields({...baseFields[1], revision: integer, sequence: integer,
 			active: nil, completed: participantPreps[1]}, digest, integer, integer, integer, digest);
 		// SAME original nested drain fields are a direct encoded child, not an
@@ -14499,12 +14901,14 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const nativeProgress = record({...nativeProgressFields, drain: record(nativeProgressFields.drain)});
 		const semanticJournalProgress = record(journalRetirementControlFields({version2: true,
 			objectId: runtime.objectId, incarnation: baseFields[1]!.incarnation, revision: integer, sequence: integer,
-			active: nil, completed: participantPreps[1], drain: record({plan: journalPlan, cursor: integer,
+			active: nil, completed: participantPreps[1], drain: record({plan: observedJournalPlan, cursor: integer,
 				batches: integer, residualImageDigest: digest})}));
 		// NEW plan projection is not permission to shrink an OLD/resumed plan.
-		// Retain every old field (including drain), widening only monotone counters.
+		// Retain every old field (including drain), widening only monotone counters. An old drain's plan rides in this
+		// carrier by digest too (closedJournalObservationControl); its exact bytes are the native carriers charged apart.
 		const journalControl = maximum(semanticJournalProgress,
-			record({...baseFields[1], revision: integer, sequence: integer}));
+			record({...(controls[1] == null ? baseFields[1] : fields(closedJournalObservationControl(controls[1]))),
+				revision: integer, sequence: integer}));
 		const participantBounds = participantPreps.map((prep, index) => {
 			const base = baseFields[index]!;
 			return record({...base, revision: integer, sequence: integer,
@@ -14555,12 +14959,19 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const nativeRows = inputResource("native.rows", futureNative.rows);
 		const nativeImage = inputResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		const census = record({rows: nativeRows, image: nativeImage, control: participantBounds[2]});
-		// The exact composer observes this same issuance census (rows, image and a
-		// control holding both completed and active preparations) as one native
-		// point image under the AHE union bound. The reservation keeps that bound;
-		// a miss falls back to the exact composer rather than admitting past it.
-		if (census.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
-		compiler?.limit(compiler.references(census).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);
+		// The exact composer observes the issuance census (FINAL rows, image and
+		// each of the old/prepared/completed controls, which this control bound
+		// covers) as one native point image under the AHE union bound. The
+		// reservation keeps that bound over the FINAL-row census; a miss falls back
+		// to the exact composer rather than admitting past it. The complete census
+		// above, with pending successor rows, stays in every successor job census.
+		const unionCensus = record({rows: inputResource("native.unionRows", futureNative.unionRows), image: nativeImage,
+			control: participantBounds[2]});
+		if (unionCensus.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
+		compiler?.limit(compiler.references(unionCensus).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);
+		// Successor reserved/entered phases hold PENDING successor rows; currentClose
+		// and successorFinal hold FINAL rows (the exact composer's post-adoption census).
+		const phaseCensus = (phase: string) => phase === "successorReserved" || phase === "successorEntered" ? census : unionCensus;
 		const runtimeEnvelopeTerms = ["currentClose", "successorReserved", "successorEntered", "successorFinal"].map(key => {
 			const phase = key as keyof typeof runtimeWidths.runtimeCensusOverheadShape, shape = runtimeWidths.runtimeCensusOverheadShape[phase];
 			if (shape.items + census.items > 65_536 || Math.max(shape.maxDepth, 1 + census.maxDepth) > 128)
@@ -14568,19 +14979,24 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			if (compiler !== undefined) {
 				compiler.limit(compiler.sum(inputNumber(`runtime.${phase}.items`, shape.items), compiler.references(census).items), 65_536);
 				compiler.limit(compiler.maximum(inputNumber(`runtime.${phase}.depth`, shape.maxDepth), compiler.sum(1, compiler.references(census).maxDepth)), 128);
-				return compiler.sum(inputNumber(`runtime.${phase}.bytes`, runtimeWidths[phase]), width(census));
+				return compiler.sum(inputNumber(`runtime.${phase}.bytes`, runtimeWidths[phase]), width(phaseCensus(phase)));
 			}
-			return sum(runtimeWidths[phase], census.byteLength);
+			return sum(runtimeWidths[phase], phaseCensus(phase).byteLength);
 		});
-		const runtimeEnvelopeTerm = compiler?.maximum(...runtimeEnvelopeTerms) ?? Math.max(...runtimeEnvelopeTerms.map(value => typeof value === "number" ? value : value.value));
+		// Close/adopt, turnover and serial lifetimes carry the exact composer's
+		// post-adoption census: the currentClose or successorFinal runtime with the
+		// FINAL-row census. Successor reserved/entered censuses (pending rows) are
+		// charged in their own successor job lifetimes below, as the exact composer
+		// charges them in its separate successor job envelopes.
+		const finalRuntimeTerms = [runtimeEnvelopeTerms[0]!, runtimeEnvelopeTerms[3]!];
+		const runtimeEnvelopeTerm = compiler?.maximum(...finalRuntimeTerms) ?? Math.max(...finalRuntimeTerms.map(value => typeof value === "number" ? value : value.value));
 		const runtimeEnvelope = typeof runtimeEnvelopeTerm === "number" ? runtimeEnvelopeTerm : runtimeEnvelopeTerm.value;
 		const snapshotImage = record({imageDigest: digest, scopeCount: integer, chunkCount: integer, metadataBytes: integer, scopes: snapshotPairs});
 		const snapshotWrapper = record({control: participantBounds[0], image: snapshotImage});
 		const journalImage = record({imageDigest: digest, scopeCount: integer, rowCount: integer, byteCharge: integer});
-		const journalDrainSource = maximum(capture.journal.drainSource === undefined ? nil : actual(capture.journal.drainSource),
-			record({control: completed[1], image: journalImage, canonicalRows: inputResource("journal.rows", journal.canonicalRows)}));
+		// The journal carrier holds no reconstructed drainSource (creatorIssuanceMaintenanceObservationCarriers).
 		const journalWrapper = record({control: journalControl, image: journalImage,
-			canonicalRows: inputResource("journal.rows", journal.canonicalRows), drainSource: journalDrainSource});
+			canonicalRows: inputResource("journal.rows", journal.canonicalRows)});
 		const newFact = record(snapshotQuarantineContract.recoveryRetirementFactFields({certificateDigest: digest, currentHead: roomHead}, pair, array(3, pair)));
 		const futureInventory = record({scopes: tuple([...inventoryScopes.map(actual), record({scope, incarnation: primitive("0".repeat(36)),
 			contentBytes: integer, retirement: newFact})]), owner: record({...fields(owner), recoveryScopes: integer, recoveryContentBytes: integer})});
@@ -14614,7 +15030,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 					snapshotRetirementContract.controlLimits.maxItems, snapshotRetirementContract.controlLimits.maxDepth],
 				[participantBounds[2]!, ISSUANCE_RETIREMENT_LIMITS.maxBytes, ISSUANCE_RETIREMENT_LIMITS.maxRows * 16 + 64, 12],
 				[snapshotWrapper, snapshotRetirementContract.maxImageBytes, 65_536, 128],
-				[journalWrapper, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, 65_536, 128], [nativeRows, CREATOR_MAINTENANCE_PROOF_MAX_BYTES, 65_536, 16],
+				[journalWrapper, CLOSED_RETIREMENT_BYTES.maxBytes, 65_536, 128], [nativeRows, CREATOR_MAINTENANCE_PROOF_MAX_BYTES, 65_536, 16],
 			] as const) {
 				const refs = compiler.references(value);
 				compiler.limit(refs.byteLength, maxBytes, 1); compiler.limit(refs.items, maxItems, 1); compiler.limit(refs.maxDepth, maxDepth);
@@ -14630,7 +15046,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			participantBounds[2]!.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes ||
 			participantBounds[2]!.items > ISSUANCE_RETIREMENT_LIMITS.maxRows * 16 + 64 || participantBounds[2]!.maxDepth > 12 ||
 			snapshotWrapper.byteLength > snapshotRetirementContract.maxImageBytes ||
-			journalWrapper.byteLength > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes || nativeRows.items > 65_536 || nativeRows.maxDepth > 16)
+			journalWrapper.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes || nativeRows.items > 65_536 || nativeRows.maxDepth > 16)
 			return undefined;
 		// Original classifier pages are reached only for all-local native scopes;
 		// mixed/received scopes refuse before paging (or use authenticated prefix
@@ -14760,15 +15176,15 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		// both inventories. No current I charge or prior UNKNOWN is removed.
 		const successorObservations = current.successorFenceCount === 0 ? [] : creatorIssuanceMaintenanceObservationCarriers({
 			journal: {control: journalControl, image: journalImage,
-				canonicalRows: inputResource("journal.rows", journal.canonicalRows), drainSource: journalDrainSource},
+				canonicalRows: inputResource("journal.rows", journal.canonicalRows)},
 			snapshot: snapshotWrapper, ahe: aheObservation, floor, floorImage: floorPoint, snapshotInventory: futureInventory,
 		}).map((value, index) => {
 			if (index !== 0) return creatorCanonicalCapacityForSizing(value as CanonicalResourceFootprint);
 			if (!isRecord(value)) throw new TypeError("ORDINARY_SUCCESSOR_OBSERVATION_UNAVAILABLE");
 			return record(value);
 		});
-		if (successorObservations.some((value, index) => value.byteLength > (index === 0
-			? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes : AHE_BOUNDED_READ_LIMITS.maxUnionBytes))) return undefined;
+		// Each observation is one carrier the job encodes with closedRetirementBytes: the same cap.
+		if (successorObservations.some(value => value.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes)) return undefined;
 		const successorJobs = current.successorFenceCount === 0 ? [] : [1, 2].map(index => {
 			const censusWidth = runtimeEnvelopeTerms[index]!;
 			return sum(...creatorSuccessorJobProofEnvelopePartsForSizing({base: lifetimeBase("successorJob"), unsignedPreimage: fencePreimage,
@@ -14826,8 +15242,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 					observations: successorObservations.map(width),
 					signingData: [inputNumber("signing.rawBytes", sum(...signingData.map(raw => raw.byteLength)))],
 					finalSigning: compiler.output("signing.finalPhaseBytes"), signingControl: width(signingControlFrame), aheControl: width(aheFrame)})));
-			successorObservations.forEach((value, index) => compiler.limit(compiler.references(value).byteLength, index === 0
-				? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes : AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1));
+			// Each observation is one carrier the job encodes with closedRetirementBytes: the same cap.
+			successorObservations.forEach(value => compiler.limit(compiler.references(value).byteLength, CLOSED_RETIREMENT_BYTES.maxBytes, 1));
 			const roots = [compiler.maximum(compiler.sum(lifetimeBaseTerm("closeAdopt"), rawSourcePhysicalTerm, currentTurnoverTerm, generationTransitions, compiler.product(2, width(floorImage)), compiler.product(6, width(aheControl))),
 				compiler.sum(lifetimeBaseTerm("currentTurnover"), rawSourcePhysicalTerm, currentTurnoverTerm, generationTransitions, compiler.product(2, width(floorImage)), compiler.product(6, width(aheControl))), ...successorJobTerms),
 				compiler.sum(lifetimeBaseTerm("serial"), rawSourcePhysicalTerm, metadataTerm, drainTerm),
@@ -15082,17 +15498,57 @@ export function createCreatorFinishingWidthCompiler() {
 	const results: Readonly<{ unknown: number; envelopes: readonly number[] }>[] = [];
 	const native: Readonly<{ width: number; maximum: number }>[] = [];
 	const counterMaximums = new Map<string, number>();
-	const interned = new Map<string, number>();
-	const append = (node: CreatorFinishingWidthNode, value: number): number => {
-		let key: string;
+	// A node is interned exactly when its kind and operands equal an earlier node's,
+	// keyed by its numbers rather than by a string spelling of them. Lists hash
+	// their kind and children into a bucket and compare every candidate fully.
+	const constantNodes = new Map<number, number>(), parameterNodes = new Map<string, number>();
+	const bytesNodes = new Map<number, number>(), arrayCountNodes = new Map<number, number>();
+	const productNodes = new Map<number, Map<number, number>>(), listNodes = new Map<number, number[]>();
+	const listHash = (kind: "sum" | "maximum", children: readonly number[]): number => {
+		let hash = kind === "sum" ? 0x2545f491 : 0x6b43a9b5;
+		for (let index = 0; index < children.length; index++)
+			hash = Math.imul(hash ^ children[index]!, 0x9e3779b1) ^ (hash >>> 15);
+		return hash;
+	};
+	const sameList = (index: number, kind: "sum" | "maximum", children: readonly number[]): boolean => {
+		const node = nodes[index]!;
+		if (node.kind !== kind || node.children.length !== children.length) return false;
+		for (let position = 0; position < children.length; position++)
+			if (node.children[position] !== children[position]) return false;
+		return true;
+	};
+	const internedIndex = (node: CreatorFinishingWidthNode): number | undefined => {
 		switch (node.kind) {
-			case "constant": key = `c:${node.value}`; break;
-			case "parameter": key = `p:${node.key}`; break;
-			case "sum": case "maximum": key = `${node.kind}:${node.children.join(",")}`; break;
-			case "product": key = `x:${node.left},${node.right}`; break;
-			case "bytes": case "array-count": key = `${node.kind}:${node.child}`; break;
+			case "constant": return constantNodes.get(node.value);
+			case "parameter": return parameterNodes.get(node.key);
+			case "sum": case "maximum": return listNodes.get(listHash(node.kind, node.children))?.find(index =>
+				sameList(index, node.kind as "sum" | "maximum", node.children));
+			case "product": return productNodes.get(node.left)?.get(node.right);
+			case "bytes": return bytesNodes.get(node.child);
+			case "array-count": return arrayCountNodes.get(node.child);
 		}
-		const existing = interned.get(key);
+	};
+	const intern = (node: CreatorFinishingWidthNode, index: number): void => {
+		switch (node.kind) {
+			case "constant": constantNodes.set(node.value, index); break;
+			case "parameter": parameterNodes.set(node.key, index); break;
+			case "sum": case "maximum": {
+				const hash = listHash(node.kind, node.children), bucket = listNodes.get(hash);
+				if (bucket === undefined) listNodes.set(hash, [index]); else bucket.push(index);
+				break;
+			}
+			case "product": {
+				let right = productNodes.get(node.left);
+				if (right === undefined) productNodes.set(node.left, right = new Map());
+				right.set(node.right, index);
+				break;
+			}
+			case "bytes": bytesNodes.set(node.child, index); break;
+			case "array-count": arrayCountNodes.set(node.child, index); break;
+		}
+	};
+	const append = (node: CreatorFinishingWidthNode, value: number): number => {
+		const existing = internedIndex(node);
 		if (existing !== undefined) {
 			if (values[existing] !== value) throw new TypeError("ORDINARY_FINISHING_TEMPLATE_NODE_DRIFT");
 			return existing;
@@ -15101,8 +15557,36 @@ export function createCreatorFinishingWidthCompiler() {
 			throw new TypeError("ORDINARY_FINISHING_TEMPLATE_COMPLEXITY");
 		const index = nodes.length;
 		nodes.push(Object.freeze(node)); values.push(value);
-		interned.set(key, index);
+		intern(node, index);
 		return index;
+	};
+	// Leaf widths. A scalar's canonical width is a pure function of the scalar, so
+	// each distinct scalar is encoded once per compile (refusals are never kept).
+	// A plain Uint8Array's is its tag, varuint length and payload, as the encoder
+	// writes it; one over the closed-retirement limit, or any other byte carrier,
+	// takes the original encode and its original refusal.
+	const integerWidth = closedRetirementBytes(Number.MAX_SAFE_INTEGER).byteLength;
+	const scalarWidths = new Map<string | number | boolean | null, number>();
+	let scalarBytes = 0;
+	const leafWidth = (node: unknown): number => {
+		if (typeof node === "number" && Number.isSafeInteger(node)) return integerWidth;
+		if (node instanceof Uint8Array) {
+			if (Object.getPrototypeOf(node) === Uint8Array.prototype && !Object.hasOwn(node, "byteLength")) {
+				const width = 1 + maintenanceVarUintWidth(node.byteLength) + node.byteLength;
+				if (width <= CLOSED_RETIREMENT_BYTES.maxBytes) return width;
+			}
+			return closedRetirementBytes(node).byteLength;
+		}
+		if (node !== null && typeof node !== "string" && typeof node !== "number" && typeof node !== "boolean")
+			return closedRetirementBytes(node).byteLength;
+		const prior = scalarWidths.get(node);
+		if (prior !== undefined) return prior;
+		const width = closedRetirementBytes(node).byteLength;
+		if (scalarWidths.size < 65_536 && width <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes - scalarBytes) {
+			scalarWidths.set(node, width);
+			scalarBytes += width;
+		}
+		return width;
 	};
 	const constant = (value: number): number => append({kind: "constant", value}, value);
 	const combine = (kind: "sum" | "maximum", children: readonly number[]): number => {
@@ -15161,7 +15645,7 @@ export function createCreatorFinishingWidthCompiler() {
 		}
 		if (value instanceof Uint8Array) {
 			const child = byteParameters.get(value);
-			return {width: child === undefined ? constant(closedRetirementBytes(value).byteLength) : bytes(child),
+			return {width: child === undefined ? constant(leafWidth(value)) : bytes(child),
 				items: constant(1), depth: constant(0)};
 		}
 		const array = Array.isArray(value);
@@ -15184,9 +15668,7 @@ export function createCreatorFinishingWidthCompiler() {
 				depth: children.length === 0 ? constant(0) : combine("sum", [constant(1),
 					combine("maximum", children.map(child => child.depth))])};
 		}
-		return {width: constant(typeof value === "number" && Number.isSafeInteger(value)
-			? closedRetirementBytes(Number.MAX_SAFE_INTEGER).byteLength : closedRetirementBytes(value).byteLength),
-			items: constant(1), depth: constant(0)};
+		return {width: constant(leafWidth(value)), items: constant(1), depth: constant(0)};
 	};
 	return Object.freeze({
 		bind: (key: string, value: number): number => { parameter(key, value); return value; },
@@ -15210,7 +15692,8 @@ export function createCreatorFinishingWidthCompiler() {
 			return register(width, expression);
 		},
 		measure: (value: unknown): number => {
-			const actual = maintenanceCanonicalCapacityWidth(value), compiled = tree(value);
+			// maintenanceCanonicalCapacityWidth with the same leaf widths, measured once.
+			const actual = maintenanceCanonicalWidth(value, leafWidth), compiled = tree(value);
 			if (values[compiled.width] < actual) throw new TypeError("ORDINARY_FINISHING_TEMPLATE_FIELD_DRIFT");
 			shapes.push(Object.freeze({items: compiled.items, depth: compiled.depth}));
 			// A repeated complete child may deliberately dominate the cold array.
@@ -15572,20 +16055,35 @@ function completeSnapshotRecoveryInventoryIsPresent(
  * A completed metadata fence cannot lose a protected scope at the same head.
  * Keep that whole CURRENT pool until the original authenticated head advances;
  * this partition is scheduling only, never a native retirement capability.
+ *
+ * An active snapshot fence is a closed-retirement install that stopped between
+ * the participant's fence and the coordinator's completion (box m46: a creator
+ * killed there refused snapshot-unavailable on every reopen). When it is the
+ * coordinator's own ACTIVE preparation, only that install can finish it (it
+ * resumes the prepared participant): keep the whole pool and retire nothing
+ * until it completes, exactly as a blocked completed fence does. A fence no
+ * active coordinator preparation owns still refuses.
+ * @param coordinatorActive - The AHE coordinator's active preparation labels, read
+ * under the same exclusions; absent when the caller has no coordinator read.
  */
 function selectCurrentSnapshotTurnoverInventory(
 	selection: NonNullable<ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory>>,
 	inventory: SnapshotRecoveryRoleInventory,
 	snapshot: SnapshotRetirementImageObservation,
-	currentHead: CreatorExpectedRoomHead
+	currentHead: CreatorExpectedRoomHead,
+	coordinatorActive?: Readonly<{ decisionDigest: string; sourceProofDigest: string }> | null
 ): ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory> {
 	if (!completeSnapshotRecoveryInventoryIsPresent(inventory, snapshot, currentHead)) return undefined;
 	const control = snapshot.control;
-	if (control !== null && (control.objectId !== currentHead.objectId || control.active !== null)) return undefined;
+	if (control !== null && control.objectId !== currentHead.objectId) return undefined;
+	const fence = control?.active?.preparation;
+	const joinedFence = fence != null && coordinatorActive != null &&
+		fence.decisionDigest === coordinatorActive.decisionDigest && fence.sourceProofDigest === coordinatorActive.sourceProofDigest;
+	if (fence != null && !joinedFence) return undefined;
 	const completed = control?.completed;
-	const blocked = completed != null && currentHead.epoch <= completed.throughEpoch + 1 &&
+	const blocked = joinedFence || (completed != null && currentHead.epoch <= completed.throughEpoch + 1 &&
 		completed.protectedScopes.some(pair => selection.retiringScopes.some(scope =>
-			closedRetirementEqual(scope, pair.scope)) && snapshot.image.scopes.some(current => closedRetirementEqual(current, pair)));
+			closedRetirementEqual(scope, pair.scope)) && snapshot.image.scopes.some(current => closedRetirementEqual(current, pair))));
 	if (!blocked) return selection;
 	if (inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
 	return Object.freeze({survivingScopes: Object.freeze(inventory.scopes.map(row => row.scope)),
@@ -15810,6 +16308,22 @@ function creatorFinishingTemplateShapeMatches(template: CreatorFinishingCapacity
 		input.signingFrames.every((row, index) => `${row.store}:${row.phase}:${JSON.stringify(row.key)}` === template.signingLayout[index]);
 }
 
+/** Diagnostics only: the first shape field on which a retained template differs. */
+function creatorFinishingTemplateShapeMismatch(template: CreatorFinishingCapacityTemplate,
+	input: CreatorFinishingCommonInput): string | undefined {
+	if (input.planEffect !== undefined) return "plan-effect";
+	if (input.archiveConstruction !== undefined) return "archive";
+	if (input.ordinaryFinishingCapacityDimensions === undefined) return "dimensions";
+	if (input.ordinaryFinishingCapacityDimensions.successorFenceCount !== template.successorFenceCount) return "successor-fence-count";
+	if (input.postAdoptionCensusSizing?.length !== template.postAdoptionVariantCount) return "post-adoption-variants";
+	if (input.exactCanonicalSnapshotChunks.length !== template.chunkCount) return `chunks:${template.chunkCount}->${input.exactCanonicalSnapshotChunks.length}`;
+	if (input.metadata.length !== template.metadataLayout.length) return `metadata:${template.metadataLayout.length}->${input.metadata.length}`;
+	if (!input.metadata.every((row, index) => row.priorRef?.digest === template.metadataLayout[index]?.prior)) return "metadata-prior";
+	if (input.signingFrames.length !== template.signingLayout.length) return `signing:${template.signingLayout.length}->${input.signingFrames.length}`;
+	const index = input.signingFrames.findIndex((row, index) => `${row.store}:${row.phase}:${JSON.stringify(row.key)}` !== template.signingLayout[index]);
+	return index === -1 ? undefined : `signing-layout:${index}`;
+}
+
 /** Existing ordinary I law: fresh byte-exact ownership plus every UNKNOWN
  * occurrence, without a charge, refund, or retained projection. */
 function creatorFinishingPrefixesFitOrdinaryBook(accounting: CreatorClosedRollbackProofAccounting,
@@ -15942,7 +16456,8 @@ function creatorFinishingAuthenticatedTrustContextEqual(
  * temporary compiler/source observations are gone before this numeric program
  * enters the existing immutable source's sole capacity cell. */
 export async function captureCreatorOrdinaryFinishingCapacityTemplate(
-	input: ProspectiveCreatorMaintenancePrefixInput, source: CreatorOrdinaryIssuanceProofSource
+	input: ProspectiveCreatorMaintenancePrefixInput, source: CreatorOrdinaryIssuanceProofSource,
+	options?: Readonly<{deferFirstCompile?: boolean}>
 ): Promise<CreatorFinishingTemplateCaptureResult> {
 	let stage = "eligibility";
 	let prefixes: CreatorFinishingValidatedPrefixes | undefined;
@@ -16020,6 +16535,27 @@ export async function captureCreatorOrdinaryFinishingCapacityTemplate(
 			} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 			return Object.freeze({captured: true});
 		}
+		// A retained source's first cold quote of a role takes the original exact
+		// cold forecast and compiles nothing: a program is only worth its compile when
+		// the SAME source sees that role's cold quote again (most sources see one and
+		// are replaced at the next boundary, so their program was never evaluated).
+		if (options?.deferFirstCompile === true) {
+			const requested = seed.capacity.templateRequests ??= new Set();
+			if (!requested.has(role)) {
+				requested.add(role);
+				try {
+					const observer = Reflect.get(globalThis, "__warmProofEvent");
+					if (typeof observer === "function") observer({kind: "ordinary-finishing-template-deferred", role});
+				} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
+				return Object.freeze({captured: false});
+			}
+		}
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "ordinary-finishing-template-compiling", role,
+				reason: existing?.kind !== "creator-finishing-field-program-1" ? "absent" : "shape-mismatch",
+				...(existing?.kind !== "creator-finishing-field-program-1" ? {} : {mismatch: creatorFinishingTemplateShapeMismatch(existing, input)})});
+		} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 		stage = "input-parameters";
 		const compiler = createCreatorFinishingWidthCompiler();
 		creatorFinishingInputParameters(input, compiler);
@@ -16093,6 +16629,7 @@ export async function captureCreatorOrdinaryFinishingCapacityTemplate(
 				ownCode.value.length <= 96 ? ownCode.value : undefined;
 			const safeMessages = ["Maximum call stack size exceeded", "Invalid array length",
 				"creator maintenance native field entitlement is invalid", "creator maintenance encoded width is invalid",
+				"creator maintenance encoded width exceeds its bound",
 				"creator maintenance encoded container shape is invalid", "creator maintenance encoded array count is invalid",
 				"creator maintenance count is invalid", "creator maintenance carrier nesting is invalid",
 				"creator maintenance encoded container nesting is invalid", "creator maintenance decoded container shape is invalid",
@@ -16249,7 +16786,14 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 			{objectId: seed.objectId, exactCanonicalAnchorPreimageBytes: input.exactCanonicalSuccessorAnchorPreimageBytes,
 				exactCanonicalParametersCarrierBytes: closedRetirementBytes(cut.parameters)}, successor, [],
 			{control: facts.capture.journal.control, closedMembershipByteLength: membership,
+				// The composer's fence horizon, from the same owners (creatorFenceHorizonMembershipWidthForSizing).
+				fenceHorizon: true, successorClosedMembershipByteLength: creatorFenceHorizonMembershipWidthForSizing({currentScope,
+					latchedAclByteLength: Math.max(input.exactCanonicalCurrentLatchedAclBytes.byteLength,
+						input.exactCanonicalSuccessorLatchedAclBytes.byteLength),
+					fencePreimageByteLength: Math.max(dimensions.canonicalSuccessorFencePreimageByteLength,
+						input.exactCanonicalUnsignedVertexBytes.byteLength)}),
 				...(received === undefined ? {} : {localIssuerBasis: received.localIssuerBasis})});
+		let futureFinalCapacity: Readonly<{canonicalRowsBytes: number; nativeImageBytes: number}> | undefined;
 		for (const context of ["current", "future"] as const) for (const phase of ["afterLocal", "afterSuccessor", "afterSuccessorLocal"] as const) {
 			const widths = journal[phase];
 			if (widths === undefined) continue;
@@ -16261,7 +16805,19 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 				maxClosedMembershipByteLength: context === "current" ? 0 : membership});
 			for (const field of ["canonicalRowsBytes", "nativeImageBytes", "canonicalRowByteLengthsTotal"] as const)
 				set(`journal.${context}.${phase}.${field}`, capacity[field]);
+			if (context === "future" && phase === "afterSuccessorLocal") futureFinalCapacity = capacity;
 		}
+		const local = journal.afterSuccessorLocal;
+		if (journal.fenceHorizon !== undefined && futureFinalCapacity !== undefined && local !== undefined)
+			for (const phase of ["afterSuccessor", "afterSuccessorLocal"] as const) {
+				const horizon = closedJournalFenceHorizonCapacityForSizing(futureFinalCapacity, journal.fenceHorizon[phase], local);
+				set(`journal.future.fenceHorizon.${phase}.canonicalRowsBytes`, horizon.canonicalRowsBytes);
+				set(`journal.future.fenceHorizon.${phase}.nativeImageBytes`, horizon.nativeImageBytes);
+			}
+		// The composer's single-epoch plan bound, from the same owner (closedJournalCurrentEpochPlanWidthForSizing).
+		set("journal.currentEpochPlan", closedJournalCurrentEpochPlanWidthForSizing({canonicalRows: facts.capture.journal.canonicalRows,
+			currentScope, afterLocalCanonicalRowBytes: journal.afterLocal.canonicalRowBytes, appendCount: 1,
+			appendReceived: received !== undefined, author: scope.author}));
 		const controls: Readonly<Record<string, unknown>> = {journal: facts.capture.journal.control,
 			issuance: native.control ?? null, snapshot: facts.capture.snapshot.control,
 			ahe: facts.capture.ahe.control, signing: closedSigningControl(facts.capture.signingRows, seed.objectId)};
@@ -16664,12 +17220,13 @@ function creatorNextEpochAdmissionForecastDelta(input: Readonly<{
 	const rows = census.rows as readonly Readonly<Record<string, unknown>>[];
 	if (rows.some(row => row.classification !== "current")) return undefined;
 	const journal = input.capture.journal;
-	const drain = journal.drainSource === undefined ? {} : {drainSource: journal.drainSource};
-	const journalNow = closedRetirementBytes({control: journal.control, image: journal.image,
-		canonicalRows: journal.canonicalRows, ...drain}).byteLength;
-	const journalNext = exactWidth({control: input.finalJournalControl, image: input.journalImage,
+	// The journal observation carrier's own control: a drain plan rides by digest (closedJournalObservationControl).
+	const journalNow = closedRetirementBytes({control: closedJournalObservationControl(journal.control), image: journal.image,
+		canonicalRows: journal.canonicalRows}).byteLength;
+	const journalNext = exactWidth({control: closedJournalObservationControl(input.finalJournalControl, () => input.digest),
+		image: input.journalImage,
 		canonicalRows: maintenanceEncodedWidth(input.finalJournal.canonicalRowsBytes, undefined,
-			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes), ...drain});
+			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes)});
 	// Closing reclassifies every current row: the genesis row is pinned, the
 	// rest are closed issuance.
 	const closed = (row: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
@@ -17516,6 +18073,16 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			successorJournalAppend,
 			currentContinuationAppends,
 			{ control: capture.journal.control, ...(!preclose ? { closedMembershipByteLength } : {}),
+				// An ordinary quote also reserves what the successor's mandatory fence will quote (its own
+				// horizon: the next successor's header and first fence), from this same function, and the
+				// membership row that successor's own close writes before the next fence acquires.
+				...(preclose ? {} : { fenceHorizon: true, successorClosedMembershipByteLength: creatorFenceHorizonMembershipWidthForSizing({
+					currentScope: immediateJournalAppend.scope,
+					latchedAclByteLength: Math.max(input.exactCanonicalCurrentLatchedAclBytes.byteLength,
+						input.exactCanonicalSuccessorLatchedAclBytes.byteLength),
+					fencePreimageByteLength: Math.max(successorNativeJobPhases?.[0]?.canonicalUnsignedVertexByteLength ?? 0,
+						capacityDimensions?.canonicalSuccessorFencePreimageByteLength ?? 0, input.exactCanonicalUnsignedVertexBytes.byteLength),
+				}) }),
 				...(received === undefined ? {} : {localIssuerBasis: received.localIssuerBasis}) }
 		);
 		const actualFinalJournal = preclose ? journal.afterLocal : (journal.afterSuccessorLocal ?? journal.afterSuccessor);
@@ -17575,10 +18142,28 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			...(journal.afterSuccessorLocal === undefined
 				? []
 				: [[journal.afterSuccessorLocal, finalJournalControl] as const]),
+			// The successor's mandatory fence horizon (live-journal fenceHorizon): the same phases that fence's
+			// own quote checks, so an admission this reserve allows never leaves the fence refused.
+			...(journal.fenceHorizon === undefined ? [] : [
+				[journal.fenceHorizon.afterSuccessor, finalJournalControl] as const,
+				[journal.fenceHorizon.afterSuccessorLocal, finalJournalControl] as const]),
 		] as const) {
-			const capacity = journalCapacityFor(phase);
+			const horizon = phase === journal.fenceHorizon?.afterSuccessor || phase === journal.fenceHorizon?.afterSuccessorLocal;
+			const local = journal.afterSuccessorLocal;
+			// A horizon phase widens by afterSuccessorLocal's own finishing rectangle (the rows it adds lie past it).
+			// The template evaluator supplies the same owner's widths under the same names.
+			const horizonCapacity = !horizon || finalJournalCapacity === undefined || local === undefined ? undefined :
+				closedJournalFenceHorizonCapacityForSizing(finalJournalCapacity, phase, local);
+			const horizonName = phase === journal.fenceHorizon?.afterSuccessor ? "afterSuccessor" : "afterSuccessorLocal";
+			const capacity = !horizon ? journalCapacityFor(phase) : horizonCapacity === undefined ? undefined : {
+				canonicalRowsBytes: compiler?.bind(`journal.future.fenceHorizon.${horizonName}.canonicalRowsBytes`,
+					horizonCapacity.canonicalRowsBytes) ?? horizonCapacity.canonicalRowsBytes,
+				nativeImageBytes: compiler?.bind(`journal.future.fenceHorizon.${horizonName}.nativeImageBytes`,
+					horizonCapacity.nativeImageBytes) ?? horizonCapacity.nativeImageBytes,
+			};
 			const wrapperWidth = maintenanceCanonicalWidth({
-				control,
+				// The carrier's control: a drain plan rides by digest (closedJournalObservationControl).
+				control: closedJournalObservationControl(control, () => digest),
 				image: {
 					imageDigest: digest,
 					scopeCount: phase.scopeCount,
@@ -17588,8 +18173,21 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 				canonicalRows: maintenanceEncodedWidth(capacity?.canonicalRowsBytes ?? phase.canonicalRowsBytes,
 					undefined, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes),
 			});
-			nativeObservations.push({width: wrapperWidth, maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes});
+			// Each phase's wrapper is the journal observation carrier a later acquisition (the close, the
+			// adoption's settlement fence, the successor's first own move) encodes with closedRetirementBytes.
+			// The after-successor phases already carry the close's membership row, the successor's scope
+			// header, its fence and the adoption reserve fence's row, so bounding them by that encode cap is
+			// the journal headroom this admission leaves for the mandatory close/adoption rows.
+			nativeObservations.push({width: wrapperWidth, maxBytes: CLOSED_RETIREMENT_BYTES.maxBytes});
 		}
+		// The single-epoch plan bound: this epoch's own rows must still fit the drain plan that retires them two closes
+		// later (a rollover cannot shrink a closed epoch). Same owner as the carrier's plan projection; the template
+		// evaluator supplies the same function's width (evaluateCreatorOrdinaryFinishingCapacityTemplate).
+		const currentEpochPlanWidth = closedJournalCurrentEpochPlanWidthForSizing({canonicalRows: capture.journal.canonicalRows,
+			currentScope: immediateJournalAppend.scope, afterLocalCanonicalRowBytes: journal.afterLocal.canonicalRowBytes,
+			appendCount: 1 + currentContinuationAppends.length, appendReceived: received !== undefined, author: issuanceScope.author});
+		nativeObservations.push({width: compiler?.bind("journal.currentEpochPlan", currentEpochPlanWidth) ?? currentEpochPlanWidth,
+			maxBytes: CLOSED_RETIREMENT_BYTES.maxBytes});
 		const manifest = decodeSnapshotManifest({
 			exactCanonicalManifestBytes: input.exactCanonicalSnapshotManifestBytes,
 			expectedManifestDigest: String(cut.snapshotManifestDigest),
@@ -18100,7 +18698,8 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		const preparationSeeds: Readonly<Record<string, unknown>>[] = [
 			{ ...labels, protectedScopes: sourceSnapshots },
 			{ ...labels, protectedScopes: protectedJournalScopes },
-			{ ...labels, protectedRecords, planRewrite: finalPlanRewriteResource === undefined ? null :
+			// Rule H: the issuance preparation's floor never exceeds its cut, so the cut's width bounds it.
+			{ ...labels, floorEpoch: labels.throughEpoch, protectedRecords, planRewrite: finalPlanRewriteResource === undefined ? null :
 				maintenanceEncodedWidth(finalPlanRewriteResource.byteLength, finalPlanRewriteResource) },
 			{ ...labels, protectedEpochs: signingEpochs },
 		];
@@ -18937,11 +19536,13 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 					// above carriers already sum the actual proof/source charge sites;
 					// native hash serialization is not another operation-local charge.
 					nativeObservations.push({width: maintenanceWidthSum(signingSourceWidths), maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+					// The carrier's control: a drain plan rides by digest (closedJournalObservationControl); the plan
+					// itself is journalNativeCarriers above, charged separately.
 					observe({
-						control: maintenanceParticipants[1],
+						control: closedJournalObservationControl(maintenanceParticipants[1], () => digest),
 						image: journalImage,
 						canonicalRows: maintenanceEncodedWidth(finalJournal.canonicalRowsBytes),
-					}, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes);
+					}, CLOSED_RETIREMENT_BYTES.maxBytes); // The journal observation carrier's encode cap.
 					observe({ control: maintenanceParticipants[0], image: sourceSnapshotImage });
 					return sourceWidths;
 				};
@@ -19707,10 +20308,10 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 									floor: forward.wholeFloor,
 									floorImage: capture.floorImage,
 									snapshotInventory: { scopes: capture.snapshotInventory.scopes, owner: capture.snapshotInventory.owner },
-								}).map(maintenanceCanonicalWidth);
+								}, () => digest).map(maintenanceCanonicalWidth);
 								nativeObservations.push({width: phaseCensusWidth, maxBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES});
-								for (const [index, width] of observations.entries()) nativeObservations.push({width,
-									maxBytes: index === 0 ? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes : AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+								// Each observation is one carrier the job encodes with closedRetirementBytes: the same cap.
+								for (const width of observations) nativeObservations.push({width, maxBytes: CLOSED_RETIREMENT_BYTES.maxBytes});
 								// Prior local PREs may be read/authenticated as standalone source
 								// leaves despite also appearing inside the complete native census.
 								// Only the immediate PRE has genuine bytes for SAME-owner identity;
@@ -19783,7 +20384,6 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 											byteCharge: journal.afterSuccessor.nativeImageBytes,
 										},
 										canonicalRows: maintenanceEncodedWidth(journal.afterSuccessor.canonicalRowsBytes),
-										...(capture.journal.drainSource === undefined ? {} : { drainSource: capture.journal.drainSource }),
 									},
 									snapshot: { control: successorJobControls.snapshot, image: snapshotImage },
 									ahe: {
@@ -19802,7 +20402,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 										metadataBytes: floorMetadataWidth,
 									},
 									snapshotInventory: successorInventory,
-								}).map(maintenanceCanonicalWidth);
+								}, () => digest).map(maintenanceCanonicalWidth);
 								const signingKey = `signing-retirement:${objectId}`;
 								const signingControlFrame = maintenanceCanonicalWidth([
 									"storageMeta",
@@ -19824,7 +20424,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 								// bounds and the complete proof envelope use their original SAME-U.
 								nativeObservations.push({width: phaseCensusWidth, maxBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES});
 								for (const [index, width] of [...observations, signingControlFrame, aheControlFrame].entries())
-									nativeObservations.push({width, maxBytes: index === 0 ? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes :
+									nativeObservations.push({width, maxBytes: index === 0 ? CLOSED_RETIREMENT_BYTES.maxBytes :
 									AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
 								return maintenanceWidthSum([
 									fullFutureBase,
@@ -19973,6 +20573,23 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
  * leave protection in a NEW checkpoint. SAME-intent retries retain its exact
  * holes, and prior permanent retirement is never resurrected. No deletion or
  * ordinary admission authority is returned. */
+/**
+ * Rule H (model issuance-image-capacity.qnt): the floor of the next issuance preparation. Rows above
+ * it are kept by the floor itself (never retired: retirement needs epoch <= through - 2), so only
+ * exceptions at or below it are listed. Monotone: never below the completed preparation's floor. A
+ * legacy (control-1) active preparation resumes exactly as it was prepared, without a floor.
+ * @param control - The actual native issuance control.
+ * @param throughEpoch - The cut being retired through.
+ * @returns The floor, or undefined to keep a legacy active preparation's form.
+ */
+function closedIssuanceRetirementFloor(control: DurableIssuanceRetirementControl | null | undefined,
+	throughEpoch: number): number | undefined {
+	const active = control?.active?.preparation;
+	if (active != null) return active.floorEpoch;
+	const completed = control?.completed;
+	return Math.min(throughEpoch, Math.max(completed == null ? 0 : issuanceRetirementFloor(completed), throughEpoch - 2, 0));
+}
+
 function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 	objectId: string; throughEpoch: number; rows: IssuanceRetirementRows;
 	intent: Readonly<{decisionDigest: string; sourceProofDigest: string}> | undefined;
@@ -19995,16 +20612,19 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 	// authenticated source after the last journal consumer disappears can release
 	// old holes at that same cut. An incomplete intent must still resume exactly.
 	requireLaw(input.control?.active == null || same === input.control.active.preparation, "chain-invalid");
+	const floorEpoch = closedIssuanceRetirementFloor(input.control, input.throughEpoch);
+	const floor = floorEpoch ?? input.throughEpoch;
 	const selected = Object.freeze(input.rows.issued.filter(row => {
 		const value = record(row.canonicalPreimageBytes), epoch = value.epoch;
 		requireLaw(typeof epoch === "number" && Number.isSafeInteger(epoch) && epoch >= 0, "chain-invalid");
 		requireLaw(row.objectId === input.objectId && value.objectId === input.objectId && value.author === row.author &&
 			value.authorSequence === row.authorSequence, "chain-invalid");
-		if (epoch > input.throughEpoch) return false;
+		if (epoch > floor) return false;
 		const digest = Array.from(row.digest, byte => byte.toString(16).padStart(2, "0")).join("");
 		const hasHole = (p: NonNullable<DurableIssuanceRetirementControl["completed"]>) => p.protectedRecords.some(
 			hole => hole.author === row.author && hole.authorSequence === row.authorSequence && hole.digest === digest);
-		if (input.control?.completed != null && epoch <= input.control.completed.throughEpoch && !hasHole(input.control.completed)) return false;
+		if (input.control?.completed != null && epoch <= issuanceRetirementFloor(input.control.completed) &&
+			!hasHole(input.control.completed)) return false;
 		if (same !== undefined) return hasHole(same);
 		if (!input.dependenciesClassified) return true;
 		const covered = classified.filter(proof => proof?.scope?.objectId === input.objectId && proof.scope.author === row.author &&
@@ -20013,10 +20633,15 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 				(proof.dependencyKind === "signed-settled-issuance" || proof.dependencyKind === "source-committed-inclusion" || proof.dependencyKind === "authenticated-covered-native-issuance") ||
 			 // Signed local-author abandonment: authenticated terminal, never published.
 			 proof.classification === "displaced" && proof.dependencyKind === "source-authenticated-expiry" ||
+			 // A replaced source released by its authenticated replaced-source resolution (design (b)): its
+			 // replacement carries the move and its epoch is closed; pending or published alike.
+			 (proof.classification === "displaced" || proof.classification === "covered-historical") &&
+				proof.dependencyKind === "source-replaced-release" ||
 			 proof.classification === "pinned-genesis" && epoch === 0 &&
 				(proof.dependencyKind === "pinned-genesis" || proof.dependencyKind === "authenticated-covered-native-issuance")) &&
 			proof.digest instanceof Uint8Array && compareBytes(proof.digest, row.digest) === 0);
-		const expired = covered.length === 1 && covered[0].dependencyKind === "source-authenticated-expiry";
+		const expired = covered.length === 1 && (covered[0].dependencyKind === "source-authenticated-expiry" ||
+			covered[0].dependencyKind === "source-replaced-release");
 		const paired = input.rows.outbox.filter(out => out.objectId === input.objectId && out.author === row.author &&
 			out.authorSequence === row.authorSequence && (out.publishState === "published" || expired && out.publishState === "pending") &&
 			compareBytes(out.digest, row.digest) === 0);
@@ -20030,8 +20655,9 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 			const left = JSON.stringify([a.author, a.authorSequence, a.digest]), right = JSON.stringify([b.author, b.authorSequence, b.digest]);
 			return left < right ? -1 : left > right ? 1 : 0;
 		}));
-	return closeIssuanceRetirementProtectedRecords({control: input.control, rows: input.rows,
-		throughEpoch: input.throughEpoch, protectedRecords: selected});
+	return Object.freeze({...(floorEpoch === undefined ? {} : {floorEpoch}) as {floorEpoch?: number},
+		protectedRecords: closeIssuanceRetirementProtectedRecords({control: input.control, rows: input.rows,
+			throughEpoch: input.throughEpoch, ...(floorEpoch === undefined ? {} : {floorEpoch}), protectedRecords: selected})});
 }
 
 /** Installation consumes only the original native image's exact-byte syntax
@@ -20251,8 +20877,11 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	// An active global intent must resume its exact image. Once globally complete,
 	// later authenticated physical maintenance may establish a fresh source instead.
 	if (priorRewrite !== undefined && source.aheControl?.active != null) requireLaw(exactRewriteTarget, "floor-stale");
+	// Rule A: a digest rewrite's BEFORE images come from the native side row, read only here.
 	const restoredIssuanceRows = exactRewriteTarget ?
-		reconstructIssuanceRetirementSourceRows(issuanceControl!, priorRewrite!, native.rows) : undefined;
+		reconstructIssuanceRetirementSourceRows(issuanceControl!, priorRewrite!, native.rows,
+			priorRewrite!.planRewrite!.kind === "v3-issuance-retirement-plan-rewrite-2"
+				? await source.acquireIssuance.readPlanBefore?.() ?? null : null) : undefined;
 	const signingData = closedSigningDataRows(source.signingRows, input.objectId);
 	const journalPrefixes: readonly LiveJournalRetirementLocalPrefix[] = Object.freeze(
 		(source.signingSummaries === undefined && source.generationSource === undefined
@@ -20465,10 +21094,19 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	);
 	// Retained physical headers are not fresh replay/deletion consumers. Old
 	// fenced holes stay fenced below; unclassified live scopes remain protected.
-	// Only actionable prefixes need the original authenticated source coverage.
+	// Only actionable prefixes need the original authenticated source coverage:
+	// a recovery trust, or (outside the retained trust window) the scope's own
+	// signed header re-verified here against the pinned genesis with its kept
+	// closed authority, as the classifier accepted it. Anything else is refused.
 	for (const prefix of journalPrefixes)
 		requireLaw(
-			source.journalScopes.some((authenticated) => closedRetirementEqual(authenticated, prefix.scope)),
+			source.journalScopes.some((authenticated) => closedRetirementEqual(authenticated, prefix.scope)) ||
+				closedJournalHeaderAuthenticates({
+					image: source.journal,
+					scope: prefix.scope,
+					exactCanonicalPinnedGenesisTrustStateRecordBytes: source.input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+					pinnedGenesisAnchorDigest: source.input.pinnedGenesisAnchorDigest,
+				}),
 			"chain-invalid"
 		);
 	// Actual accepted entries and the original protected replay scopes are
@@ -20524,7 +21162,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				? read.drainSource!
 				: { control: read.control, image: read.image, canonicalRows: read.readExactCanonicalRows() };
 			checkSourceImage(original.image.imageDigest, source.journal.image.imageDigest);
-			requireLaw(closedRetirementEqual(original.canonicalRows, source.journal.canonicalRows), "floor-stale");
+			requireLaw(closedJournalRowsEqual(original.canonicalRows, source.journal.canonicalRows), "floor-stale");
 			if (sameDrain)
 				requireLaw(closedRetirementEqual(read.control.drain!.plan.prefixes, journalPrefixes) &&
 					closedJournalDrainHeadersEqual(read.control.drain!.plan, source.journalHeaders), "chain-invalid");
@@ -20549,7 +21187,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 			});
 		}
 	};
-	const protectedRecords = closedIssuanceProtectedRecordsForRetirement({objectId: input.objectId, throughEpoch: cut.epoch,
+	const {floorEpoch: issuanceFloorEpoch, protectedRecords} = closedIssuanceProtectedRecordsForRetirement({objectId: input.objectId, throughEpoch: cut.epoch,
 		rows: issuanceRows, control: issuanceControl, intent: labels,
 		censusRows: census.rows, protectedReplayScopes: source.journalDetails.protectedReplayScopes,
 		physicalJournalRows: source.journalPhysical.canonicalRows,
@@ -20557,13 +21195,14 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	try {
 		const observer = Reflect.get(globalThis, "__warmProofEvent");
 		if (typeof observer === "function") observer({kind: "closed-retirement-issuance-holes", epoch: current.epoch,
-			issued: issuanceRows.issued.length, protected: protectedRecords.length,
+			throughEpoch: cut.epoch, holes: protectedRecords, issued: issuanceRows.issued.length, protected: protectedRecords.length,
 			unprotected: issuanceRows.issued.filter(row => !protectedRecords.some(hole => hole.author === row.author &&
 				hole.authorSequence === row.authorSequence)).map(row => ({authorSequence: row.authorSequence,
 				epoch: record(row.canonicalPreimageBytes).epoch})),
 			classifications: Array.isArray(census.rows) ? [...new Set(census.rows.map(row => `${row.classification}:${row.dependencyKind}`))] : []});
 	} catch { /* Observation neither unprotects nor prunes any record. */ }
-	const issuancePreparation = issuanceRetirementPreparationWithPlanRewrite(issuanceControl, {...labels, protectedRecords}, issuanceRows);
+	const issuancePreparation = issuanceRetirementPreparationWithPlanRewrite(issuanceControl, {...labels,
+		...(issuanceFloorEpoch === undefined ? {} : {floorEpoch: issuanceFloorEpoch}), protectedRecords}, issuanceRows);
 	requireLaw(accounting.charge(closedRetirementBytes(issuancePreparation)), "proof-budget-exceeded");
 	const issuanceCompletedImage = issuancePreparation.planRewrite?.targetImageDigest ?? issuanceImage.imageDigest;
 	const issuanceNative = async (): Promise<ClosedEpochRetirementMetadataRead> => {
@@ -21031,7 +21670,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				);
 			const originalJournal = sameDrain ? journal.value.drainSource! : journal.value;
 			requireLaw(
-				closedRetirementEqual(originalJournal.canonicalRows, source.journal.canonicalRows) &&
+				closedJournalRowsEqual(originalJournal.canonicalRows, source.journal.canonicalRows) &&
 					closedRetirementEqual(originalJournal.image, source.journal.image),
 				"floor-stale"
 			);
@@ -22108,12 +22747,12 @@ function buildRoomRetentionPassPlan(source: Readonly<{
 	const censusFacts = record(source.census);
 	const nativeIssuance = censusFacts.nativeIssuance as Readonly<{ rows: IssuanceRetirementRows; control?: unknown }> | undefined;
 	requireLaw(nativeIssuance !== undefined && nativeIssuance !== null && nativeIssuance.control !== undefined, "snapshot-unavailable");
-	const issuance = Object.freeze({ protectedRecords: closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
+	const issuance = Object.freeze(closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
 		throughEpoch: through, rows: nativeIssuance.rows, control: nativeIssuance.control as DurableIssuanceRetirementControl | null,
 		intent: (nativeIssuance.control as DurableIssuanceRetirementControl | null)?.active?.preparation,
 		censusRows: censusFacts.rows, protectedReplayScopes: journalDetails.protectedReplayScopes,
 		physicalJournalRows: journal.canonicalRows,
-		dependenciesClassified: !source.unclassifiedSigning && !source.unclassifiedGenerationReplay }) });
+		dependenciesClassified: !source.unclassifiedSigning && !source.unclassifiedGenerationReplay }));
 	const snapshot: RoomRetentionSelection["snapshot"] = source.turnover === undefined
 		? Object.freeze({ retire: Object.freeze([]), turnover: null })
 		: Object.freeze({
@@ -22672,6 +23311,21 @@ async function authenticateRoomRetentionRetainedCuts(context: Readonly<{
 	collector: RoomRetentionLedgerCollector;
 }>): Promise<void> {
 	const { input, reader, forward, frame: work, parsing, prior, collector } = context;
+	// The same retained-cut law as stage 1's acquisition (acquireClosedData, since 1515daab): a
+	// native publication's checkpoint cuts name remote proof epochs and are not proved against
+	// local generations; each native current row's carrier must be an authenticated recovery trust
+	// of this frame instead. (A repeat pass at one boundary can find a cut's carrier demoted from
+	// a required to an excluded generation by the previous pass's retirement; stage 1 accepts it.)
+	if (forward.nativePublication === true) {
+		for (const row of forward.rows) {
+			const carrier = parsing.record(parsing.unique(view(reader, reader.generations.indexOf(row)), "drp-anchor-trust-state").bytes);
+			requireLaw([...work.recoveryTrusts].some(trust => trust.objectId === input.objectId &&
+				trust.currentEpoch === carrier.currentEpoch && trust.currentAnchorDigest === carrier.currentAnchorDigest &&
+				trust.profileId === forward.currentTrust.profileId && trust.genesisAnchorDigest === input.pinnedGenesisAnchorDigest),
+			"chain-invalid");
+		}
+		return;
+	}
 	const retainedCuts = context.summary.cuts.filter((cut) => cut.epoch > 0);
 	if (retainedCuts.length === 0) return;
 	const minimumEpoch = Math.min(...retainedCuts.map((cut) => cut.epoch - 1));
@@ -22871,7 +23525,12 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 			{ kind: "full-recovery-role-acquisition", owner: input.store, objectId: nativeObject.value,
 				limits: AHE_BOUNDED_READ_LIMITS, reader: admitted });
 		const forward = facts.forward;
-		requireLaw(forward !== undefined && forward.held.length === 2, "snapshot-unavailable");
+		// The same held-target law as stage 1's acquisition (acquireClosedData): a native publication
+		// (a settlement-v1 member whose base is a received or checkpoint publication) holds one target
+		// per authenticated row carrying a live generation, otherwise the two newest closed epochs.
+		requireLaw(forward !== undefined && forward.held.length === (forward.nativePublication === true
+			? forward.rows.filter(row => uniqueCreatorTransitionCandidate(view(admitted, admitted.generations.indexOf(row)).candidates,
+				"v3-live-generation-2") !== undefined).length : 2), "snapshot-unavailable");
 		const work = creatorClosedProofWork(source);
 		requireLaw(work !== undefined && creatorClosedProofWorkAvailable(work), "internal-invariant");
 		// The steady shape this planner decides; any other boundary is stage 1's.
@@ -23121,8 +23780,9 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 				physical: journal.value,
 				...(verifyVertex === undefined ? {} : { verifyVertex: (value: Parameters<typeof verifyReceivedVertex>[0]) =>
 					verifyVertex.call(lifetime, value) }),
-				...(lifetime.readSettledLocalSource === undefined ? {} : { readSettledLocalSource:
-					(source: CreatorSettledLocalSource) => lifetime.readSettledLocalSource!(source) }),
+				// One classification: its settled-source reads share one own-fence scan.
+				...(lifetime.readSettledLocalSource === undefined ? {} : ((walk: object) => ({ readSettledLocalSource:
+					(source: CreatorSettledLocalSource) => lifetime.readSettledLocalSource!(source, walk) }))({})),
 				...(lifetime.readClosedJournalAuthority === undefined ? {} : { readClosedJournalAuthority:
 					(value: Omit<ReceivedClosedJournalAuthorityRead, "exactCanonicalPinnedGenesisTrustStateRecordBytes">) =>
 						lifetime.readClosedJournalAuthority!({ ...value,
@@ -23714,7 +24374,20 @@ async function reconcileSnapshotRecoveryRoles(
 			requireLaw(schedulingFrame !== undefined && schedulingFrame.alive, "internal-invariant");
 			const snapshotBytes = closedRetirementBytes(snapshot);
 			requireLaw(schedulingFrame.accounting.charge(snapshotBytes), "proof-budget-exceeded");
-			const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshot, floor.state.stable);
+			// Only a fence in flight needs the coordinator's active preparation (a resumed install).
+			let coordinatorActive: Readonly<{ decisionDigest: string; sourceProofDigest: string }> | null = null;
+			if (snapshot.control?.active != null) {
+				const nativeObject = parseStorageObjectId(input.objectId);
+				requireLaw(nativeObject.ok, "internal-invariant");
+				const ahe = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementControl"]>>(
+					input.store, "readRetirementControl")(nativeObject.value);
+				if (!ahe.ok) throw new Refusal(failure("ahe-rejected", "ahe", `RETIREMENT_SOURCE_CONTROL:${ahe.reason}`));
+				requireLaw(schedulingFrame.accounting.charge(ahe.value === null ? closedRetirementBytes(null) :
+					encodeAheRetirementControl(ahe.value)), "proof-budget-exceeded");
+				coordinatorActive = ahe.value?.active?.preparation ?? null;
+			}
+			const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshot, floor.state.stable,
+				coordinatorActive);
 			requireLaw(selection !== undefined, "snapshot-unavailable");
 			protectedScopes = selection.survivingScopes.map(nativeScope);
 			requireLaw(protectedScopes.length >= 2 && protectedScopes.length <= 4, "proof-budget-exceeded");
@@ -24356,8 +25029,9 @@ async function reconcileSnapshotRecoveryRoles(
 			authenticatedScopes: journalScopes,
 			journalMembershipAuthorities: roleProofs.flatMap(proof => proof.journalMembershipAuthorities),
 			...(lifetime.verifyVertex === undefined ? {} : {verifyVertex: value => lifetime.verifyVertex!(value)}),
-			...(lifetime.readSettledLocalSource === undefined ? {} :
-				{readSettledLocalSource: source => lifetime.readSettledLocalSource!(source)}),
+			// One classification: its settled-source reads share one own-fence scan.
+			...(lifetime.readSettledLocalSource === undefined ? {} : ((walk: object) =>
+				({readSettledLocalSource: (source: CreatorSettledLocalSource) => lifetime.readSettledLocalSource!(source, walk)}))({})),
 			...(lifetime.readClosedJournalAuthority === undefined ? {} : {
 				readClosedJournalAuthority: value => lifetime.readClosedJournalAuthority!({ ...value,
 					exactCanonicalPinnedGenesisTrustStateRecordBytes: sourceFrame.input.exactCanonicalPinnedGenesisTrustStateRecordBytes }) }),
@@ -24712,11 +25386,15 @@ export async function reconcileCreatorSnapshotRecoveryRoles(
  * @param closeHold - Genuine received seal's joined native dependency census.
  * @param requireClosedWorkflowCompletion - A durable-reopen resume must reach the
  * original terminal retirement result, exactly as the creator's resume does.
+ * @param acknowledgeCompletedJournalDrain - A recipient lull acknowledges its completed
+ * journal drain, as the creator's readiness and pool boundaries do, so its next pass
+ * decides afresh on the drained journal instead of resuming the drain's reconstruction.
  */
 export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
 	value: CreatorClosedRollbackDataInput,
 	closeHold: CreatorSnapshotRecoveryCloseHold,
-	requireClosedWorkflowCompletion = false
+	requireClosedWorkflowCompletion = false,
+	acknowledgeCompletedJournalDrain = false
 ): Promise<"complete" | "fresh-summary-required"> {
 	try {
 		// Slice 14b stage 2: an opted-in room host's ledger decision on this same sealed hold;
@@ -24725,7 +25403,8 @@ export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
 			const ledger = await reconcileCreatorReceivedRoomRetentionFromLedger(value, closeHold);
 			if (ledger !== undefined) return ledger;
 		}
-		return (await reconcileSnapshotRecoveryRoles(value, closeHold, false, requireClosedWorkflowCompletion, undefined, undefined, true))
+		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion,
+			undefined, undefined, true))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {
 		throwCreatorSnapshotRecoveryFailure(error);

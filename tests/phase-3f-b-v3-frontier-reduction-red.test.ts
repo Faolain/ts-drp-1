@@ -8,11 +8,19 @@ import {
 } from "./fixtures/phase-3f-b/frontier-reduction-fixture.js";
 
 function exactDependencyClasses(result: FrontierScenarioResult): readonly (readonly string[])[] {
+	// A join takes the first sixteen hash-ordered tips, except that it always covers the author's latest
+	// own row (here every initial tip is one of the author's own sibling rows; then each issued row), in
+	// place of the sixteenth (v3-live causalJoinDependencies). No issued row descends from another tip
+	// here, so covering means selecting that row itself.
 	let tips = [...result.initialTips].sort();
+	let own = result.initialTipsBySequence.at(-1);
 	return result.issued.map((vertex) => {
-		const selected = Reflect.get(vertex.operation, "action") === "causalJoin" ? tips.slice(0, 16) : [...tips];
+		let selected = Reflect.get(vertex.operation, "action") === "causalJoin" ? tips.slice(0, 16) : [...tips];
+		if (own !== undefined && tips.includes(own) && !selected.includes(own))
+			selected = [...tips.slice(0, 15), own].sort();
 		const consumed = new Set(selected);
 		tips = [...tips.filter((tip) => !consumed.has(tip)), vertex.digest].sort();
+		own = vertex.digest;
 		return selected;
 	});
 }

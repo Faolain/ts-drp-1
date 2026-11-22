@@ -1,6 +1,7 @@
 import {
 	CanonicalEncodingError,
 	type CanonicalLimits,
+	compareBytes,
 	decodeCanonical,
 	encodeCanonical,
 	hashDomain,
@@ -314,7 +315,7 @@ function captureJournalRetirementControlWithPlan(
 function equalNative(left: unknown, right: unknown): boolean {
 	const a = encodeCanonical(left),
 		b = encodeCanonical(right);
-	return a.length === b.length && a.every((byte, index) => byte === b[index]);
+	return a.length === b.length && compareBytes(a, b) === 0;
 }
 function dense(value: unknown, maximum: number): readonly unknown[] {
 	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new TypeError("malformed-input");
@@ -683,7 +684,7 @@ function decodeCapturedJournalRetirementNativeCarriers(
 	const plan = capture(planBytes);
 	const previous = syntax?.plan;
 	const unchanged = previous !== undefined && plan.length === previous.bytes.length &&
-		plan.every((byte, index) => byte === previous.bytes[index]);
+		compareBytes(plan, previous.bytes) === 0;
 	const planDigest = unchanged ? previous.digest : nativePlanDigest(plan);
 	if (
 		bytes.byteLength + plan.byteLength > LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES ||
@@ -696,7 +697,7 @@ function decodeCapturedJournalRetirementNativeCarriers(
 		const encoded = encodeCanonical(capturedPlan, {
 			maxBytes: LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, maxItems: 65_536, maxDepth: 32,
 		});
-		if (encoded.length !== plan.length || !plan.every((byte, index) => byte === encoded[index]))
+		if (encoded.length !== plan.length || compareBytes(plan, encoded) !== 0)
 			throw new TypeError("store-poisoned");
 	}
 	const capturedSyntax = unchanged ? previous : Object.freeze({bytes: plan, digest: planDigest, plan: capturedPlan});
@@ -721,7 +722,7 @@ function decodeCapturedJournalRetirementNativeCarriers(
 	), {maxBytes: LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, maxItems: 65_536, maxDepth: 32});
 	if (
 		bytes.length !== encoded.length ||
-		!bytes.every((byte, index) => byte === encoded[index])
+		compareBytes(bytes, encoded) !== 0
 	)
 		throw new TypeError("store-poisoned");
 	if (syntax !== undefined) syntax.plan = capturedSyntax;
@@ -1052,6 +1053,66 @@ export function createJournalRetirementImageCapture(): Readonly<{
 		release,
 	});
 }
+/** One frame of {@link createJournalRetirementImageCapture}: its table, key and exact bytes. */
+export type JournalRetirementCapturedFrame = Readonly<{ table: string; key: readonly unknown[]; bytes: Uint8Array }>;
+let imageShell: Readonly<{ rowsHead: Uint8Array; scopesHead: Uint8Array }> | undefined;
+/**
+ * The exact image of a subset of one capture's frames, assembled from each frame's own row syntax
+ * instead of capturing and encoding every row again.
+ *
+ * A frame is `[table, key, row]` (an ARRAY of 3) and the image is `{rows, scopes}`, whose arrays hold
+ * the SAME captured row syntax (createJournalRetirementImageCapture appends each row once and encodes
+ * the frame and the image from that one capture). A canonical array is its tag, its varuint count and
+ * its elements' bytes; an object is its tag, count and its sorted key/value bytes. So the image of any
+ * subset of a capture's frames, in their capture order, is those row bytes under the codec's own
+ * headers, which are taken here from the public encoder (never written by hand). Each frame must begin
+ * with exactly the encoder's bytes of `[table, key]` (with count 3); otherwise this answers undefined
+ * and the caller captures as before. Every limit of the capture holds for a subset of rows it accepted;
+ * the counts and the final byte bound are checked again.
+ * @param frames - Frames of one successful capture (in its order within each table).
+ * @returns The exact image, or undefined when a frame is not of that exact shape.
+ */
+export function journalRetirementImageOfCapturedFrames(frames: readonly JournalRetirementCapturedFrame[]):
+	LiveJournalRetirementImage | undefined {
+	const scopes: Uint8Array[] = [], rows: Uint8Array[] = [];
+	let total = 0;
+	for (const frame of frames) {
+		const prefix = encodeCanonical([frame.table, frame.key]);
+		const bytes = frame.bytes;
+		if (prefix.byteLength < 2 || prefix[1] !== 0x02 || bytes.byteLength <= prefix.byteLength ||
+			bytes[0] !== prefix[0] || bytes[1] !== 0x03 ||
+			compareBytes(bytes.subarray(2, prefix.byteLength), prefix.subarray(2)) !== 0) return undefined;
+		const row = bytes.subarray(prefix.byteLength);
+		(frame.table === "scopes" ? scopes : rows).push(row);
+		total += row.byteLength;
+	}
+	if (!journalRetirementImageCountsFit(scopes.length, rows.length)) throw new TypeError("retirement-fenced");
+	imageShell ??= (() => {
+		// {rows: null, scopes: null}: tag, count 2, then each key followed by its one-byte null.
+		const shell = encodeCanonical({ rows: null, scopes: null }), rowsKey = encodeCanonical("rows"),
+			scopesKey = encodeCanonical("scopes"), at = 2 + rowsKey.byteLength;
+		if (shell.byteLength !== 4 + rowsKey.byteLength + scopesKey.byteLength || shell[at] !== 0x00 ||
+			shell[shell.byteLength - 1] !== 0x00 || compareBytes(shell.subarray(2, at), rowsKey) !== 0 ||
+			compareBytes(shell.subarray(at + 1, shell.byteLength - 1), scopesKey) !== 0)
+			throw new TypeError("retirement-image-layout");
+		return Object.freeze({ rowsHead: shell.slice(0, at), scopesHead: shell.slice(at + 1, shell.byteLength - 1) });
+	})();
+	const arrayHead = (count: number): Uint8Array => {
+		const nulls = encodeCanonical(new Array<null>(count).fill(null), { maxItems: Math.max(1, count) });
+		return nulls.subarray(0, nulls.byteLength - count);
+	};
+	const rowsHead = arrayHead(rows.length), scopesHead = arrayHead(scopes.length);
+	const length = imageShell.rowsHead.byteLength + rowsHead.byteLength + imageShell.scopesHead.byteLength +
+		scopesHead.byteLength + total;
+	if (length > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) throw new TypeError("retirement-fenced");
+	const exact = new Uint8Array(length);
+	let offset = 0;
+	for (const part of [imageShell.rowsHead, rowsHead, ...rows, imageShell.scopesHead, scopesHead, ...scopes]) {
+		exact.set(part, offset);
+		offset += part.byteLength;
+	}
+	return retirementImageFromExact(exact, scopes.length, rows.length);
+}
 /**
  * Charges one native row before retaining it in the bounded image.
  * @param row - One native scope or accepted-entry record.
@@ -1128,38 +1189,33 @@ interface FutureWidthMeasurements {
 }
 function futureWidths(
 	frames: readonly Pick<NativeFrame, "table" | "key" | "row">[],
-	unknownSignatureIndex?: number,
-	unknownLocalDigestIndex?: number,
+	unknownSignatureIndex?: number | readonly number[],
+	unknownLocalDigestIndex?: number | readonly number[],
 	measurements?: FutureWidthMeasurements
 ): JournalFutureNativeWidths {
+	const indices = (value: number | readonly number[] | undefined): readonly number[] =>
+		value === undefined ? [] : typeof value === "number" ? [value] : value;
 	const scopes = frames.filter((f) => f.table === "scopes"),
 		rows = frames.filter((f) => f.table !== "scopes");
 	if (!journalRetirementImageCountsFit(scopes.length, rows.length)) throw new TypeError("retirement-fenced");
 	// The missing registered BYTES64 field is measured structurally. No placeholder
 	// signature, native row, digest or dedup identity is created for that field.
-	const missing =
-		unknownSignatureIndex === undefined
-			? 0
-			: ((): number => {
-					const f = frames[unknownSignatureIndex];
-					if (f === undefined || typeof f.row !== "object" || f.row === null) throw new TypeError("malformed-input");
-					const n = Object.keys(f.row).length;
-					const name = Object.hasOwn(f.row, "object_id") ? "detached_anchor_signature" : "detachedAnchorSignature";
-					return encodeCanonical(name).length + 1 + varUintWidth(64) + 64 + varUintWidth(n + 1) - varUintWidth(n);
-				})();
-	const missingDigest =
-		unknownLocalDigestIndex === undefined
-			? 0
-			: ((): number => {
-					const f = frames[unknownLocalDigestIndex];
-					if (f === undefined || typeof f.row !== "object" || f.row === null) throw new TypeError("malformed-input");
-					const n = Object.keys(f.row).length;
-					const name = Object.hasOwn(f.row, "object_id") ? "vertex_digest" : "vertexDigest";
-					// Complete STRING64 field width; no prospective digest value is created.
-					return encodeCanonical(name).length + 1 + varUintWidth(64) + 64 + varUintWidth(n + 1) - varUintWidth(n);
-				})();
+	const missingField = (index: number, sqlName: string, browserName: string): number => {
+		const f = frames[index];
+		if (f === undefined || typeof f.row !== "object" || f.row === null) throw new TypeError("malformed-input");
+		const n = Object.keys(f.row).length;
+		const name = Object.hasOwn(f.row, "object_id") ? sqlName : browserName;
+		// Complete BYTES64 / STRING64 field width; no prospective signature or digest value is created.
+		return encodeCanonical(name).length + 1 + varUintWidth(64) + 64 + varUintWidth(n + 1) - varUintWidth(n);
+	};
+	const signatureIndices = indices(unknownSignatureIndex), digestIndices = indices(unknownLocalDigestIndex);
+	const missingSignatures = signatureIndices.map(index => missingField(index, "detached_anchor_signature", "detachedAnchorSignature"));
+	const missingDigests = digestIndices.map(index => missingField(index, "vertex_digest", "vertexDigest"));
+	const missing = missingSignatures.reduce((n, width) => n + width, 0),
+		missingDigest = missingDigests.reduce((n, width) => n + width, 0);
 	const missingAt = (index: number): number =>
-		(index === unknownSignatureIndex ? missing : 0) + (index === unknownLocalDigestIndex ? missingDigest : 0);
+		signatureIndices.reduce((n, at, k) => n + (at === index ? missingSignatures[k]! : 0), 0) +
+		digestIndices.reduce((n, at, k) => n + (at === index ? missingDigests[k]! : 0), 0);
 	const measured = (frame: FutureWidthFrame) => {
 		let value = measurements?.frames.get(frame);
 		if (value === undefined) {
@@ -1263,11 +1319,20 @@ export function journalFutureAppendPostimageWidths(
 	successorLocalAppendForSizing?: Readonly<{ author: string; authorSequence: number }>,
 	currentContinuationAppends: readonly unknown[] = [],
 	sizingOptions?: Readonly<{ control?: LiveJournalRetirementControl | null; closedMembershipByteLength?: number;
-		localIssuerBasis?: Readonly<{objectId: string; author: string; nextAuthorSequence: number}> }>
+		localIssuerBasis?: Readonly<{objectId: string; author: string; nextAuthorSequence: number}>;
+		/** Also measure the successor's mandatory fence horizon (see fenceHorizon below). */
+		fenceHorizon?: boolean;
+		/** Width of the membership row the successor epoch's own close writes when it holds only its fence: the
+		 * horizon's next fence acquires the journal after that close (fenceHorizon only). */
+		successorClosedMembershipByteLength?: number }>
 ): Readonly<{
 	afterLocal: JournalFutureNativeWidths;
 	afterSuccessor: JournalFutureNativeWidths;
 	afterSuccessorLocal?: JournalFutureNativeWidths;
+	/** What the next mandatory fence observes beyond afterSuccessorLocal when the successor epoch holds only its own
+	 * fence (a refusal-triggered rollover): the successor epoch's close membership row (successorClosedMembershipByteLength),
+	 * the next successor's scope header, and that successor's first local fence. */
+	fenceHorizon?: Readonly<{ afterSuccessor: JournalFutureNativeWidths; afterSuccessorLocal: JournalFutureNativeWidths }>;
 }> {
 	const frames = decodeNativeFrames(
 		dense(actualCanonicalRows, LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows * 2) as readonly Uint8Array[]
@@ -1296,9 +1361,12 @@ export function journalFutureAppendPostimageWidths(
 	let localIssuer = localIssued ? {objectId: local.scope.objectId, author: local.author,
 		nextAuthorSequence: local.authorSequence + 1} : undefined;
 	let completedScopes: readonly LiveJournalScope[] = [],
-		membershipByteLength = 0;
+		membershipByteLength = 0,
+		horizonMembershipByteLength = 0,
+		fenceHorizon = false;
 	if (sizingOptions !== undefined) {
-		const present = ["control", "closedMembershipByteLength", "localIssuerBasis"].filter(
+		const present = ["control", "closedMembershipByteLength", "localIssuerBasis", "fenceHorizon",
+			"successorClosedMembershipByteLength"].filter(
 			(key) => Object.getOwnPropertyDescriptor(sizingOptions, key) !== undefined
 		);
 		const options = record(sizingOptions, present);
@@ -1309,6 +1377,16 @@ export function journalFutureAppendPostimageWidths(
 				throw new TypeError("malformed-input");
 			localIssuer = {objectId: basis.objectId as string, author: basis.author,
 				nextAuthorSequence: integer(basis.nextAuthorSequence)};
+		}
+		if (present.includes("fenceHorizon")) {
+			if (typeof options.fenceHorizon !== "boolean") throw new TypeError("malformed-input");
+			fenceHorizon = options.fenceHorizon;
+		}
+		if (present.includes("successorClosedMembershipByteLength")) {
+			// Sizing of the fence horizon only: it names no close of the epoch this call appends to.
+			if (!fenceHorizon) throw new TypeError("malformed-input");
+			horizonMembershipByteLength = integer(options.successorClosedMembershipByteLength);
+			if (horizonMembershipByteLength > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) throw new TypeError("retirement-fenced");
 		}
 		if (present.includes("closedMembershipByteLength")) {
 			membershipByteLength = integer(options.closedMembershipByteLength);
@@ -1561,11 +1639,37 @@ export function journalFutureAppendPostimageWidths(
 	updated[updated.indexOf(added)] = finalHeader;
 	updated.push(successorEntry);
 	updated.sort(compareFrameKeys);
-	return Object.freeze({
-		afterLocal,
-		afterSuccessor,
-		afterSuccessorLocal: futureWidths(updated, updated.indexOf(finalHeader), updated.indexOf(successorEntry), measurements),
-	});
+	const afterSuccessorLocal = futureWidths(updated, updated.indexOf(finalHeader), updated.indexOf(successorEntry), measurements);
+	if (!fenceHorizon) return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal });
+	// The next successor has the same structural anchor and parameters carriers as this one (an epoch-chain
+	// anchor's fields have fixed widths), one epoch on; a wider epoch integer widens its preimage by as much.
+	if (s.scope.epoch >= Number.MAX_SAFE_INTEGER - 1 || integer(futureLocal.authorSequence) === Number.MAX_SAFE_INTEGER)
+		throw new TypeError("malformed-input");
+	const nextScope = { ...s.scope, epoch: s.scope.epoch + 1 };
+	const epochGrowth = varUintWidth(nextScope.epoch) - varUintWidth(s.scope.epoch);
+	const nextPreimage = new Uint8Array(s.exactCanonicalAnchorPreimageBytes.byteLength + epochGrowth);
+	const nextKey = [nextScope.objectId, nextScope.epoch, nextScope.anchorDigest];
+	const nextHeaderRow = journalUnsignedSuccessorHeaderFields({sql, scope: nextScope,
+		exactCanonicalAnchorPreimageBytes: nextPreimage, parametersDigest: s.parametersDigest,
+		exactCanonicalParametersCarrierBytes: s.exactCanonicalParametersCarrierBytes});
+	const nextHeader = { table: "scopes", key: nextKey, row: nextHeaderRow };
+	// The successor epoch closes before the next fence acquires: its header then carries that close's membership row.
+	const closedHeader = horizonMembershipByteLength === 0 ? finalHeader : { ...finalHeader,
+		row: { ...finalHeader.row, [membershipField]: new Uint8Array(horizonMembershipByteLength) } };
+	const closedUpdated = updated.map(entry => entry === finalHeader ? closedHeader : entry);
+	const horizon = [...closedUpdated, nextHeader].sort(compareFrameKeys);
+	const signed = [horizon.indexOf(closedHeader), horizon.indexOf(nextHeader)];
+	const horizonSuccessor = futureWidths(horizon, signed, horizon.indexOf(successorEntry), measurements);
+	const nextEntryRow: Record<string, unknown> = { ...successorRow,
+		epoch: nextScope.epoch,
+		[sql ? "local_author_sequence" : "localAuthorSequence"]: integer(futureLocal.authorSequence) + 1 };
+	const nextEntry = { table, key: [...nextKey, 0], row: nextEntryRow };
+	const nextFinalHeader = { ...nextHeader, row: { ...nextHeaderRow, [sql ? "next_journal_sequence" : "nextJournalSequence"]: 1 } };
+	const horizonLocal = [...closedUpdated, nextFinalHeader, nextEntry].sort(compareFrameKeys);
+	const horizonSuccessorLocal = futureWidths(horizonLocal, [horizonLocal.indexOf(closedHeader), horizonLocal.indexOf(nextFinalHeader)],
+		[horizonLocal.indexOf(successorEntry), horizonLocal.indexOf(nextEntry)], measurements);
+	return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal,
+		fenceHorizon: Object.freeze({ afterSuccessor: horizonSuccessor, afterSuccessorLocal: horizonSuccessorLocal }) });
 }
 
 /**
@@ -2320,6 +2424,24 @@ function imageOfFrames(frames: readonly NativeFrame[]): LiveJournalRetirementIma
 		return capture.finish();
 	} finally { capture.release(); }
 }
+/**
+ * The image of a drain batch's residual frames: the exact row syntax of the adapter's captured frames
+ * (journalRetirementImageOfCapturedFrames), or, for any frame not of that exact shape, a full capture
+ * of the decoded rows (imageOfFrames). Debug mode (TS_DRP_DEBUG_RESIDUAL_IMAGE=1) also captures in full
+ * and refuses a divergence. The adapter still checks this digest against its own native residual.
+ */
+function residualImageOfFrames(frames: readonly NativeFrame[]): LiveJournalRetirementImage {
+	const spliced = journalRetirementImageOfCapturedFrames(frames);
+	if (spliced === undefined) return imageOfFrames(frames);
+	if (journalResidualImageDebug() && !equalNative(spliced, imageOfFrames(frames)))
+		throw new Error("journal residual image diverged from a full capture");
+	return spliced;
+}
+/** Debug mode (TS_DRP_DEBUG_RESIDUAL_IMAGE=1): every derived residual image is also captured in full and compared. */
+export function journalResidualImageDebug(): boolean {
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env?.TS_DRP_DEBUG_RESIDUAL_IMAGE === "1";
+}
 function compareFrameKeys(left: Pick<NativeFrame, "table" | "key">, right: Pick<NativeFrame, "table" | "key">): number {
 	if (left.table === "scopes" && right.table !== "scopes") return -1;
 	if (left.table !== "scopes" && right.table === "scopes") return 1;
@@ -2333,6 +2455,18 @@ function compareFrameKeys(left: Pick<NativeFrame, "table" | "key">, right: Pick<
 	}
 	return 0;
 }
+/** Work counts of the drain-source reconstruction in this process: full derivations of the
+ * original image (decode every frame, rebuild every retired row, re-encode and compare) and
+ * verified reuses of an earlier derivation. Measurement only. */
+export interface JournalRetirementDrainSourceCounts {
+	readonly derivations: number;
+	readonly reuses: number;
+}
+const drainSourceWork = { derivations: 0, reuses: 0 };
+/** @returns This process's drain-source reconstruction work counts so far. */
+export function journalRetirementDrainSourceCounts(): JournalRetirementDrainSourceCounts {
+	return Object.freeze({ ...drainSourceWork });
+}
 /** Reconstructs original local metadata through the adapter codec and received
  * detail through its exact captured native frame. Consumers still own protocol reauthentication.
  * A finished checkpoint with newer legitimate work is not an old-source view. */
@@ -2340,7 +2474,9 @@ export function reconstructJournalRetirementDrainSource(
 	control: LiveJournalRetirementControl | null,
 	image: LiveJournalRetirementImage,
 	frames: readonly Uint8Array[],
-	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array
+	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array,
+	memo?: JournalRetirementDrainSourceMemo,
+	framesProof?: object
 ): LiveJournalRetirementDrainSource | undefined {
 	const state = control?.drain;
 	if (state == null || control === null) return undefined;
@@ -2357,8 +2493,47 @@ export function reconstructJournalRetirementDrainSource(
 		if (finished) return undefined;
 		throw new TypeError("retirement-stale");
 	}
+	if (memo === undefined) return deriveDrainSource(state, base, rows, frames, reconstructLocal).source;
+	const planBytes = encodeCanonical(state.plan);
+	const reused = memo.reuse(planBytes, state.cursor, frames, framesProof);
+	if (reused !== undefined) {
+		drainSourceWork.reuses++;
+		const source = Object.freeze({
+			control: captureJournalRetirementControl(base),
+			image: Object.freeze({ ...reused.image }),
+			canonicalRows: Object.freeze(reused.original.map((bytes) => bytes.slice())),
+		});
+		if (drainSourceDebug()) {
+			const fresh = deriveDrainSource(state, base, rows, frames, reconstructLocal).source;
+			if (!equalNative(fresh, source)) throw new Error("journal drain source reuse diverged from a fresh derivation");
+		}
+		return source;
+	}
+	const derived = deriveDrainSource(state, base, rows, frames, reconstructLocal);
+	memo.remember(planBytes, derived, state.cursor, framesProof);
+	return derived.source;
+}
+/** Debug mode (TS_DRP_DEBUG_DRAIN_SOURCE=1): every reused drain source is also derived afresh and compared. */
+function drainSourceDebug(): boolean {
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env?.TS_DRP_DEBUG_DRAIN_SOURCE === "1";
+}
+type DerivedDrainSource = Readonly<{
+	source: LiveJournalRetirementDrainSource;
+	/** The original frames in source order, each with its drain item index (-1: kept by the plan). */
+	original: readonly Readonly<{ bytes: Uint8Array; item: number }>[];
+}>;
+function deriveDrainSource(
+	state: NonNullable<LiveJournalRetirementControl["drain"]>,
+	base: LiveJournalRetirementControl,
+	rows: readonly JournalRetirementDrainItem[],
+	frames: readonly Uint8Array[],
+	reconstructLocal: (selected: JournalRetirementDrainRow) => Uint8Array
+): DerivedDrainSource {
+	drainSourceWork.derivations++;
 	const actual = decodeNativeFrames(frames),
 		original = [...actual], indexByKey = indexNativeDrainFrames(actual, rows);
+	const itemOf = new Map<NativeFrame, number>();
 	for (const [index, selected] of rows.entries()) {
 		const found = indexByKey.find(selected);
 		if (index < state.cursor) {
@@ -2370,17 +2545,85 @@ export function reconstructJournalRetirementDrainSource(
 			if (reconstructed === undefined || !matchesDrainFrame(reconstructed, selected))
 				throw new TypeError("retirement-stale");
 			original.push(reconstructed);
+			itemOf.set(reconstructed, index);
 		} else if (found.length !== 1 || found[0] === undefined || !matchesDrainFrame(found[0], selected))
 			throw new TypeError("retirement-stale");
+		else itemOf.set(found[0], index);
 	}
 	original.sort(compareFrameKeys);
 	const originalImage = imageOfFrames(original);
 	if (!equalNative(originalImage, state.plan.sourceImage)) throw new TypeError("retirement-stale");
 	return Object.freeze({
-		control: captureJournalRetirementControl(base),
-		image: originalImage,
-		canonicalRows: Object.freeze(original.map((frame) => frame.bytes.slice())),
+		source: Object.freeze({
+			control: captureJournalRetirementControl(base),
+			image: originalImage,
+			canonicalRows: Object.freeze(original.map((frame) => frame.bytes.slice())),
+		}),
+		original: Object.freeze(original.map((frame) => Object.freeze({ bytes: frame.bytes.slice(), item: itemOf.get(frame) ?? -1 }))),
 	});
+}
+function fnv1a(bytes: Uint8Array): number {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < bytes.length; index++) hash = Math.imul(hash ^ (bytes[index] as number), 0x01000193);
+	return hash >>> 0;
+}
+function sameFrameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index++) if (left[index] !== right[index]) return false;
+	return true;
+}
+/**
+ * One adapter's memo of the drain source it last derived (one drain at a time). A drain's original
+ * source is a pure function of its plan, so it is kept against the plan's exact canonical bytes; it is
+ * returned again only when the native frames read now are exactly, byte for byte, the original frames
+ * minus the items retired before the control's cursor (every residual frame present once and
+ * unchanged, every retired one absent). Any other input re-derives in full, so every refusal the full
+ * derivation makes ("retirement-stale") is unchanged. Nothing escapes: a reuse returns fresh copies.
+ *
+ * An adapter may also pass a frames proof: an opaque private object it passes again only with
+ * byte-identical frames (storage-node: its verified image memo entry, whose private frames every read
+ * copies). Once the frames under one proof have been checked (or derived) for a cursor, the same proof
+ * at the same cursor and plan bytes needs no second check of every frame.
+ */
+export class JournalRetirementDrainSourceMemo {
+	#planBytes: Uint8Array | undefined;
+	#original: readonly Readonly<{ bytes: Uint8Array; item: number }>[] = [];
+	#image: LiveJournalRetirementImage | undefined;
+	#proof: Readonly<{ proof: object; cursor: number }> | undefined;
+	/** @internal */
+	remember(planBytes: Uint8Array, derived: DerivedDrainSource, cursor: number, proof?: object): void {
+		this.#planBytes = planBytes.slice();
+		this.#original = derived.original;
+		this.#image = Object.freeze({ ...derived.source.image });
+		this.#proof = proof === undefined ? undefined : Object.freeze({ proof, cursor });
+	}
+	/** @internal */
+	reuse(planBytes: Uint8Array, cursor: number, frames: readonly Uint8Array[], proof?: object):
+		Readonly<{ image: LiveJournalRetirementImage; original: readonly Uint8Array[] }> | undefined {
+		if (this.#planBytes === undefined || this.#image === undefined || compareBytes(this.#planBytes, planBytes) !== 0) return undefined;
+		if (proof !== undefined && this.#proof?.proof === proof && this.#proof.cursor === cursor)
+			return { image: this.#image, original: this.#original.map((frame) => frame.bytes) };
+		const residual = this.#original.filter((frame) => frame.item < 0 || frame.item >= cursor);
+		if (residual.length !== frames.length) return undefined;
+		const buckets = new Map<number, number[]>();
+		for (const [index, frame] of residual.entries()) {
+			const hash = fnv1a(frame.bytes), bucket = buckets.get(hash);
+			if (bucket === undefined) buckets.set(hash, [index]); else bucket.push(index);
+		}
+		const used = new Uint8Array(residual.length);
+		for (const bytes of frames) {
+			const bucket = buckets.get(fnv1a(bytes));
+			const match = bucket?.find((index) => used[index] === 0 && sameFrameBytes(residual[index]!.bytes, bytes));
+			if (match === undefined) return undefined;
+			used[match] = 1;
+		}
+		this.#proof = proof === undefined ? undefined : Object.freeze({ proof, cursor });
+		return { image: this.#image, original: this.#original.map((frame) => frame.bytes) };
+	}
+}
+/** @returns A fresh drain-source memo for one journal adapter. */
+export function createJournalRetirementDrainSourceMemo(): JournalRetirementDrainSourceMemo {
+	return new JournalRetirementDrainSourceMemo();
 }
 /** Detach only mutable leaves of this owner's already captured, deeply frozen
  * control. No result is retained across native reads or used as authorization.
@@ -2624,7 +2867,7 @@ function createCapturedJournalRetirementControlRead(
 						removed.add(found[0]);
 					}
 					const remaining = actual.filter((frame) => !removed.has(frame));
-					const postimage = imageOfFrames(remaining);
+					const postimage = residualImageOfFrames(remaining);
 					if (own.revision === Number.MAX_SAFE_INTEGER) throw new TypeError("retirement-exhausted");
 					// Validate the atomic cursor/revision postimage, never an impossible
 					// intermediate revision with the prior unfinished cursor.

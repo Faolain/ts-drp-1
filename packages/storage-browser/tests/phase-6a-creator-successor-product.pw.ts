@@ -13,6 +13,7 @@ import {
 } from "./fixtures/product-browser-server.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
+type RoomProfileId = "creator-trusted-v1" | "creator-trusted-settlement-v1";
 const contractLoad = import(
 	pathToFileURL(resolve(REPOSITORY_ROOT, "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts")).href
 ) as Promise<
@@ -35,8 +36,10 @@ const contractLoad = import(
 			string,
 		];
 		readonly D108E5_BROWSER_BEHAVIORS: readonly [string, string, string, string];
-		isD108d2Authority(value: unknown): boolean;
-		isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number): boolean;
+		readonly PRODUCT_ROOM_PROFILE_ID: RoomProfileId;
+		readonly LEGACY_DIRECT_ROOM_PROFILE_ID: RoomProfileId;
+		isD108d2Authority(value: unknown, expectedProfileId: RoomProfileId): boolean;
+		isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number, expectedProfileId: RoomProfileId): boolean;
 	}>
 >;
 // @ts-expect-error Playwright loads this ESM test before registration; the package typecheck uses an older module target.
@@ -46,8 +49,16 @@ const D108E2B_BROWSER_BEHAVIORS = contract.D108E2B_BROWSER_BEHAVIORS;
 const D108E2C_PRODUCT_BROWSER_BEHAVIORS = contract.D108E2C_PRODUCT_BROWSER_BEHAVIORS;
 const D108E3_BROWSER_BEHAVIORS = contract.D108E3_BROWSER_BEHAVIORS;
 const D108E5_BROWSER_BEHAVIORS = contract.D108E5_BROWSER_BEHAVIORS;
-let isD108d2Authority: (value: unknown) => boolean = () => false;
-let isD110cBSuccessorAuthority: (value: unknown, expectedEpoch: number) => boolean = () => false;
+// Each room's authority is checked against the profile its own genesis signed: the product room
+// (the v3-chat demo) signs the demo's exported profile, the legacy direct room creator-trusted-v1.
+const PRODUCT_ROOM_PROFILE_ID = contract.PRODUCT_ROOM_PROFILE_ID;
+const LEGACY_DIRECT_ROOM_PROFILE_ID = contract.LEGACY_DIRECT_ROOM_PROFILE_ID;
+let isD108d2Authority: (value: unknown, expectedProfileId: RoomProfileId) => boolean = () => false;
+let isD110cBSuccessorAuthority: (
+	value: unknown,
+	expectedEpoch: number,
+	expectedProfileId: RoomProfileId
+) => boolean = () => false;
 const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
 const CHANNEL_NAME = "d108d2-successor-product";
 
@@ -1094,7 +1105,7 @@ test(D108D2_BROWSER_BEHAVIORS[0], async () => {
 		DATABASES.creator
 	);
 	const after = await snapshot(creator);
-	expect(isD108d2Authority(after.authority)).toBe(true);
+	expect(isD108d2Authority(after.authority, PRODUCT_ROOM_PROFILE_ID)).toBe(true);
 	expect(after.authority).toEqual(carrier.authority);
 	expect(after.roomId).toBe(carrier.authority.anchorDigest);
 	expect(after.roomId).not.toBe(genesisRoomId);
@@ -2513,7 +2524,7 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-one"));
 		const epochOne = await snapshot(page);
-		expect(isD110cBSuccessorAuthority(epochOne.authority, 1)).toBe(true);
+		expect(isD110cBSuccessorAuthority(epochOne.authority, 1, PRODUCT_ROOM_PROFILE_ID)).toBe(true);
 		expect(
 			isD110cBSuccessorAuthority(
 				await page.evaluate(
@@ -2521,7 +2532,8 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 						window.phase6aCreatorSuccessorProduct.rawAuthorityAtEpoch(selected, epoch),
 					{ databaseName, epoch: 1 }
 				),
-				1
+				1,
+				PRODUCT_ROOM_PROFILE_ID
 			)
 		).toBe(true);
 		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
@@ -2537,7 +2549,7 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-two"));
 		const epochTwo = await snapshot(page);
-		expect(isD110cBSuccessorAuthority(epochTwo.authority, 2)).toBe(true);
+		expect(isD110cBSuccessorAuthority(epochTwo.authority, 2, PRODUCT_ROOM_PROFILE_ID)).toBe(true);
 		expect(epochTwo.authority).toMatchObject({
 			epoch: 2,
 			genesisAnchorDigest: (epochOne.authority as Readonly<Record<string, unknown>>).genesisAnchorDigest,
@@ -2558,7 +2570,8 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 						window.phase6aCreatorSuccessorProduct.rawAuthorityAtEpoch(selected, epoch),
 					{ databaseName, epoch: 2 }
 				),
-				2
+				2,
+				PRODUCT_ROOM_PROFILE_ID
 			)
 		).toBe(true);
 		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
@@ -2592,7 +2605,7 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 			closeBindFailureName
 		);
 		expect(closeBindFailure).toMatchObject({ detail: "D110C_B_CLOSE_REBIND_FAILED", status: "rejected" });
-		expect(isD110cBSuccessorAuthority(closeBindFailureState.authority, 1)).toBe(true);
+		expect(isD110cBSuccessorAuthority(closeBindFailureState.authority, 1, LEGACY_DIRECT_ROOM_PROFILE_ID)).toBe(true);
 		expect(closeBindFailureState.status).toMatchObject({
 			closeAuthority: "unavailable",
 			continuity: "stalled",
@@ -2898,7 +2911,8 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 			const issued = d110c0cArray(hint.postReopenRows).map(d110c0cRecord);
 			const expectedText = `matrix-${fault}-hint-after-reopen`;
 			expect(hint.coldReopenCount).toBe(1);
-			expect(authority).toMatchObject({ epoch: 2, lifecycle: "active", profileId: "creator-trusted-v1" });
+			// The matrix runs on the legacy direct room.
+			expect(authority).toMatchObject({ epoch: 2, lifecycle: "active", profileId: LEGACY_DIRECT_ROOM_PROFILE_ID });
 			expect(stable).toEqual({ currentAnchorDigest: authority.anchorDigest, epoch: 2, objectId: authority.objectId });
 			expect(genuineScope).toMatchObject({ epoch: 1, objectId: authority.objectId });
 			expect(reopened.authority).toEqual(hot.authority);

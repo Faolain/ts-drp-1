@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { describe, expect, it } from "vitest";
+import { resolveVerifiedCreatorHistoricalIssuance } from "../src/internal/creator-transition-advance.js";
 
 // Track X, decision row 60 (R6, owner's R6-A): the recovery census recognizes a displaced own
 // source as settled by a completed nonportable replacement (completedNonportableReplacementChunk)
@@ -31,6 +32,12 @@ const code = [
 	"derivePolicyReplacement",
 	"derivePolicySettlement",
 	"settlementSourceOperations",
+	// The settlement window's expiry branch (94d117ca): only the creator's verified signed frontier
+	// can authorize an "expire" entry for a source the policy would replace.
+	"settlementFrontierFromHistory",
+	"validSettlementFrontierContext",
+	"settlementOwnRowClass",
+	"settlementOwnRowFenceGuarded",
 ]
 	.map(declaration)
 	.join("\n");
@@ -65,6 +72,12 @@ const context = {
 	isV3ApplicationAuthorAuthorized: (authorization: { writers: string[] }, author: string) =>
 		authorization.writers.includes(author),
 	applicationBatchEntries: () => undefined,
+	// The real verifier: only a capability it issued resolves (WeakMap identity); a lookalike does not.
+	resolveVerifiedCreatorHistoricalIssuance,
+	// The own-fence scan is reached only past a verified frontier, which these premises never hold.
+	ownEpochFences: async () => {
+		throw new Error("OWN_FENCE_SCAN_NOT_REACHED");
+	},
 	// The source epoch's ACL does not resolve: the original derivation refuses, as for any source
 	// older than the immediately closed epoch.
 	deriveOwnedReplacement: () => {
@@ -139,6 +152,7 @@ interface Case {
 	policy?: "expire" | "manual-review" | "rebase" | "transform";
 	sourceDigest?: Uint8Array;
 	replacementSequence?: number | null;
+	historicalIssuance?: unknown;
 }
 
 async function completed(input: Case = {}): Promise<boolean> {
@@ -161,6 +175,7 @@ async function completed(input: Case = {}): Promise<boolean> {
 			},
 		},
 		authorization: { writers: [scope.author] },
+		...(input.historicalIssuance === undefined ? {} : { historicalIssuance: input.historicalIssuance }),
 		issuanceScope: scope,
 		store: { readIssued: async (_scope: unknown, sequence: number) => issued.get(sequence) ?? null },
 		classify,
@@ -237,7 +252,12 @@ describe("R6-A: a completed nonportable replacement of a source older than the c
 describe("shared own-source completion for expiry and review", () => {
 	it("recognizes expiry only when the immutable policy derives expiry for the exact source", async () => {
 		expect(await completed({ policy: "expire", disposition: "expire", replacementSequence: null, issued: false })).toBe(true);
+		// A window expiry of a source the policy would replace needs the creator's verified frontier.
+		expect(await completed({ disposition: "expire", replacementSequence: null, issued: false })).toBe(false);
 		expect(await completed({ disposition: "expire", replacementSequence: null })).toBe(false);
+		// A lookalike of a verified frontier capability (not issued by the verifier) authorizes nothing.
+		const forged = { capability: { admissionEpoch: 0, successorEpoch: 3, admittedAuthorSequence: 6 }, retainedSources: new Map() };
+		expect(await completed({ disposition: "expire", replacementSequence: null, issued: false, historicalIssuance: forged })).toBe(false);
 		expect(await completed({ policy: "expire", disposition: "expire", replacementSequence: null,
 			sourceDigest: digest(8) })).toBe(false);
 		expect(await completed({ policy: "expire", disposition: "expire" })).toBe(false);

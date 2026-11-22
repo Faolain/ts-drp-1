@@ -92,6 +92,10 @@ describe("recovery source snapshot syntax ownership",()=>{
    const calls:ts.CallExpression[]=[];const visit=(node:ts.Node)=>{if(ts.isCallExpression(node)&&node.expression.getText(ast)==="readTarget")calls.push(node);ts.forEachChild(node,visit);};visit(declaration(name));
    for(const call of calls){expect(call.arguments).toHaveLength(5);expect(call.arguments[3]?.getText(ast)).toBe("parsing");
     expect(call.arguments[4]?.getText(ast)).toBe(name==="authenticateHeldPendingRole"?"frame.accounting":"accounting");total++;}
-  }expect(total).toBe(5);
+  }
+  // 1515daab added three genuine source reads, each threading the same owner:
+  // the native-source snapshot in certificate acquisition, and the native
+  // checkpoint role's current and prior cuts in authenticate.
+  expect(total).toBe(8);
  });
 });

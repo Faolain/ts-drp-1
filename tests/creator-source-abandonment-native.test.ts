@@ -113,11 +113,15 @@ describe("explicit local-author source abandonment", () => {
 		expect(retired).not.toContain(original.commit.authorSequence);
 		expect(drained.outbox.find(row => row.sequence === original.commit.authorSequence)?.publishState).toBe("pending");
 		expect(published.slice(publishedBefore).some(bytes => Buffer.from(bytes).toString("hex").includes(sourceHex))).toBe(false);
-		// Physical prefix pruning stays behind the removed author's own earlier
-		// signed FENCE (a retained protocol no-op hole that predates abandonment);
-		// abandonment adds no FENCE and no Writer grant to release it.
+		// Abandonment adds no FENCE and no Writer grant. Once nothing below the removed
+		// author's own earlier signed FENCE is unresolved, that retained no-op leaves
+		// protection too (removed-author FENCE release). Its plan entry stays as
+		// custody while the row is physically present, so physical prefix pruning
+		// still does not run for a removed author.
 		const fence = drained.outbox.find(row => row.action === "$drp.author-fence.v1");
-		expect(retired).toEqual([required(fence).sequence]);
+		expect(retired).toEqual([]);
+		expect(drained.plan?.entries.find(entry => entry.sourceSequence === required(fence).sequence))
+			.toMatchObject({ disposition: "expire", replacementSequence: null });
 		expect(drained.prunedThrough).toBeNull();
 		expect(await reopened.room.unresolvedAcceptedWork()).toEqual([]);
 		expect(decodeCanonical(original.commit.envelope.canonicalPreimageBytes)).toMatchObject({ author });

@@ -11,9 +11,9 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
 import { toCanvasWireOperation } from "../packages/blueprints/src/v3-canvas.js";
+import { startConfiguredV3CanvasDaemon } from "../packages/cli/src/v3-canvas.js";
 import { Keychain } from "../packages/keychain/src/keychain.js";
 import { type CanvasProjection, createV3CanvasApplication } from "../packages/node/src/applications/canvas.js";
-import { startConfiguredV3CanvasDaemon } from "../packages/node/src/cli/v3-canvas.js";
 import { DRPNode } from "../packages/node/src/index.js";
 import { startV3NodeDaemon, type V3NodeDaemonHost } from "../packages/node/src/rpc/v3-daemon.js";
 import {

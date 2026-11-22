@@ -2,7 +2,18 @@ import { CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND, issuanceLegacySettlementPlanEnt
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import {
 	applySettlementPlanEffect,
+	applySettlementPlanEffects,
+	assertDurableIssueBatchEffects,
 	assertDurableIssueScope,
+	captureDurableIssueBatchInput,
+	copyAndValidateDurableIssueBatch,
+	durableIssueBatchFirstSequence,
+	durableIssueBatchMatchesIntents,
+	durableLineageAfterBatch,
+	type DurableBuildAndSignBatch,
+	type DurableIssueBatchInput,
+	type DurableIssueBatchSignContext,
+	type DurableUnsignedBatchIntent,
 	assertSettlementPlanProgressTransition,
 	captureSettlementPlanWriteInput,
 	classifyDurableIssuanceTerminalSuppression,
@@ -50,6 +61,7 @@ import {
 	captureDurableIssuancePruningInput,
 	captureDurableIssuanceRecoveryCensusInput,
 	captureIssuanceNativeSignContext,
+	issuanceSettlementReplacementReserveCharge,
 	captureIssuanceNativeSignInput,
 	captureIssuancePendingUnsignedIntent,
 	captureIssuanceRetirementObject,
@@ -78,10 +90,14 @@ import {
 	issuanceRetirementBytesEqual,
 	issuanceRetirementHex,
 	issuanceRetirementImage,
+	issuanceRetirementImageBound,
 	issuanceRetirementRefusal,
 	issuanceRetirementTransitionRows,
+	issuanceRetirementTransitionPlanBefore,
+	issuanceUnsignedBatchPostimageCharge,
 	issuanceUnsignedPostimageCharge,
 	issuanceUnsignedPostimageWidths,
+	issuancePendingIntents,
 	issuanceUnsignedOwnMaterialByteLength,
 	joinIssuanceNativeSign,
 	type IssuanceRetirementRows,
@@ -89,16 +105,19 @@ import {
 	settlementEntryIsAuthenticatedExpiry,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
+import { statSync } from "node:fs";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
+import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./native-writer-gate.js";
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
-import { configuredStatement } from "./sqlite-statement-cache.js";
+import { connectionRevision, RevisionReadMemo } from "./sqlite-revision.js";
+import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const PAGE_SIZE = 4096;
 const BUSY_TIMEOUT = 1000;
 
@@ -142,14 +161,29 @@ const RETIREMENT_TRIGGERS = ["lineages", "issued_records", "issuance_outbox", "s
 		})
 	)
 	.sort((a, b) => a.name.localeCompare(b.name));
-const DDL = [...V3_DDL, RETIREMENT_DDL, ...RETIREMENT_TRIGGERS.map((t) => t.sql)];
-const EXPECTED_CATALOG = [
+/**
+ * Schema 6 (rule A, issuance-image-capacity.qnt): one side row per object holding the exact BEFORE
+ * plan images of the completed control-2 preparation (issuanceRetirementPlanBeforeRecord). It sits
+ * outside the census and the control and is read only to reconstruct the committed source. Schema 5
+ * reopens by adding the empty table; older code refuses schema 6 (ISSUANCE_UNSUPPORTED_SCHEMA).
+ */
+const PLAN_BEFORE_DDL =
+	"CREATE TABLE retirement_plan_before (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID";
+const DDL = [...V3_DDL, RETIREMENT_DDL, PLAN_BEFORE_DDL, ...RETIREMENT_TRIGGERS.map((t) => t.sql)];
+const V5_EXPECTED_CATALOG = [
 	...V3_EXPECTED_CATALOG.map((row) => (row.name === "lineages" ? { ...row, sql: LINEAGES_DDL } : row)),
 	{ name: "retirement_controls", sql: RETIREMENT_DDL, type: "table" },
 ]
 	.sort((a, b) => a.name.localeCompare(b.name))
 	.concat(RETIREMENT_TRIGGERS.map((t) => ({ name: t.name, sql: t.sql, type: "trigger", table: t.table })));
-const V4_EXPECTED_CATALOG = EXPECTED_CATALOG.map((row) =>
+const EXPECTED_CATALOG = [
+	...V3_EXPECTED_CATALOG.map((row) => (row.name === "lineages" ? { ...row, sql: LINEAGES_DDL } : row)),
+	{ name: "retirement_controls", sql: RETIREMENT_DDL, type: "table" },
+	{ name: "retirement_plan_before", sql: PLAN_BEFORE_DDL, type: "table" },
+]
+	.sort((a, b) => a.name.localeCompare(b.name))
+	.concat(RETIREMENT_TRIGGERS.map((t) => ({ name: t.name, sql: t.sql, type: "trigger", table: t.table })));
+const V4_EXPECTED_CATALOG = V5_EXPECTED_CATALOG.map((row) =>
 	row.name === "lineages" ? { ...row, sql: LINEAGES_V4_DDL } : row
 );
 
@@ -224,13 +258,18 @@ function mapSubstrate(error: unknown, message: string, fallback: "permanent" | "
 	}
 	const number = errorNumber(error);
 	const text = errorText(error);
-	if (number === 5 || number === 6 || /\b(?:busy|locked)\b/iu.test(text)) {
-		return createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, "transient");
-	}
-	if (number === 7 || number === 13 || /\b(?:full|no memory|out of memory)\b/iu.test(text)) {
-		return createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, "resource-exhausted");
-	}
-	return createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, fallback);
+	// Diagnostics only: the substrate error stays reachable as `cause` (the message is unchanged).
+	const failure = createDurableIssuanceFailure(
+		"ISSUANCE_SUBSTRATE_FAILURE",
+		message,
+		number === 5 || number === 6 || /\b(?:busy|locked)\b/iu.test(text)
+			? "transient"
+			: number === 7 || number === 13 || /\b(?:full|no memory|out of memory)\b/iu.test(text)
+				? "resource-exhausted"
+				: fallback
+	);
+	Object.defineProperty(failure, "cause", { configurable: true, enumerable: false, value: error, writable: true });
+	return failure;
 }
 
 function capturePrimaryFilename(value: unknown): { primaryFilename: string; initialization: "create" | "reopen" } {
@@ -265,10 +304,9 @@ function capturePrimaryFilename(value: unknown): { primaryFilename: string; init
 	}
 }
 
+/** A readBigInts=false statement for one iterateSqliteRows iteration (exclusively checked out). */
 function statement(database: DatabaseSync, sql: string): StatementSync {
-	const prepared = database.prepare(sql);
-	prepared.setReadBigInts(false);
-	return prepared;
+	return iterationStatement(database, sql);
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
@@ -376,23 +414,30 @@ function admit(database: DatabaseSync, initialization: "create" | "reopen" = "cr
 			database.exec("DROP TABLE lineages_v1");
 			database.exec(SETTLEMENT_PLANS_DDL);
 			database.exec(RETIREMENT_DDL);
+			database.exec(PLAN_BEFORE_DDL);
 			for (const t of RETIREMENT_TRIGGERS) database.exec(t.sql);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion === 2 && catalogMatches(lockedCatalog, V2_EXPECTED_CATALOG)) {
 			migrateUnsignedLineage(database);
 			database.exec(SETTLEMENT_PLANS_DDL);
 			database.exec(RETIREMENT_DDL);
+			database.exec(PLAN_BEFORE_DDL);
 			for (const t of RETIREMENT_TRIGGERS) database.exec(t.sql);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion === 3 && catalogMatches(lockedCatalog, V3_EXPECTED_CATALOG)) {
 			migrateUnsignedLineage(database);
 			database.exec(RETIREMENT_DDL);
+			database.exec(PLAN_BEFORE_DDL);
 			for (const t of RETIREMENT_TRIGGERS) database.exec(t.sql);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion === 4 && catalogMatches(lockedCatalog, V4_EXPECTED_CATALOG)) {
 			for (const trigger of RETIREMENT_TRIGGERS) database.exec(`DROP TRIGGER ${trigger.name}`);
 			migrateUnsignedLineage(database);
 			for (const trigger of RETIREMENT_TRIGGERS) database.exec(trigger.sql);
+			database.exec(PLAN_BEFORE_DDL);
+			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+		} else if (lockedVersion === 5 && catalogMatches(lockedCatalog, V5_EXPECTED_CATALOG)) {
+			database.exec(PLAN_BEFORE_DDL);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion !== SCHEMA_VERSION || !catalogMatches(lockedCatalog)) {
 			throw unsupported("existing issuance SQLite authority is unsupported");
@@ -524,9 +569,26 @@ function copyOutboxRow(value: unknown): NativeOutboxRow | undefined {
 }
 
 function settlementPlanEntriesJson(plan: SettlementPlan): string {
-	if (plan.sourceContexts !== undefined) return JSON.stringify({kind: CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND,
-		bytes: Buffer.from(encodeCanonical(plan, {maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 12,
-			maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32})).toString("base64")});
+	// A refused replay's hand-back (entry handedBack) has no legacy JSON form: it outlives its records.
+	if (
+		plan.sourceContexts !== undefined ||
+		plan.handBacks !== undefined ||
+		plan.memberFrontier !== undefined ||
+		plan.completedSourceCustody !== undefined ||
+		plan.reissueOrigins !== undefined ||
+		plan.sourceAuthorities !== undefined ||
+		plan.entries.some((entry) => entry.handedBack !== undefined)
+	)
+		return JSON.stringify({
+			kind: CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND,
+			bytes: Buffer.from(
+				encodeCanonical(plan, {
+					maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
+					maxDepth: 12,
+					maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
+				})
+			).toString("base64"),
+		});
 	return issuanceLegacySettlementPlanEntriesJson(plan);
 }
 
@@ -869,7 +931,8 @@ function reserveUnsignedIntent(
 		throw issuanceRetirementRefusal("native unsigned lineage changed");
 	if (
 		context !== undefined &&
-		!isClosedDurableIssuanceRecord(context, Object.hasOwn(context, "planEffect") ? ["planEffect"] : [])
+		!isClosedDurableIssuanceRecord(context, ["planEffect", "settlementReplacementReserve"]
+			.filter((key) => Object.hasOwn(context, key)))
 	)
 		throw invalid("native unsigned settlement context is malformed");
 	const planEffect = context?.planEffect === undefined ? undefined : copySettlementPlanEffect(context.planEffect);
@@ -922,7 +985,8 @@ function reserveUnsignedIntent(
 			: [...priorRows.lineages, normalized],
 	};
 	if (ordinaryRows === undefined) {
-		issuanceRetirementImage(rows, scope.objectId); // reserved postimage, including exact unknown debt bytes
+		// Reserved postimage gate, including exact unknown debt bytes; the image itself is not needed.
+		issuanceRetirementImageBound(rows, scope.objectId);
 		issuanceUnsignedPostimageCharge(rows, scope, pending); // eventual pair + exact prospective plan
 	} else {
 		// The exact initial native image is still held by this writer. NONE's
@@ -935,6 +999,10 @@ function reserveUnsignedIntent(
 			canonicalPreimageBytes: captured.bytes, digest: captured.digest,
 		}, priorControl);
 	}
+	// A fresh Writer move only: a resumed intent is already durable and is never refused here.
+	if (old === undefined && context?.settlementReplacementReserve !== undefined)
+		issuanceSettlementReplacementReserveCharge(rows, scope, pending,
+			context.settlementReplacementReserve as Readonly<{ maxDependencies: number }>);
 	assertRetirementRow(database, scope, captured.sequence, captured.bytes, captured.digest);
 	if (priorControl === null)
 		configuredStatement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
@@ -970,10 +1038,60 @@ function bumpRetirement(database: DatabaseSync, objectId: string): void {
 import type { LocalSessionLifetime } from "./local-session-lifetime.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows } from "./local-session-lifetime.js";
 
+// Recovery census work counts (diagnostics): every census read, and those that read and classified
+// the rows (the others were proven unchanged by the connection's exact revision).
+const recoveryCensusCounts = { reads: 0, fullReads: 0 };
+/**
+ * Reads the recovery census work counts since the process started.
+ * @returns A snapshot: census reads, and the full reads among them.
+ */
+export function nodeRecoveryCensusCounts(): Readonly<{ reads: number; fullReads: number }> {
+	return Object.freeze({ ...recoveryCensusCounts });
+}
+// Issuance read work counts (diagnostics), per read kind: every read, and those that read the rows
+// (the others were proven unchanged by the connection's exact revision under a held reservation).
+type IssuanceReadKind = "page" | "issued" | "plan" | "lineage";
+const issuanceReadCounts: Record<IssuanceReadKind, { reads: number; fullReads: number }> = {
+	page: { reads: 0, fullReads: 0 },
+	issued: { reads: 0, fullReads: 0 },
+	plan: { reads: 0, fullReads: 0 },
+	lineage: { reads: 0, fullReads: 0 },
+};
+/**
+ * Reads the issuance read work counts since the process started.
+ * @returns A snapshot per read kind: reads, and the full reads among them.
+ */
+export function nodeIssuanceReadCounts(): Readonly<
+	Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>
+> {
+	return Object.freeze(
+		Object.fromEntries(Object.entries(issuanceReadCounts).map(([kind, row]) => [kind, Object.freeze({ ...row })]))
+	) as Readonly<Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>>;
+}
+// A census observation (rows, image and control: up to the census byte entitlement) and its exact
+// encoding, for one census input, retained as private copies.
+const RECOVERY_CENSUS_MEMO_ENTRIES = 1024;
+const RECOVERY_CENSUS_MEMO_BYTES = 16 * 1024 * 1024;
+
 class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
+	// The recovery census is a pure read of this connection's database. Inside the census's own read
+	// transaction, an equal connection revision (sqlite-revision.ts: total_changes, data_version,
+	// schema_version) proves no row and no schema changed since the remembered read, so the remembered
+	// rows, image and control are exactly what the full read would return. Any write, by this
+	// connection (rolled back too) or another, misses. Every hit is a private deep copy. The memo lives
+	// only while one native read reservation is held: acquiring or releasing a reservation clears it,
+	// so an ended reservation retains no observation and no encoded image.
+	readonly #censusMemo = new RevisionReadMemo(RECOVERY_CENSUS_MEMO_ENTRIES, RECOVERY_CENSUS_MEMO_BYTES);
 	readonly #filename: string;
 	readonly #readReservations: SqliteNativeReadReservationOwner;
+	// Persistent (session-less) stores keep the last issue job's private writer connection for the
+	// next job instead of reopening one. Released only after its job ended with no failure and no
+	// transaction open, it holds nothing and grants nothing: every job still takes the in-process
+	// writer gate and BEGIN IMMEDIATE on it, and re-enforces custody exactly as on open. It is reused
+	// only while the path still names the file it opened (dev/ino), so a lost or replaced store
+	// reaches the original open and fails exactly as before. Disposable-session stores never park.
+	#idleIssueWriter?: Readonly<{ database: DatabaseSync; dev: number; ino: number }>;
 	readonly #signOperations = new Set<Promise<unknown>>();
 	readonly #signReleases = new Set<() => Promise<void>>();
 	#closed = false;
@@ -1000,6 +1118,52 @@ class NodeIssuanceImplementation {
 		this.#readReservations = new SqliteNativeReadReservationOwner(filename, session);
 	}
 
+	// True while this store's native read reservation is held: the WAL writer lock excludes every
+	// write, and the census memo (with its revision check behind it) may serve exact repeats.
+	#memoReserved(): boolean {
+		const holder = this.#censusLease;
+		return holder !== undefined && !holder.releasing && this.#readReservations.current() === holder.native;
+	}
+	// One pure read inside the caller's open read transaction: remembered for the connection's exact
+	// revision while a reservation is held, read through otherwise. Every hit is a private deep copy.
+	#memoLoad<T>(kind: IssuanceReadKind, key: string, read: () => T): T {
+		issuanceReadCounts[kind].reads += 1;
+		const full = (): T => {
+			issuanceReadCounts[kind].fullReads += 1;
+			return read();
+		};
+		if (!this.#memoReserved()) return full();
+		const memo = this.#censusMemo;
+		memo.begin(this.#database);
+		try {
+			return memo.load(`${kind}\u0000${key}`, full);
+		} finally {
+			memo.end();
+		}
+	}
+	// The same, opening its own read transaction (for reads that run as single statements).
+	// `read(opened)`: opened is true when this call opened the transaction the read runs in.
+	#memoTransaction<T>(kind: IssuanceReadKind, key: string, read: (opened: boolean) => T): T {
+		if (!this.#memoReserved() || (this.#database as { isTransaction?: boolean }).isTransaction === true) {
+			issuanceReadCounts[kind].reads += 1;
+			issuanceReadCounts[kind].fullReads += 1;
+			return read(false);
+		}
+		this.#database.exec("BEGIN");
+		try {
+			const value = this.#memoLoad(kind, key, () => read(true));
+			this.#database.exec("COMMIT");
+			return value;
+		} catch (error) {
+			try {
+				this.#database.exec("ROLLBACK");
+			} catch {
+				/* Preserve the read failure. */
+			}
+			throw error;
+		}
+	}
+
 	async acquireNativeReadReservation(
 		input: Readonly<{ objectId: string }>
 	): ReturnType<SqliteNativeReadReservationOwner["acquire"]> {
@@ -1008,11 +1172,13 @@ class NodeIssuanceImplementation {
 		const native = await this.#readReservations.acquire();
 		const pending = new Set<Promise<boolean>>(), token = Object.freeze({});
 		let terminal: Promise<void> | undefined;
+		this.#censusMemo.clear();
 		const lease = {native, pending, token, releasing: false, release: (): Promise<void> => {
 			// Revoke before the first await. Escaping probes retain tokens only,
 			// never an observation, its encoded image, or this native lease.
 			lease.releasing = true;
 			if (this.#censusEnrollment?.leaseToken === token) this.#censusEnrollment = undefined;
+			if (this.#censusLease === lease) this.#censusMemo.clear();
 			return terminal ??= Promise.allSettled([...pending]).then(async () => {
 				try { await native.release(); }
 				finally { if (this.#censusLease === lease) this.#censusLease = undefined; }
@@ -1039,15 +1205,40 @@ class NodeIssuanceImplementation {
 		try {
 			this.#database.exec("BEGIN");
 			began = true;
-			const rows = retirementRows(this.#database, captured.objectId, captured.limits);
-			const image = issuanceRetirementImage(rows, captured.objectId);
-			const control = readRetirementControl(this.#database, captured.objectId);
-			if (image.logicalBytes > captured.limits.maxBytes)
-				throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+			recoveryCensusCounts.reads += 1;
+			const key = `${captured.objectId}\u0000${String(captured.limits.maxRows)}\u0000${String(captured.limits.maxBytes)}`;
+			const memo = this.#censusMemo;
+			const holder = this.#censusLease;
+			const reserved = holder !== undefined && !holder.releasing && this.#readReservations.current() === holder.native;
+			// Outside a held reservation every read is full (the memo is not begun: load reads through).
+			if (reserved) memo.begin(this.#database);
+			let observation: DurableIssuanceRecoveryCensus;
+			let exactValueBytes: Uint8Array | undefined;
+			try {
+				observation = memo.load(`census\u0000${key}`, () => {
+					recoveryCensusCounts.fullReads += 1;
+					const rows = retirementRows(this.#database, captured.objectId, captured.limits);
+					const image = issuanceRetirementImage(rows, captured.objectId);
+					const control = readRetirementControl(this.#database, captured.objectId);
+					return { rows, image, control };
+				});
+				if (observation.image.logicalBytes > captured.limits.maxBytes)
+					throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+				// The enrollment's exact encoding is a pure function of the observation: remembered with it.
+				const value = observation;
+				if (reserved)
+					try {
+						exactValueBytes = memo.load(`bytes\u0000${key}`, () => encodeCanonical(value));
+					} catch {
+						/* Optional capture: retried below exactly as before. */
+					}
+			} finally {
+				memo.end();
+			}
 			this.#database.exec("COMMIT");
 			began = false;
 			this.#assertAvailable();
-			const observation = { rows, image, control }, lease = this.#censusLease;
+			const lease = this.#censusLease;
 			if (lease !== undefined && !lease.releasing && this.#readReservations.current() === lease.native) {
 				// The original complete native read above has validated every row,
 				// preimage, plan and issued/outbox pair. Enrollment is optional DATA
@@ -1056,7 +1247,7 @@ class NodeIssuanceImplementation {
 					const observations = new WeakMap<DurableIssuanceRecoveryCensus, Readonly<{
 						input: DurableIssuanceRecoveryCensusInput; exactValueBytes: Uint8Array;
 					}>>();
-					observations.set(observation, {input: captured, exactValueBytes: encodeCanonical(observation)});
+					observations.set(observation, {input: captured, exactValueBytes: exactValueBytes ?? encodeCanonical(observation)});
 					this.#censusEnrollment = {leaseToken: lease.token, token: Object.freeze({}), observations};
 				} catch { /* Optional capture cannot narrow the original full read. */ }
 			}
@@ -1090,30 +1281,36 @@ class NodeIssuanceImplementation {
 				this.#readReservations.current() !== lease.native) return undefined;
 		} catch { return undefined; }
 		basis.observations.delete(observation);
-		return this.#createCensusCurrentProbe(lease.token, basis.token);
+		return this.#createCensusCurrentProbe(lease.token, basis.token, connectionRevision(this.#database));
 	}
 
-	#createCensusCurrentProbe(leaseToken: object, imageToken: object): DurableIssuanceRecoveryCensusCurrentProbe {
+	#createCensusCurrentProbe(leaseToken: object, imageToken: object, revision: string): DurableIssuanceRecoveryCensusCurrentProbe {
 		const implementation = this;
 		const probe: DurableIssuanceRecoveryCensusCurrentProbe = Object.freeze({
 			checkCurrent: function (this: DurableIssuanceRecoveryCensusCurrentProbe): Promise<boolean> {
 				if (this !== probe) return Promise.reject(invalid("native census probe is foreign"));
-				return implementation.#checkCensusCurrent(leaseToken, imageToken);
+				return implementation.#checkCensusCurrent(leaseToken, imageToken, revision);
 			},
 		});
 		return probe;
 	}
 
-	#checkCensusCurrent(leaseToken: object, imageToken: object): Promise<boolean> {
+	#checkCensusCurrent(leaseToken: object, imageToken: object, revision: string): Promise<boolean> {
 		const lease = this.#censusLease;
+		// The probe's image is current while its enrollment is the latest, or, under the same held
+		// reservation, while the connection's exact revision is the one it was captured at: an
+		// unchanged database gives the same census, so a later census read of the same lease (its
+		// enrollment replaced) does not make it stale.
+		const currentImage = (): boolean =>
+			this.#censusEnrollment?.token === imageToken || connectionRevision(this.#database) === revision;
 		const task = Promise.resolve().then(async () => {
 			this.#assertAvailable();
 			if (lease === undefined || lease.releasing || lease.token !== leaseToken ||
-				this.#censusEnrollment?.token !== imageToken || this.#readReservations.current() !== lease.native) return false;
+				!currentImage() || this.#readReservations.current() !== lease.native) return false;
 			try {
 				await lease.native.check();
 				this.#assertAvailable();
-				return this.#censusLease === lease && !lease.releasing && this.#censusEnrollment?.token === imageToken &&
+				return this.#censusLease === lease && !lease.releasing && currentImage() &&
 					this.#readReservations.current() === lease.native;
 			} catch (cause) { this.#censusEnrollment = undefined; throw cause; }
 		});
@@ -1155,6 +1352,7 @@ class NodeIssuanceImplementation {
 		const database = acquired;
 		let released = false,
 			began = false;
+		let releaseWriter: (() => void) | undefined;
 		let releasePromise: Promise<void> | undefined;
 		const release = (): Promise<void> =>
 			(releasePromise ??= new Promise<void>((resolve, reject) => {
@@ -1171,6 +1369,7 @@ class NodeIssuanceImplementation {
 				} catch (error) {
 					failures.push(error);
 				}
+				releaseWriter?.();
 				this.#signReleases.delete(release);
 				if (!failures.length) try { releaseLocal?.(); } catch (cause) { failures.push(cause); }
 				if (failures.length === 1) reject(failures[0]);
@@ -1179,14 +1378,20 @@ class NodeIssuanceImplementation {
 				else resolve();
 			}));
 		this.#signReleases.add(release);
-		// Native BEGIN/check happen synchronously before the original crypto task.
+		// Native BEGIN/check happen synchronously before the original crypto task,
+		// unless another private writer in this thread holds: then BEGIN waits for it.
 		return joinIssuanceNativeSign(
-			// eslint-disable-next-line @typescript-eslint/require-await
 			async () => {
 				this.#assertAvailable();
 				if (released) throw issuanceRetirementRefusal("native sign reservation released");
 				if (!began) {
+					const contended = this.#writerFree("native sign admission failed");
+					if (contended !== undefined) {
+						await contended;
+						if (released) throw issuanceRetirementRefusal("native sign reservation released");
+					}
 					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
+					releaseWriter ??= holdNativeWriter(this.#filename);
 					database.exec("BEGIN IMMEDIATE");
 					began = true;
 					if (scalar(database, "PRAGMA user_version") !== SCHEMA_VERSION || !catalogMatches(catalog(database)))
@@ -1203,7 +1408,6 @@ class NodeIssuanceImplementation {
 	}
 
 	// Async preserves promise rejection for input/native failures.
-	// eslint-disable-next-line @typescript-eslint/require-await
 	async acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
 		this.#assertAvailable();
 		const objectId = captureIssuanceRetirementObject(input);
@@ -1219,6 +1423,8 @@ class NodeIssuanceImplementation {
 				active: null,
 				completed: null,
 			};
+			const contended = this.#writerFree("issuance retirement birth failed");
+			if (contended !== undefined) await contended;
 			let began = false;
 			try {
 				this.#database.exec("BEGIN IMMEDIATE");
@@ -1259,9 +1465,10 @@ class NodeIssuanceImplementation {
 		const control = snapshot.control as DurableIssuanceRetirementControl;
 		const captured = snapshot.image;
 		// Native SQLite CAS is synchronous; the capability keeps async delivery.
-		// eslint-disable-next-line @typescript-eslint/require-await
 		return createIssuanceRetirementControlRead(control, captured, async (next, p) => {
 			this.#assertAvailable();
+			const contended = this.#writerFree("issuance retirement transition failed");
+			if (contended !== undefined) await contended;
 			const expectedRows = issuanceRetirementTransitionRows(control, next, snapshot.rows);
 			const expectedImage = issuanceRetirementImage(expectedRows, objectId);
 			let began = false;
@@ -1284,6 +1491,14 @@ class NodeIssuanceImplementation {
 				const targetRows = issuanceRetirementTransitionRows(current, next, rows);
 				if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
 					throw issuanceRetirementRefusal("issuance retirement target stale");
+				// Rule A: the commit moves the BEFORE images to the one side row (or drops a stale one).
+				const planBefore = issuanceRetirementTransitionPlanBefore(current, next, rows);
+				if (planBefore === null)
+					configuredStatement(this.#database, "DELETE FROM retirement_plan_before WHERE object_id=?").run(objectId);
+				else if (planBefore !== undefined)
+					configuredStatement(this.#database,
+						"INSERT INTO retirement_plan_before(object_id,record) VALUES(?,?) ON CONFLICT(object_id) DO UPDATE SET record=excluded.record"
+					).run(objectId, planBefore);
 				for (let index = 0; index < rows.plans.length; index++) {
 					const before = rows.plans[index]!, after = targetRows.plans[index]!;
 					if (after === before) continue;
@@ -1351,6 +1566,13 @@ class NodeIssuanceImplementation {
 				: new DurableIssuanceContractError("ISSUANCE_OUTCOME_UNKNOWN", "issuance retirement readback ambiguous");
 		});
 	}
+	async readRetirementPlanBefore(input: { readonly objectId: string }): Promise<Uint8Array | null> {
+		this.#assertAvailable();
+		const objectId = captureIssuanceRetirementObject(input);
+		const row = configuredStatement(this.#database, "SELECT record FROM retirement_plan_before WHERE object_id=?")
+			.get(objectId) as { record: Uint8Array } | undefined;
+		return row === undefined ? null : new Uint8Array(row.record);
+	}
 	#retirementSnapshot(objectId: string): {
 		rows: IssuanceRetirementRows;
 		image: ReturnType<typeof issuanceRetirementImage>;
@@ -1378,6 +1600,27 @@ class NodeIssuanceImplementation {
 		}
 	}
 
+	/** The parked issue writer, only while the path still names the file it opened; else closed. */
+	#takeIdleIssueWriter(): Readonly<{ database: DatabaseSync; dev: number; ino: number }> | undefined {
+		const idle = this.#idleIssueWriter;
+		this.#idleIssueWriter = undefined;
+		if (idle === undefined) return undefined;
+		let same = false;
+		try {
+			const now = statSync(this.#filename);
+			same = now.dev === idle.dev && now.ino === idle.ino;
+		} catch {
+			same = false;
+		}
+		if (same) return idle;
+		try {
+			idle.database.close();
+		} catch {
+			/* A stale parked connection holds nothing; the fresh open decides. */
+		}
+		return undefined;
+	}
+
 	close(): Promise<void> {
 		if (this.#closePromise !== undefined) return this.#closePromise;
 		this.#closed = true;
@@ -1388,6 +1631,12 @@ class NodeIssuanceImplementation {
 		} catch {
 			// Close is an idempotent, non-rejecting capability operation.
 		}
+		try {
+			this.#idleIssueWriter?.database.close();
+		} catch {
+			// Parked connections hold no transaction; close stays non-rejecting.
+		}
+		this.#idleIssueWriter = undefined;
 		const releases = Array.from(this.#signReleases);
 		const readJoined = this.session || this.#censusLease === undefined
 			? this.#readReservations.close()
@@ -1405,10 +1654,11 @@ class NodeIssuanceImplementation {
 	}
 
 	// Async is intentional: input and availability failures are Promise rejections.
-	// eslint-disable-next-line @typescript-eslint/require-await
 	async compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void> {
 		this.#assertAvailable();
 		const captured = this.#capturePublicationInput(input);
+		const contended = this.#writerFree("publication write failed");
+		if (contended !== undefined) await contended;
 		let began = false;
 		let committing = false;
 		try {
@@ -1478,7 +1728,9 @@ class NodeIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
 		try {
-			const lineage = readNativeLineage(this.#database, detached);
+			const lineage = this.#memoTransaction("lineage", JSON.stringify([detached.objectId, detached.author]), () =>
+				readNativeLineage(this.#database, detached)
+			);
 			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
 			return { exhausted: lineage.exhausted, next: lineage.next };
 		} catch (error) {
@@ -1495,7 +1747,15 @@ class NodeIssuanceImplementation {
 		const detached = copyDurableIssueScope(scope);
 		let observation: TerminalReadback;
 		try {
-			observation = this.#readTerminal(detached, authorSequence);
+			observation = this.#memoTransaction(
+				"issued",
+				JSON.stringify([detached.objectId, detached.author, authorSequence]),
+				// Inside the transaction opened here, the same queries #readTerminal runs in its own.
+				(opened) =>
+					opened
+						? this.#queryTerminal(detached, authorSequence, this.#database)
+						: this.#readTerminal(detached, authorSequence)
+			);
 		} catch (error) {
 			throw this.#mapOperationError(error, "issued-record read failed");
 		}
@@ -1534,7 +1794,9 @@ class NodeIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
 		try {
-			const plan = readSettlementPlanRow(this.#database, detached);
+			const plan = this.#memoTransaction("plan", JSON.stringify([detached.objectId, detached.author]), () =>
+				readSettlementPlanRow(this.#database, detached)
+			);
 			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
 			return plan === null ? null : cloneSettlementPlan(plan);
 		} catch (error) {
@@ -1542,15 +1804,12 @@ class NodeIssuanceImplementation {
 		}
 	}
 
-	transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
-		let captured: ReturnType<typeof captureSettlementPlanWriteInput>;
-		try {
-			captured = captureSettlementPlanWriteInput(input);
-			this.session?.assertOwnedAuthor(captured.scope.author);
-			this.#assertAvailable();
-		} catch (error) {
-			return Promise.reject(error);
-		}
+	async transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
+		const captured = captureSettlementPlanWriteInput(input);
+		this.session?.assertOwnedAuthor(captured.scope.author);
+		this.#assertAvailable();
+		const contended = this.#writerFree("settlement plan write failed");
+		if (contended !== undefined) await contended;
 		let began = false;
 		try {
 			this.#database.exec("BEGIN IMMEDIATE");
@@ -1560,7 +1819,7 @@ class NodeIssuanceImplementation {
 			if ((current?.revision ?? null) !== captured.expectedRevision) {
 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 			}
-			assertSettlementPlanProgressTransition(current, captured.plan);
+			assertSettlementPlanProgressTransition(current, captured.plan, captured.declineHandBack);
 			assertSettlementExpiryPublicationExclusive(
 				captured.plan,
 				captured.plan.entries
@@ -1612,7 +1871,7 @@ class NodeIssuanceImplementation {
 			bumpRetirement(this.#database, captured.scope.objectId);
 			this.#database.exec("COMMIT");
 			began = false;
-			return Promise.resolve(cloneSettlementPlan(captured.plan));
+			return cloneSettlementPlan(captured.plan);
 		} catch (error) {
 			if (began) {
 				try {
@@ -1621,7 +1880,7 @@ class NodeIssuanceImplementation {
 					// Preserve the settlement plan failure.
 				}
 			}
-			return Promise.reject(this.#mapOperationError(error, "settlement plan write failed"));
+			throw this.#mapOperationError(error, "settlement plan write failed");
 		}
 	}
 
@@ -1632,87 +1891,94 @@ class NodeIssuanceImplementation {
 		const parsed = this.#parsePageInput(input);
 		try {
 			this.#database.exec("BEGIN");
-			const lineageRows = iterateSqliteRows(
-				statement(this.#database, "SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages")
-			);
-			// Even unused foreign lineages remain part of global validation.
-			for (const raw of lineageRows) {
-				const row = copyLineageRow(raw);
-				if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
-			}
-			const issuedRows = iterateSqliteRows(
-				statement(
+			const pageKey = JSON.stringify([parsed.scope ?? null, parsed.afterKey, parsed.limit]);
+			const page = this.#memoLoad("page", pageKey, () => {
+				const lineageRows = iterateSqliteRows(
+					statement(
+						this.#database,
+						"SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages"
+					)
+				);
+				// Even unused foreign lineages remain part of global validation.
+				for (const raw of lineageRows) {
+					const row = copyLineageRow(raw);
+					if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
+				}
+				const issuedRows = iterateSqliteRows(
+					statement(
+						this.#database,
+						"SELECT i.object_id,i.author,i.author_sequence,i.canonical_preimage,i.digest,i.signature," +
+							"o.digest AS outbox_digest,o.publish_state,l.next AS lineage_next,l.exhausted AS lineage_exhausted," +
+							"l.pruned_through_author_sequence AS lineage_watermark FROM issued_records AS i " +
+							"LEFT JOIN issuance_outbox AS o ON o.object_id=i.object_id AND o.author=i.author AND o.author_sequence=i.author_sequence " +
+							"LEFT JOIN lineages AS l ON l.object_id=i.object_id AND l.author=i.author"
+					)
+				);
+				const records: { issued: NativeIssuedRow; publishState: "pending" | "published" }[] = [];
+				for (const raw of issuedRows) {
+					const issued = copyIssuedRow(raw);
+					if (issued === undefined) throw this.#latchCorruption("stored issued record is malformed");
+					const row = copyOutboxRow({
+						object_id: raw.object_id,
+						author: raw.author,
+						author_sequence: raw.author_sequence,
+						digest: raw.outbox_digest,
+						publish_state: raw.publish_state,
+					});
+					if (row === undefined) throw this.#latchCorruption("stored outbox row is malformed");
+					if (!bytesEqual(issued.digest, row.digest)) {
+						throw this.#latchCorruption("outbox has no matching issued record");
+					}
+					const lineage = copyLineageRow({
+						object_id: raw.object_id,
+						author: raw.author,
+						next: raw.lineage_next,
+						exhausted: raw.lineage_exhausted,
+						pruned_through_author_sequence: raw.lineage_watermark,
+					});
+					if (
+						lineage === undefined ||
+						!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
+						durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
+					) {
+						throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
+					}
+					const key = this.#issuedKey(issued);
+					if (
+						(parsed.scope !== undefined && !this.#sameScope(issued, parsed.scope)) ||
+						(parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(key, parsed.afterKey) <= 0)
+					)
+						continue;
+					// SQLite BINARY order is not the shared UTF-16 order. Select the
+					// smallest requested page without retaining or sorting all history.
+					let low = 0,
+						high = records.length;
+					while (low < high) {
+						const middle = Math.floor((low + high) / 2);
+						const prior = records[middle];
+						if (prior === undefined) throw new Error("outbox page selection changed");
+						if (compareDurableIssuanceCompoundKeys(this.#issuedKey(prior.issued), key) < 0) low = middle + 1;
+						else high = middle;
+					}
+					if (low < parsed.limit) {
+						records.splice(low, 0, { issued, publishState: row.publishState });
+						if (records.length > parsed.limit) records.pop();
+					}
+				}
+				const orphan = configuredStatement(
 					this.#database,
-					"SELECT i.object_id,i.author,i.author_sequence,i.canonical_preimage,i.digest,i.signature," +
-						"o.digest AS outbox_digest,o.publish_state,l.next AS lineage_next,l.exhausted AS lineage_exhausted," +
-						"l.pruned_through_author_sequence AS lineage_watermark FROM issued_records AS i " +
-						"LEFT JOIN issuance_outbox AS o ON o.object_id=i.object_id AND o.author=i.author AND o.author_sequence=i.author_sequence " +
-						"LEFT JOIN lineages AS l ON l.object_id=i.object_id AND l.author=i.author"
-				)
-			);
-			const records: { issued: NativeIssuedRow; publishState: "pending" | "published" }[] = [];
-			for (const raw of issuedRows) {
-				const issued = copyIssuedRow(raw);
-				if (issued === undefined) throw this.#latchCorruption("stored issued record is malformed");
-				const row = copyOutboxRow({
-					object_id: raw.object_id,
-					author: raw.author,
-					author_sequence: raw.author_sequence,
-					digest: raw.outbox_digest,
-					publish_state: raw.publish_state,
-				});
-				if (row === undefined) throw this.#latchCorruption("stored outbox row is malformed");
-				if (!bytesEqual(issued.digest, row.digest)) {
-					throw this.#latchCorruption("outbox has no matching issued record");
-				}
-				const lineage = copyLineageRow({
-					object_id: raw.object_id,
-					author: raw.author,
-					next: raw.lineage_next,
-					exhausted: raw.lineage_exhausted,
-					pruned_through_author_sequence: raw.lineage_watermark,
-				});
-				if (
-					lineage === undefined ||
-					!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
-					durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
-				) {
-					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
-				}
-				const key = this.#issuedKey(issued);
-				if (
-					(parsed.scope !== undefined && !this.#sameScope(issued, parsed.scope)) ||
-					(parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(key, parsed.afterKey) <= 0)
-				)
-					continue;
-				// SQLite BINARY order is not the shared UTF-16 order. Select the
-				// smallest requested page without retaining or sorting all history.
-				let low = 0,
-					high = records.length;
-				while (low < high) {
-					const middle = Math.floor((low + high) / 2);
-					const prior = records[middle];
-					if (prior === undefined) throw new Error("outbox page selection changed");
-					if (compareDurableIssuanceCompoundKeys(this.#issuedKey(prior.issued), key) < 0) low = middle + 1;
-					else high = middle;
-				}
-				if (low < parsed.limit) {
-					records.splice(low, 0, { issued, publishState: row.publishState });
-					if (records.length > parsed.limit) records.pop();
-				}
-			}
-			const orphan = configuredStatement(
-				this.#database,
-				"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
-					"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
-					"WHERE i.object_id IS NULL LIMIT 1"
-			).get();
-			if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
+					"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
+						"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
+						"WHERE i.object_id IS NULL LIMIT 1"
+				).get();
+				if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
+				return records.map(({ issued, publishState }) => ({
+					commit: cloneDurableIssueCommit(issuedCommit(issued)),
+					publishState,
+				}));
+			});
 			this.#database.exec("COMMIT");
-			return records.map(({ issued, publishState }) => ({
-				commit: cloneDurableIssueCommit(issuedCommit(issued)),
-				publishState,
-			}));
+			return page;
 		} catch (error) {
 			try {
 				this.#database.exec("ROLLBACK");
@@ -1772,6 +2038,8 @@ class NodeIssuanceImplementation {
 		}
 		if (prior.exhausted) throw failure("ISSUANCE_EXHAUSTED", "author sequence is exhausted");
 		let database: DatabaseSync | undefined;
+		let issueWriterIdentity: Readonly<{ dev: number; ino: number }> | undefined;
+		let releaseWriter: (() => void) | undefined;
 		let admitted: ReturnType<typeof captureIssuanceNativeSignInput> | undefined;
 		let hookEnded = false;
 		let signing: Promise<Uint8Array> | undefined;
@@ -1781,24 +2049,54 @@ class NodeIssuanceImplementation {
 		let primaryFailed = false;
 		let primary: unknown;
 		try {
-			const nativeSignAdmission: NonNullable<Parameters<DurableBuildAndSign>[1]> = (bytes, sign, context) => {
+			let admissionDeferred = false;
+			const admitSign = (
+				bytes: Uint8Array,
+				sign: () => Promise<Uint8Array>,
+				context: Parameters<NonNullable<Parameters<DurableBuildAndSign>[1]>>[2],
+				waited: boolean
+			): Promise<Uint8Array> => {
 				this.#assertAvailable();
-				if (hookEnded || admitted !== undefined) throw invalid("native issue sign admission is one-use");
+				if ((!waited && (hookEnded || admissionDeferred)) || admitted !== undefined)
+					throw invalid("native issue sign admission is one-use");
 				const captured = captureIssuanceNativeSignInput({ scope: detached, exactCanonicalUnsignedVertexBytes: bytes });
 				const capturedContext = captureIssuanceNativeSignContext(context);
 				if (captured.sequence !== prior.next || typeof sign !== "function")
 					throw invalid("native issue sign input changed");
+				if (!waited) {
+					// Another private writer in this thread holds across awaits: its BEGIN
+					// IMMEDIATE would sleep the thread it needs. Admit once it releases.
+					const contended = this.#writerFree("issuance write failed");
+					if (contended !== undefined) {
+						admissionDeferred = true;
+						signing = contended.then(() => admitSign(bytes, sign, context, true));
+						void signing.catch(() => undefined);
+						return signing;
+					}
+				}
 				enter();
 				admitted = captured;
-				database = new DatabaseSync(this.#filename, {
-					allowExtension: false,
-					enableDoubleQuotedStringLiterals: false,
-					enableForeignKeyConstraints: false,
-				});
-				enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
-				database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
-				database.exec("PRAGMA synchronous=FULL");
-				registerRetirementConnection(database);
+				const idle = this.#takeIdleIssueWriter();
+				if (idle !== undefined) {
+					database = idle.database;
+					issueWriterIdentity = idle;
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+				} else {
+					database = new DatabaseSync(this.#filename, {
+						allowExtension: false,
+						enableDoubleQuotedStringLiterals: false,
+						enableForeignKeyConstraints: false,
+					});
+					if (this.session === undefined) {
+						const opened = statSync(this.#filename);
+						issueWriterIdentity = { dev: opened.dev, ino: opened.ino };
+					}
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
+					database.exec("PRAGMA synchronous=FULL");
+					registerRetirementConnection(database);
+				}
+				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				verifyAuthority(database);
 				const current = readNativeLineage(database, detached, "writer");
@@ -1883,7 +2181,14 @@ class NodeIssuanceImplementation {
 					database,
 					detached,
 					captured,
-					capturedContext?.planEffect === undefined ? undefined : { planEffect: capturedContext.planEffect },
+					capturedContext?.planEffect === undefined && capturedContext?.settlementReplacementReserve === undefined
+						? undefined
+						: {
+								...(capturedContext.planEffect === undefined ? {} : { planEffect: capturedContext.planEffect }),
+								...(capturedContext.settlementReplacementReserve === undefined
+									? {}
+									: { settlementReplacementReserve: capturedContext.settlementReplacementReserve }),
+							},
 					ordinaryRows
 				);
 				ownedPending = prior.pendingUnsigned;
@@ -1892,7 +2197,10 @@ class NodeIssuanceImplementation {
 				retainOwnQuotePostimage(reservedChanges);
 				// A provisional ordinal is durable before any crypto. No signature or
 				// eligibility is inferred from this mechanical native intent.
+				// The gate follows SQLite's reservation: a same-process writer may land in this gap.
+				releaseWriter?.();
 				database.exec("COMMIT");
+				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				this.#assertAvailable();
 				const reserved = readNativeLineage(database, detached, "writer");
@@ -1921,7 +2229,9 @@ class NodeIssuanceImplementation {
 					bumpRetirement(database, detached.objectId);
 				}
 				retainOwnQuotePostimage(enteringChanges);
+				releaseWriter?.();
 				database.exec("COMMIT"); // entered marker survives an escaped signature
+				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				checkQuoteCurrency();
 				const entered = readNativeLineage(database, detached, "writer");
@@ -1960,6 +2270,8 @@ class NodeIssuanceImplementation {
 				void signing.catch(() => undefined);
 				return signing;
 			};
+			const nativeSignAdmission: NonNullable<Parameters<DurableBuildAndSign>[1]> = (bytes, sign, context) =>
+				admitSign(bytes, sign, context, false);
 			const built = await buildAndSign(prior.next, nativeSignAdmission);
 			hookEnded = true;
 			if (signing !== undefined) await signing;
@@ -1971,6 +2283,11 @@ class NodeIssuanceImplementation {
 					!issuanceRetirementBytesEqual(candidate.envelope.digest, admitted.digest))
 			)
 				throw invalid("native issue candidate differs from admitted unsigned bytes");
+			if (database === undefined) {
+				// Main-connection commit: another job's writer reservation may be held.
+				const contended = this.#writerFree("issuance write failed");
+				if (contended !== undefined) await contended;
+			}
 			return this.#commitCandidate(detached, prior, candidate, database, database !== undefined);
 		} catch (error) {
 			primaryFailed = true;
@@ -2021,17 +2338,541 @@ class NodeIssuanceImplementation {
 				} catch (error) {
 					cleanup = error;
 				}
-				try {
-					database.close();
-				} catch (error) {
-					cleanup = cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
-				}
+				if (
+					!primaryFailed &&
+					cleanup === undefined &&
+					issueWriterIdentity !== undefined &&
+					this.session === undefined &&
+					!this.#closed &&
+					this.#idleIssueWriter === undefined &&
+					(database as { isTransaction?: boolean }).isTransaction === false
+				)
+					this.#idleIssueWriter = Object.freeze({
+						database,
+						dev: issueWriterIdentity.dev,
+						ino: issueWriterIdentity.ino,
+					});
+				else
+					try {
+						database.close();
+					} catch (error) {
+						cleanup =
+							cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
+					}
+				releaseWriter?.();
 				if (cleanup !== undefined)
 					throw primaryFailed
 						? new AggregateError([primary, cleanup], "native issue and release failed", { cause: primary })
 						: cleanup;
 			}
 		}
+	}
+
+	/**
+	 * One batched issue (transactIssueBatch): ONE writer transaction durably binds every intent of the
+	 * batch to its consecutive sequence (the entered marker, before any crypto), the writer is held
+	 * through signing, and ONE transaction commits every issued/outbox row, the plan after every effect
+	 * and the lineage advance. A crash leaves the whole batch committed, or its entered marker (resumed
+	 * whole), or nothing.
+	 * @param input - Scope, commit count and the plan revision the caller checked.
+	 * @param buildAndSign - Builds the batch's commits; may enter the one batch crypto admission.
+	 * @returns The committed batch, in sequence order.
+	 */
+	transactIssueBatch(input: DurableIssueBatchInput, buildAndSign: DurableBuildAndSignBatch): Promise<readonly DurableIssueCommit[]> {
+		let captured: DurableIssueBatchInput;
+		try {
+			captured = captureDurableIssueBatchInput(input);
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		this.session?.assertCurrent();
+		this.session?.assertOwnedAuthor(captured.scope.author);
+		let resolveJob!: (value: readonly DurableIssueCommit[]) => void;
+		let rejectJob!: (cause: unknown) => void;
+		const operation = new Promise<readonly DurableIssueCommit[]>((resolve, reject) => {
+			resolveJob = resolve;
+			rejectJob = reject;
+		});
+		let finishSession: (() => void) | undefined;
+		const running = this.#transactIssueBatch(captured, buildAndSign, () => {
+			finishSession ??= this.session?.enter();
+			this.#signOperations.add(operation);
+		});
+		void running.then(
+			(value) => { finishSession?.(); resolveJob(value); },
+			(primary: unknown) => { finishSession?.(); rejectJob(primary); }
+		);
+		void operation.then(
+			() => this.#signOperations.delete(operation),
+			() => this.#signOperations.delete(operation)
+		);
+		return operation;
+	}
+
+	async #transactIssueBatch(
+		input: DurableIssueBatchInput,
+		buildAndSign: DurableBuildAndSignBatch,
+		enter: () => void
+	): Promise<readonly DurableIssueCommit[]> {
+		this.#assertAvailable();
+		if (typeof buildAndSign !== "function") throw invalid("buildAndSign must be a function");
+		const { scope, count, expectedPlanRevision } = input;
+		let prior: NativeLineage;
+		let first: number;
+		try {
+			const observed = readNativeLineage(this.#database, scope);
+			if (observed === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			prior = observed;
+			first = durableIssueBatchFirstSequence(prior, count);
+			const plan = readSettlementPlanRow(this.#database, scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if ((plan?.revision ?? null) !== expectedPlanRevision)
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+		} catch (error) {
+			throw this.#mapOperationError(error, "batch lineage selection failed");
+		}
+		let database: DatabaseSync | undefined;
+		let issueWriterIdentity: Readonly<{ dev: number; ino: number }> | undefined;
+		let releaseWriter: (() => void) | undefined;
+		let marker: DurableIssuancePendingUnsignedIntent | undefined;
+		let admissionUsed = false;
+		let signing: Promise<readonly Uint8Array[]> | undefined;
+		let inheritedEntered = prior.pendingUnsigned?.phase === "entered";
+		let markerCommitted = false;
+		let primaryFailed = false;
+		let primary: unknown;
+		try {
+			const admit = async (
+				intents: readonly DurableUnsignedBatchIntent[],
+				sign: (index: number) => Promise<Uint8Array>,
+				context: DurableIssueBatchSignContext | undefined,
+				proceed: ((index: number) => boolean) | undefined
+			): Promise<readonly Uint8Array[]> => {
+				this.#assertAvailable();
+				if (admissionUsed) throw invalid("native batch sign admission is one-use");
+				admissionUsed = true;
+				if (
+					typeof sign !== "function" ||
+					(proceed !== undefined && typeof proceed !== "function") ||
+					!Array.isArray(intents) ||
+					intents.length !== count
+				)
+					throw invalid("native batch sign input changed");
+				const capturedContext =
+					context === undefined
+						? undefined
+						: captureIssuanceNativeSignContext({
+								...(context.expectedIssuanceImageDigest === undefined
+									? {}
+									: { expectedIssuanceImageDigest: context.expectedIssuanceImageDigest }),
+								...(context.expectedIssuanceControlBytes === undefined
+									? {}
+									: { expectedIssuanceControlBytes: context.expectedIssuanceControlBytes }),
+							});
+				const capturedIntents = intents.map((intent, index) => {
+					if (!isClosedDurableIssuanceRecord(intent, ["exactCanonicalUnsignedVertexBytes",
+						...(Object.hasOwn(intent ?? {}, "planEffect") ? ["planEffect"] : [])]))
+						throw invalid("native batch intent is malformed");
+					const bytes = captureIssuanceNativeSignInput({
+						scope,
+						exactCanonicalUnsignedVertexBytes: intent.exactCanonicalUnsignedVertexBytes,
+					});
+					if (bytes.sequence !== first + index) throw invalid("native batch intent sequence changed");
+					const planEffect = intent.planEffect === undefined ? undefined : copySettlementPlanEffect(intent.planEffect);
+					if (intent.planEffect !== undefined && planEffect === undefined)
+						throw invalid("native batch intent effect is malformed");
+					return { authorSequence: bytes.sequence, canonicalPreimageBytes: bytes.bytes, digest: bytes.digest,
+						...(planEffect === undefined ? {} : { planEffect }) };
+				});
+				assertDurableIssueBatchEffects(capturedIntents.map((intent) => intent.planEffect));
+				const contended = this.#writerFree("issuance batch write failed");
+				if (contended !== undefined) await contended;
+				enter();
+				const idle = this.#takeIdleIssueWriter();
+				if (idle !== undefined) {
+					database = idle.database;
+					issueWriterIdentity = idle;
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+				} else {
+					database = new DatabaseSync(this.#filename, {
+						allowExtension: false,
+						enableDoubleQuotedStringLiterals: false,
+						enableForeignKeyConstraints: false,
+					});
+					if (this.session === undefined) {
+						const opened = statSync(this.#filename);
+						issueWriterIdentity = { dev: opened.dev, ino: opened.ino };
+					}
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
+					database.exec("PRAGMA synchronous=FULL");
+					registerRetirementConnection(database);
+				}
+				const writer = database;
+				releaseWriter = holdNativeWriter(this.#filename);
+				writer.exec("BEGIN IMMEDIATE");
+				verifyAuthority(writer);
+				const current = readNativeLineage(writer, scope, "writer");
+				inheritedEntered ||= current?.pendingUnsigned?.phase === "entered";
+				if (!current || !sameLineage(current, prior) || current.exhausted)
+					throw issuanceRetirementRefusal("native batch lineage changed");
+				const rows = retirementRows(writer, scope.objectId);
+				const priorControl = readRetirementControl(writer, scope.objectId);
+				if (capturedContext?.expectedIssuanceImageDigest !== undefined) {
+					const expectedControl = capturedContext.expectedIssuanceControlBytes;
+					const actualControl = readRetirementControlRecord(writer, scope.objectId)?.bytes ?? null;
+					if (
+						issuanceRetirementImage(rows, scope.objectId).imageDigest !== capturedContext.expectedIssuanceImageDigest ||
+						(expectedControl === null || expectedControl === undefined
+							? actualControl !== null
+							: actualControl === null || !issuanceRetirementBytesEqual(actualControl, expectedControl))
+					)
+						throw issuanceRetirementRefusal("native issuance batch quote currency changed");
+				}
+				const plan = readSettlementPlanRow(writer, scope);
+				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+				if ((plan?.revision ?? null) !== expectedPlanRevision)
+					throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+				const withEffects = capturedIntents[0]!.planEffect !== undefined;
+				if (withEffects && plan === null) throw issuanceRetirementRefusal("native batch settlement plan is unavailable");
+				const control: DurableIssuanceRetirementControl = priorControl ?? {
+					kind: "v3-issuance-retirement-control-1",
+					objectId: scope.objectId,
+					incarnation: issuanceRetirementHex(globalThis.crypto.getRandomValues(new Uint8Array(32))),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+				const [head, ...following] = capturedIntents;
+				const requested = captureIssuancePendingUnsignedIntent(
+					{
+						kind: "v3-issuance-pending-unsigned-1",
+						incarnation: control.incarnation,
+						authorSequence: head!.authorSequence,
+						canonicalPreimageBytes: head!.canonicalPreimageBytes,
+						digest: head!.digest,
+						phase: "entered",
+						...(withEffects ? { planEffect: head!.planEffect, exactCanonicalPlanBytes: encodeCanonical(plan) } : {}),
+						...(following.length === 0 ? {} : { followingIntents: following }),
+					},
+					scope
+				);
+				const old = current.pendingUnsigned;
+				// Only the SAME whole batch may resume an existing marker (a crash after it): exact bytes,
+				// effects, plan and incarnation. Anything else is another intent's ordinal.
+				if (
+					old !== undefined &&
+					!issuanceRetirementBytesEqual(encodeCanonical({ ...old, phase: "entered" }), encodeCanonical(requested))
+				)
+					throw issuanceRetirementRefusal("native unsigned identity or context is unresolved");
+				if (old === undefined && following.length === 0 && count !== 1) throw invalid("native batch count changed");
+				const normalized = {
+					...scope,
+					next: current.next,
+					exhausted: current.exhausted,
+					prunedThroughAuthorSequence: current.prunedThroughAuthorSequence,
+					pendingUnsigned: requested,
+				};
+				const markedRows = {
+					...rows,
+					lineages: current.present
+						? rows.lineages.map((row) => (row.author === scope.author ? normalized : row))
+						: [...rows.lineages, normalized],
+				};
+				// The whole batch is charged once, before its marker: the marker postimage itself and every
+				// eventual pair plus the plan after every effect. A refusal writes nothing and signs nothing.
+				issuanceRetirementImageBound(markedRows, scope.objectId);
+				issuanceUnsignedBatchPostimageCharge(markedRows, scope, requested);
+				for (const intent of capturedIntents)
+					if (!issuanceRetirementAllows(priorControl, scope, intent.authorSequence, intent.canonicalPreimageBytes, intent.digest))
+						throw issuanceRetirementRefusal("issued epoch is retired");
+				if (old === undefined || old.phase !== "entered") {
+					if (priorControl === null)
+						configuredStatement(writer, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
+							scope.objectId,
+							encodeIssuanceRetirementControl(control)
+						);
+					if (current.present)
+						configuredStatement(writer, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
+							encodeCanonical(requested),
+							scope.objectId,
+							scope.author
+						);
+					else
+						configuredStatement(
+							writer,
+							"INSERT INTO lineages (object_id,author,next,exhausted,pending_unsigned) VALUES(?,?,?,?,?)"
+						).run(scope.objectId, scope.author, current.next, current.exhausted ? 1 : 0, encodeCanonical(requested));
+					bumpRetirement(writer, scope.objectId);
+				}
+				marker = requested;
+				releaseWriter?.();
+				writer.exec("COMMIT"); // the batch's entered marker survives an escaped signature
+				markerCommitted = true;
+				releaseWriter = holdNativeWriter(this.#filename);
+				writer.exec("BEGIN IMMEDIATE");
+				this.#assertAvailable();
+				const entered = readNativeLineage(writer, scope, "writer");
+				if (
+					entered?.pendingUnsigned === undefined ||
+					!issuanceRetirementBytesEqual(encodeCanonical(entered.pendingUnsigned), encodeCanonical(requested)) ||
+					readRetirementControl(writer, scope.objectId)?.incarnation !== requested.incarnation
+				)
+					throw issuanceRetirementRefusal("native batch entered source changed");
+				prior = { ...prior, pendingUnsigned: requested, present: true };
+				// Keep this exact writer through every signature and the commit.
+				signing = (async (): Promise<readonly Uint8Array[]> => {
+					const signatures: Uint8Array[] = [];
+					for (let index = 0; index < capturedIntents.length; index += 1) {
+						this.#assertAvailable();
+						// The caller may stop the batch before a later signature: the signed prefix commits alone.
+						if (index > 0 && proceed !== undefined && proceed(index) !== true) break;
+						const digest = capturedIntents[index]!.digest;
+						const signature = await (this.session
+							? this.session.withOwnedOperationSigning(digest, () => sign(index))
+							: sign(index));
+						this.#assertAvailable();
+						if (!(signature instanceof Uint8Array) || signature.byteLength !== 64)
+							throw invalid("native registered signature is malformed");
+						signatures.push(new Uint8Array(signature));
+					}
+					return Object.freeze(signatures);
+				})();
+				void signing.catch(() => undefined);
+				return signing;
+			};
+			const built = await buildAndSign(first, (intents, sign, context, proceed) => admit(intents, sign, context, proceed));
+			// A stopped batch commits exactly the prefix it signed, matching the marker's first intents.
+			const signed = signing === undefined ? undefined : await signing;
+			const committed = signed === undefined ? count : signed.length;
+			const candidates = copyAndValidateDurableIssueBatch(built, scope, first, committed);
+			this.#assertAvailable();
+			if (
+				marker !== undefined &&
+				!durableIssueBatchMatchesIntents(issuancePendingIntents(marker).slice(0, committed), candidates)
+			)
+				throw invalid("native batch candidates differ from admitted unsigned bytes");
+			if (database === undefined) {
+				const contended = this.#writerFree("issuance batch write failed");
+				if (contended !== undefined) await contended;
+			}
+			return this.#commitBatch(scope, prior, first, candidates, marker, expectedPlanRevision, database, database !== undefined);
+		} catch (error) {
+			primaryFailed = true;
+			const enteredUncertainty = markerCommitted || inheritedEntered;
+			primary =
+				enteredUncertainty &&
+				!this.#closed &&
+				error !== this.#poison &&
+				!this.#hasCode(error, "ISSUANCE_OUTCOME_UNKNOWN")
+					? new DurableIssuanceUnknownOutcomeError(scope, { cause: error })
+					: error;
+			throw primary;
+		} finally {
+			if (signing !== undefined) await signing.catch(() => undefined);
+			if (database !== undefined) {
+				let cleanup: unknown;
+				try {
+					try {
+						database.exec("ROLLBACK");
+					} catch {
+						/* terminal may already have joined */
+					}
+				} catch (error) {
+					cleanup = error;
+				}
+				if (
+					!primaryFailed &&
+					issueWriterIdentity !== undefined &&
+					this.session === undefined &&
+					!this.#closed &&
+					this.#idleIssueWriter === undefined &&
+					(database as { isTransaction?: boolean }).isTransaction === false
+				)
+					this.#idleIssueWriter = Object.freeze({ database, dev: issueWriterIdentity.dev, ino: issueWriterIdentity.ino });
+				else
+					try {
+						database.close();
+					} catch (error) {
+						cleanup = cleanup === undefined ? error : new AggregateError([cleanup, error], "native batch release failed");
+					}
+				releaseWriter?.();
+				if (cleanup !== undefined)
+					throw primaryFailed
+						? new AggregateError([primary, cleanup], "native batch and release failed", { cause: primary })
+						: cleanup;
+			}
+		}
+	}
+
+	#commitBatch(
+		scope: DurableIssueScope,
+		prior: NativeLineage,
+		first: number,
+		candidates: readonly DurableIssueCommit[],
+		marker: DurableIssuancePendingUnsignedIntent | undefined,
+		expectedPlanRevision: number | null,
+		database = this.#database,
+		alreadyBegan = false
+	): readonly DurableIssueCommit[] {
+		let began = alreadyBegan;
+		let committing = false;
+		let expectedPlan: SettlementPlan | null = null;
+		try {
+			if (!alreadyBegan) database.exec("BEGIN IMMEDIATE");
+			began = true;
+			const current = readNativeLineage(database, scope, "writer");
+			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			if (marker === undefined) {
+				// A raw builder (no crypto admission): no marker may stand at these ordinals.
+				if (current.pendingUnsigned !== undefined) throw issuanceRetirementRefusal("issuance unsigned identity is unresolved");
+			} else if (
+				current.pendingUnsigned === undefined ||
+				!issuanceRetirementBytesEqual(encodeCanonical(current.pendingUnsigned), encodeCanonical(marker)) ||
+				marker.incarnation !== readRetirementControl(database, scope.objectId)?.incarnation
+			)
+				throw issuanceRetirementRefusal("issuance unsigned batch or incarnation changed");
+			if (!sameLineage(current, prior) || current.exhausted || current.next !== first) {
+				database.exec("ROLLBACK");
+				began = false;
+				throw failure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
+			}
+			const control = readRetirementControl(database, scope.objectId);
+			for (const candidate of candidates)
+				if (
+					!issuanceRetirementAllows(
+						control,
+						scope,
+						candidate.authorSequence,
+						candidate.envelope.canonicalPreimageBytes,
+						candidate.envelope.digest
+					)
+				)
+					throw issuanceRetirementRefusal("issued epoch is retired");
+			const plan = readSettlementPlanRow(database, scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if ((plan?.revision ?? null) !== expectedPlanRevision)
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+			if (candidates[0]!.planEffect !== undefined) {
+				if (plan === null) throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+				if (marker !== undefined && !issuanceRetirementBytesEqual(encodeCanonical(plan), marker.exactCanonicalPlanBytes!))
+					throw issuanceRetirementRefusal("issuance unsigned settlement source changed");
+				expectedPlan = applySettlementPlanEffects(plan, candidates);
+				const planChanges = configuredStatement(
+					database,
+					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+				).run(
+					expectedPlan!.revision,
+					expectedPlan!.fenceSequence,
+					settlementPlanEntriesJson(expectedPlan!),
+					scope.objectId,
+					scope.author,
+					plan.revision
+				).changes;
+				if (planChanges !== 1) throw this.#latchCorruption("settlement plan effect changed an impossible row count");
+			}
+			const after = durableLineageAfterBatch(first, candidates.length);
+			const lineageChanges = prior.present
+				? configuredStatement(
+						database,
+						"UPDATE lineages SET next=?,exhausted=?,pending_unsigned=NULL WHERE object_id=? AND author=? AND next=? AND exhausted=?"
+					).run(after.next, after.exhausted ? 1 : 0, scope.objectId, scope.author, prior.next, prior.exhausted ? 1 : 0).changes
+				: configuredStatement(database, "INSERT INTO lineages (object_id,author,next,exhausted) VALUES(?,?,?,?)").run(
+						scope.objectId,
+						scope.author,
+						after.next,
+						after.exhausted ? 1 : 0
+					).changes;
+			if (lineageChanges !== 1) throw this.#latchCorruption("lineage CAS changed an impossible row count");
+			for (const candidate of candidates) {
+				const issuedChanges = configuredStatement(
+					database,
+					"INSERT INTO issued_records (object_id,author,author_sequence,canonical_preimage,digest,signature) VALUES(?,?,?,?,?,?)"
+				).run(
+					scope.objectId,
+					scope.author,
+					candidate.authorSequence,
+					candidate.envelope.canonicalPreimageBytes,
+					candidate.envelope.digest,
+					candidate.envelope.signature
+				).changes;
+				if (issuedChanges !== 1) throw this.#latchCorruption("issued insert changed an impossible row count");
+				const outboxChanges = configuredStatement(
+					database,
+					"INSERT INTO issuance_outbox (object_id,author,author_sequence,digest,publish_state) VALUES(?,?,?,?,?)"
+				).run(scope.objectId, scope.author, candidate.authorSequence, candidate.envelope.digest, "pending").changes;
+				if (outboxChanges !== 1) throw this.#latchCorruption("outbox insert changed an impossible row count");
+			}
+			if (expectedPlan !== null && control)
+				assertIssuanceRetirementPlanAllowed(control, expectedPlan, retirementRows(database, scope.objectId));
+			bumpRetirement(database, scope.objectId);
+			committing = true;
+			database.exec("COMMIT");
+			began = false;
+			committing = false;
+		} catch (error) {
+			if (began || committing) {
+				try {
+					database.exec("ROLLBACK");
+				} catch {
+					// Preserve the mutation failure.
+				}
+			}
+			if (committing) return this.#classifyBatchAfterCommit(scope, candidates, expectedPlan, database);
+			if (error === this.#poison) throw error;
+			if (this.#hasCode(error, "ISSUANCE_RETRY_REQUIRED")) throw error;
+			if (this.#isConstraint(error)) throw this.#latchCorruption("issuance child-key collision");
+			throw mapSubstrate(error, "issuance batch write failed");
+		}
+		return this.#classifyBatchAfterCommit(scope, candidates, expectedPlan, database);
+	}
+
+	/**
+	 * The committed postimage of a batch, read back after its COMMIT (or an ambiguous COMMIT failure):
+	 * every row present with its exact digest and the plan after every effect, or none of them. A
+	 * partial batch is corruption.
+	 */
+	#classifyBatchAfterCommit(
+		scope: DurableIssueScope,
+		candidates: readonly DurableIssueCommit[],
+		expectedPlan: SettlementPlan | null,
+		database: DatabaseSync
+	): readonly DurableIssueCommit[] {
+		let present = 0;
+		let plan: SettlementPlan | null | undefined;
+		try {
+			database.exec("BEGIN");
+			try {
+				for (const candidate of candidates) {
+					const row = configuredStatement(
+						database,
+						"SELECT digest FROM issued_records WHERE object_id=? AND author=? AND author_sequence=?"
+					).get(scope.objectId, scope.author, candidate.authorSequence) as { digest?: unknown } | undefined;
+					if (row === undefined) continue;
+					const digest = copyDurableIssuanceBytes(row.digest);
+					if (digest === undefined || !issuanceRetirementBytesEqual(digest, candidate.envelope.digest))
+						throw this.#latchCorruption("batch issued row differs from its candidate");
+					present += 1;
+				}
+				plan = readSettlementPlanRow(database, scope);
+			} finally {
+				database.exec("COMMIT");
+			}
+		} catch (error) {
+			if (error === this.#poison) throw error;
+			throw new DurableIssuanceUnknownOutcomeError(scope, { cause: error });
+		}
+		if (present === 0) throw new DurableIssuanceUnknownOutcomeError(scope);
+		if (present !== candidates.length) throw this.#latchCorruption("batch committed partially");
+		if (
+			expectedPlan !== null &&
+			(plan === undefined ||
+				plan === null ||
+				!issuanceRetirementBytesEqual(encodeCanonical(plan), encodeCanonical(expectedPlan)))
+		)
+			throw this.#latchCorruption("settlement plan differs from the committed batch effects");
+		return Object.freeze(candidates.map((candidate) => cloneDurableIssueCommit(candidate)));
 	}
 
 	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
@@ -2067,14 +2908,11 @@ class NodeIssuanceImplementation {
 		return this.#prunePrefix(input, false);
 	}
 
-	#prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
-		let captured: ReturnType<typeof captureDurableIssuancePruningInput>;
-		try {
-			captured = captureDurableIssuancePruningInput(input);
-			this.#assertAvailable();
-		} catch (error) {
-			return Promise.reject(error);
-		}
+	async #prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
+		const captured = captureDurableIssuancePruningInput(input);
+		this.#assertAvailable();
+		const contended = this.#writerFree("issuance pruning failed");
+		if (contended !== undefined) await contended;
 		let began = false;
 		try {
 			this.#database.exec("BEGIN IMMEDIATE");
@@ -2105,7 +2943,7 @@ class NodeIssuanceImplementation {
 			) {
 				this.#database.exec("COMMIT");
 				began = false;
-				return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, null));
+				return createDurableIssuancePruningReceipt(captured, lineage, null);
 			}
 			if (
 				current.prunedThroughAuthorSequence !== captured.expectedPrunedThroughAuthorSequence ||
@@ -2123,12 +2961,6 @@ class NodeIssuanceImplementation {
 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
 			assertIssuanceRetirementPruningAllowed(
 				readRetirementControl(this.#database, captured.scope.objectId),
-				captured.scope,
-				from,
-				captured.throughAuthorSequence
-			);
-			assertIssuanceInheritedTargetPruningAllowed(
-				retirementRows(this.#database, captured.scope.objectId).plans,
 				captured.scope,
 				from,
 				captured.throughAuthorSequence
@@ -2188,6 +3020,14 @@ class NodeIssuanceImplementation {
 					}
 				}
 			}
+			// Its whole-object census refuses any unclassified row as retryable, so it runs only
+			// after the selected prefix has latched its own corruption; still before any write.
+			assertIssuanceInheritedTargetPruningAllowed(
+				retirementRows(this.#database, captured.scope.objectId).plans,
+				captured.scope,
+				from,
+				captured.throughAuthorSequence
+			);
 			const issuedChanges = configuredStatement(
 				this.#database,
 				"DELETE FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ?"
@@ -2220,7 +3060,7 @@ class NodeIssuanceImplementation {
 			bumpRetirement(this.#database, captured.scope.objectId);
 			this.#database.exec("COMMIT");
 			began = false;
-			return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, from));
+			return createDurableIssuancePruningReceipt(captured, lineage, from);
 		} catch (error) {
 			if (began) {
 				try {
@@ -2229,7 +3069,7 @@ class NodeIssuanceImplementation {
 					// Preserve the pruning failure.
 				}
 			}
-			return Promise.reject(this.#mapOperationError(error, "issuance pruning failed"));
+			throw this.#mapOperationError(error, "issuance pruning failed");
 		}
 	}
 
@@ -2578,6 +3418,25 @@ class NodeIssuanceImplementation {
 		return this.#poison;
 	}
 
+	/**
+	 * A main-connection write must not busy-wait on this file's in-process writer
+	 * reservations (see native-writer-gate.ts): it would sleep the thread their
+	 * release needs and always fail after busy_timeout. Uncontended, this is
+	 * undefined and the write proceeds synchronously as before. Contended, it waits
+	 * for the holders asynchronously within the same busy budget and then rejects with
+	 * the transient busy failure the synchronous wait would have produced, without
+	 * freezing the event loop. The caller begins its write before any further await.
+	 * @param message - The write's substrate failure message.
+	 * @returns Undefined when uncontended, else the wait (rejecting past the busy budget).
+	 */
+	#writerFree(message: string): Promise<void> | undefined {
+		if (!nativeWriterHeld(this.#filename)) return undefined;
+		return awaitNativeWriterFree(this.#filename, BUSY_TIMEOUT).then((free) => {
+			this.#assertAvailable();
+			if (!free) throw createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, "transient");
+		});
+	}
+
 	#mapOperationError(error: unknown, message: string): Error {
 		if (error === this.#poison && this.#poison !== undefined) return this.#poison;
 		if (error instanceof DurableIssuanceInvalidArgumentError) return error;
@@ -2695,6 +3554,8 @@ export function createNodeDurableIssuanceStoreImplementation(
 			readSettlementPlan: (scope: DurableIssueScope) => implementation.readSettlementPlan(scope),
 			transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 				implementation.transactIssue(scope, buildAndSign),
+			transactIssueBatch: (input: DurableIssueBatchInput, buildAndSign: DurableBuildAndSignBatch) =>
+				implementation.transactIssueBatch(input, buildAndSign),
 			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
 		});
 		const readBoundedRecoveryCensus: DurableIssuanceRecoveryCensusReader = (input) => implementation.readBoundedRecoveryCensus(input);
@@ -2711,6 +3572,8 @@ export function createNodeDurableIssuanceStoreImplementation(
 				implementation.withNativeSignAdmission(input, sign),
 			acquireRetirementControl: (input: { readonly objectId: string }) =>
 				implementation.acquireRetirementControl(input),
+			readRetirementPlanBefore: (input: { readonly objectId: string }) =>
+				implementation.readRetirementPlanBefore(input),
 			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),

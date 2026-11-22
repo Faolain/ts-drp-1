@@ -2135,8 +2135,44 @@ export type TransactIssue = (scope: IssueScope, buildAndSign: BuildAndSign) => P
 
 export type SignRegisteredVertexDigest = (registeredDigest: Uint8Array, ownedRequest?: OwnedSigningRequest) => Promise<Uint8Array>;
 
+/** One vertex of a batch: its own clock, operation and optional settlement source. */
+export interface LocalVertexBatchEntry {
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly settlementSource?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Consecutive vertices of one author issued in one batched transaction. The first vertex depends on
+ * `dependencies`; every later one depends on its predecessor alone (the predecessor covered every
+ * earlier frontier tip), exactly the frontier the same singles would see without foreign ingress.
+ */
+export interface LocalVertexBatchInput {
+	readonly anchor: string;
+	readonly dependencies: readonly string[];
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly entries: readonly LocalVertexBatchEntry[];
+}
+
+/**
+ * The store's batch crypto admission. It may return fewer signatures than vertices, in order: its caller
+ * stopped the batch before a later signature, and only the signed prefix is built and committed.
+ */
+export type UnsignedVertexBatchSignAdmission = (
+	exactCanonicalUnsignedVertexBytes: readonly Uint8Array[],
+	sign: (index: number) => Promise<Uint8Array>
+) => Promise<readonly Uint8Array[]>;
+export type BuildAndSignBatch = (
+	firstAuthorSequence: number,
+	nativeSignAdmission?: UnsignedVertexBatchSignAdmission
+) => Promise<readonly IssueCommit[]>;
+export type TransactIssueBatch = (scope: IssueScope, count: number, buildAndSign: BuildAndSignBatch) => Promise<readonly IssueCommit[]>;
+
 export interface TransactionalVertexIssuer {
 	issue(input: LocalVertexInput): Promise<IssueCommit>;
+	/** Every entry admitted, built and signed exactly as `issue` does one, committed by one batched transaction. */
+	issueBatch(input: LocalVertexBatchInput, transactIssueBatch: TransactIssueBatch): Promise<readonly IssueCommit[]>;
 }
 
 export interface TransactionalIssuerOptions {
@@ -3574,21 +3610,97 @@ function createTransactionalVertexIssuerCore(
 ): TransactionalVertexIssuer {
 	const { author, publicKeyBytes, transactIssue } = common;
 
-	return {
-		async issue(input: LocalVertexInput): Promise<IssueCommit> {
-			if (operationAdmission !== undefined && operationAdmission(input.operation) === undefined) {
+	const admittedOperation = (raw: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> => {
+		if (operationAdmission !== undefined && operationAdmission(raw) === undefined) {
+			throw new VertexValidationError("operation does not match the prepared blueprint ABI");
+		}
+		const operation = detachCanonicalRecord(raw);
+		if (operationAdmission !== undefined) {
+			const schema = operationAdmission(operation);
+			if (schema === undefined) {
 				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
 			}
-			const operation = detachCanonicalRecord(input.operation);
-			if (operationAdmission !== undefined) {
-				const schema = operationAdmission(operation);
-				if (schema === undefined) {
-					throw new VertexValidationError("operation does not match the prepared blueprint ABI");
-				}
-				if (!operationWithinCanonicalByteBudget(operation, schema)) {
-					throw new RangeError("operation exceeds the prepared blueprint canonical byte budget");
-				}
+			if (!operationWithinCanonicalByteBudget(operation, schema)) {
+				throw new RangeError("operation exceeds the prepared blueprint canonical byte budget");
 			}
+		}
+		return operation;
+	};
+	const signDigest = async (canonicalPreimageBytes: Uint8Array, digest: Uint8Array): Promise<Uint8Array> => {
+		if (signingState.kind === "private-key-seed") return ed25519.sign(digest, signingState.privateKeySeed);
+		const retainedDigest = new intrinsicUint8Array(digest);
+		const callbackDigest = new intrinsicUint8Array(digest);
+		const callbackResult = await withAuthoredOperationSigningRequest(canonicalPreimageBytes, request =>
+			intrinsicReflectApply(signingState.signRegisteredVertexDigest, undefined, [callbackDigest, request]) as Promise<Uint8Array>);
+		const signature = copyExactRegisteredDigestSignature(callbackResult);
+		if (!verifyEd25519RegisteredDigest(signature, retainedDigest, publicKeyBytes)) {
+			throw new VertexValidationError("signRegisteredVertexDigest returned an invalid signature");
+		}
+		return signature;
+	};
+
+	return {
+		async issueBatch(input: LocalVertexBatchInput, transactIssueBatch: TransactIssueBatch): Promise<readonly IssueCommit[]> {
+			if (typeof transactIssueBatch !== "function") throw new TypeError("transactIssueBatch must be a function");
+			const entries = input.entries.map((entry) => ({
+				logicalTime: entry.logicalTime,
+				operation: admittedOperation(entry.operation),
+				...(entry.settlementSource === undefined ? {} : { settlementSource: detachCanonicalRecord(entry.settlementSource) }),
+			}));
+			if (entries.length === 0) throw new TypeError("a vertex batch has at least one entry");
+			const scope: IssueScope = { author, objectId: input.objectId };
+			const dependencies = [...input.dependencies];
+			return transactIssueBatch(scope, entries.length, async (firstAuthorSequence, nativeSignAdmission) => {
+				const preimages: Uint8Array[] = [];
+				const digests: Uint8Array[] = [];
+				for (let index = 0; index < entries.length; index += 1) {
+					const entry = entries[index]!;
+					const canonicalPreimageBytes = vertexCanonicalBytes({
+						kind: "drp-vertex",
+						protocolMajor: 3,
+						objectId: input.objectId,
+						epoch: input.epoch,
+						anchor: input.anchor,
+						author,
+						authorSequence: firstAuthorSequence + index,
+						logicalTime: entry.logicalTime,
+						dependencies: index === 0 ? dependencies : [bytesToHex(digests[index - 1]!)],
+						operation: entry.operation,
+						...(entry.settlementSource === undefined ? {} : { settlementSource: entry.settlementSource }),
+					});
+					preimages.push(canonicalPreimageBytes);
+					digests.push(digestReceivedVertexPreimage(canonicalPreimageBytes));
+				}
+				const sign = (index: number): Promise<Uint8Array> => signDigest(preimages[index]!, digests[index]!);
+				let signatures: readonly Uint8Array[];
+				if (nativeSignAdmission === undefined) {
+					const signed: Uint8Array[] = [];
+					for (let index = 0; index < preimages.length; index += 1) signed.push(await sign(index));
+					signatures = signed;
+				} else {
+					signatures = await nativeSignAdmission(preimages.map((bytes) => new intrinsicUint8Array(bytes)), sign);
+				}
+				// A native admission may stop the batch: the commits of its signed prefix (at least one row).
+				if (
+					signatures.length > entries.length ||
+					signatures.length < 1 ||
+					(nativeSignAdmission === undefined && signatures.length !== entries.length)
+				)
+					throw new TypeError("batch signatures do not match its vertices");
+				return preimages.slice(0, signatures.length).map((canonicalPreimageBytes, index) => {
+					const authorSequence = firstAuthorSequence + index;
+					const envelope: SignedVertexEnvelope = { canonicalPreimageBytes, digest: digests[index]!, signature: signatures[index]! };
+					return {
+						authorSequence,
+						envelope,
+						issuedRecord: { authorSequence, envelope, scope },
+						outboxEntry: { authorSequence, envelope, scope },
+					};
+				});
+			});
+		},
+		async issue(input: LocalVertexInput): Promise<IssueCommit> {
+			const operation = admittedOperation(input.operation);
 			const detachedInput: LocalVertexInput = {
 				anchor: input.anchor,
 				dependencies: [...input.dependencies],
@@ -3615,22 +3727,7 @@ function createTransactionalVertexIssuerCore(
 					...(detachedInput.settlementSource === undefined ? {} : { settlementSource: detachedInput.settlementSource }),
 				});
 				const digest = digestReceivedVertexPreimage(canonicalPreimageBytes);
-				const sign = async (): Promise<Uint8Array> => {
-				let signature: Uint8Array;
-				if (signingState.kind === "private-key-seed") {
-					signature = ed25519.sign(digest, signingState.privateKeySeed);
-				} else {
-					const retainedDigest = new intrinsicUint8Array(digest);
-					const callbackDigest = new intrinsicUint8Array(digest);
-					const callbackResult = await withAuthoredOperationSigningRequest(canonicalPreimageBytes, request =>
-						intrinsicReflectApply(signingState.signRegisteredVertexDigest, undefined, [callbackDigest, request]) as Promise<Uint8Array>);
-					signature = copyExactRegisteredDigestSignature(callbackResult);
-					if (!verifyEd25519RegisteredDigest(signature, retainedDigest, publicKeyBytes)) {
-						throw new VertexValidationError("signRegisteredVertexDigest returned an invalid signature");
-					}
-				}
-					return signature;
-				};
+				const sign = (): Promise<Uint8Array> => signDigest(canonicalPreimageBytes, digest);
 				const signature =
 					nativeSignAdmission === undefined
 						? await sign()

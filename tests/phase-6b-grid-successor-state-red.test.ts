@@ -356,8 +356,11 @@ it("uses one world order for independent same-block branches live and after genu
 			if (typeof id !== "string") throw new TypeError("GRID_BRANCH_ID_MISSING");
 			blocks.set(id, { id, kind, x, y });
 		}
+		// Zone state v2 binds the creator roster entry (ea4eb158).
 		return encodeCanonical({
-			version: 1,
+			version: 2,
+			creatorAuthor: creator.author,
+			creatorPeerId: required(roster[0]).peerId,
 			blocks: [...blocks.values()].sort((a, b) => (String(a.id) < String(b.id) ? -1 : 1)),
 			outcomes: [],
 			roster,

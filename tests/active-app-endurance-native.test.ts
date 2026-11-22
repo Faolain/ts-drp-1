@@ -7,8 +7,9 @@ import { cpus, loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 
-import { driveActiveAppEndurance } from "./fixtures/active-endurance/driver.js";
+import { APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS, driveActiveAppEndurance } from "./fixtures/active-endurance/driver.js";
 import { installEnvironment, nodeHostFor, sqliteFileCensus } from "./fixtures/track-m-apps/app-long-room.js";
+import { genesisProfileFor } from "./fixtures/track-m-apps/genesis-profile.js";
 import { openRole } from "./fixtures/track-m-apps/long-room-core.js";
 import type { AppKind, RoleEndpoint } from "./fixtures/track-m-apps/long-room-driver.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
@@ -28,6 +29,26 @@ for (const value of [epochs, moves, streamLimit])
 if (!Number.isSafeInteger(reopenAt) || reopenAt < 1 || reopenAt > epochs)
 	throw new Error("ENDURANCE_REOPEN_EPOCH_INVALID");
 const output = process.env.ACTIVE_ENDURANCE_OUT ?? join(tmpdir(), `active-endurance-${Date.now()}`);
+// Every app signs its own exported genesis profile (examples/<app>/src/profile.ts) by default.
+// ACTIVE_ENDURANCE_PROFILE=trusted-v1 is the explicit opt-in override for Grid and Chat (the legacy
+// trusted profile, which never prunes issued records); it is recorded in the configuration line.
+// Canvas always follows its shipped profile.
+const profile = process.env.ACTIVE_ENDURANCE_PROFILE;
+if (profile !== undefined && profile !== "trusted-v1" && profile !== "settlement-v1")
+	throw new Error(`ENDURANCE_PROFILE:${profile}`);
+// ACTIVE_ENDURANCE_ROLLOVER=app: each app's own rollover policy (examples/<app>/src/rollover.ts) rolls
+// the room over instead of the harness. ACTIVE_ENDURANCE_EPOCHS then counts adopted epochs (the
+// creator room's authenticated epoch), not driver rounds. Successor offers travel by the pages' own
+// delivery (examples/v3-room successor-delivery); the harness only carries its frames over the same
+// scripted wire as signed rows, and harness offer passing is refused. Default "harness".
+const rollover = process.env.ACTIVE_ENDURANCE_ROLLOVER ?? "harness";
+if (rollover !== "harness" && rollover !== "app") throw new Error(`ENDURANCE_ROLLOVER:${rollover}`);
+// App mode: the most a Writer's issue may take when it overlaps an automatic rollover (seal start
+// to 1 s after adoption) before the run counts it starved (see APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS).
+const memberRolloverIssueBoundMs = Number(
+	process.env.ACTIVE_ENDURANCE_MEMBER_ROLLOVER_ISSUE_BOUND_MS ?? APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS
+);
+if (!(memberRolloverIssueBoundMs > 0)) throw new Error("ENDURANCE_MEMBER_ROLLOVER_ISSUE_BOUND");
 
 it.skipIf(!enabled).each(apps)(
 	"%s: active writers conserve work and native storage through endurance",
@@ -59,6 +80,19 @@ it.skipIf(!enabled).each(apps)(
 			moves,
 			streamLimit,
 			reopenAt,
+			genesisProfile: genesisProfileFor({
+				app,
+				...(profile === "trusted-v1" && app !== "canvas" ? { profile } : {}),
+			}),
+			profileOverride: profile === "trusted-v1" && app !== "canvas" ? "trusted-v1" : null,
+			rollover,
+			...(rollover === "app"
+				? {
+						epochsCount: "adopted epochs (the creator room's authenticated epoch), not driver rounds",
+						successorOffers: "pages' own successor delivery over the scripted wire; harness offer passing refused",
+						memberRolloverIssueBoundMs,
+					}
+				: {}),
 			host: "SQLite",
 			transport: "scripted signed-byte first-copy loss/delay and explicit durable replay",
 			successorMembership: "v2 native journal point read",
@@ -77,6 +111,8 @@ it.skipIf(!enabled).each(apps)(
 				epochs,
 				moves,
 				chatFormat: "shares" as const,
+				...(profile === "trusted-v1" && app !== "canvas" ? { profile: "trusted-v1" as const } : {}),
+				...(rollover === "app" ? { rollover: "app" as const } : {}),
 			};
 			const openPeers = async (reopen: boolean): Promise<readonly [RoleEndpoint, RoleEndpoint]> => {
 				const host = nodeHostFor("node", directory, reopen);
@@ -106,6 +142,8 @@ it.skipIf(!enabled).each(apps)(
 				streamLimit,
 				peers: await openPeers(false),
 				reopenAt: metadata.reopenAt,
+				rollover,
+				...(rollover === "app" ? { memberRolloverIssueBoundMs } : {}),
 				reopen: async (peers) => {
 					await Promise.all(peers.map((peer) => peer.close()));
 					return openPeers(true);

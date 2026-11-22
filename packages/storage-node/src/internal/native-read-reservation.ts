@@ -3,6 +3,12 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { enforceNativeLocalSessionFile, type LocalSessionLifetime } from "./local-session-lifetime.js";
+import {
+	awaitNativeWriterFree,
+	holdNativeWriter,
+	nativeWriterBusyError,
+	nativeWriterHeld,
+} from "./native-writer-gate.js";
 import { cachedStatement } from "./sqlite-statement-cache.js";
 
 /**
@@ -80,6 +86,7 @@ export class SqliteNativeReadReservationOwner {
 		const database = acquired;
 		let active = false,
 			released = false;
+		let releaseWriter: (() => void) | undefined;
 		let resolveJoin!: () => void, rejectJoin!: (cause: unknown) => void;
 		this.#heldJoin = new Promise<void>((resolve, reject) => { resolveJoin = resolve; rejectJoin = reject; });
 		void this.#heldJoin.catch(() => undefined);
@@ -100,6 +107,7 @@ export class SqliteNativeReadReservationOwner {
 				} catch (cause) {
 					failures.push(cause);
 				}
+				releaseWriter?.();
 				if (this.#held === held) this.#held = undefined;
 				if (!failures.length) try { releaseHandle?.(); } catch (cause) { failures.push(cause); }
 				if (!failures.length) joined?.();
@@ -122,7 +130,15 @@ export class SqliteNativeReadReservationOwner {
 		});
 		this.#held = held;
 		try {
+			if (nativeWriterHeld(this.filename)) {
+				// Another private writer in this thread holds across awaits; BEGIN IMMEDIATE would sleep it out.
+				const free = await awaitNativeWriterFree(this.filename, 1000);
+				this.session?.assertCurrent();
+				if (this.#closed || released) throw new Error("NATIVE_READ_RESERVATION_RELEASED");
+				if (!free) throw nativeWriterBusyError();
+			}
 			database.exec("PRAGMA busy_timeout=1000");
+			releaseWriter = holdNativeWriter(this.filename);
 			database.exec("BEGIN IMMEDIATE");
 			active = true;
 			await held.check();

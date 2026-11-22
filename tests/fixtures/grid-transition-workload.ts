@@ -236,6 +236,8 @@ export async function runGridTransitions(target: 30 | 60 | 100, observer?: GridT
 						epoch: 0,
 						profileDigest,
 					});
+					// Deliberately creator-trusted-settlement-v1: the workload's room (grid-room-workload)
+					// tests that profile; it does not mirror a shipped app's profile.
 					expect(record(invite.exactCanonicalProfileBytes).profileId).toBe("creator-trusted-settlement-v1");
 					const selected = readV3ApplicationProjectionOrder({
 						plane: required(observed.planes.get(peer.databaseName)),

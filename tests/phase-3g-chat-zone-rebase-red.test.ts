@@ -14,6 +14,8 @@ vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => ({
 		if (typeof application !== "object" || application === null) throw new TypeError("missing chat application");
 		return Promise.resolve(
 			Object.freeze({
+				// A genesis room has no successor authority yet (the v3-chat rollover policy reads it).
+				authority: () => null,
 				close: () => Promise.resolve(),
 				invite: "phase3g-controlled-invite",
 				issue: (operation: Readonly<Record<string, unknown>>) => {

@@ -118,6 +118,7 @@ async function longRoomFixture() {
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const host = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	// A persisted reopen recreates the owner over the SAME databases and external floor.
 	const open = async (index: number, options: { reopen?: boolean } = {}) => {
 		const identity = required(identities[index]);
@@ -174,6 +175,14 @@ async function longRoomFixture() {
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. This
+		// harness has no successor delivery, so it hands over the creator's statement as the delivery
+		// does on bind.
+		if (index === 0) creatorRoom = room;
+		else if (options.reopen === true && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		// Delivers authenticated signed rows of another peer in issue order. The final
 		// row is an ordinary move, whose application acceptance joins the delivery; a
 		// preceding reserved author fence has no application callback of its own.

@@ -54,7 +54,8 @@ const UNCERTIFIED_WINDOW = Object.freeze({
 	maxCanonicalEpochVertexByteLength: 8192,
 	maxSuccessorFencePreimageByteLength: 8192,
 	maxReceivedPendingIngressByteLength: 8192,
-	maxApplicationBytes: 1_048_576,
+	// At most the room's application state limit: a window past it is refused when the room opens.
+	maxApplicationBytes: 32_768,
 	maxApplicationItems: 4096,
 	maxApplicationDepth: 8,
 });

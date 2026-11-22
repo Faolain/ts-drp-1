@@ -37,7 +37,10 @@ import {
 	resolveCreatorAuthorSettlement,
 } from "../../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
 import { createBrowserAheDurableStore } from "../../packages/storage-browser/src/index.js";
-import { PHASE_5E_SCHEMA_AUTHORITY } from "../../packages/storage-browser/src/internal/schema-idb.js";
+import {
+	CURRENT_BROWSER_SCHEMA_VERSION,
+	PHASE_5E_SCHEMA_AUTHORITY,
+} from "../../packages/storage-browser/src/internal/schema-idb.js";
 import { createBrowserDurableIssuanceStore } from "../../packages/storage-browser/src/issuance.js";
 import { createBrowserRoomHeadAuthority } from "../../packages/storage-browser/src/room-head.js";
 
@@ -125,8 +128,10 @@ vi.mock(
 	"../../packages/node/dist/src/creator-adoption-recover.js",
 	() => import("../../packages/node/src/creator-adoption-recover.js")
 );
-vi.mock("../../packages/node/dist/src/creator-adoption-activate.js", async () => {
-	const real = await import("../../packages/node/src/creator-adoption-activate.js");
+// v3-room imports "@ts-drp/node/creator-adoption-activate", which the root config
+// aliases to src (ea4eb158); a dist-path mock no longer reaches the room.
+vi.mock("../../packages/node/src/creator-adoption-activate.js", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../packages/node/src/creator-adoption-activate.js")>();
 	type ActivationRealm = typeof real;
 	const realms = new Map<string, Promise<ActivationRealm>>();
 	// Independent physical clients have independent module-local activeOwners.
@@ -203,9 +208,17 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 		...real,
 		createBrowserDurableIssuanceStore: async (input: { primaryDatabaseName: string }) => {
 			const store = await real.createBrowserDurableIssuanceStore(input);
-			const transactIssue = store.transactIssue;
-			const readLineage = store.readLineage;
-			Reflect.set(store, "readLineage", (scope: Parameters<typeof readLineage>[0]) => {
+			// The facade is frozen (its methods delegate to the native implementation on
+			// every call), so the observers sit on that exact implementation instance. The
+			// facade keeps its maintenance WeakMap identity; nothing is minted or rebound.
+			const implementation = browserIssuanceImplementationForTest(store);
+			if (implementation === undefined) throw new Error("F5B_NATIVE_ISSUANCE_IDENTITY_LOST");
+			const observe = (name: string, value: unknown) => {
+				if (!Reflect.set(implementation, name, value)) throw new Error(`F5B_OBSERVER_NOT_INSTALLED:${name}`);
+			};
+			const transactIssue: DurableIssuanceStore["transactIssue"] = implementation.transactIssue.bind(implementation);
+			const readLineage: DurableIssuanceStore["readLineage"] = implementation.readLineage.bind(implementation);
+			observe("readLineage", (scope: Parameters<typeof readLineage>[0]) => {
 				if (observed.failRecoveryReadFor === input.primaryDatabaseName)
 					return Promise.reject(new Error("F5B_RECOVERY_DURABLE_READ_UNAVAILABLE"));
 				return readLineage(scope);
@@ -225,9 +238,11 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 			};
 			// Observe methods on the EXACT backend facade. Its existing maintenance
 			// WeakMap identity remains intact; no capability is minted or rebound.
-			Reflect.set(store, "transactIssue", (async (scope, build) => {
+			observe("transactIssue", (async (scope, build) => {
 				let selected: DurableIssueCommit | undefined;
+				let uncommitted: DurableIssueCommit | undefined;
 				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
+				const abandoned = new Error("F5B_AMBIGUOUS_UNCOMMITTED_ABORT");
 				const result = await transactIssue(scope, async (sequence, nativeJob) => {
 					// The native writer is entered by build's signing admission hook,
 					// not by transactIssue's callback entry. Observe before it is held.
@@ -237,10 +252,11 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					observed.issueAttempts.push(candidate);
 					const effect = candidate.planEffect;
 					if (ambiguity !== undefined && ambiguity.kind === effect?.kind && !ambiguity.committed) {
-						await ambiguousReadback(candidate);
-						if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
-						observed.ambiguous = undefined;
-						throw new DurableIssuanceUnknownOutcomeError(scope);
+						// The native writer is held from build() until this callback settles,
+						// so durable truth cannot be read from inside it (a store read here
+						// waits on this very job). Abort the transaction and read back after.
+						uncommitted = candidate;
+						throw abandoned;
 					}
 					if (
 						input.primaryDatabaseName === observed.failSuffixFor &&
@@ -253,6 +269,14 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					}
 					selected = candidate;
 					return candidate;
+				}).catch(async (error: unknown) => {
+					// The store reports a callback that throws after native entry as an
+					// unknown commit outcome, so the sentinel itself does not surface here.
+					if (uncommitted === undefined || ambiguity === undefined) throw error;
+					await ambiguousReadback(uncommitted);
+					if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
+					observed.ambiguous = undefined;
+					throw new DurableIssuanceUnknownOutcomeError(scope);
 				});
 				if (selected !== undefined) {
 					observed.commits.push(selected);
@@ -271,8 +295,9 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 				}
 				return result;
 			}) satisfies DurableIssuanceStore["transactIssue"]);
-			const publish = store.compareAndMarkOutboxPublished;
-			Reflect.set(store, "compareAndMarkOutboxPublished", (async (value) => {
+			const publish: DurableIssuanceStore["compareAndMarkOutboxPublished"] =
+				implementation.compareAndMarkOutboxPublished.bind(implementation);
+			observe("compareAndMarkOutboxPublished", (async (value) => {
 				await publish(value);
 				observed.timeline.push({
 					database: input.primaryDatabaseName,
@@ -286,18 +311,17 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					handle: observed.planes.get(input.primaryDatabaseName),
 				});
 			}) satisfies DurableIssuanceStore["compareAndMarkOutboxPublished"]);
-			const writePlan = store.transactWriteSettlementPlan;
-			Reflect.set(store, "transactWriteSettlementPlan", (async (value) => {
+			const writePlan: DurableIssuanceStore["transactWriteSettlementPlan"] =
+				implementation.transactWriteSettlementPlan.bind(implementation);
+			observe("transactWriteSettlementPlan", (async (value) => {
 				const plan = await writePlan(value);
 				observed.planWrites.push({ database: input.primaryDatabaseName, plan: structuredClone(plan) });
 				observed.timeline.push({ database: input.primaryDatabaseName, kind: "plan", revision: plan.revision });
 				return plan;
 			}) satisfies DurableIssuanceStore["transactWriteSettlementPlan"]);
-			const implementation = browserIssuanceImplementationForTest(store);
-			if (implementation === undefined) throw new Error("F5B_NATIVE_ISSUANCE_IDENTITY_LOST");
 			const prune = implementation.pruneAuthenticatedSettledPrefix.bind(implementation);
 			// Forward without a global spy registry retaining every closed store owner.
-			Reflect.set(implementation, "pruneAuthenticatedSettledPrefix", async (value: Parameters<typeof prune>[0]) => {
+			observe("pruneAuthenticatedSettledPrefix", async (value: Parameters<typeof prune>[0]) => {
 				const event: (typeof observed.prunes)[number] = {
 					database: input.primaryDatabaseName,
 					input: structuredClone(value),
@@ -376,8 +400,11 @@ const hex = (value: Uint8Array) => Buffer.from(value).toString("hex");
  * @param value
  */
 const record = (value: Uint8Array) => decodeCanonical(value) as Record<string, unknown>;
+// ea4eb158: a local head exactly one epoch behind the authenticated floor is first
+// tried as a direct received transition; with no received successor material that
+// closure cannot be built, so reopen refuses there, before the floor comparison.
 const STALE_LOCAL_HEAD_FAILURE =
-	"v3 room successor reopen failed: D110C_FLOOR_MISMATCH: creator successor differs from the authenticated room-head floor";
+	"v3 room successor reopen failed: chain-invalid: creator received projection replacement is invalid";
 let ordinal = 0;
 
 const wideDiagnosticState = {
@@ -490,7 +517,9 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 		sourceScope[4] !== targetScope[4]
 	)
 		throw new TypeError("F5B_TRANSFER_DATABASE_SCOPE_INVALID");
-	const schema = PHASE_5E_SCHEMA_AUTHORITY;
+	// Versions 4-6 keep the phase-5e stores (local control and signing-writer fences);
+	// the product opens and writes the current version.
+	const schema = { stores: PHASE_5E_SCHEMA_AUTHORITY.stores, version: CURRENT_BROWSER_SCHEMA_VERSION };
 	const expectedStores = [...schema.stores].sort((left, right) => left.name.localeCompare(right.name));
 	const schemaFor = async (database: IDBDatabase) => {
 		const transaction = database.transaction([...database.objectStoreNames], "readonly");
@@ -617,6 +646,16 @@ async function floorOwner(databaseName: string, scope: { objectId: string; pinne
 		authority,
 		read,
 		receive: async (published: V3RoomHeadState) => {
+			// A fresh device's floor is still empty: create it at genesis, then follow.
+			const current = await authority.read({ scope });
+			if (!current.ok) throw new TypeError("F5B_NATIVE_FLOOR_READ_CONFLICT");
+			if (current.state === null || current.state === undefined) {
+				const created = await authority.create({
+					scope,
+					stable: { objectId: scope.objectId, epoch: 0, currentAnchorDigest: scope.pinnedGenesisAnchorDigest },
+				});
+				if (!created.ok) throw new TypeError("F5B_NATIVE_FLOOR_CREATE_CONFLICT");
+			}
 			let state = await read();
 			const same = (left: unknown, right: unknown) => hex(encodeCanonical(left)) === hex(encodeCanonical(right));
 			if (same(state, published)) return;
@@ -726,6 +765,8 @@ async function openRoom(
 				.sort((a, b) => (a.author < b.author ? -1 : 1)),
 		}),
 		exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
+		// Deliberately chosen per scenario (`legacy` selects creator-trusted-v1): this fixture tests
+		// both profiles' mechanics; it does not mirror a shipped app's profile.
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
 			profileId: legacy ? "creator-trusted-v1" : "creator-trusted-settlement-v1",
@@ -933,9 +974,11 @@ async function openRoom(
 		wideDiagnostic("reopen-session", "begin", closedEpoch + 1, peer.databaseName);
 		peer.room = await createV3RoomSession({
 			...reopenInput,
-			// Legacy keeps its existing restriction. Settlement creator restart must
-			// authenticate this existing input pair and rebind close authority.
-			...(!legacy && creatorFinalitySigner !== undefined ? { creatorFinalitySigner } : {}),
+			// A restarted creator authenticates this existing input pair and rebinds close
+			// authority, as the pages' owned session always does for the creator (both
+			// profiles). Without its signer a reopened creator is an ordinary Writer that
+			// nothing can make current (Decision B: the currency statement is the creator's).
+			...(creatorFinalitySigner !== undefined ? { creatorFinalitySigner } : {}),
 			application,
 			onProjection: observeEmissions ? observeProjection(peer.databaseName, application) : reopenInput.onProjection,
 			roomHeadAuthority: { ...peer.floor.authority, initialization: { kind: "reopen" } },
@@ -943,6 +986,12 @@ async function openRoom(
 		});
 		wideDiagnostic("reopen-session", "end", closedEpoch + 1, peer.databaseName);
 		sessions.add(peer.room);
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		if (peer !== origin && sessions.has(origin.room)) {
+			const statement = origin.room.currencyStatement?.();
+			if (statement !== undefined) await peer.room.confirmCurrent?.(statement);
+		}
 		if (observeEmissions) {
 			required(emitted.get(peer.databaseName)).owner = peer.room;
 			emittedProjection(peer);
@@ -1221,8 +1270,28 @@ async function assertRetainedRollbackPair(peer: Peer) {
 	const retained = facts.generations.filter((generation) => generation.state === "Superseded");
 	// Cleanup retains physical generations, including preparation/close ancestors.
 	const expected = 2;
-	expect(retained, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
-	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(expected + 1);
+	// ea4eb158: cleanup also keeps the caller-authenticated independent source
+	// generations (at most four, closed-epoch-cleanup), outside the rollback pair.
+	// Read them from the cleanup that produced this exact head: a peer's own latest
+	// cleanup can lag the store observed here by one close.
+	type CleanupPlan = {
+		activeGenerationId: string;
+		rollbackGenerationIds: readonly string[];
+		independentSourceGenerations?: readonly { generationId: string }[];
+	};
+	const plan = observed.cleanup
+		.map((event) => (event.result as { plan?: CleanupPlan }).plan)
+		.findLast((candidate) => candidate?.activeGenerationId === facts.head.generationId);
+	const independent = (plan?.independentSourceGenerations ?? []).map((generation) => generation.generationId);
+	expect(independent.length, "F5B_C13_INDEPENDENT_SOURCES_BOUNDED").toBeLessThanOrEqual(4);
+	expect(required(plan).rollbackGenerationIds, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
+	expect(
+		retained.map((generation) => generation.generationId).sort(),
+		"F5B_C13_RETAINED_EXACTLY_ROLLBACK_PAIR_AND_INDEPENDENT_SOURCES"
+	).toEqual([...required(plan).rollbackGenerationIds, ...independent].sort());
+	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(
+		expected + independent.length + 1
+	);
 	const active = required(facts.generations.find((generation) => generation.generationId === facts.head.generationId));
 	expect(active.state).toBe("Adopted");
 	let base = active.baseExpectedHead;

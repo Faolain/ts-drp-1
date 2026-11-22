@@ -59,6 +59,53 @@ describe("D.110c-0c1f4 exact pinned-genesis bootstrap policy", () => {
 					extra: true,
 				} as never)
 			).resolves.toMatchObject({ kind: "malformed-input", ok: false });
+			// ea4eb158's receive-only restriction exists only beside a latched ACL; a
+			// legacy author-list recovery still accepts exactly the four combinations.
+			expect(Reflect.has(bindings.input, "exactCanonicalLatchedAclBytes")).toBe(false);
+			for (const variant of variants) {
+				await expect(
+					recoverV3LiveReplica({
+						...variant,
+						capability: Object.freeze({ counterfeit: true }) as never,
+						receiveOnly: true,
+					} as never)
+				).resolves.toMatchObject({ kind: "malformed-input", ok: false });
+			}
+		} finally {
+			await fixture.close();
+		}
+	});
+
+	it("accepts the receive-only restriction on each of the four combinations only beside a latched ACL", async () => {
+		const fixture = await createGenuinePreparedV3Fixture({ authorizationMode: "latched-acl" });
+		try {
+			const bindings = await createRecoveryInput(fixture, fixture.capability, BOOTSTRAP_OPERATION);
+			expect(Reflect.has(bindings.input, "exactCanonicalLatchedAclBytes")).toBe(true);
+			const operationAdmissionPolicy = Object.freeze({
+				reserve: () => Object.freeze({ kind: "duplicate" as const }),
+			});
+			const bootstrapBytes = encodeCanonical(BOOTSTRAP_OPERATION);
+			for (const variant of [
+				bindings.input,
+				{ ...bindings.input, operationAdmissionPolicy },
+				{ ...bindings.input, [BOOTSTRAP_POLICY_KEY]: bootstrapBytes },
+				{ ...bindings.input, [BOOTSTRAP_POLICY_KEY]: bootstrapBytes, operationAdmissionPolicy },
+			]) {
+				await expect(
+					recoverV3LiveReplica({
+						...variant,
+						capability: Object.freeze({ counterfeit: true }) as never,
+						receiveOnly: true,
+					} as never)
+				).resolves.toMatchObject({ kind: "capability-consumed", ok: false });
+			}
+			await expect(
+				recoverV3LiveReplica({
+					...bindings.input,
+					capability: Object.freeze({ counterfeit: true }) as never,
+					receiveOnly: false,
+				} as never)
+			).resolves.toMatchObject({ kind: "malformed-input", ok: false });
 		} finally {
 			await fixture.close();
 		}
@@ -99,7 +146,9 @@ describe("D.110c-0c1f4 exact pinned-genesis bootstrap policy", () => {
 		const live = source("packages/node/src/v3-live.ts");
 		const activation = source("packages/node/src/creator-adoption-activate.ts");
 		const pending = source("packages/node/src/creator-adoption-recover.ts");
-		const room = source("examples/v3-room/src/index.ts");
+		// ea4eb158 moved the room session into the node package; the example re-exports it.
+		const room = source("packages/node/src/v3-room.ts");
+		expect(source("examples/v3-room/src/index.ts")).toContain('from "@ts-drp/node/v3-room"');
 		const snapshotInput = section(live, "function snapshotRecoveryRecord(", "function isInstanceOf(");
 		const exactPredicate = section(
 			live,
@@ -123,10 +172,32 @@ describe("D.110c-0c1f4 exact pinned-genesis bootstrap policy", () => {
 		);
 		const hotKeys = section(activation, "const HOT_KEYS", "const COLD_KEYS");
 		const coldKeys = section(activation, "const COLD_KEYS", "type PlainRecord");
+		const coldOptional = section(activation, "const optional = [", "const bindings = runtimeBindings(captured);");
 
-		expect(snapshotInput.match(/snapshotClosedRecord\(/gu)).toHaveLength(4);
+		// ea4eb158 adds the receive-only restriction: the same four combinations again,
+		// each with "receiveOnly", reachable only when the keys carry a latched ACL.
+		const [ordinaryInput, receiveOnlyInput] = snapshotInput.split("if (ordinary !== undefined) return ordinary;");
+		expect(ordinaryInput?.match(/snapshotClosedRecord\(/gu)).toHaveLength(4);
+		expect(ordinaryInput).not.toContain("receiveOnly");
+		expect(receiveOnlyInput).toContain('if (!keys.includes("exactCanonicalLatchedAclBytes")) return undefined;');
+		expect(receiveOnlyInput?.match(/snapshotClosedRecord\(/gu)).toHaveLength(4);
+		expect(receiveOnlyInput?.match(/"receiveOnly"/gu)).toHaveLength(4);
+		expect(snapshotInput.match(/snapshotClosedRecord\(/gu)).toHaveLength(8);
 		expect(snapshotInput).toContain("PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY");
-		expect(live.match(/authenticatedPinnedGenesisOutboxRow\(/gu)).toHaveLength(3);
+		// ea4eb158 routes four more owners (both census source branches, the hidden native
+		// census and the displaced/current plane classification) through the SAME predicate.
+		// Freeze one definition, and that every call hands it exact pinned bootstrap bytes.
+		expect(live.match(/function authenticatedPinnedGenesisOutboxRow\(/gu)).toHaveLength(1);
+		const pinnedCalls = live
+			.split(/(?<!function )authenticatedPinnedGenesisOutboxRow\(/u)
+			.slice(1)
+			.map((tail) => tail.slice(0, tail.indexOf(")")));
+		expect(pinnedCalls).toHaveLength(6);
+		for (const call of pinnedCalls) {
+			const args = call.split(",").map((argument) => argument.trim());
+			expect(args).toHaveLength(6);
+			expect(args[4]).toMatch(/^(?:[A-Za-z.]+\.)?(?:exactCanonicalPinnedGenesisBootstrapOperationBytes|pinnedBootstrapBytes|bootstrapBytes)$/u);
+		}
 		for (const required of [
 			"row.authorSequence !== 0",
 			"extracted.vertex.anchor !== pinnedGenesisAnchorDigest",
@@ -146,13 +217,22 @@ describe("D.110c-0c1f4 exact pinned-genesis bootstrap policy", () => {
 		expect(exactPredicate).not.toContain('action === "join"');
 		expect(coveredHistorical).toContain("row.authorSequence === 0");
 		expect(filteredStore).toContain("authenticatedPinnedGenesisOutboxRow(");
-		expect(displacedActivation).toContain(
-			"transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes"
-		);
-		expect(displacedActivation).toContain("transportHandoff.displacedSource.pinnedGenesisAnchorDigest");
+		// ea4eb158 names the same displaced-source custody once (originalNativeBranch)
+		// and filters the original native branch with its exact pinned bootstrap bytes.
+		expect(displacedActivation).toContain("const originalNativeBranch = transportHandoff?.displacedSource;");
+		expect(displacedActivation).toContain("originalNativeBranch.exactCanonicalPinnedGenesisBootstrapOperationBytes");
+		expect(displacedActivation).toContain("originalNativeBranch.pinnedGenesisAnchorDigest");
 		expect(hotKeys).not.toContain(BOOTSTRAP_POLICY_KEY);
-		expect(coldKeys).toContain("COLD_BOOTSTRAP_POLICY_KEYS");
-		expect(coldKeys).toContain(BOOTSTRAP_POLICY_KEY);
+		// ea4eb158 replaces the closed COLD_BOOTSTRAP_POLICY_KEYS variant with one list of
+		// optional OWN keys captured beside COLD_KEYS; the bootstrap key stays cold-only and
+		// must be an exact plain Uint8Array, copied, or the reopen fails closed.
+		expect(coldKeys).not.toContain(BOOTSTRAP_POLICY_KEY);
+		expect(coldOptional).toContain(`const optional = ["${BOOTSTRAP_POLICY_KEY}"`);
+		expect(coldOptional).toContain("Object.hasOwn(input, key)");
+		expect(coldOptional).toContain("captureRuntimeInput(input, [...COLD_KEYS, ...optional])");
+		expect(coldOptional).toContain("Object.getPrototypeOf(rawBootstrapOperationBytes) === Uint8Array.prototype");
+		expect(coldOptional).toContain("Uint8Array.from(rawBootstrapOperationBytes)");
+		expect(coldOptional).toContain('"creator successor bootstrap policy input is invalid"');
 		expect(pending).not.toContain(BOOTSTRAP_POLICY_KEY);
 		expect(room.match(/exactCanonicalPinnedGenesisBootstrapOperationBytes/gu)?.length ?? 0).toBeGreaterThanOrEqual(4);
 	});

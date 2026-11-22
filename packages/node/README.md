@@ -9,7 +9,8 @@ DRP Node can be used using the CLI or integrated into an existing application.
 
 ### CLI
 
-The CLI starts the explicit configured v3 Canvas receive-only daemon. Importing
+The CLI lives in the private [`@ts-drp/cli`](../cli) package (it composes this package with the
+Node SQLite host, so it sits above both). It starts the explicit configured v3 Canvas receive-only daemon. Importing
 its entry point does not start a host. It does not register the old bare-ID RPC.
 For the executable's arguments, run:
 
@@ -19,7 +20,7 @@ pnpm cli --help
 
 #### Trusted local configuration
 
-The [configured host](src/cli/v3-canvas.ts) owns the configuration schema.
+The [configured host](../cli/src/v3-canvas.ts) owns the configuration schema.
 The operator selects the packaged application, finite RPC messaging policy,
 local SQLite directory, exact known room/genesis bindings and local author
 identity. Invites authenticate before those bindings can acquire storage;

@@ -1070,7 +1070,10 @@ async function emulate(session: CDPSession, profile: NetworkProfile): Promise<re
 }
 
 async function openGrid(page: Page): Promise<void> {
-	await page.goto("/");
+	// Grid hosts its zone in a room worker by default; this suite drives the main-thread zone it was
+	// written against (its synchronous snapshot and the page's own node), so it opts out with
+	// `?mainThread`. The worker default is covered by tests/room-worker-grid.pw.ts and the FPS gate.
+	await page.goto("/?mainThread");
 	await page.waitForFunction(() => window.__TS_DRP_GRID_SESSION__ !== undefined);
 	await expect(page.locator("#loadingMessage")).toBeHidden();
 	await page.waitForFunction(() => window.__TS_DRP_V3_ZONE__ !== undefined, undefined, { timeout: 10_000 });

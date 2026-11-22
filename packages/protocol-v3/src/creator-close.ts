@@ -20,6 +20,7 @@ import {
 } from "./internal/seal-authority-custody.js";
 import { resolveSealAuthorityIdentity } from "./internal/seal-authority-identity.js";
 import { openSealAuthority, SEAL_CANONICAL_RECORD_MAX_BYTES, verifySealQC } from "./seal.js";
+import { isRegisteredRoomParameterExtension } from "./room-parameters.js";
 import { settlementProfileFor } from "./settlement-profile.js";
 import { decodeSnapshotManifest } from "./snapshot-transfer.js";
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
@@ -480,7 +481,12 @@ function validClosedParameters(value: Readonly<Record<string, unknown>>): boolea
 	const fields = registry.kinds.parameters?.fields;
 	return (
 		fields !== undefined &&
-		Reflect.ownKeys(value).every((key) => typeof key === "string" && fields.some((field) => field.name === key)) &&
+		// A registry field, or the record's one registered extension (room-parameters.ts) with a valid value.
+		Reflect.ownKeys(value).every(
+			(key) =>
+				typeof key === "string" &&
+				(fields.some((field) => field.name === key) || isRegisteredRoomParameterExtension(key, value[key]))
+		) &&
 		fields.every((field) => {
 			if (!Object.hasOwn(value, field.name)) return !field.required;
 			const candidate = value[field.name];

@@ -72,7 +72,7 @@ import {
 } from "@ts-drp/storage";
 
 import { openCreatorCloseHistory } from "./creator-close-history.js";
-import { resolveCreatorSourceCustody, type VerifiedCreatorSourceCustody } from "./creator-source-custody.js";
+import { creatorMemberFrontierWidth, recordCreatorMemberFrontierWidth, resolveCreatorSourceCustody, type VerifiedCreatorSourceCustody } from "./creator-source-custody.js";
 import { deriveReceivedCreatorTransitionCandidates, matchesCreatorAdoptionReferences } from "./creator-adoption-references.js";
 import { consumeCreatorRecoveryRoleRetiredReadback, createCreatorClosedRollbackProofAccounting } from "./creator-closed-rollback-data.js";
 import { canonicalCreatorDataRecord, createCreatorCanonicalSyntaxReader, creatorDataDigest, creatorPromotedSnapshotProjectionMatches, creatorSnapshotProjectionMatches, creatorSnapshotProjectionAuthorityMatches, validateCreatorSnapshotData } from "./creator-snapshot-data.js";
@@ -526,7 +526,25 @@ const verifiedHistoricalIssuance = new WeakMap<VerifiedCreatorHistoricalIssuance
 	detachedSourceAnchorSignature?: Uint8Array;
 	profileId: string;
 	settlement?: VerifiedCreatorAuthorSettlement;
+	/** The verbatim signed material of a member's settlement frontier (settlement branch only). */
+	memberFrontier?: MemberFrontierMaterial;
 }>>();
+
+export interface VerifiedCreatorMemberFrontier {
+	readonly __verifiedCreatorMemberFrontier?: never;
+}
+
+const MEMBER_FRONTIER_KIND = "creator-settlement-member-frontier-1";
+const MEMBER_FRONTIER_DOMAIN = "ts-drp/settlement-source-context/v1";
+const MEMBER_FRONTIER_KEYS = ["kind", "version", "anchorPreimage", "anchorSignature", "settlementBytes", "cutBytes", "qcBytes"] as const;
+const memberFrontierLimits = { maxBytes: 131_072, maxDepth: 2, maxItems: 32 };
+const verifiedMemberFrontiers = new WeakMap<VerifiedCreatorMemberFrontier, CreatorHistoricalIssuanceIdentity>();
+
+type MemberFrontierMaterial = Readonly<{ settlementBytes: Uint8Array; cutBytes: Uint8Array; qcBytes: Uint8Array;
+	anchorPreimage: Uint8Array; anchorSignature: Uint8Array }>;
+const encodeMemberFrontier = (frontier: MemberFrontierMaterial): Uint8Array => encodeCanonical({ kind: MEMBER_FRONTIER_KIND,
+	version: 1, anchorPreimage: frontier.anchorPreimage, anchorSignature: frontier.anchorSignature,
+	settlementBytes: frontier.settlementBytes, cutBytes: frontier.cutBytes, qcBytes: frontier.qcBytes }, memberFrontierLimits);
 
 type SettlementFrontier = readonly [author: string, admissionEpoch: number, terminalThrough: number | null];
 
@@ -1124,6 +1142,12 @@ export function openVerifiedCreatorHistoricalIssuance(
 		readonly floorTrust: CurrentAnchorTrust;
 		readonly sourceTrust?: CurrentAnchorTrust;
 		readonly retainedSourceCustody?: VerifiedCreatorSourceCustody;
+		/**
+		 * The plane's OWN install or recovery open: keep the verbatim signed member frontier for a later
+		 * removing close (SettlementPlan.memberFrontier) and register its width for sizing. Per-member
+		 * frontier selection (the cold fallback) leaves it unset and pays nothing for it.
+		 */
+		readonly captureMemberFrontier?: true;
 	}>
 ): VerifiedCreatorHistoricalIssuance | undefined {
 	try {
@@ -1208,7 +1232,21 @@ export function openVerifiedCreatorHistoricalIssuance(
 			...(sourceAnchor instanceof Uint8Array && sourceSignature instanceof Uint8Array ? {
 				exactCanonicalSourceAnchorPreimageBytes: new Uint8Array(sourceAnchor), detachedSourceAnchorSignature: new Uint8Array(sourceSignature),
 			} : {}),
-			...(evidence.settlement === undefined ? {} : {settlement:evidence.settlement.capability})}));
+			...(evidence.settlement === undefined ? {} : {settlement:evidence.settlement.capability}),
+			...(input.captureMemberFrontier === true && evidence.settlement !== undefined && selected.admissionEpoch !== undefined &&
+				selected.admittedAuthorSequence !== null
+				? (() => {
+						const anchor = readCreatorSettlementSourceAnchor(input.floorTrust);
+						if (anchor === undefined) return {};
+						const memberFrontier = Object.freeze({
+							settlementBytes: new Uint8Array(evidence.settlement.candidate.bytes), cutBytes: new Uint8Array(evidence.cut.bytes),
+							qcBytes: new Uint8Array(evidence.qc.bytes), anchorPreimage: new Uint8Array(anchor.anchorPreimage),
+							anchorSignature: new Uint8Array(anchor.anchorSignature)});
+						// Sizing charges exactly this record from here on (G21).
+						recordCreatorMemberFrontierWidth(input.floorTrust, encodeMemberFrontier(memberFrontier).byteLength);
+						return {memberFrontier};
+					})()
+				: {})}));
 		return capability;
 	} catch {
 		return undefined;
@@ -1224,6 +1262,104 @@ export function resolveVerifiedCreatorHistoricalIssuance(
 	capability: VerifiedCreatorHistoricalIssuance
 ): CreatorHistoricalIssuanceIdentity | undefined {
 	const identity = verifiedHistoricalIssuance.get(capability)?.identity;
+	return identity === undefined ? undefined : Object.freeze({ ...identity });
+}
+
+/**
+ * The author's last-member frontier as durable bytes: the verbatim creator-signed settlement record,
+ * its closed Cut and commit QC, and the signed successor anchor they were verified against. No new
+ * signature: these are exactly the bytes this member install already authenticated. Persisted once, at
+ * the close that removes the author (SettlementPlan.memberFrontier), and re-verified on every open.
+ * @param capability - A member's genuine historical-issuance capability (settlement branch, admitted).
+ * @param currentTrust - The plane's current trust (the anchor must open under it).
+ * @returns The context, or undefined when the capability carries no member frontier.
+ */
+export function captureCreatorMemberFrontier(capability: VerifiedCreatorHistoricalIssuance,
+	currentTrust: CurrentAnchorTrust): Readonly<{ digest: Uint8Array; exactCanonicalContextBytes: Uint8Array }> | undefined {
+	const material = verifiedHistoricalIssuance.get(capability);
+	const frontier = material?.memberFrontier;
+	if (material === undefined || frontier === undefined) return undefined;
+	const bytes = encodeMemberFrontier(frontier);
+	// Persist only what sizing charged: the width registered for the installed anchor.
+	if (creatorMemberFrontierWidth(currentTrust) !== bytes.byteLength) return undefined;
+	const context = Object.freeze({ digest: hashDomain(MEMBER_FRONTIER_DOMAIN, bytes), exactCanonicalContextBytes: bytes });
+	const reopened = openCreatorMemberFrontier({ currentTrust, context, author: material.identity.author });
+	const identity = reopened === undefined ? undefined : resolveCreatorMemberFrontier(reopened);
+	return identity === undefined || identity.admittedAuthorSequence !== material.identity.admittedAuthorSequence ||
+		identity.admissionEpoch !== material.identity.admissionEpoch || identity.closedEpoch !== material.identity.closedEpoch ||
+		identity.successorEpoch !== material.identity.successorEpoch ? undefined : context;
+}
+
+/**
+ * Re-verifies a persisted last-member frontier under the installed trust: its successor anchor opens
+ * only with the fixed creator of `currentTrust` (the source-context trust path) at an epoch not after
+ * it, and the settlement record, Cut and commit QC authenticate exactly as at that member install.
+ * Grants no membership, Writer role or currency: only the author's admitted sequence then.
+ * @param input - Installed trust, the persisted context, and the plan's author.
+ * @returns A private capability, or undefined on any refusal.
+ */
+export function openCreatorMemberFrontier(input: Readonly<{
+	currentTrust: CurrentAnchorTrust;
+	context: Readonly<{ digest: Uint8Array; exactCanonicalContextBytes: Uint8Array }>;
+	author: string;
+}>): VerifiedCreatorMemberFrontier | undefined {
+	try {
+		const bytes = new Uint8Array(input.context.exactCanonicalContextBytes);
+		if (bytes.byteLength === 0 || bytes.byteLength > memberFrontierLimits.maxBytes ||
+			compareBytes(hashDomain(MEMBER_FRONTIER_DOMAIN, bytes), input.context.digest) !== 0) return undefined;
+		const decoded = decodeCanonical(bytes, memberFrontierLimits) as Record<string, unknown>;
+		if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded) ||
+			Object.keys(decoded).length !== MEMBER_FRONTIER_KEYS.length || MEMBER_FRONTIER_KEYS.some(key => !Object.hasOwn(decoded, key)) ||
+			decoded.kind !== MEMBER_FRONTIER_KIND || decoded.version !== 1 ||
+			compareBytes(encodeCanonical(decoded, memberFrontierLimits), bytes) !== 0) return undefined;
+		const field = (name: string): Uint8Array | undefined => decoded[name] instanceof Uint8Array ? new Uint8Array(decoded[name]) : undefined;
+		const anchorPreimage = field("anchorPreimage"), anchorSignature = field("anchorSignature");
+		const settlementBytes = field("settlementBytes"), cutBytes = field("cutBytes"), qcBytes = field("qcBytes");
+		if (anchorPreimage === undefined || anchorSignature === undefined || settlementBytes === undefined ||
+			cutBytes === undefined || qcBytes === undefined) return undefined;
+		const current = input.currentTrust;
+		const trust = openCreatorSettlementSourceTrust(current, anchorPreimage, anchorSignature, current.objectId,
+			current.genesisAnchorDigest);
+		if (trust === undefined || trust.currentEpoch < 1 || trust.currentEpoch > current.currentEpoch) return undefined;
+		const candidate = (value: Uint8Array): DetachedClosureCandidate | undefined => {
+			const digest = digestBlob(value);
+			return digest.ok ? Object.freeze({ bytes: value, ref: Object.freeze({ digest: digest.value, byteLength: value.byteLength }) }) : undefined;
+		};
+		const settlement = candidate(settlementBytes), cut = candidate(cutBytes), qc = candidate(qcBytes);
+		const currentAclDigest = settlement === undefined ? undefined : record(settlement)?.currentAclDigest;
+		if (settlement === undefined || cut === undefined || qc === undefined || typeof currentAclDigest !== "string") return undefined;
+		const qcRecord = record(qc);
+		if (qcRecord?.kind !== "drp-seal-qc" || qcRecord.phase !== "commit" || qcRecord.epoch !== trust.currentEpoch - 1) return undefined;
+		const opened = openCreatorTransitionSettlementOwned(settlement, trust, cut, qc, currentAclDigest);
+		const frontier = opened === undefined ? undefined : frontierFor(opened.capability, input.author);
+		if (opened === undefined || frontier === undefined || frontier[0] !== input.author || frontier[2] === null) return undefined;
+		const identity: CreatorHistoricalIssuanceIdentity = Object.freeze({
+			admissionEpoch: frontier[1],
+			admittedAuthorSequence: frontier[2],
+			author: frontier[0],
+			closedAnchorDigest: opened.identity.closedAnchorDigest,
+			closedEpoch: opened.identity.closedEpoch,
+			objectId: opened.identity.objectId,
+			successorAnchorDigest: opened.identity.successorAnchorDigest,
+			successorEpoch: opened.identity.successorEpoch,
+		});
+		if (identity.objectId !== current.objectId || identity.successorEpoch !== trust.currentEpoch ||
+			identity.successorAnchorDigest !== trust.currentAnchorDigest) return undefined;
+		const capability = Object.freeze({}) as VerifiedCreatorMemberFrontier;
+		verifiedMemberFrontiers.set(capability, identity);
+		return capability;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * The detached identity of a genuine last-member frontier capability.
+ * @param capability - Capability returned by openCreatorMemberFrontier.
+ * @returns The identity, or undefined for foreign custody.
+ */
+export function resolveCreatorMemberFrontier(capability: VerifiedCreatorMemberFrontier): CreatorHistoricalIssuanceIdentity | undefined {
+	const identity = verifiedMemberFrontiers.get(capability);
 	return identity === undefined ? undefined : Object.freeze({ ...identity });
 }
 

@@ -30,12 +30,16 @@ import {
 	type DurableIssueScope,
 	type DurableIssueSignContext,
 	type DurableOutboxPageInput,
+	MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS,
+	normalizeSettlementSourceAuthorities,
+	SETTLEMENT_SOURCE_AUTHORITY_DOMAIN,
 	type DurableOutboxPublicationTransitionInput,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+	settlementHandBacksAtOrigin,
 	type SettlementPlan,
-	type SettlementSourceContext,
 	settlementReplacementLastLogicalTimeFromPreimage,
+	type SettlementSourceContext,
 } from "@ts-drp/issuance-store";
 import {
 	bindDurableIssuancePruningMaintenance,
@@ -55,8 +59,11 @@ import {
 	issuanceUnsignedSuccessorFenceWidths,
 	issuanceUnsignedSuccessorFenceRevisionDeltas,
 	issuanceOrdinaryFinishingCapacityWidths,
+	issuanceRetirementAllows,
 	issuanceRetirementPlanRewriteResourceForSizing,
+	issuancePotentialSourceCustody,
 	settlementPlanPermitsAuthenticatedPruning,
+	issuanceRetirementFloor,
 } from "@ts-drp/issuance-store/maintenance";
 import {
 	type DurableLiveJournalStore,
@@ -80,6 +87,7 @@ import {
 	type PreparedBlueprintAdmission,
 	type PreparedBlueprintRuntime,
 	type SignRegisteredVertexDigest,
+	type TransactIssueBatch,
 } from "@ts-drp/protocol-v3";
 import {
 	type CurrentEpochAuthorAuthorization,
@@ -107,8 +115,9 @@ import {
 import {
 	CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN,
 	creatorSourceExpiryDigest,
+	creatorReplacedSourceFields,
 	creatorSourceExpiryFields,
-	openCreatorSourceExpiryReceipt,
+	openCreatorSourceAuthorReceiptAuthor,
 	verifyCreatorSourceExpiryReceipt,
 } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
 import {
@@ -122,6 +131,11 @@ import {
 	stageLatchedAclOperations,
 } from "@ts-drp/protocol-v3/latched-acl";
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
+import {
+	ROOM_APPLICATION_STATE_DEFAULT_BYTES,
+	ROOM_APPLICATION_STATE_LIMIT_PARAMETER,
+	roomApplicationStateLimit,
+} from "@ts-drp/protocol-v3/room-parameters";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	createCreatorSealActor,
@@ -187,10 +201,12 @@ import {
 	type CreatorRoomSettlementPreview,
 	type V3CreatorCloseRegistration,
 	inspectHead,
+	issuanceCapacityRefusalOf,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
 import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
+import { createDeferredSeedRunner } from "./internal/deferred-seed.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 	rewriteCreatorCloseMembershipWitnesses } from "./internal/creator-close-membership.js";
 import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
@@ -198,6 +214,7 @@ import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyRecei
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
 	captureCreatorSourceCompletion, openCreatorSourceCompletion, captureCreatorSourceExpiry, openCreatorSourceExpiry,
+	captureCreatorReplacedSourceResolution, openCreatorReplacedSourceResolution, openCreatorSourceAuthority,
 	type VerifiedCreatorSourceCustody, type CreatorSourceCustodyIdentity } from "./internal/creator-source-custody.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -221,7 +238,10 @@ import {
 	installCreatorSuccessorRetainedReadPause,
 } from "./internal/creator-successor-live.js";
 import {
+	captureCreatorMemberFrontier,
+	openCreatorMemberFrontier,
 	openVerifiedCreatorHistoricalIssuance,
+	resolveCreatorMemberFrontier,
 	resolveVerifiedCreatorHistoricalIssuance,
 	resolveVerifiedHistoricalSourceAcl,
 	resolveVerifiedHistoricalSourceContext,
@@ -230,6 +250,7 @@ import {
 	resolveCreatorCheckpointAttachment,
 	type VerifiedCreatorCheckpointAttachment,
 	type VerifiedCreatorHistoricalIssuance,
+	type VerifiedCreatorMemberFrontier,
 } from "./internal/creator-transition-advance.js";
 import {
 	acceptCreatorCloseRecoveryRetirement,
@@ -265,6 +286,7 @@ export {
 import { v3RoomRetentionOpener, type V3RoomRetirementSession } from "./internal/room-retirement.js";
 import { createRoomRetentionLedger, type RoomRetentionLedger } from "./internal/room-retention-ledger.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
+import { snapshotParameterRecord, V3_ROOM_PARAMETER_SCHEMA as PARAMETER_SCHEMA } from "./internal/v3-room-parameters.js";
 import type { NodeRoomDeliveryRepairTracking } from "./room-network.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -373,6 +395,15 @@ const PROVENANCE_KEYS = [
 	"signerSetDigest",
 ] as const;
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
+/**
+ * The application state limit of a room whose parameters declare none, in canonical bytes (with at most
+ * 16,384 items and depth 16). A room's own limit is its authenticated parameters' optional
+ * `maxApplicationStateBytes` (protocol-v3 room-parameters; AcceptedParameters.maxApplicationStateBytes),
+ * fixed for the room's life. The plane's fold machine carries the room's limit, and admission refuses any
+ * vertex whose fold would pass it (`applicationStateAdmits`), so a seal's fold never refuses.
+ * maxSnapshotBytes bounds the snapshot carrier, not the state.
+ */
+export const ROOM_APPLICATION_STATE_BYTES = ROOM_APPLICATION_STATE_DEFAULT_BYTES;
 const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	legacyParametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	parametersDigest: "c92ee60718d7a593e0809e56ddef0c9d55a3015c27ecba8d54dd16547553044a",
@@ -639,6 +670,12 @@ export interface V3PlaneHandle {
 		  }
 		| undefined;
 	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
+	/**
+	 * The room's own settlement drain (its author fence at adoption or install, a replacement): the
+	 * same issue as issueLocal, admitted through the settlement lane that received rows and caller
+	 * moves never consume, so a mandatory fence is never refused for input capacity.
+	 */
+	issueSettlementLocal?(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
 	authorizeSettlementSourceSelection?(
 		input: V3SettlementSourceSelectionRequest &
 			Readonly<{
@@ -647,6 +684,14 @@ export interface V3PlaneHandle {
 			}>
 	): Promise<Uint8Array>;
 	readRebaseOutbox(): Promise<V3RebaseOutboxResult>;
+	/**
+	 * The source-authority record (SettlementSourceAuthority bytes) of this plane's displaced source
+	 * epoch, which the room writes into its plan with that epoch's owed entries; undefined for any
+	 * other epoch or when the plane holds no such authority.
+	 */
+	settlementSourceAuthority?(
+		sourceEpoch: number
+	): Readonly<{ digest: Uint8Array; exactCanonicalAuthorityBytes: Uint8Array }> | undefined;
 	completeRebaseSource(
 		input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 	): Promise<V3EgressResult>;
@@ -770,7 +815,8 @@ export type V3LocalIssueResult =
 				| "issuance-rejected"
 				| "admission-rejected"
 				| "journal-rejected"
-				| "graph-rejected";
+				| "graph-rejected"
+				| "application-state-limit";
 			readonly detail: string;
 	  }>;
 
@@ -818,9 +864,54 @@ export type V3EgressResult =
 			readonly detail: string;
 	  }>;
 
+/**
+ * Rows one drain dependency turn may carry (per-drain batching). The turn's native reservations
+ * exclude every issuance and journal writer while it runs (publication marks included), so a drain
+ * of more rows runs one turn per chunk of this many and yields between them (lull rule iii): ingress,
+ * local moves and installs queued meanwhile run between chunks, so a chunk stays well under an epoch.
+ * Chosen by the 100x16 / slow-member A/B (4 vs 8; 32 held the registration gate long enough to lose
+ * the member its epochs).
+ */
+export const V3_SETTLEMENT_DRAIN_TURN_ROWS = 8;
+// The genuine rebase sources this module minted, with their runtime and held source: a batched
+// preparation accepts only these, never a look-alike.
+const rebaseSourceOwners = new WeakMap<object, RebaseSourceOwner>();
+type RebaseSourceOwner = Readonly<{
+	registration: V3PlaneRegistration;
+	source: ClassifiedRebaseRow;
+	/** The source's whole-floor checkpoint when it may issue in a batch (no creator selection held). */
+	batchFloor(): Uint8Array | undefined;
+}>;
+
+/**
+ * One drain chunk's replacements issued in one batched issuance (V3RebaseSource.issueReplacements).
+ * `batch-unavailable`: nothing was reserved, entered or signed; the drain issues the chunk's rows
+ * singly (a portable or creator-selected source, a store without transactIssueBatch, a row that
+ * needs a split or a join, a batch the store's sizing refuses). `batch-retry`: the plan moved past
+ * the revision the drain re-checked; nothing was written and the drain re-checks the chunk.
+ * Any other failure is the singles' failure of the row it stopped at. `journal`: how the accepted rows
+ * were journaled (`batch`: one native write for the chunk; `rows`: one append per row). `rows` is the
+ * chunk's leading rows only when the caller's stopBefore stopped the chunk before a later row's signature
+ * (rule R: the epoch was sealed meanwhile); the rest were never signed and stay unreplaced.
+ */
+export type V3ReplacementBatchResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "accepted";
+			readonly rows: readonly Readonly<{ readonly authorSequence: number; readonly digest: string }>[];
+			readonly journal: "batch" | "rows";
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: "batch-unavailable" | "batch-retry"; readonly detail: string }>
+	| Extract<V3LocalIssueResult, { readonly ok: false }>;
+
 type V3RebaseSource = Readonly<{
 	readonly author: string;
 	readonly authorSequence: number;
+	/** The source row's own signed epoch (an observation for the settlement window; no authority). */
+	readonly epoch: number;
+	/** The creator's signed settlement frontier classifies this row displaced: its epoch closed without
+	 * it, so it can never be admitted (the settlement window may expire it). */
+	readonly frontierDisplaced: boolean;
 	issueReplacement(
 		input: V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>
 	): Promise<V3LocalIssueResult>;
@@ -828,6 +919,21 @@ type V3RebaseSource = Readonly<{
 	/** Current ordinary Writer authority or genuine fixed creator needs no foreign selection callback. */
 	readonly requiresCreatorSelection: boolean;
 	prepareReplacement(): Promise<NativeReplacementPreparation>;
+	/** Several sources of the same runtime prepared in one dependency turn (at most
+	 * V3_SETTLEMENT_DRAIN_TURN_ROWS); same decisions as prepareReplacement on each, in order. */
+	prepareReplacements(peers: readonly V3RebaseSource[]): Promise<readonly NativeReplacementPreparation[]>;
+	/** Several sources' legacy replacements (one input per peer, in order; at most
+	 * V3_SETTLEMENT_DRAIN_TURN_ROWS) issued in ONE batched issuance transaction against
+	 * `expectedPlanRevision`, under one native custody and one census; each row is checked as its
+	 * single issueReplacement checks it. See V3ReplacementBatchResult. */
+	issueReplacements(
+		peers: readonly V3RebaseSource[],
+		inputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
+		expectedPlanRevision: number,
+		/** Asked before each row's signature after the first: true stops the chunk there (rule R); the
+		 * signed rows are committed alone and the rest are never signed. */
+		stopBefore?: () => boolean
+	): Promise<V3ReplacementBatchResult>;
 	/** Explicit creator selection; this never grants authority merely from the local source capability. */
 	authorizeReplacement(
 		sign: (request: Readonly<{ exactCanonicalSelectionBytes: Uint8Array; digest: Uint8Array }>) => Promise<Uint8Array>
@@ -960,11 +1066,35 @@ type NativeReplacementPreparation = ReturnType<typeof derivePolicyReplacement> &
 		transformRefusal?: NonNullable<SettlementPlan["entries"][number]["transformRefusal"]>;
 	}>;
 
+/**
+ * The application's own upper bound on its state's canonical byte length, over a base state and every
+ * operation advanced into it, in any order and any subset (the same bound the creator's ordinary proof
+ * book charges: readOrdinaryApplicationResourceBound). quote never retains its candidate. Undefined means
+ * the bound does not cover that material; the caller then judges the exact fold.
+ */
+export interface V3ApplicationStateBound {
+	advance(operations: readonly unknown[]): boolean;
+	quote(candidateOperation: unknown): number | undefined;
+	/** The bound over the base and advanced operations alone, with no candidate. */
+	quoteBase(): number | undefined;
+}
+
+/** The resumable seed of a {@link V3ApplicationStateBound}: step consumes at most about `byteBudget`
+ * more base bytes (true once done), and finish returns the bound the synchronous seed returns. */
+export interface V3ApplicationStateBoundSeed {
+	step(byteBudget: number): boolean;
+	finish(): V3ApplicationStateBound | undefined;
+}
+
 export interface V3OperationAdmissionPolicy {
 	reserve(
 		operation: Readonly<Record<string, unknown>>,
 		context?: Readonly<{ author: string }>
 	): V3OperationAdmissionReservation;
+	/** The application's state bound seeded with this plane's exact base state, when it has one. */
+	createApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBound | undefined;
+	/** The same bound, seeded in bounded steps (the plane drives it in short turns after an install). */
+	beginApplicationStateBound?(exactCanonicalBaseStateBytes: Uint8Array): V3ApplicationStateBoundSeed | undefined;
 }
 export type V3OperationAdmissionPolicyFactory = (
 	context: Readonly<{
@@ -1189,6 +1319,8 @@ interface AcceptedParameters {
 	readonly maxPendingEntries: number;
 	readonly maxSnapshotBytes: number;
 	readonly snapshotChunkBytes: number;
+	/** The room's application state limit (its parameters' optional field; 32,768 when absent). */
+	readonly maxApplicationStateBytes: number;
 }
 
 const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
@@ -1494,17 +1626,6 @@ function captureInput(input: PrepareV3LiveGenerationInput): CapturedInput | unde
 	});
 }
 
-interface ParameterFieldSchema {
-	readonly maximum: number;
-	readonly minimum: number;
-	readonly name: string;
-	readonly required: boolean;
-}
-
-interface ParameterSchema {
-	readonly domain: string;
-	readonly fields: readonly ParameterFieldSchema[];
-}
 
 function ownDataValue(value: unknown, key: string): unknown {
 	if (!isObject(value)) return undefined;
@@ -1579,120 +1700,6 @@ function snapshotDenseArray(value: unknown, expectedLength: number): readonly un
 	}
 }
 
-function snapshotPublishedParameterSchema(value: unknown): ParameterSchema | undefined {
-	try {
-		const kinds = ownDataValue(value, "kinds");
-		const parameters = snapshotClosedRecord(ownDataValue(kinds, "parameters"), [
-			"domain",
-			"encoding",
-			"fields",
-			"signedEnvelope",
-		]);
-		if (
-			parameters === undefined ||
-			typeof parameters.domain !== "string" ||
-			parameters.encoding !== "canonical-object"
-		) {
-			return undefined;
-		}
-		const fields = snapshotDenseArray(parameters.fields, 8);
-		if (fields === undefined) return undefined;
-		const captured: ParameterFieldSchema[] = [];
-		for (let index = 0; index < fields.length; index += 1) {
-			const field = snapshotClosedRecord(fields[index], [
-				"name",
-				"type",
-				"const",
-				"constraints",
-				"required",
-				"sortRule",
-			]);
-			if (
-				field === undefined ||
-				typeof field.name !== "string" ||
-				field.name.length === 0 ||
-				field.type !== "safe-integer" ||
-				field.const !== null ||
-				typeof field.required !== "boolean" ||
-				field.sortRule !== null
-			) {
-				return undefined;
-			}
-			const constraints = snapshotClosedRecord(field.constraints, ["minimum", "maximum"]);
-			if (
-				constraints === undefined ||
-				typeof constraints.minimum !== "number" ||
-				!NumberIsSafeInteger(constraints.minimum) ||
-				typeof constraints.maximum !== "number" ||
-				!NumberIsSafeInteger(constraints.maximum) ||
-				constraints.minimum > constraints.maximum
-			) {
-				return undefined;
-			}
-			for (let previous = 0; previous < captured.length; previous += 1) {
-				if (captured[previous]?.name === field.name) return undefined;
-			}
-			if (
-				!defineDenseElement(
-					captured,
-					index,
-					ObjectFreeze({
-						maximum: constraints.maximum,
-						minimum: constraints.minimum,
-						name: field.name,
-						required: field.required,
-					})
-				)
-			) {
-				return undefined;
-			}
-		}
-		const frozenFields = finishDenseArray(captured, fields.length);
-		return frozenFields === undefined ? undefined : ObjectFreeze({ domain: parameters.domain, fields: frozenFields });
-	} catch {
-		return undefined;
-	}
-}
-
-const PARAMETER_SCHEMA = snapshotPublishedParameterSchema(parameterRegistry);
-
-function snapshotParameterRecord(value: unknown, schema: ParameterSchema): PlainRecord | undefined {
-	try {
-		if (!isObject(value) || ObjectGetPrototypeOf(value) !== null) return undefined;
-		const keys = ReflectOwnKeys(value);
-		if (keys.some((key) => typeof key !== "string" || !schema.fields.some(({ name }) => name === key))) {
-			return undefined;
-		}
-		const output = ObjectCreate(null) as Record<string, unknown>;
-		for (let fieldIndex = 0; fieldIndex < schema.fields.length; fieldIndex += 1) {
-			const field = schema.fields[fieldIndex] as ParameterFieldSchema;
-			let keyFound = false;
-			for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
-				if (keys[keyIndex] === field.name) keyFound = true;
-			}
-			if (!keyFound) {
-				if (field.required) return undefined;
-				continue;
-			}
-			const descriptor = ObjectGetOwnPropertyDescriptor(value, field.name);
-			if (
-				descriptor === undefined ||
-				descriptor.enumerable !== true ||
-				!("value" in descriptor) ||
-				typeof descriptor.value !== "number" ||
-				!NumberIsSafeInteger(descriptor.value) ||
-				descriptor.value < field.minimum ||
-				descriptor.value > field.maximum
-			) {
-				return undefined;
-			}
-			output[field.name] = descriptor.value;
-		}
-		return output;
-	} catch {
-		return undefined;
-	}
-}
 
 function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): AcceptedParameters | undefined {
 	try {
@@ -1702,10 +1709,18 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 		const reencoded = encodeCanonical(snapshot);
 		if (!sameBytes(reencoded, bytes)) return undefined;
 		const digest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, reencoded));
+		// The supported profile is judged on the registry fields; the room's own limit (the registered
+		// extension, absent in every room before the setting) is judged by its owner.
+		const maxApplicationStateBytes = roomApplicationStateLimit(snapshot);
+		const profile = ObjectCreate(null) as Record<string, unknown>;
+		for (const key of ReflectOwnKeys(snapshot) as string[])
+			if (key !== ROOM_APPLICATION_STATE_LIMIT_PARAMETER) profile[key] = snapshot[key];
+		const profileDigest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, encodeCanonical(profile)));
 		if (
+			maxApplicationStateBytes === undefined ||
 			digest !== expectedDigest ||
-			(digest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
-				digest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
+			(profileDigest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest &&
+				profileDigest !== SUPPORTED_PARAMETER_PROFILE.legacyParametersDigest)
 		) {
 			return undefined;
 		}
@@ -1742,6 +1757,7 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 					maxPendingEntries,
 					maxSnapshotBytes,
 					snapshotChunkBytes,
+					maxApplicationStateBytes,
 				})
 			: undefined;
 	} catch {
@@ -3251,6 +3267,13 @@ interface V3PlaneRegistration {
 	}>;
 	creatorMaintenanceBound?: boolean;
 	creatorMaintenanceAdmission?: CreatorIssuanceMaintenanceConsumer;
+	/** This epoch's own close was interrupted: a creator reopen (successor
+	 * durable reopen, or the genesis plane's close binding) found its scope
+	 * (temporary or retained, unadopted) on disk, or the close failed in process
+	 * after staging. Its retry must run on the exact durable state, so no
+	 * ordinary local or received work may enter this epoch. The registration
+	 * retires at adoption; it is never cleared. */
+	creatorInterruptedClose?: true;
 	/** One nominal context sentinel and its exact ACL byte DATA, never admission authority. */
 	ordinaryIssuanceSourceIdentity?: Readonly<{ token: object; bindings: readonly unknown[]; aclBytes: Uint8Array;
 		/** Numerical byte correspondence only; never native freshness or ACL authority. */
@@ -3285,6 +3308,26 @@ interface V3PlaneRegistration {
 	readonly controlVertices: Set<string>;
 	displacedIssuanceBoundary?: number;
 	displacedSource?: V3DisplacedSourceAuthority;
+	/**
+	 * Source authorities of epochs before displacedSource that this plane's predecessor held
+	 * (keptDisplacedSources), inside the own-row settlement window. A replacement rule R deferred is
+	 * signed by a later install, when its source epoch is more than one epoch back (displacedSourceFor).
+	 */
+	olderDisplacedSources?: readonly V3DisplacedSourceAuthority[];
+	/**
+	 * The plan's source-authority records (SettlementSourceAuthority) this plane authenticated, by source
+	 * epoch and anchor: the authority of an owed row's source epoch, durable from the install that closed
+	 * that epoch until the row is replaced or given back. A plane that reopens cold has no kept
+	 * authorities (olderDisplacedSources); this is the one it shares with a live plane
+	 * (settlementSourceAuthorityFor). Refreshed from each settlement scan's plan read.
+	 */
+	settlementSourceAuthorities?: ReadonlyMap<string, Readonly<{
+		digest: string; authorization: V3LiveAuthorization; context: SettlementSourceContext;
+	}>>;
+	/** The record this plane captured for its displaced source epoch (settlementSourceAuthorityRecord). */
+	displacedSourceAuthorityRecord?: Readonly<{
+		source: V3DisplacedSourceAuthority; digest: Uint8Array; exactCanonicalAuthorityBytes: Uint8Array;
+	}>;
 	epochBytes: number;
 	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	graphVersion: number;
@@ -3330,6 +3373,10 @@ interface V3PlaneRegistration {
 	admittedInputJobs: number;
 	/** Exact encoded private local/replacement operations held by those jobs. */
 	admittedInputBytes: number;
+	/** Entered plus queued settlement-drain jobs (own fence, replacement, frontier resolution): their own lane. */
+	admittedSettlementJobs: number;
+	/** Exact encoded operations held by those settlement jobs, bounded by settlementLaneBytes. */
+	admittedSettlementBytes: number;
 	/** Caller-requested dependency/source reads; not mandatory transition control. */
 	admittedReadControlJobs: number;
 	/** Fresh caller-requested publication turns, retained through native join. */
@@ -3344,6 +3391,11 @@ interface V3PlaneRegistration {
 	 * exist (`bindV3MissingDependencyRequest`), including before the first live row.
 	 */
 	deliveryRepair?: V3PlaneDeliveryRepair;
+	/**
+	 * Creator move equivocation recovery (R1): vertices under this creator's own key that it did not
+	 * sign, and every vertex depending on one. Never indexed, never parked; this plane only.
+	 */
+	creatorSupersededClosure?: Set<string>;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
 	/** The native egress pool bounds distinct selectors. Targeted retained replies
@@ -3382,6 +3434,21 @@ interface VerifiedV3IngressEvidence {
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+/** Room-local observers of a creator's received-move capacity refusals, keyed by the plane's admitted sink. */
+const ingressCapacityRefusalListeners = new WeakMap<object, (reason: string) => void>();
+
+/**
+ * Observes the creator refusing a received move at a capacity a rollover clears (the typed
+ * ISSUANCE_CAPACITY_FORECAST_EXCEEDED reason: the issuance image forecast or the per-epoch
+ * maintenance proof book). Observation only: it grants nothing, and the move stays held as pending
+ * ingress and is offered again; a room's rollover policy may seal sooner so the Writer's move lands
+ * in the successor rather than waiting for the room's budget or idle trigger.
+ * @param sink - The admitted-vertex sink the room activates its planes with.
+ * @param listener - Called with the typed reason; its failures are ignored.
+ */
+export function bindV3IngressCapacityRefusalListener(sink: object, listener: (reason: string) => void): void {
+	ingressCapacityRefusalListeners.set(sink, listener);
+}
 interface V3EgressAdmissionOwner {
 	jobs: number;
 	bufferedBytes: number;
@@ -3453,6 +3520,12 @@ function releaseIdleEgressAdmissionOwner(registration: V3PlaneRegistration, owne
 // The room transport's bounded retained-history request, per network node and stable
 // room topic (the topic outlives every successor plane of one room session).
 const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, (gap?: V3DeliveryGap) => void>>();
+// Creator move equivocation recovery (R1): the room session's sink for an authenticated vertex under
+// the creator's own key that this creator did not sign, per network node and stable room topic.
+const v3CreatorSupersessionSinks = new WeakMap<
+	DRPNetworkNode,
+	Map<string, (vertex: V3CreatorSupersededVertex) => void>
+>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const preparedMigrationTargetFloors = new WeakMap<V3PlaneRegistration, Readonly<{ read(): Promise<Uint8Array> }>>();
 
@@ -3498,15 +3571,34 @@ function captureCreatorOrdinaryPreparedVertex(registration: V3PlaneRegistration,
 			format: key.format, bytes: new Uint8ArrayConstructor(key.bytes)})})});
 }
 
+// Current keys resolved within one synchronous pass, bound to the exact authorization object they were
+// resolved from. resolveV3AuthorizedAuthor is a pure function of that object and the author.
+type CreatorOrdinaryAuthorKeys = Readonly<{authorization: V3LiveAuthorization,
+	keys: Map<string, ReturnType<typeof resolveV3AuthorizedAuthor>>}>;
 function creatorOrdinaryPreparedVertexCurrent(registration: V3PlaneRegistration,
-	row: CreatorOrdinaryPreparedAdmission["vertices"][number]): boolean {
+	row: CreatorOrdinaryPreparedAdmission["vertices"][number], authorKeys?: CreatorOrdinaryAuthorKeys): boolean {
 	if (registration.closeVertices.get(row.digest) !== row.vertex || registration.closeAuthors.get(row.digest) !== row.identity ||
 		registration.closeCharges.get(row.digest) !== row.charge || !row.intact()) return false;
 	if (row.authorKey !== undefined) {
-		const key = resolveV3AuthorizedAuthor(registration.authorization, row.authorKey.author);
+		const author = row.authorKey.author, authorization = registration.authorization;
+		// A replaced authorization (never expected mid-pass) resolves afresh, as without the memo.
+		const keys = authorKeys?.authorization === authorization ? authorKeys.keys : undefined;
+		let key = keys?.get(author);
+		if (key === undefined && !keys?.has(author)) {
+			key = resolveV3AuthorizedAuthor(authorization, author);
+			keys?.set(author, key);
+		}
 		if (key === undefined || key.format !== row.authorKey.format || !sameBytes(key.bytes, row.authorKey.bytes)) return false;
 	}
 	return true;
+}
+
+/** Every prepared vertex is current. Each author's current key is resolved once per synchronous
+ * pass of the same authorization object, never carried to a later pass. */
+function creatorOrdinaryPreparedVerticesCurrent(registration: V3PlaneRegistration,
+	rows: readonly CreatorOrdinaryPreparedAdmission["vertices"][number][]): boolean {
+	const authorKeys: CreatorOrdinaryAuthorKeys = ObjectFreeze({authorization: registration.authorization, keys: new Map()});
+	return rows.every(row => creatorOrdinaryPreparedVertexCurrent(registration, row, authorKeys));
 }
 
 function captureCreatorOrdinaryPreparedAdmission(registration: V3PlaneRegistration,
@@ -3539,7 +3631,7 @@ function creatorOrdinaryPreparedGraphCurrent(registration: V3PlaneRegistration,
 	prepared: CreatorOrdinaryPreparedAdmission): boolean {
 	return prepared.applicationIntact() && prepared.admission === registration.payload.admission &&
 		vertexRegistry.domain === V3_VERTEX_DOMAIN && prepared.index === registration.index && registration.closeVertices.size === prepared.vertices.length &&
-		registration.closeCharges.size === prepared.vertices.length && prepared.vertices.every(row => creatorOrdinaryPreparedVertexCurrent(registration, row)) &&
+		registration.closeCharges.size === prepared.vertices.length && creatorOrdinaryPreparedVerticesCurrent(registration, prepared.vertices) &&
 		registration.controlVertices.size === prepared.controls.length && prepared.controls.every(digest => registration.controlVertices.has(digest));
 }
 
@@ -3610,7 +3702,7 @@ function advanceCreatorOrdinaryPreparedAdmission(registration: V3PlaneRegistrati
 		issued !== undefined && (issued.authorSequence >= Number.MAX_SAFE_INTEGER || lowerHexDigest(issued.digest) !== row.digest ||
 			!sameBytes(issued.canonicalPreimageBytes, row.exactCanonicalPreimageBytes) || !sameBytes(issued.signature, row.detachedSignature)))
 		throw new TypeError("ordinary accepted effect is incomplete");
-	if (!previous.vertices.every(vertex => creatorOrdinaryPreparedVertexCurrent(registration, vertex)))
+	if (!creatorOrdinaryPreparedVerticesCurrent(registration, previous.vertices))
 		throw new TypeError("ordinary accepted prefix was changed");
 	const vertex = captureCreatorOrdinaryPreparedVertex(registration, row.digest);
 	if (vertex.identity === undefined || vertex.identity.sourceAuthorized || !sameBytes(encodeCanonical(vertex.vertex), row.exactCanonicalVertexBytes))
@@ -4121,12 +4213,14 @@ function resolveRecoveryCloseHold(
 			: {
 					readSettledLocalSource: function (
 						this: CreatorSnapshotRecoveryCloseLifetime,
-						source: CreatorSettledLocalSource
+						source: CreatorSettledLocalSource,
+						walk?: object
 					): Promise<CreatorSettledLocalSourceRead | undefined> {
 						const registration = facts.registration;
 						if (this !== lifetime || !available() || registration === undefined)
 							return Promise.reject(new TypeError("creator recovery close hold is unavailable"));
-						return admit(() => settledLocalSourceFacts(registration, source));
+						return admit(() => settledLocalSourceFacts(registration, source,
+							walk === undefined ? undefined : settledSourceWalkFences(walk)));
 					},
 				}),
 		captureRoomRetentionLedger: function (this: CreatorSnapshotRecoveryCloseLifetime, create: boolean) {
@@ -4149,7 +4243,9 @@ function resolveRecoveryCloseHold(
 			const acquire = native?.acquireRetirementControl?.bind(native);
 			if (acquire === undefined) throw new TypeError("native issuance retirement is unsupported");
 			const scope = ObjectFreeze({ objectId: facts.context.payload.trust.trust.objectId });
-			return ObjectFreeze({ signing: facts.captureSigning(), issuance: () => acquire(scope) });
+			const readPlanBefore = native?.readRetirementPlanBefore?.bind(native);
+			return ObjectFreeze({ signing: facts.captureSigning(), issuance: ObjectFreeze(Object.assign(() => acquire(scope),
+				readPlanBefore === undefined ? {} : { readPlanBefore: () => readPlanBefore(scope) })) });
 		},
 		captureIssuanceRetirementOwner: function (this: CreatorSnapshotRecoveryCloseLifetime) {
 			if (this !== lifetime || !available() || !facts.retirementAllowed)
@@ -4162,8 +4258,10 @@ function resolveRecoveryCloseHold(
 			// the eventual native view supplies CAS, not caller-selected authority.
 			// Slice 14a: a room retirement session acts only for the owner of this same
 			// maintenance capability (a filtered facade is re-bound to it, never minted).
+			const readPlanBefore = native?.readRetirementPlanBefore?.bind(native);
 			return ObjectFreeze(Object.assign(() => acquire(scope), {
 				acquireIn: (session: V3RoomRetirementSession) => session.acquireIssuance(scope, native),
+				...(readPlanBefore === undefined ? {} : { readPlanBefore: () => readPlanBefore(scope) }),
 			}));
 		},
 		captureSigningRetirementOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
@@ -4660,7 +4758,7 @@ function resolveOrdinaryIssuanceRuntimeHold(value: unknown, owners: CreatorSnaps
 				...(typeof action === "string" ? {action} : {}), control}),
 			blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 				exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+				maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes, maxDepth: 16 as const, maxItems: 16384 as const,
 				catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 					runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 					canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -5286,6 +5384,26 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
 }
 
 /**
+ * Observation only (tests): how much native settlement work this process has done. Counts of
+ * charged dependency turns (withActiveRebaseDependencies), complete recovery census reads
+ * (readCreatorRecoveryDependencyCensus), retained source contract preparations
+ * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed, own-fence outbox
+ * scans (scanOwnFences) and the own fence rows those scans authenticate (ownFenceAuthentications: one
+ * registered-digest Ed25519 check each, through the exact-bytes verify memo). recoveryCensusReuses
+ * counts the checks a close hold's own census cell answered with byte-identical complete reads instead
+ * of a complete census (recoveryCensusReads + recoveryCensusReuses is the former count of complete
+ * reads). Monotonic
+ * process-wide scalars; never authority, never reset by the runtime.
+ */
+const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, recoveryCensusReuses: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
+	ownFenceScans: 0, ownFenceAuthentications: 0, dependencyTurnCensusReads: 0, maxDependencyTurnCensusReads: 0};
+// The complete census reads each recovery close hold made (its seal and every full check), by hold.
+const recoveryCloseHoldCensusReads = new WeakMap<CreatorSnapshotRecoveryCloseHold, () => number>();
+export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
+	return ObjectFreeze({...v3SettlementWorkCounts});
+}
+
+/**
  * Reads scalar diagnostics from an already-owned handle without retaining owners.
  * Gate presence is not queue depth: a settled completion promise can remain installed.
  * @param plane Existing live-plane handle.
@@ -5317,6 +5435,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		terminalPublicationInputBytes: registration.terminalPublicationInputBytes,
 		admittedInputJobs: registration.admittedInputJobs,
 		admittedInputBytes: registration.admittedInputBytes,
+		admittedSettlementJobs: registration.admittedSettlementJobs,
 		admittedReadControlJobs: registration.admittedReadControlJobs,
 		admittedPendingPublicationJobs: registration.admittedPendingPublicationJobs,
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
@@ -5997,6 +6116,7 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 					predecessor.rebaseSnapshot = undefined;
 				}
 				initial.displacedSource = undefined;
+				initial.olderDisplacedSources = undefined;
 				initial.displacedIssuanceBoundary = undefined;
 				initial.rebaseCursor = undefined;
 				initial.rebaseSnapshot = undefined;
@@ -6032,6 +6152,52 @@ function egressFailure(
 function egressSuccess(kind: "empty" | "published"): Extract<V3EgressResult, { readonly ok: true }> {
 	return ObjectFreeze({ kind, ok: true as const });
 }
+
+// Retryable like any closing plane: reissue once that close has adopted.
+const CREATOR_CLOSE_PENDING = "close-pending: v3 creator's interrupted epoch close must complete before new local work";
+
+/**
+ * D.108d1b (amended): the local author never signs at or below its authenticated
+ * closed frontier. Such a store is a stale copy or a restored backup of this key; a
+ * signature there would be a second vertex for a slot the room already admitted.
+ */
+/**
+ * A creator recovery dependency hold could not be taken now (the plane's boundary moved, its census is
+ * unavailable, or other work owns it). Scheduling, never a fault: a lull pass that meets it reports
+ * "deferred" and runs again at a later lull. The message keeps the original text.
+ */
+export class CreatorRecoveryHoldUnavailable extends TypeError {
+	readonly code = "recovery-hold-unavailable";
+	constructor(message: string) {
+		super(message);
+	}
+}
+
+export class V3LocalLineageBehindFrontier extends TypeError {
+	readonly code = "V3_LOCAL_LINEAGE_BEHIND_FRONTIER";
+	constructor(
+		readonly author: string,
+		readonly next: number,
+		readonly admitted: number
+	) {
+		super(`V3_LOCAL_LINEAGE_BEHIND_FRONTIER: local lineage ${next} is at or below the admitted frontier ${admitted}`);
+	}
+}
+
+/** The registration's authenticated closed frontier for its own local author, if any. */
+function localAdmittedFrontier(registration: V3PlaneRegistration, scope: DurableIssueScope): number | null {
+	const historical = registration.historicalIssuance;
+	const identity = historical === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(historical.capability);
+	return identity !== undefined && identity.author === scope.author && identity.objectId === scope.objectId &&
+		identity.successorEpoch === registration.payload.provenance.epoch ? identity.admittedAuthorSequence : null;
+}
+
+/**
+ * The detail of a local move the room's operation admission policy refused: its reservation came back
+ * rejected, the policy's own decision about this operation in this epoch. Every other
+ * "admission-rejected" local failure is a capacity, readiness or recovery refusal a retry can clear.
+ */
+export const V3_LOCAL_POLICY_REFUSAL_DETAIL = "v3 local operation was rejected before issuance";
 
 function localIssueFailure(
 	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
@@ -6239,6 +6405,8 @@ export function authorizeV3NewLocalOperation(
 		if (registration === undefined) {
 			return localIssueFailure("malformed-input", "v3 new operation plane has no provenance");
 		}
+		if (currentRegistration(registration) && !registration.receiveOnly && creatorInterruptedClosePending(registration))
+			return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
 		if (
 			!currentRegistration(registration) ||
 			registration.receiveOnly ||
@@ -7193,8 +7361,8 @@ async function withOwnedCreatorSourceExpiryRequest<T>(registration: V3PlaneRegis
 	read: CreatorSnapshotRecoveryCloseDependencyRead, bytes: Uint8Array, valid: () => Promise<boolean>,
 	action: (request: OwnedSigningRequest) => Promise<T>): Promise<T> {
 	const author = registration.issuanceScope.author;
-	const receipt = openCreatorSourceExpiryReceipt(bytes);
-	if (receipt === undefined || receipt.sourceAuthor !== author || !(await valid()))
+	// An expiry or a replaced-source resolution: the author's own settlement statements.
+	if (openCreatorSourceAuthorReceiptAuthor(bytes) !== author || !(await valid()))
 		throw new TypeError("creator source expiry exact owner is unavailable");
 	await custody.check();
 	if (!currentRegistration(registration) || !(await valid())) throw new TypeError("creator source expiry exact owner is revoked");
@@ -7451,6 +7619,7 @@ function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.terminalBarrier = undefined;
 	registration.pendingIngress.clear();
 	registration.pendingIngressBytes = 0;
+	closePendingIngressCarriesTo(registration);
 	const registrations = v3PlaneRegistrations.get(registration.networkNode);
 	if (registrations?.get(registration.topic) === registration) registrations.delete(registration.topic);
 	releaseIdleEgressAdmissionOwner(registration);
@@ -7696,6 +7865,132 @@ export function bindV3MissingDependencyRequest(
 	};
 }
 
+/** An authenticated vertex under the creator's own key that this creator did not sign (R1). */
+export interface V3CreatorSupersededVertex {
+	readonly digest: string;
+	readonly authorSequence: number;
+	readonly epoch: number;
+	readonly dependencies: readonly string[];
+	/** The signed operation, as the vertex carries it. */
+	readonly operation: unknown;
+	/** Every dependency was admitted (or is itself such a vertex) when it arrived. */
+	readonly dependenciesKnown: boolean;
+}
+
+/**
+ * Binds a creator room session's sink for vertices under its own key that it did not sign (another
+ * incarnation of the creator: a stale restore, or the original after one). Such a vertex is never
+ * indexed or parked on that creator, and neither is anything depending on it; the sink receives each.
+ * @param networkNode - The room's network node.
+ * @param topic - The room's stable live topic.
+ * @param sink - The session's sink; it must not throw into ingress.
+ * @returns Unbind.
+ */
+export function bindV3CreatorSupersession(
+	networkNode: DRPNetworkNode,
+	topic: string,
+	sink: (vertex: V3CreatorSupersededVertex) => void
+): () => void {
+	if (typeof topic !== "string" || topic.length === 0 || typeof sink !== "function")
+		throw new TypeError("v3 creator supersession binding is invalid");
+	let byTopic = v3CreatorSupersessionSinks.get(networkNode);
+	if (byTopic === undefined) {
+		byTopic = new IntrinsicMap<string, (vertex: V3CreatorSupersededVertex) => void>();
+		v3CreatorSupersessionSinks.set(networkNode, byTopic);
+	}
+	const bound = byTopic;
+	ReflectApply(MapPrototypeSet, bound, [topic, sink]);
+	return (): void => {
+		if (ReflectApply(MapPrototypeGet, bound, [topic]) === sink) ReflectApply(MapPrototypeDelete, bound, [topic]);
+	};
+}
+
+/**
+ * R1's synchronous screen, so the ingress hot path does not await for an ordinary member vertex: only
+ * a vertex under the creator's own key, or one depending on a recorded other-incarnation vertex, can
+ * be refused.
+ * @param registration - The plane receiving the vertex.
+ * @param authenticated - The authenticated, not yet admitted vertex.
+ * @returns True when refuseCreatorSuperseded must decide.
+ */
+function creatorSupersessionCandidate(
+	registration: V3PlaneRegistration,
+	authenticated: AuthenticatedRecoveryVertex
+): boolean {
+	if (registration.creatorMaintenanceBound !== true) return false;
+	if (authenticated.author === registration.issuanceScope.author) return true;
+	const closure = registration.creatorSupersededClosure;
+	return (
+		closure !== undefined &&
+		closure.size > 0 &&
+		authenticated.vertex.dependencies.some((dependency) => closure.has(dependency))
+	);
+}
+
+/**
+ * R1, before admission or parking: a vertex under the creator's own key that is not its own durable
+ * row at that sequence is another incarnation's (recorded and handed to the session's sink); a vertex
+ * depending on one is refused with it. Pending rows depending on a newly recorded one are released.
+ * @param registration - The creator's current plane.
+ * @param authenticated - The authenticated, not yet admitted vertex.
+ * @returns True when the vertex must not enter this plane.
+ */
+async function refuseCreatorSuperseded(
+	registration: V3PlaneRegistration,
+	authenticated: AuthenticatedRecoveryVertex
+): Promise<boolean> {
+	if (registration.creatorMaintenanceBound !== true) return false;
+	const closure = registration.creatorSupersededClosure;
+	const dependencies = authenticated.vertex.dependencies;
+	if (authenticated.author !== registration.issuanceScope.author) {
+		if (closure === undefined || !dependencies.some((dependency) => closure.has(dependency))) return false;
+		closure.add(authenticated.digest);
+		return true;
+	}
+	let own: DurableIssueCommit | null;
+	try {
+		own = await registration.issuanceStore.readIssued(registration.issuanceScope, authenticated.authorSequence);
+	} catch {
+		return false;
+	}
+	if (own !== null && lowerHexDigest(own.envelope.digest) === authenticated.digest) return false;
+	if (!currentRegistration(registration)) return true;
+	const superseded = closure ?? (registration.creatorSupersededClosure = new IntrinsicSet<string>());
+	const known = dependencies.every((dependency) => registration.index.has(dependency) || superseded.has(dependency));
+	superseded.add(authenticated.digest);
+	for (let released = true; released; ) {
+		released = false;
+		for (const [digest, pending] of [...registration.pendingIngress])
+			if (pending.evidence.authenticated.vertex.dependencies.some((dependency) => superseded.has(dependency))) {
+				releasePendingIngress(registration, digest);
+				superseded.add(digest);
+				released = true;
+			}
+	}
+	const byTopic = v3CreatorSupersessionSinks.get(registration.networkNode);
+	const sink =
+		byTopic === undefined
+			? undefined
+			: (ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as
+					| ((vertex: V3CreatorSupersededVertex) => void)
+					| undefined);
+	try {
+		sink?.(
+			ObjectFreeze({
+				digest: authenticated.digest,
+				authorSequence: authenticated.authorSequence,
+				epoch: authenticated.vertex.epoch,
+				dependencies: ObjectFreeze([...dependencies]),
+				operation: authenticated.vertex.operation,
+				dependenciesKnown: known,
+			})
+		);
+	} catch {
+		// The sink must not throw into ingress.
+	}
+	return true;
+}
+
 function requestMissingDependencies(registration: V3PlaneRegistration, peerId: string, digest: string): void {
 	if (!currentRegistration(registration)) return;
 	// The held row remains a target until admission; send success cannot clear it.
@@ -7733,7 +8028,12 @@ function attachDeliveryRepair(registration: V3PlaneRegistration): V3PlaneDeliver
 			maxBytes: registration.payload.parameters.maxPendingBytes,
 			isAdmitted: (digest: string): boolean => {
 				const current = plane.deref();
-				return current === undefined || !currentRegistration(current) || current.index.has(digest);
+				return (
+					current === undefined ||
+					!currentRegistration(current) ||
+					current.index.has(digest) ||
+					current.creatorSupersededClosure?.has(digest) === true
+				);
 			},
 		}),
 		capacity: (): V3DeliveryRepairCapacity => {
@@ -7829,12 +8129,78 @@ function releasePendingIngress(registration: V3PlaneRegistration, digest: string
 	registration.pendingIngressBytes -= pending.pendingByteCharge;
 }
 
+/**
+ * Case 1 backstop: the encoded pending roots a creator issuance census may carry. The
+ * 64-Writer continuation measured 732554 of the 786432-byte native image (53878 bytes of
+ * headroom, storage AHE_BOUNDED_READ_LIMITS); pending ingress was empty there, so its
+ * roots get a fixed share well inside that headroom. A lossy, non-adversarial episode
+ * holds a few Writer moves; only a flood reaches this bound.
+ */
+const CREATOR_ISSUE_PENDING_CENSUS_BYTES = 16_384;
+
+/**
+ * Whether pending ingress holds a row of the creator's own issuance author (never expected).
+ * @param registration - The creator's current plane.
+ * @returns True when any pending row is the creator's own.
+ */
+function creatorOwnPendingIngress(registration: V3PlaneRegistration): boolean {
+	for (const pending of registration.pendingIngress.values())
+		if (pending.evidence.authenticated.author === registration.issuanceScope.author) return true;
+	return false;
+}
+
+/**
+ * Before a local issue seals its census: when the pending roots' exact encoded width
+ * exceeds CREATOR_ISSUE_PENDING_CENSUS_BYTES, release the newest foreign entries
+ * (insertion order) until it fits. Admitted and own rows are never touched. A released
+ * row stays a delivery-repair target until admitted, so its copy is fetched again.
+ * @param registration - The creator's current plane.
+ */
+function evictCreatorPendingIngressForCensus(registration: V3PlaneRegistration): void {
+	if (registration.drainingPendingIngress || registration.pendingIngress.size === 0) return;
+	const scope = liveJournalScope(registration.payload);
+	const entries = [...registration.pendingIngress].map(([digest, pending]) => {
+		const evidence = pending.evidence;
+		return { digest, own: evidence.authenticated.author === registration.issuanceScope.author,
+			width: encodeCanonical({ dependencyKind: "authenticated-unadmitted-pending-ingress", digest,
+				exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes, signature: evidence.signature,
+				wireByteCharge: pending.pendingByteCharge,
+				missingParents: evidence.authenticated.vertex.dependencies.filter((dependency) => !registration.index.has(dependency)),
+				scope }).byteLength };
+	});
+	let width = entries.reduce((sum, entry) => sum + entry.width, 0);
+	for (let index = entries.length - 1; index >= 0 && width > CREATOR_ISSUE_PENDING_CENSUS_BYTES; index--) {
+		const entry = entries[index];
+		if (entry === undefined || entry.own) continue;
+		releasePendingIngress(registration, entry.digest);
+		width -= entry.width;
+	}
+}
+
+/** Ordinary admission is closed while the creator's own interrupted close is on disk. */
+function creatorInterruptedClosePending(registration: V3PlaneRegistration): boolean {
+	return registration.creatorInterruptedClose === true && registration.creatorMaintenanceBound === true;
+}
+
 function retainPendingIngress(
 	registration: V3PlaneRegistration,
 	evidence: VerifiedV3IngressEvidence,
 	pendingByteCharge: number
 ): void {
 	const authenticated = evidence.authenticated;
+	if (
+		!currentRegistration(registration) &&
+		pendingIngressCarries.has(registration) &&
+		collectLateIngress(
+			registration,
+			V3Envelope.encode({
+				canonicalPreimage: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+				signature: new Uint8ArrayConstructor(evidence.signature),
+			}).finish(),
+			evidence.transportSender
+		)
+	)
+		return;
 	if (registration.pendingIngress.has(authenticated.digest)) return;
 	if (
 		registration.pendingIngress.size >= registration.payload.parameters.maxPendingEntries ||
@@ -7850,6 +8216,26 @@ function retainPendingIngress(
 		})
 	);
 	registration.pendingIngressBytes += pendingByteCharge;
+}
+
+/**
+ * Schedules one drain of retained pending ingress through the original FIFO and full admission
+ * path, when a retained row has become admissible. Never inside a drain: the drain's own admission
+ * job ends while it runs, and a row it could not admit must not schedule a retry loop.
+ * @param registration - The plane.
+ */
+function resumePendingIngress(registration: V3PlaneRegistration): void {
+	if (!currentRegistration(registration) || registration.drainingPendingIngress || registration.pendingIngress.size === 0)
+		return;
+	let ready = false;
+	for (const pending of registration.pendingIngress.values())
+		if (pending.evidence.authenticated.vertex.dependencies.every((dependency) => registration.index.has(dependency))) {
+			ready = true;
+			break;
+		}
+	if (!ready) return;
+	void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
+		.catch(() => ingressFailureLog("admission-rejected"));
 }
 
 async function drainPendingIngress(registration: V3PlaneRegistration): Promise<void> {
@@ -7949,6 +8335,19 @@ async function handleV3Ingress(
 	evidence: VerifiedV3IngressEvidence,
 	signedAdmission?: RetainedCloseSignedAdmission
 ): Promise<boolean> {
+	// The creator's close shut application admission (its stage set blueprintClosing after
+	// the close shut the maintenance consumer) and is about to take, or holds, the live
+	// journal's single native read reservation for its sources. Custody takes the same
+	// reservation, and the consumer would refuse this append anyway, so meet the closed gate
+	// before custody: retain the row as the consumer's refusal does. Ingress queued before
+	// the stage finished ahead of it; this is a retained row's drain queued behind it.
+	if (registration.creatorMaintenanceBound && registration.blueprintClosing && registration.receivedTransition !== true &&
+		!registration.index.has(evidence.authenticated.digest)) {
+		retainPendingIngress(registration, evidence, V3Envelope.encode({
+			canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
+		ingressFailureLog("admission-rejected", "received-maintenance-closing");
+		return false;
+	}
 	if (evidence.authenticated.admitted.settlementSource === undefined) {
 		if (!registration.creatorMaintenanceBound || registration.index.has(evidence.authenticated.digest))
 			return handleV3IngressWithSource(registration, evidence, false, undefined, signedAdmission);
@@ -8110,6 +8509,21 @@ async function handleV3IngressWithSource(
 		ingressFailureLog("admission-rejected");
 		return false;
 	}
+	if (
+		!alreadyAccepted &&
+		!controlOperation &&
+		!applicationStateAdmits(registration, {
+			digest: authenticated.digest,
+			author: authenticated.author,
+			dependencies: authenticated.vertex.dependencies,
+			operation: authenticated.vertex.operation as Readonly<Record<string, unknown>>,
+			byteCharge: authenticated.byteCharge,
+		}, "received")
+	) {
+		releaseOperationReservation(reservation);
+		ingressFailureLog("admission-rejected", "application-state-limit");
+		return false;
+	}
 	let maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined;
 	if (!alreadyAccepted && registration.creatorMaintenanceBound) {
 		const consumer = registration.creatorMaintenanceAdmission;
@@ -8131,8 +8545,17 @@ async function handleV3IngressWithSource(
 			releaseOperationReservation(reservation);
 			retainPendingIngress(registration, evidence, V3Envelope.encode({
 				canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
-			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${
-				creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable")}`);
+			const reason = creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable");
+			// Typed as on the local issue path: the bare Refusal kind ("proof-budget-exceeded") is not.
+			const capacity = issuanceCapacityRefusalOf(error);
+			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${capacity ?? reason}`);
+			if (capacity !== undefined) {
+				try { ingressCapacityRefusalListeners.get(registration.onAdmittedVertex)?.(capacity); }
+				catch { /* Observation cannot alter admission. */ }
+			}
+			// This job already ended (its release ran above): retry the retained row once, after
+			// this turn, so a refusal that clears ends in an admission rather than a held row.
+			resumePendingIngress(registration);
 			return false;
 		} finally { receivedAppendReceipts.delete(receipt); }
 	}
@@ -8150,6 +8573,29 @@ async function handleV3IngressWithSource(
 				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
 			throw new TypeError("received journal contexts disagree");
 		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		// A same-epoch recovery revoked this plane after the job's currency check (the custody path
+		// awaits its journal reads in between): an append now could land after the successor rebuilt
+		// from the journal, leaving the row in no index. The carry takes it instead. Both journals open
+		// their write transaction synchronously inside appendAccepted, so an append already called is
+		// ordered before the successor's later journal read. The creator's received append is gated
+		// by its close actor's maintenance admission, which the recovery joins before it rebuilds.
+		if (
+			!alreadyAccepted &&
+			maintenanceAdmission === undefined &&
+			!currentRegistration(registration) &&
+			pendingIngressCarries.has(registration)
+		) {
+			releaseOperationReservation(reservation);
+			collectLateIngress(
+				registration,
+				V3Envelope.encode({
+					canonicalPreimage: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(evidence.signature),
+				}).finish(),
+				evidence.transportSender
+			);
+			return false;
+		}
 		appended = await registration.liveJournalStore.appendAccepted({
 			detachedSignature: new Uint8ArrayConstructor(evidence.signature),
 			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
@@ -8310,7 +8756,10 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 		// The existing FIFO owns only captured input here. Start the native and
 		// admission work in a host turn, then recheck the original live owner.
 		await yieldToHost();
-		if (!currentRegistration(registration) || registration.blueprintClosing) return;
+		if (!currentRegistration(registration) || registration.blueprintClosing) {
+			collectLateIngress(registration, captured.exactWireBytes, captured.sender);
+			return;
+		}
 		if (registration.retainedBootstrapHold && captured.transport === "gossip") {
 			ingressFailureLog("admission-rejected");
 			return;
@@ -8365,6 +8814,18 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			signature: new Uint8ArrayConstructor(signature),
 			transportSender: captured.sender,
 		});
+		// R1: another incarnation of this creator, or work built on it: kept out of this plane.
+		if (
+			!registration.index.has(authenticated.digest) &&
+			creatorSupersessionCandidate(registration, authenticated) &&
+			(await refuseCreatorSuperseded(registration, authenticated))
+		)
+			return ingressFailureLog("admission-rejected", "creator-superseded-incarnation");
+		// Refused, not retained: held work would block the interrupted close's own
+		// recovery dependency hold (it requires an empty pending ingress). The
+		// sender's row stays in its outbox and is redelivered after the close.
+		if (!registration.index.has(authenticated.digest) && creatorInterruptedClosePending(registration))
+			return ingressFailureLog("admission-rejected", "creator-interrupted-close-pending");
 		if (!registration.index.has(authenticated.digest) && !hasInstalledDependencies(registration.index, authenticated)) {
 			retainPendingIngress(registration, evidence, exactWireBytes.byteLength);
 			// A dependency is missing (for example a settlement fence that arrived before this
@@ -8384,6 +8845,30 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 // Keep mandatory control/maintenance schedulable so a full input pool cannot
 // prevent a terminal barrier or recovery operation from joining.
 const MAX_ADMITTED_INPUT_JOBS = 32;
+// The room's own settlement drain (an author's mandatory fence at adoption or install, its
+// replacements and frontier resolutions) is admitted through its own lane: received rows and caller
+// moves keep their MAX_ADMITTED_INPUT_JOBS bound and byte account and never consume this one, so a
+// full input pool at a roll cannot refuse the fence that completes it.
+// Jobs: the room's drain awaits every settlement issue (one in flight), plus one overlapping
+// recovery re-issue of the same drain step (v3-room issueSettlement's recovered-source retry).
+const MAX_ADMITTED_SETTLEMENT_JOBS = 2;
+/**
+ * The settlement lane's own captured-bytes share. A fence captures one AUTHOR_FENCE operation and a
+ * frontier resolution only selectors; the widest single settlement issue is a replacement, whose
+ * operations are one displaced source's: one vertex, whose byte charge is bounded by the epoch's
+ * parameters.maxEpochBytes (the per-vertex limit: nextEpochBytes / byteCharge > maxEpochBytes), and
+ * which was itself admitted once through the input account (<= maxPendingBytes). So every legal
+ * settlement issue fits min(maxEpochBytes, maxPendingBytes), and the share admits the lane's two jobs
+ * at that width: a mandatory replacement is never refused for bytes (no retry livelock).
+ * Per-plane captured input bound: input account maxPendingBytes + this share
+ * (<= min(maxPendingBytes, 2 x maxEpochBytes)) + the gossip queue's maxPendingBytes; read-control and
+ * egress lanes capture no bytes. Grid zone (maxEpochBytes 8 MiB, maxPendingBytes 16 MiB): 48 MiB.
+ * @param parameters - The plane's registered parameters.
+ * @returns The lane's byte share.
+ */
+function settlementLaneBytes(parameters: Readonly<{ maxEpochBytes: number; maxPendingBytes: number }>): number {
+	return Math.min(parameters.maxPendingBytes, MAX_ADMITTED_SETTLEMENT_JOBS * parameters.maxEpochBytes);
+}
 const MAX_ADMITTED_READ_CONTROL_JOBS = 32;
 // Explicit local admission policy; no payload is captured by publishPending.
 // Durable row/proof bytes remain charged by their original native owners.
@@ -8437,7 +8922,7 @@ function enqueueRegistrationTask<Result>(
 	registration: V3PlaneRegistration,
 	capture: (custody?: InputCaptureCustody) => (() => Promise<Result>) | Readonly<{ join: Promise<Result> }>,
 	inputAdmission?: Readonly<{
-		pool?: "input" | "read-control" | "pending-publication" | "egress-control";
+		pool?: "input" | "settlement" | "read-control" | "pending-publication" | "egress-control";
 		refuse(): Result;
 		refuseCapture?(capacity: "byte" | "entry"): Result;
 		barrier?: Promise<void>;
@@ -8451,7 +8936,13 @@ function enqueueRegistrationTask<Result>(
 				? "admittedEgressControlJobs"
 				: inputAdmission?.pool === "pending-publication"
 					? "admittedPendingPublicationJobs"
-					: "admittedInputJobs";
+					: inputAdmission?.pool === "settlement"
+						? "admittedSettlementJobs"
+						: "admittedInputJobs";
+	const bytes = inputAdmission?.pool === "settlement" ? "admittedSettlementBytes" : "admittedInputBytes";
+	const byteLimit = inputAdmission?.pool === "settlement"
+		? settlementLaneBytes(registration.payload.parameters)
+		: registration.payload.parameters.maxPendingBytes;
 	const limit =
 		inputAdmission?.pool === "read-control"
 			? MAX_ADMITTED_READ_CONTROL_JOBS
@@ -8459,7 +8950,9 @@ function enqueueRegistrationTask<Result>(
 				? MAX_ADMITTED_EGRESS_CONTROL_JOBS
 				: inputAdmission?.pool === "pending-publication"
 					? MAX_ADMITTED_PENDING_PUBLICATION_JOBS
-					: MAX_ADMITTED_INPUT_JOBS;
+					: inputAdmission?.pool === "settlement"
+						? MAX_ADMITTED_SETTLEMENT_JOBS
+						: MAX_ADMITTED_INPUT_JOBS;
 	const egressOwner = inputAdmission?.pool === "egress-control" ? egressAdmissionOwner(registration) : undefined;
 	if (inputAdmission !== undefined) {
 		if ((egressOwner?.jobs ?? registration[counter]) >= limit) {
@@ -8481,7 +8974,7 @@ function enqueueRegistrationTask<Result>(
 			inputReservationReleased = true;
 			registration[counter]--;
 			if (egressOwner !== undefined) releaseEgressAdmission(registration, egressOwner);
-			registration.admittedInputBytes -= capturedBytes;
+			registration[bytes] -= capturedBytes;
 			if (counter === "admittedInputJobs" && registration.deliveryRepair?.wake === true)
 				noteDeliveryCapacity(registration);
 		};
@@ -8490,13 +8983,13 @@ function enqueueRegistrationTask<Result>(
 				? undefined
 				: {
 						entryLimit: registration.payload.parameters.maxPendingEntries,
-						remainingBytes: () => registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes,
-						chargeBytes: (bytes): void => {
+						remainingBytes: () => byteLimit - registration[bytes],
+						chargeBytes: (charge): void => {
 							// Canonical caller inspection may reenter; use current remaining credit.
-							if (bytes > registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes)
+							if (charge > byteLimit - registration[bytes])
 								throw new InputCaptureCapacityError("byte");
-							registration.admittedInputBytes += bytes;
-							capturedBytes += bytes;
+							registration[bytes] += charge;
+							capturedBytes += charge;
 						},
 					};
 		if (inputAdmission?.captureBeforeBarrier === true) {
@@ -8585,6 +9078,39 @@ function enqueueV3Ingress(
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
 ): Promise<void> {
+	let rawMessage: Message | undefined = message;
+	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
+	let sender: string | undefined;
+	try {
+		sender = typeof message.sender === "string" ? message.sender : undefined;
+	} catch {
+		sender = undefined;
+	}
+	return enqueueCapturedV3Ingress(registration, transport, sender, (custody) => {
+		const selected = rawMessage;
+		rawMessage = undefined;
+		if (selected === undefined) throw new TypeError("v3 ingress input custody is unavailable");
+		return captureV3Ingress(registration, selected, transport, custody);
+	});
+}
+
+/**
+ * The FIFO entry every arrival takes: capture (charged to the bounded input pool), then full
+ * authentication and admission. Network input reaches it only through enqueueV3Ingress, whose
+ * capture revalidates the message's native provenance; the only other caller re-offers rows
+ * copied out of a predecessor plane of this process (reofferV3CarriedPendingIngress).
+ * @param registration - The plane whose FIFO takes the job.
+ * @param transport - How the row arrived.
+ * @param sender - The transport identity a refusal reports.
+ * @param capture - Captures the exact bytes, charged to the plane's bounded input pool.
+ * @returns Completion when the job has settled.
+ */
+function enqueueCapturedV3Ingress(
+	registration: V3PlaneRegistration,
+	transport: "gossip" | "retained",
+	sender: string | undefined,
+	capture: (custody: InputCaptureCustody) => CapturedV3Ingress | undefined
+): Promise<void> {
 	// A readiness boundary keeps the epoch: queue behind it in FIFO order (the
 	// same bounded input pool) instead of dropping. Authentication and every
 	// admission check run after it releases; a failed boundary leaves the
@@ -8600,33 +9126,23 @@ function enqueueV3Ingress(
 	const terminal = registration.terminalBarrier;
 	const barrier = hold === undefined ? terminal :
 		terminal === undefined ? hold : Promise.all([terminal, hold]).then(() => undefined);
-	let rawMessage: Message | undefined = message;
-	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
-	let sender: string | undefined;
-	try {
-		sender = typeof message.sender === "string" ? message.sender : undefined;
-	} catch {
-		sender = undefined;
-	}
 	const refuse = (): void => {
 		// The route attached the state if the room transport is bound to this plane's topic.
 		if (registration.deliveryRepair !== undefined) noteDeliveryRefusal(registration, sender);
 		ingressFailureLog("admission-rejected");
 	};
+	// Counted until settled: a same-epoch recovery's carry forwards what these jobs end with.
+	ingressJobsInFlight.set(registration, (ingressJobsInFlight.get(registration) ?? 0) + 1);
 	return enqueueRegistrationTask(
 		registration,
 		(custody): (() => Promise<void>) | Readonly<{ join: Promise<void> }> => {
 			let captured: CapturedV3Ingress | undefined;
 			try {
-				const message = rawMessage;
-				if (message === undefined || custody === undefined)
-					throw new TypeError("v3 ingress input custody is unavailable");
-				captured = captureV3Ingress(registration, message, transport, custody);
+				if (custody === undefined) throw new TypeError("v3 ingress input custody is unavailable");
+				captured = capture(custody);
 			} catch (error) {
 				if (error instanceof InputCaptureCapacityError) throw error;
 				ingressFailureLog("envelope-rejected");
-			} finally {
-				rawMessage = undefined;
 			}
 			if (
 				captured !== undefined &&
@@ -8645,7 +9161,299 @@ function enqueueV3Ingress(
 			captureBeforeBarrier: true,
 			...(barrier === undefined ? {} : { barrier }),
 		}
+	).finally(() => settleIngressJob(registration));
+}
+
+/**
+ * A same-epoch recovery's carry of its predecessor plane's pending ingress (decision: carry, model
+ * packages/node/formal/plane-recovery-pending-carry.qnt). Opaque: only carryV3PendingIngress opens
+ * one, from rows the live plane holds in memory and rows its own ingress jobs end with after it is
+ * revoked; reofferV3CarriedPendingIngress binds each once. Nothing of the predecessor's verdict
+ * crosses: every row re-enters the successor's ordinary capture, authentication and admission.
+ */
+export interface V3CarriedPendingIngress {
+	readonly rows: number;
+}
+
+type CarriedV3Row = Readonly<{ exactWireBytes: Uint8Array; sender: string }>;
+
+/**
+ * One same-epoch recovery's carry, keyed by its predecessor plane. It holds the pending rows the
+ * predecessor had when the recovery began, plus every row one of the predecessor's own ingress jobs
+ * ends with after the plane is no longer current (dropped before authentication, or retained onto
+ * the revoked plane: the creator's received append refused because its close actor stopped). Once
+ * the successor is bound it forwards such late rows straight to it, one at a time through the
+ * successor's ordinary ingress (the input pool is bounded). It ends when the predecessor's last
+ * ingress job settles or the successor is deactivated (an epoch change), whichever is first. After
+ * an epoch-change end it stays as a refusing tombstone until the predecessor's last job settles:
+ * a late row then, or one past the bound, is refused and named to delivery repair.
+ */
+interface PendingIngressCarry {
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchorDigest: string;
+	readonly maxEntries: number;
+	readonly maxBytes: number;
+	readonly rows: CarriedV3Row[];
+	bytes: number;
+	readonly refused: string[];
+	successor: V3PlaneRegistration | undefined;
+	refusing: boolean;
+	// The successor's re-offers past the direct share, one ingress job at a time.
+	reoffers: Promise<void>;
+	chained: number;
+}
+
+// Ingress jobs each plane has admitted to its FIFO and not yet settled.
+const ingressJobsInFlight = new WeakMap<V3PlaneRegistration, number>();
+const pendingIngressCarries = new WeakMap<V3PlaneRegistration, PendingIngressCarry>();
+const carriesForwardingTo = new WeakMap<V3PlaneRegistration, V3PlaneRegistration[]>();
+const carryPredecessors = new WeakMap<object, V3PlaneRegistration>();
+let openPendingIngressCarries = 0;
+
+/**
+ * How many same-epoch recovery carries are still open in this process (observation only).
+ * @returns The count.
+ */
+export function openV3PendingIngressCarries(): number {
+	return openPendingIngressCarries;
+}
+
+function deletePendingIngressCarry(predecessor: V3PlaneRegistration): void {
+	const carry = pendingIngressCarries.get(predecessor);
+	if (carry === undefined) return;
+	pendingIngressCarries.delete(predecessor);
+	detachForwarding(carry, predecessor);
+	carry.rows.length = 0;
+	openPendingIngressCarries -= 1;
+}
+
+function detachForwarding(carry: PendingIngressCarry, predecessor: V3PlaneRegistration): void {
+	const forwarding = carry.successor === undefined ? undefined : carriesForwardingTo.get(carry.successor);
+	if (forwarding !== undefined) {
+		const at = forwarding.indexOf(predecessor);
+		if (at >= 0) forwarding.splice(at, 1);
+	}
+	carry.successor = undefined;
+}
+
+// Ends a carry without a successor to take its rows: what it holds is refused and named to repair;
+// while the predecessor still has ingress jobs in flight it refuses what they end with too.
+function endPendingIngressCarry(predecessor: V3PlaneRegistration): void {
+	const carry = pendingIngressCarries.get(predecessor);
+	if (carry === undefined) return;
+	detachForwarding(carry, predecessor);
+	const refused = [...carry.refused.splice(0), ...carry.rows.splice(0).map((row) => row.sender)];
+	carry.bytes = 0;
+	if (ingressJobsInFlight.has(predecessor)) carry.refusing = true;
+	else deletePendingIngressCarry(predecessor);
+	for (const sender of refused) refuseCarriedRow(predecessor, sender);
+}
+
+// A successor's deactivation (an epoch change, or another recovery) ends the carries forwarding to it.
+function closePendingIngressCarriesTo(successor: V3PlaneRegistration): void {
+	const forwarding = carriesForwardingTo.get(successor);
+	if (forwarding === undefined) return;
+	carriesForwardingTo.delete(successor);
+	for (const predecessor of [...forwarding]) endPendingIngressCarry(predecessor);
+}
+
+type CarryPlane = Readonly<{ objectId: string; epoch: number; anchorDigest: string }>;
+
+function sameCarryPlane(carry: CarryPlane, registration: V3PlaneRegistration): boolean {
+	const provenance = registration.payload.provenance;
+	return (
+		currentRegistration(registration) &&
+		provenance.objectId === carry.objectId &&
+		provenance.epoch === carry.epoch &&
+		provenance.anchorDigest === carry.anchorDigest
 	);
+}
+
+// A row the carry cannot take is refused and named to repair on the topic's current plane (repair
+// attaches there as routeV3RetainedIngress attaches it).
+function refuseCarriedRow(predecessor: V3PlaneRegistration, sender: string): void {
+	ingressFailureLog("admission-rejected", "carried-ingress-refused");
+	const current = v3PlaneRegistrations.get(predecessor.networkNode)?.get(predecessor.topic);
+	if (current !== undefined && currentRegistration(current)) noteDeliveryRefusal(current, sender);
+}
+
+// Carried rows enter the successor's FIFO at once, in order, ahead of later arrivals (their children
+// would otherwise be held and ask repair for a parent the carry is bringing), while the successor's
+// input pool is under half full; past that, one at a time behind each other, so a carry larger than
+// the pool is not refused at it and arrivals keep their share. A row whose successor is no longer the
+// carry's plane when its turn comes is refused and named to repair.
+function reofferCarriedRow(
+	predecessor: V3PlaneRegistration,
+	carry: PendingIngressCarry,
+	successor: V3PlaneRegistration,
+	row: CarriedV3Row
+): void {
+	const plane: CarryPlane = { objectId: carry.objectId, epoch: carry.epoch, anchorDigest: carry.anchorDigest };
+	const reoffer = (): Promise<void> =>
+		sameCarryPlane(plane, successor)
+			? enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
+					custody.chargeBytes(row.exactWireBytes.byteLength);
+					return ObjectFreeze({
+						exactWireBytes: row.exactWireBytes,
+						sender: row.sender,
+						transport: "retained" as const,
+					});
+				}).catch(() => ingressFailureLog("admission-rejected"))
+			: Promise.resolve(refuseCarriedRow(predecessor, row.sender));
+	if (carry.chained === 0 && successor.admittedInputJobs < MAX_ADMITTED_INPUT_JOBS / 2) {
+		void reoffer();
+		return;
+	}
+	carry.chained += 1;
+	carry.reoffers = carry.reoffers.then(reoffer).finally(() => {
+		carry.chained -= 1;
+	});
+}
+
+/**
+ * One of a revoked plane's own ingress jobs ended without a verdict. When a same-epoch recovery's
+ * carry is open for that plane, the row's exact signed bytes join it (or go straight to the bound
+ * successor); otherwise nothing changes.
+ * @param registration - The plane whose job ended.
+ * @param exactWireBytes - The row's exact envelope bytes, as captured.
+ * @param sender - The transport identity it arrived from.
+ * @returns Whether a carry took (or refused) the row.
+ */
+function collectLateIngress(registration: V3PlaneRegistration, exactWireBytes: Uint8Array, sender: string): boolean {
+	if (currentRegistration(registration)) return false;
+	const carry = pendingIngressCarries.get(registration);
+	if (carry === undefined) return false;
+	if (carry.refusing) {
+		refuseCarriedRow(registration, sender);
+		return true;
+	}
+	if (carry.successor !== undefined) {
+		if (sameCarryPlane(carry, carry.successor))
+			reofferCarriedRow(registration, carry, carry.successor, ObjectFreeze({ exactWireBytes, sender }));
+		else {
+			endPendingIngressCarry(registration);
+			refuseCarriedRow(registration, sender);
+		}
+		return true;
+	}
+	if (carry.rows.length >= carry.maxEntries || carry.bytes + exactWireBytes.byteLength > carry.maxBytes) {
+		carry.refused.push(sender);
+		return true;
+	}
+	carry.bytes += exactWireBytes.byteLength;
+	carry.rows.push(ObjectFreeze({ exactWireBytes, sender }));
+	return true;
+}
+
+function settleIngressJob(registration: V3PlaneRegistration): void {
+	const left = (ingressJobsInFlight.get(registration) ?? 1) - 1;
+	if (left > 0) {
+		ingressJobsInFlight.set(registration, left);
+		return;
+	}
+	ingressJobsInFlight.delete(registration);
+	const carry = pendingIngressCarries.get(registration);
+	if (carry !== undefined && (carry.successor !== undefined || carry.refusing)) deletePendingIngressCarry(registration);
+}
+
+/**
+ * Opens a same-epoch recovery's carry on the live plane about to be deactivated: copies the exact
+ * signed rows it holds as pending ingress (deactivation clears them) and collects the rows its
+ * in-flight ingress jobs end with after deactivation. In memory only, within the plane's own
+ * maxPendingEntries/maxPendingBytes.
+ * @param plane - The live plane about to be deactivated.
+ * @returns The carry, or undefined when the plane holds no pending row and no ingress job.
+ */
+export function carryV3PendingIngress(plane: V3PlaneHandle): V3CarriedPendingIngress | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (
+		registration === undefined ||
+		!currentRegistration(registration) ||
+		pendingIngressCarries.has(registration) ||
+		(registration.pendingIngress.size === 0 && !ingressJobsInFlight.has(registration))
+	)
+		return undefined;
+	const { maxPendingBytes, maxPendingEntries } = registration.payload.parameters;
+	const provenance = registration.payload.provenance;
+	const carry: PendingIngressCarry = {
+		objectId: provenance.objectId,
+		epoch: provenance.epoch,
+		anchorDigest: provenance.anchorDigest,
+		maxEntries: maxPendingEntries,
+		maxBytes: maxPendingBytes,
+		rows: [],
+		bytes: 0,
+		refused: [],
+		successor: undefined,
+		refusing: false,
+		reoffers: Promise.resolve(),
+		chained: 0,
+	};
+	for (const pending of registration.pendingIngress.values()) {
+		const exactWireBytes = V3Envelope.encode({
+			canonicalPreimage: new Uint8ArrayConstructor(pending.evidence.exactCanonicalPreimageBytes),
+			signature: new Uint8ArrayConstructor(pending.evidence.signature),
+		}).finish();
+		if (carry.rows.length >= maxPendingEntries || carry.bytes + exactWireBytes.byteLength > maxPendingBytes) {
+			carry.refused.push(pending.evidence.transportSender);
+			continue;
+		}
+		carry.bytes += exactWireBytes.byteLength;
+		carry.rows.push(ObjectFreeze({ exactWireBytes, sender: pending.evidence.transportSender }));
+	}
+	pendingIngressCarries.set(registration, carry);
+	openPendingIngressCarries += 1;
+	const carried: V3CarriedPendingIngress = ObjectFreeze({ rows: carry.rows.length });
+	carryPredecessors.set(carried, registration);
+	return carried;
+}
+
+/**
+ * Binds a carry to the recovered successor, only when it is a plane of the same object, epoch and
+ * anchor (an epoch change carries nothing: a closed epoch's rows outside its cut are the author's
+ * settlement work), and re-offers what it holds. Each row is charged to the successor's bounded
+ * input pool and goes through the same authentication and admission as any arrival: deduplicated
+ * against its index, admitted with its parents, held as pending, or refused at a bound. Rows the
+ * predecessor's remaining ingress jobs end with are forwarded until the last of them settles.
+ * @param plane - The recovered successor.
+ * @param carried - A carry from carryV3PendingIngress (each is bound once).
+ * @returns How many rows were re-offered now.
+ */
+export function reofferV3CarriedPendingIngress(plane: V3PlaneHandle, carried: V3CarriedPendingIngress): number {
+	const predecessor = carryPredecessors.get(carried);
+	carryPredecessors.delete(carried);
+	const carry = predecessor === undefined ? undefined : pendingIngressCarries.get(predecessor);
+	if (predecessor === undefined || carry === undefined || carry.successor !== undefined || carry.refusing) return 0;
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || registration === predecessor || !sameCarryPlane(carry, registration)) {
+		endPendingIngressCarry(predecessor);
+		return 0;
+	}
+	// Refusals at the successor's input pool are named to repair (as routeV3RetainedIngress attaches it).
+	attachDeliveryRepair(registration);
+	const rows = carry.rows.splice(0);
+	carry.bytes = 0;
+	carry.successor = registration;
+	const forwarding = carriesForwardingTo.get(registration);
+	if (forwarding === undefined) carriesForwardingTo.set(registration, [predecessor]);
+	else forwarding.push(predecessor);
+	for (const row of rows) reofferCarriedRow(predecessor, carry, registration, row);
+	for (const sender of carry.refused.splice(0)) refuseCarriedRow(predecessor, sender);
+	if (!ingressJobsInFlight.has(predecessor)) deletePendingIngressCarry(predecessor);
+	return rows.length;
+}
+
+/**
+ * Ends a carry whose recovery produced no successor: its rows are refused and named to repair.
+ * @param carried - A carry from carryV3PendingIngress that was never bound.
+ */
+export function releaseV3CarriedPendingIngress(carried: V3CarriedPendingIngress): void {
+	const predecessor = carryPredecessors.get(carried);
+	carryPredecessors.delete(carried);
+	const carry = predecessor === undefined ? undefined : pendingIngressCarries.get(predecessor);
+	if (predecessor === undefined || carry === undefined || carry.successor !== undefined || carry.refusing) return;
+	endPendingIngressCarry(predecessor);
 }
 
 /** Decision row 51: a creator's ordinary readiness preparation holds its plane's
@@ -8945,6 +9753,8 @@ type ClassifiedPlaneVertex = Readonly<{
 	authenticated: AuthenticatedRecoveryVertex;
 	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 	sourceContract?: CreatorRetainedSourceContract;
+	/** Admitted under the persisted last-member frontier: settled history, never applied or re-offered. */
+	terminal?: true;
 }>;
 
 interface CreatorRetainedSourceContract {
@@ -8963,7 +9773,7 @@ interface CreatorRetainedSourceRow {
 	readonly expiry?: SettlementSourceContext;
 }
 
-interface SettlementFrontierContext {
+export interface SettlementFrontierContext {
 	readonly admissionEpoch: number;
 	readonly currentEpoch: number;
 	readonly terminalThrough: number | null;
@@ -8986,6 +9796,12 @@ interface HistoricalIssuanceContext {
 	readonly capability: VerifiedCreatorHistoricalIssuance;
 	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
 	readonly retainedSources?: ReadonlyMap<number, CreatorRetainedSourceRow>;
+	/**
+	 * The author's persisted last-member frontier (SettlementPlan.memberFrontier), re-verified at this
+	 * open. Classification uses it only through the covered-historical path, for own rows it proves
+	 * admitted (seq <= its admitted sequence): terminal, never applied, never re-offered.
+	 */
+	readonly memberFrontier?: VerifiedCreatorMemberFrontier;
 	readonly originalIssuanceStore: DurableIssuanceStore;
 	/** Same private adoption's bounded facts, never historical/admission authority. */
 	readonly vertexFacts?: CreatorCensusVertexFacts;
@@ -9446,6 +10262,7 @@ async function captureCreatorOrdinarySourceLinkedApplicationEffects(registration
 	};
 	const verifiedSources = new Set<number>();
 	const vertexFacts = createCreatorCensusVertexFacts();
+	const settledFences = createOwnEpochFenceReader();
 	for (const row of targets) {
 		if (!sameScope(row, own)) return undefined; // Local completion law is never foreign authority.
 		const target = await snapshot(row), classified = target === undefined ? undefined : classifyRebaseRow(registration, target, undefined, vertexFacts);
@@ -9460,7 +10277,7 @@ async function captureCreatorOrdinarySourceLinkedApplicationEffects(registration
 		if (!verifiedSources.has(sources[0]!.authorSequence)) {
 			const original = await snapshot(sources[0]!), selected = original === undefined ? undefined : classifyRebaseRow(registration, original, undefined, vertexFacts);
 			if (selected === undefined || !validRebaseRow(registration, selected) ||
-				!await ownSourceSettlementIsComplete(registration, selected, plan, vertexFacts, accounting)) return undefined;
+				!await ownSourceSettlementIsComplete(registration, selected, plan, vertexFacts, accounting, settledFences)) return undefined;
 			verifiedSources.add(sources[0]!.authorSequence);
 		}
 		const entry = plan?.entries.find(entry => entry.sourceSequence === source.sourceSequence);
@@ -9781,7 +10598,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		expectedObjectId: targetTrust.objectId, expectedProfileId: targetTrust.profileId});
 	if (!targetAcl.ok) throw new TypeError("creator source custody target is not authenticated");
 	const writer = authorizeLatchedApplicationWrite({author: registration.issuanceScope.author, snapshot: targetAcl.snapshot});
-	const requiresApplicationCustody = targetTrust.currentEpoch !== payload.provenance.epoch + 1 || !writer.ok || !writer.authorized;
+	const removedAuthor = !writer.ok || !writer.authorized;
+	const requiresApplicationCustody = targetTrust.currentEpoch !== payload.provenance.epoch + 1 || removedAuthor;
 	let committedMembers: ReadonlySet<string> | undefined;
 	if (receivedMembership !== undefined) {
 		// The SAME original membership owner verified the complete Cut membership.
@@ -9818,9 +10636,24 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 	};
 	const entries = [...(prior?.entries ?? [])];
 	const contexts = [...(prior?.sourceContexts ?? [])];
+	// Custody of an owed row of an older epoch reads that epoch's record from this same plan.
+	refreshSettlementSourceAuthorities(registration, prior);
 	const retained = await prepareCreatorRetainedSourceContracts(prior, payload.trust.trust, payload.input.catalog);
 	if (!current()) throw new TypeError("creator source custody changed during contract preparation");
 	let added = false;
+	// The close that removes this author persists, once, the creator-signed settlement frontier it holds
+	// from its install as a member of this epoch (verbatim signed bytes, SettlementPlan.memberFrontier):
+	// after removal no creator statement names it, and that frontier proves which of its own rows were
+	// admitted (seq <= its admitted sequence). Later opens re-verify it.
+	const memberIdentity = registration.historicalIssuance === undefined ? undefined
+		: resolveVerifiedCreatorHistoricalIssuance(registration.historicalIssuance.capability);
+	const memberThrough = memberIdentity?.admissionEpoch !== undefined && memberIdentity.successorEpoch === payload.provenance.epoch &&
+		memberIdentity.successorAnchorDigest === payload.provenance.anchorDigest ? memberIdentity.admittedAuthorSequence : null;
+	const memberFrontier = !removedAuthor || prior?.memberFrontier !== undefined || memberThrough === null ||
+		registration.historicalIssuance === undefined ? undefined
+		: captureCreatorMemberFrontier(registration.historicalIssuance.capability, payload.trust.trust);
+	if (memberFrontier !== undefined) added = true;
+	let completedSourceCustody = prior?.completedSourceCustody === true;
 	for (const issued of before.rows.issued) {
 		if (!sameScope(issued, scope)) continue;
 		const outbox = before.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === issued.authorSequence);
@@ -9847,6 +10680,38 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		// Protocol no-ops retain their signed source contract while still current.
 		// They have no application intent to retry or abandon. This also preserves
 		// old fences if a later ACL removes the author before native retirement.
+		// A completed replacement entry's source still present and not covered by the author's signed
+		// frontier (seq > T), whose replacement is not proven committed in this close: either the close
+		// removes its author (no later creator statement names it), or the replacement missed this epoch
+		// too (lost twice), so no later frontier will cover the source. Custody of the source under its
+		// displaced plane's authenticated context, written once on the completed entry (store law). The
+		// drain still treats the entry as done; nothing is re-offered.
+		const replacementChunks = existing === undefined || existing.replacementSequence === null ? [] :
+			existing.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [existing.replacementSequence];
+		const replacementCommittedHere = committedMembers !== undefined && replacementChunks.length > 0 &&
+			replacementChunks.every(sequence => {
+				const replacement = before.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === sequence);
+				return replacement !== undefined && committedMembers!.has(lowerHexDigest(replacement.digest)!);
+			});
+		if ((removedAuthor || !replacementCommittedHere) && replacementChunks.every(sequence => sequence > issued.authorSequence) &&
+			existing !== undefined && existing.sourceContextDigest === undefined &&
+			existing.replacementSequence !== null && (existing.disposition === "rebase" || existing.disposition === "transform") &&
+			retainedVertex === undefined && classified.kind === "displaced" &&
+			(memberThrough === null || issued.authorSequence > memberThrough)) {
+			const displaced = registration.displacedSource;
+			const original = displaced?.prepared, originalAuthorization = displaced?.authorization;
+			if (original === undefined || originalAuthorization?.kind !== "latched-acl" ||
+				classified.authenticated.vertex.epoch !== original.provenance.epoch ||
+				classified.authenticated.vertex.anchor !== original.provenance.anchorDigest) continue;
+			const replacedContext = captureCreatorSourceContext(original.trust.trust, encodeCanonical(originalAuthorization.value),
+				original.provenance.blueprintDigest, original.input.exactCanonicalParametersCarrierBytes);
+			if (!contexts.some(value => sameBytes(value.digest, replacedContext.digest))) contexts.push(replacedContext);
+			entries[entries.indexOf(existing)] = {...existing, sourceContextDigest: new Uint8ArrayConstructor(replacedContext.digest)};
+			// Beyond the removing close (F2), mark the plan so readers before this custody refuse it at open.
+			if (!removedAuthor) completedSourceCustody = true;
+			added = true;
+			continue;
+		}
 		if (!requiresApplicationCustody && !currentFence) continue;
 		// The complete signed membership is transferred into the original plan,
 		// once per source epoch. A terminal label alone never supplies this proof.
@@ -9864,16 +10729,24 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 			existing.replacementSequence === null;
 		if (classified.kind !== "current" && !unresolved) continue;
 		const source = classified.authenticated;
-		const original = knownCommitted || classified.kind === "current" ? payload : registration.displacedSource?.prepared;
-		const originalAuthorization = knownCommitted || classified.kind === "current" ? authorization : registration.displacedSource?.authorization;
-		if (original === undefined || originalAuthorization?.kind !== "latched-acl" ||
-			source.vertex.epoch !== original.provenance.epoch || source.vertex.anchor !== original.provenance.anchorDigest)
+		const displaced = displacedSourceFor(registration, source.admitted);
+		// A plane that reopened cold keeps no older authority: the row's source epoch is then the plan's
+		// source-authority record, whose bytes are that epoch's source context (deriveOwnedReplacement).
+		const recorded = knownCommitted || classified.kind === "current" || (displaced !== undefined &&
+			source.vertex.epoch === displaced.prepared.provenance.epoch && source.vertex.anchor === displaced.prepared.provenance.anchorDigest)
+			? undefined : settlementSourceAuthorityRecordFor(registration, source.admitted);
+		const original = knownCommitted || classified.kind === "current" || recorded !== undefined ? payload : displaced?.prepared;
+		const originalAuthorization = knownCommitted || classified.kind === "current" ? authorization
+			: recorded?.authorization ?? displaced?.authorization;
+		if (original === undefined || originalAuthorization?.kind !== "latched-acl" || recorded === undefined &&
+			(source.vertex.epoch !== original.provenance.epoch || source.vertex.anchor !== original.provenance.anchorDigest))
 			throw new TypeError("creator unresolved source contract is unavailable");
 		const intents = rebaseIntents(original, source);
 		if (intents === undefined) throw new TypeError("creator source custody application contract is unavailable");
 		if (!currentFence && (intents.length === 0 || Reflect.get(source.vertex.operation as object, "action") === "acl")) continue;
 		if (existing !== undefined && !unresolved) continue;
-		const selectedContext = knownCommitted || classified.kind === "current" ? context : captureCreatorSourceContext(original.trust.trust,
+		const selectedContext = knownCommitted || classified.kind === "current" ? context : recorded !== undefined ? recorded.context :
+			captureCreatorSourceContext(original.trust.trust,
 			encodeCanonical(originalAuthorization.value), original.provenance.blueprintDigest, original.input.exactCanonicalParametersCarrierBytes);
 		if (!contexts.some(value => sameBytes(value.digest, selectedContext.digest))) contexts.push(selectedContext);
 		const resolution = knownCommitted ? await completion() : undefined;
@@ -9891,8 +10764,22 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 	if (added) {
 		entries.sort((a, b) => a.sourceSequence - b.sourceSequence);
 		contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
-		const plan = copySettlementPlan({scope, revision: prior === null ? 0 : prior.revision + 1,
-			fenceSequence: prior?.fenceSequence ?? null, entries, sourceContexts: contexts}, scope);
+		const persistedFrontier = memberFrontier ?? prior?.memberFrontier;
+		const plan = copySettlementPlan(
+			normalizeSettlementSourceAuthorities({
+				scope,
+				revision: prior === null ? 0 : prior.revision + 1,
+				fenceSequence: prior?.fenceSequence ?? null,
+				entries,
+				...(contexts.length === 0 ? {} : { sourceContexts: contexts }),
+				...(prior?.handBacks === undefined ? {} : { handBacks: prior.handBacks }),
+				...(persistedFrontier === undefined ? {} : { memberFrontier: persistedFrontier }),
+				...(completedSourceCustody ? { completedSourceCustody: true } : {}),
+				...(prior?.reissueOrigins === undefined ? {} : { reissueOrigins: prior.reissueOrigins }),
+				...(prior?.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+			} as SettlementPlan),
+			scope
+		);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
 		const future = {...before.rows, plans: [...before.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 		encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -9917,6 +10804,7 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 
 async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null, currentTrust: CurrentAnchorTrust,
 	catalogOwner: TrustedBlueprintCatalog): Promise<ReadonlyMap<number, CreatorRetainedSourceRow>> {
+	v3SettlementWorkCounts.retainedContractPreparations += 1;
 	const contexts = new Map<string, CreatorRetainedSourceContract>();
 	for (const context of plan?.sourceContexts ?? []) {
 		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined && sameBytes(entry.sourceContextDigest, context.digest))) continue;
@@ -9938,6 +10826,31 @@ async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null
 			throw new TypeError("CREATOR_SOURCE_BLUEPRINT_UNAVAILABLE");
 		contexts.set(lowerHexDigest(context.digest)!, ObjectFreeze({capability, identity, admission, parameters, runtime,
 			trust: ObjectFreeze({trust: identity.trust})}));
+	}
+	// A replaced-source frontier resolution: the store admits it structurally; only the plan author's exact
+	// signature over a receipt bound to this room, this entry and a past epoch, whose frontier statement
+	// holds, authenticates it. Checked on every preparation (each install and reopen): fails closed.
+	for (const entry of plan?.entries ?? []) {
+		if (entry.sourceResolutionScope === undefined) continue;
+		const resolution = plan?.sourceContexts?.find(value => entry.sourceResolutionDigest !== undefined &&
+			sameBytes(value.digest, entry.sourceResolutionDigest));
+		// A committed-replacement resolution names its replacement's own completion proof, which the loop
+		// below opens and checks (creator-signed Cut membership of the replacement); the link itself is
+		// proven from signed content by the census on every install (replacementCommittedResolution).
+		if (entry.sourceResolutionKind === "replacement") {
+			const replacement = plan?.entries.find(value => value.sourceSequence === entry.replacementSequence);
+			if (resolution === undefined || entry.replacementSequence === null || replacement?.disposition !== "committed" ||
+				replacement.sourceContextDigest === undefined || replacement.sourceResolutionDigest === undefined ||
+				!sameBytes(replacement.sourceResolutionDigest, resolution.digest))
+				throw new TypeError("creator replaced source proof is invalid");
+			continue;
+		}
+		if (plan == null || resolution === undefined || entry.replacementSequence === null ||
+			openCreatorReplacedSourceResolution(resolution, {objectId: currentTrust.objectId,
+				pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest, sourceAuthor: plan.scope.author,
+				sourceSequence: entry.sourceSequence, sourceDigest: entry.sourceDigest, replacementSequence: entry.replacementSequence,
+				currentEpoch: currentTrust.currentEpoch}, V3_SETTLEMENT_OWN_WINDOW_EPOCHS) === undefined)
+			throw new TypeError("creator replaced source proof is invalid");
 	}
 	const sources = new Map<number, CreatorRetainedSourceRow>();
 	const completions = new Map<string, Readonly<{members: ReadonlySet<string>; context: SettlementSourceContext}>>();
@@ -10205,6 +11118,7 @@ const CREATOR_ISSUANCE_CENSUS_DEPENDENCY_KINDS = ObjectFreeze([
 	"current-issuance", "unsettled-issuance", "pinned-genesis", "signed-settled-issuance", "source-committed-inclusion",
 	"source-bound-completed-issuance", "adjacent-author-fence", "separate-source-author-fence",
 	"authenticated-closed-issuance", "authenticated-covered-native-issuance", "source-authenticated-expiry",
+	"source-replaced-release",
 ] as const);
 const CREATOR_ISSUANCE_CENSUS_CLASSIFICATIONS = ObjectFreeze([
 	"covered-historical", "current", "displaced", "pinned-genesis", "filtered-settlement-source",
@@ -10258,6 +11172,8 @@ function creatorRuntimeActiveCensusFields(
 		pendingRoots: readonly unknown[];
 		wireByteCharge: number;
 		activeSource?: Readonly<{ sourceSequence: number; sourceDigest: Uint8Array }>;
+		// Every source of one batched drain preparation (more than one), in the batch's order.
+		activeBatch?: readonly Readonly<{ sourceSequence: number; sourceDigest: Uint8Array }>[];
 		unsettledSources: readonly unknown[];
 		cursor: number | null;
 		cacheSourceSequences: readonly number[];
@@ -10273,6 +11189,7 @@ function creatorRuntimeActiveCensusFields(
 		},
 		activeUnsettled: {
 			...(input.activeSource ?? {}),
+			...(input.activeBatch === undefined ? {} : { batch: input.activeBatch }),
 			sources: input.unsettledSources,
 			cursor: input.cursor,
 			cacheSourceSequences: input.cacheSourceSequences,
@@ -10298,6 +11215,7 @@ async function sealCreatorPendingClassificationDependencies(
 		author: input.owners.author,
 		closure: { candidates: input.generation.candidates, closure: input.generation.references },
 		floorTrust: input.generation.trust,
+		captureMemberFrontier: true,
 	});
 	const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
 	if (
@@ -10308,14 +11226,23 @@ async function sealCreatorPendingClassificationDependencies(
 		identity.successorAnchorDigest !== input.generation.trust.currentAnchorDigest
 	)
 		return undefined;
+	// The persisted last-member frontier, re-verified under this generation's trust (fails closed).
+	const pendingScope = ObjectFreeze({ objectId: identity.objectId, author: input.owners.author });
+	const rawPendingPlan = await input.issuanceStore.readSettlementPlan(pendingScope);
+	const pendingPlan = rawPendingPlan === null ? null : copySettlementPlan(rawPendingPlan, pendingScope);
+	if (pendingPlan === undefined) return undefined;
+	const memberFrontier = pendingPlan?.memberFrontier === undefined ? undefined : openCreatorMemberFrontier({
+		currentTrust: input.generation.trust, context: pendingPlan.memberFrontier, author: input.owners.author});
+	if (pendingPlan?.memberFrontier !== undefined && memberFrontier === undefined) return undefined;
 	const context: CreatorRecoveryCensusContext = {
 		payload,
 		authorization,
 		issuanceStore: input.issuanceStore,
 		liveJournalStore: input.liveJournalStore,
-		issuanceScope: ObjectFreeze({ objectId: identity.objectId, author: input.owners.author }),
+		issuanceScope: pendingScope,
 		historicalIssuance: {
 			capability,
+			...(memberFrontier === undefined ? {} : {memberFrontier}),
 			originalIssuanceStore: input.issuanceStore,
 			count: 0,
 			countedSequences: new IntrinsicSet(),
@@ -10657,6 +11584,7 @@ export async function prepareV3TerminalMigrationSource(
 				: {
 						historicalIssuance: {
 							capability: history.capability,
+							...(history.memberFrontier === undefined ? {} : {memberFrontier: history.memberFrontier}),
 							originalIssuanceStore: history.originalIssuanceStore,
 							count: 0,
 							countedSequences: new IntrinsicSet<number>(),
@@ -10720,20 +11648,37 @@ interface CreatorRecoveryCensusInputCapture {
 	overCapacity: boolean;
 }
 
+/** Debug mode (TS_DRP_DEBUG_CENSUS_REUSE=1): every reused census classification is also
+ * classified afresh by the complete census and compared byte for byte. */
+function censusReuseDebug(): boolean {
+	const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+	return env?.TS_DRP_DEBUG_CENSUS_REUSE === "1";
+}
+
 /** A complete census is classified once by its original owner. Under that
  * SAME hold's native exclusion, unchanged complete inputs need fresh currency,
  * not another outbox/plan walk and semantic report construction. This closure
  * is private DATA reuse, never a reservation, paid credit or admission grant.
- * Cross-object/branch/rebase work keeps the original complete construction. */
+ * Cross-object/branch/rebase work keeps the original complete construction.
+ *
+ * Without preparedHeld, the cell belongs to the close hold itself, not to one
+ * issuance lease: every use is an ACTUAL complete native census read and a read
+ * of every captured outbox page (inside the caller's lease when it has one), and
+ * the original replay verification. Only byte-identical inputs skip the
+ * classification; the census is a deterministic function of them and the bound
+ * context checked below. It never uses a lease's storage probe. Under a lease,
+ * `probe` receives that lease's own storage probe, captured on this actual
+ * complete read, from which the caller may prepare the lease's currency cell. */
 function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration,
 	runtime: ReturnType<typeof captureCreatorRecoveryRuntime>, replay: Readonly<{verify(): Promise<boolean>}>,
 	sealed: Uint8Array, live: () => boolean, captured: CreatorRecoveryCensusInputCapture,
-	preparedHeld: CreatorHeldIssuanceCensusRead,
+	preparedHeld: CreatorHeldIssuanceCensusRead | undefined,
 	journalCurrent?: (held: CreatorHeldIssuanceCensusRead) => Promise<boolean | undefined>
-): ((held: CreatorHeldIssuanceCensusRead) => Promise<boolean | undefined>) | undefined {
+): ((held: CreatorHeldIssuanceCensusRead | undefined, probe?: {nativeCurrent?: CreatorRecoveryCensusInputCapture["nativeCurrent"]}) =>
+	Promise<boolean | undefined>) | undefined {
 	try {
 		if (captured.applicationPolicyRead || captured.overCapacity || captured.pages.length === 0 ||
-			!live() || !preparedHeld.available() || !runtime.sourceBound ||
+			!live() || (preparedHeld !== undefined && !preparedHeld.available()) || !runtime.sourceBound ||
 			runtime.nativeBranchSource !== undefined || runtime.migrationSource !== undefined ||
 			registration.pendingIngress.size !== 0 || registration.pendingIngressBytes !== 0 ||
 			(registration.rebaseSnapshot?.length ?? 0) !== 0 || registration.rebaseCursor !== undefined ||
@@ -10759,7 +11704,8 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 			// The original resolver intentionally returns a detached identity per
 			// call. Compare its complete typed value, never its allocation identity.
 			const identity = resolveVerifiedCreatorHistoricalIssuance(value.capability);
-			return [value, value.capability, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
+			// retainedSources (frozen custody rows; replacementChainLive, ownSourceSettlementIsComplete) is bound by identity.
+			return [value, value.capability, value.memberFrontier, value.retainedSources, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
 				identity?.closedAnchorDigest, identity?.closedEpoch, identity?.objectId,
 				identity?.successorAnchorDigest, identity?.successorEpoch,
 				value.maxEpochVertices, value.scopeAuthorMatches, value.count, value.countedSequences, ...sequences];
@@ -10796,12 +11742,12 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 				return captured;
 			});
 		}
-		const verifyReplay = async (held: CreatorHeldIssuanceCensusRead): Promise<boolean> => {
-			const current = await journalCurrent?.(held);
+		const verifyReplay = async (held: CreatorHeldIssuanceCensusRead | undefined): Promise<boolean> => {
+			const current = held === undefined ? undefined : await journalCurrent?.(held);
 			if (current === undefined) return replay.verify();
 			if (!current || graphVertices === undefined || registration.closeVertices.size !== graphVertices.length ||
 				registration.closeCharges.size !== graphVertices.length) return false;
-			return graphVertices.every(vertex => creatorOrdinaryPreparedVertexCurrent(registration, vertex));
+			return creatorOrdinaryPreparedVerticesCurrent(registration, graphVertices);
 		};
 		const context = () => {
 			const history = (value: HistoricalIssuanceContext | undefined) => {
@@ -10832,7 +11778,8 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 		// whole-context encoding. Actual field/reference bindings and mutable
 		// history counters/Sets above remain freshly compared on every turn.
 		const contextIntact = captureCreatorOrdinaryDimensionIntegrity(contextValue);
-		const nativeCurrent = captured.nativeCurrent;
+		// A lease's storage probe is that lease's currency only, never the hold's.
+		const nativeCurrent = preparedHeld === undefined ? undefined : captured.nativeCurrent;
 		const expectedNative = nativeCurrent !== undefined ? undefined :
 			encodeCanonical((decodeCanonical(sealed) as {nativeIssuance: unknown}).nativeIssuance);
 		const carriers = () => [registration.payload, ...(registration.displacedSource === undefined ? [] : [registration.displacedSource.prepared])]
@@ -10844,8 +11791,12 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 		const capturedCarriers = originalCarriers.map(bytes => new Uint8ArrayConstructor(bytes));
 		const pages = (nativeCurrent === undefined ? captured.pages : []).map(page => ObjectFreeze({afterKey: page.afterKey == null ? page.afterKey : [...page.afterKey] as typeof page.afterKey,
 			bytes: new Uint8ArrayConstructor(page.bytes)}));
-		const available = (held: CreatorHeldIssuanceCensusRead): boolean => { try {return live() && held === preparedHeld && held.available() &&
-			held.store === store && held.objectId === runtime.currentTrust.objectId && registration.issuanceStore === store &&
+		const available = (held: CreatorHeldIssuanceCensusRead | undefined): boolean => { try {return live() &&
+			(preparedHeld === undefined ? held === undefined || held.available() && held.store === store && held.objectId === runtime.currentTrust.objectId
+				: held === preparedHeld && held.available() && held.store === store && held.objectId === runtime.currentTrust.objectId) &&
+			registration.issuanceStore === store &&
+			registration.pendingIngress.size === 0 && registration.pendingIngressBytes === 0 &&
+			(registration.rebaseSnapshot?.length ?? 0) === 0 && registration.rebaseCursor === undefined &&
 			creatorOriginalIssuanceStore(registration) === original &&
 			durableIssuancePruningMaintenanceForStore(store) === maintenance && maintenance.readBoundedRecoveryCensus === read &&
 			store.readOutboxPage === readPage &&
@@ -10856,7 +11807,7 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 		} catch {return false;} }; // Inconclusive context bindings use the original full check.
 		const intact = (): boolean => {try {return contextIntact() &&
 			carriers().every((bytes, index) => sameBytes(bytes, capturedCarriers[index]!));} catch {return false;} };
-		return async held => {
+		return async (held, probe) => {
 			if (!available(held) || !intact()) return undefined;
 			if (nativeCurrent !== undefined) {
 				// Enrolled by the ORIGINAL frozen native producer on its exact
@@ -10873,9 +11824,16 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 			if (expectedNative === undefined) return undefined;
 			// This is an ACTUAL complete native read in the same held transaction,
 			// including hidden/foreign rows, full PRE, plans, image and control.
-			const current = await ReflectApply(read, maintenance, [{objectId: runtime.currentTrust.objectId,
-				limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}}]);
+			const request = {objectId: runtime.currentTrust.objectId,
+				limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+			const current = await ReflectApply(read, maintenance, [request]);
 			if (!available(held)) return undefined;
+			// The lease's own storage probe, on this actual complete read (as the complete census enrolls it).
+			if (probe !== undefined && held !== undefined) try {
+				const method = ObjectGetOwnPropertyDescriptor(read, "captureCurrentProbe");
+				if (ObjectIsFrozen(read) && method !== undefined && "value" in method && typeof method.value === "function")
+					probe.nativeCurrent = read.captureCurrentProbe?.call(read, request, current);
+			} catch { /* Optional: without it the caller keeps this cell's complete reads. */ }
 			let currentBytes: Uint8Array;
 			try {currentBytes = encodeCanonical({rows: current.rows, image: current.image,
 				...(current.control === undefined ? {} : {control: current.control})});} catch {return undefined;}
@@ -10890,7 +11848,9 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 				try {if (!sameBytes(encodeCanonical(fresh), page.bytes)) return undefined;} catch {return undefined;}
 			}
 			if (!(await verifyReplay(held))) return false;
-			return available(held) && intact() ? true : undefined;
+			if (!available(held) || !intact()) return undefined;
+			if (preparedHeld === undefined) v3SettlementWorkCounts.recoveryCensusReuses += 1;
+			return true;
 		};
 	} catch {return undefined;} // Inconclusive preparation retains the full original route.
 }
@@ -10915,7 +11875,7 @@ async function readCreatorRecoveryDependencyCensus(
 			pendingIngressBytes: number;
 			pendingCurrent(): boolean;
 			index: V3PlaneRegistration["index"];
-			activeSource: ClassifiedRebaseRow | undefined;
+			activeSource: ClassifiedRebaseRow | readonly ClassifiedRebaseRow[] | undefined;
 			rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
 			rebaseCursor: number | undefined;
 		}>;
@@ -10929,6 +11889,7 @@ async function readCreatorRecoveryDependencyCensus(
 	  }>
 	| undefined
 > {
+	v3SettlementWorkCounts.recoveryCensusReads += 1;
 	const vertexFacts = creatorReplayReads.get(observation.replay)?.vertexFacts;
 	// This read walk retains its original native reservations and live
 	// predicate. A checkpoint neither releases custody nor caches permission.
@@ -10943,7 +11904,10 @@ async function readCreatorRecoveryDependencyCensus(
 	const pendingIngress = active?.pendingIngress ?? [];
 	const pendingIngressBytes = active?.pendingIngressBytes;
 	const pendingCurrent = (): boolean => active !== undefined && active.pendingCurrent();
+	// One displaced source, or every source of one batched drain preparation (prepareReplacements).
 	const activeSource = active?.activeSource;
+	const activeSources: readonly ClassifiedRebaseRow[] =
+		activeSource === undefined ? [] : ArrayIsArray(activeSource) ? activeSource : [activeSource as ClassifiedRebaseRow];
 	const rebaseSnapshot = active?.rebaseSnapshot;
 	const rebaseCursor = active?.rebaseCursor;
 
@@ -10983,8 +11947,10 @@ async function readCreatorRecoveryDependencyCensus(
 				}).finish().byteLength !== pending.pendingByteCharge
 			)
 				return undefined;
+			// A row whose parents are all admitted (a received append retained after a refused
+			// maintenance capture) is still unadmitted foreign work: carry it as a root like any
+			// other until a drain admits it. Local dependencies stay on the admitted index.
 			const missingParents = authenticated.vertex.dependencies.filter((dependency) => !index.has(dependency));
-			if (missingParents.length === 0 && active.enteredReceivedDigest === undefined) return undefined;
 			wireByteCharge += pending.pendingByteCharge;
 			if (!NumberIsSafeInteger(wireByteCharge) || wireByteCharge > registration.payload.parameters.maxPendingBytes)
 				return undefined;
@@ -11000,7 +11966,7 @@ async function readCreatorRecoveryDependencyCensus(
 		}
 		if (wireByteCharge !== pendingIngressBytes || !pendingCurrent()) return undefined;
 	}
-	if (activeSource !== undefined) {
+	for (const activeSource of activeSources) {
 		const selectedStore =
 			activeSource.row.scope.objectId === registration.displacedSource?.prepared.provenance.objectId
 				? (registration.displacedSource.issuanceStore ?? registration.issuanceStore)
@@ -11090,6 +12056,9 @@ async function readCreatorRecoveryDependencyCensus(
 	if (sourceTrust !== undefined) anchors.set(sourceTrust.currentEpoch, sourceTrust.currentAnchorDigest);
 	let afterKey: DurableOutboxPageInput["afterKey"] = null;
 	let scanned = 0;
+	// The author's own fences per epoch, read once for this walk when a row first reaches the
+	// settlement window or is classified as settled (ownSourceSettlementIsComplete).
+	const settledFences = createOwnEpochFenceReader();
 	for (;;) {
 		await checkpoint();
 		if (!live()) return undefined;
@@ -11281,10 +12250,13 @@ async function readCreatorRecoveryDependencyCensus(
 				observation.stage = `retained-source-completion:${row.authorSequence}`; return undefined;
 			}
 			// Signed local-author abandonment: terminal, never published, retained
-			// and charged until the ORIGINAL retirement owner retires it.
+			// and charged until the ORIGINAL retirement owner retires it. A frontier
+			// resolution signs the same receipt for a row it proves committed: that row
+			// is in history (covered, or the pinned bootstrap row, which is never pruned).
 			const durablyExpired = scope.author === registration.issuanceScope.author && !openSource &&
 				retainedCompletion?.expiry !== undefined && sameBytes(retainedCompletion.sourceDigest, row.digest) &&
-				classified?.kind === "displaced" && classified.authenticated.digest === lowerHexDigest(row.digest) &&
+				(classified?.kind === "displaced" || classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") &&
+				classified.authenticated.digest === lowerHexDigest(row.digest) &&
 				creatorRetainedExpiryMatchesPlan(retainedCompletion, row.authorSequence, inheritancePlan);
 			if (retainedCompletion?.expiry !== undefined && !durablyExpired) {
 				observation.stage = `retained-source-expiry:${row.authorSequence}`; return undefined;
@@ -11307,6 +12279,37 @@ async function readCreatorRecoveryDependencyCensus(
 					terminalFrontier,
 					vertexFacts
 				)?.digest === classified.authenticated.digest;
+			// A pending completed-replacement source in custody (its entry gained its displaced context at a
+			// close) is the dependency of its replacement chain while that chain is live: retained and
+			// charged, never re-offered (a completed entry is never replaced again). See
+			// replacementChainLive for the evidence each step rests on.
+			const replacedPending = scope.author === registration.issuanceScope.author && classified?.kind === "displaced" &&
+				row.publishState === "pending" && classified.sourceContract !== undefined && retainedCompletion !== undefined &&
+				retainedCompletion.completion === undefined && retainedCompletion.expiry === undefined &&
+				sameBytes(retainedCompletion.sourceDigest, row.digest) && sourceBound && observation.liveRegistration !== undefined &&
+				await replacementChainLive(observation.liveRegistration, registration, ObjectFreeze({ ...classified, row }),
+					inheritancePlan === null ? null : copySettlementPlan(inheritancePlan, scope) ?? null, nativeRows.issued, vertexFacts);
+			// C03 layer 3: the exact own author fence of a closed epoch whose startup drain committed it
+			// (published only after readiness) and died before publishing it. No plane admits it any
+			// more, it has nothing to replan (no intents, so no plan entry), and the new epoch's fence
+			// supersedes it. It is the same signed no-op as a published historical fence: retained,
+			// charged and anchored below (retainedHistoricalFence), never refused.
+			// Model: packages/node/formal/creator-unpublished-fence-census.qnt.
+			const unpublishedFence = classified?.kind === "displaced" && row.publishState === "pending"
+				? snapshotClosedRecord(classified.authenticated.vertex.operation, ["action", "fenceSequence", "version"])
+				: undefined;
+			const unpublishedHistoricalFence =
+				classified?.kind === "displaced" &&
+				sourceBound &&
+				scope.author === registration.issuanceScope.author &&
+				settlementProfileFor(currentTrust.profileId) === "v1" &&
+				classified.authenticated.author === scope.author &&
+				classified.authenticated.authorSequence === row.authorSequence &&
+				classified.authenticated.digest === lowerHexDigest(row.digest) &&
+				classified.authenticated.vertex.epoch < currentTrust.currentEpoch &&
+				unpublishedFence?.action === AUTHOR_FENCE_ACTION &&
+				unpublishedFence.version === 1 &&
+				unpublishedFence.fenceSequence === row.authorSequence;
 			if (
 				classified === undefined ||
 				(classified.kind !== "current" &&
@@ -11318,7 +12321,9 @@ async function readCreatorRecoveryDependencyCensus(
 					row.publishState !== "published" &&
 					!openSource &&
 					!inheritedComplete &&
-					!terminalCoveredPending)
+					!terminalCoveredPending &&
+					!replacedPending &&
+					!unpublishedHistoricalFence)
 			)
 				return undefined;
 			let dependencyKind: CreatorIssuanceCensusDependencyKind = durablyCommitted ? "source-committed-inclusion" : openSource
@@ -11335,11 +12340,15 @@ async function readCreatorRecoveryDependencyCensus(
 						observation.liveRegistration,
 						ObjectFreeze({ ...classified, row }),
 						inheritancePlan,
-						vertexFacts
+						vertexFacts,
+						undefined,
+						settledFences
 					);
 				}
 
-				if (completedBranch) dependencyKind = "source-bound-completed-issuance";
+				// A pending completed-replacement source with a live chain (replacedPending above) is the same
+				// completed own settlement, its link and every chain step authenticated.
+				if (completedBranch || replacedPending) dependencyKind = "source-bound-completed-issuance";
 				const adjacent =
 					sourceBound && displacedSource !== undefined && sourceDependencyTrust !== undefined
 						? authenticateRecoveryVertex(
@@ -11403,7 +12412,8 @@ async function readCreatorRecoveryDependencyCensus(
 				const retainedClosedIssuance =
 					closedCovered !== undefined && closedCovered.digest === classified.authenticated.digest;
 				if (retainedClosedIssuance) dependencyKind = "authenticated-closed-issuance";
-				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch && !durablyExpired) {
+				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch && !durablyExpired &&
+					!replacedPending) {
 					const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
 					if (
 						scope.author !== registration.issuanceScope.author ||
@@ -11426,6 +12436,24 @@ async function readCreatorRecoveryDependencyCensus(
 					if (covered === undefined || covered.digest !== classified.authenticated.digest) return undefined;
 				}
 				if (durablyExpired) dependencyKind = "source-authenticated-expiry";
+				// Past the own-row settlement window, a displaced row whose own settlement is complete
+				// (an expired fence or source) is resolved as expired: the signed frontier shows the
+				// creator closed its epoch without it, and no later plane can admit it.
+				const windowFrontier = settlementFrontierFromHistory(registration.historicalIssuance);
+				const windowExpired = sourceBound && scope.author === registration.issuanceScope.author &&
+					windowFrontier !== undefined && validSettlementFrontierContext(registration.payload, windowFrontier) &&
+					(retainedHistoricalFence || completedBranch) &&
+					settlementOwnRowClass(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch, row.authorSequence,
+						windowFrontier.admissionEpoch, windowFrontier.terminalThrough) === "displaced" &&
+					settlementOwnRowWindowExpired(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch) &&
+					settlementOwnRowFenceGuarded(await settledFences(
+						creatorOriginalIssuanceStore(registration), registration.issuanceScope),
+					classified.authenticated.vertex.epoch, row.authorSequence, windowFrontier.terminalThrough);
+				// The retirement store releases a pending source only on its plan's authenticated expiry
+				// (durablyExpired above). A pending row past its window without one (a completed-replacement
+				// source whose chain is live, replacedPending) stays a protected hole: naming it expired
+				// would drop it from the holes and the store would refuse the retirement.
+				if (windowExpired && row.publishState === "published") dependencyKind = "source-authenticated-expiry";
 			}
 			const vertex = classified.authenticated.vertex;
 			if (typeof vertex.anchor !== "string") return undefined;
@@ -11448,9 +12476,14 @@ async function readCreatorRecoveryDependencyCensus(
 				branchSource !== undefined &&
 				vertex.epoch === branchSource.prepared.provenance.epoch &&
 				vertex.anchor === branchSource.prepared.provenance.anchorDigest;
+			// A row the native issuance retirement has already retired is held only
+			// until the prefix pruner reaches it (its completed entry is custody, not
+			// a dependency). Nothing replays it, so it keeps no historical anchor.
+			const retiredCustody = objectCensus.control !== undefined && objectCensus.control !== null &&
+				!issuanceRetirementAllows(objectCensus.control, scope, row.authorSequence, row.canonicalPreimageBytes, row.digest);
 			// A verified detached source capsule owns its historical anchor/ACL/ABI
 			// in the charged native plan. It does not consume an old live generation.
-			if (!separateSourceAnchor && !terminallyCovered && classified.sourceContract === undefined) {
+			if (!separateSourceAnchor && !terminallyCovered && !retiredCustody && classified.sourceContract === undefined) {
 				if (anchors.has(vertex.epoch) && anchors.get(vertex.epoch) !== vertex.anchor) return undefined;
 				anchors.set(vertex.epoch, vertex.anchor);
 			}
@@ -11468,7 +12501,26 @@ async function readCreatorRecoveryDependencyCensus(
 			// source rows as displaced forever. This does not prune anything: the
 			// complete native preimages remain held and charged; the retirement
 			// owner still checks replay consumers and its native protected holes.
-			rows.push(creatorIssuanceCensusFields(terminallyCovered ? "authenticated-covered-native-issuance" : dependencyKind,
+			// A replaced-source resolution (design (b)) releases this exact source: its frontier receipt was
+			// authenticated at preparation; a committed-replacement resolution is proven here, on every install,
+			// by the same link step the lost-twice chain walk uses. Anything else refuses.
+			const release = scope.author === registration.issuanceScope.author
+				? inheritancePlan?.entries.find(value => value.sourceSequence === row.authorSequence && value.sourceResolutionScope !== undefined)
+				: undefined;
+			if (release !== undefined) {
+				const plan = inheritancePlan === null ? undefined : copySettlementPlan(inheritancePlan, scope);
+				const live = observation.liveRegistration;
+				if (!sameBytes(release.sourceDigest, row.digest) || (classified.kind !== "displaced" && classified.kind !== "covered-historical") ||
+					release.sourceResolutionKind === "replacement" && (plan === undefined || live === undefined ||
+						!replacementCommittedResolution(registration, plan, plan.entries.find(value => value.sourceSequence === row.authorSequence)!,
+							proveReplacementLink(live.payload, registration, ObjectFreeze({ ...classified, row }),
+								plan.entries.find(value => value.sourceSequence === row.authorSequence)!, plan, replacementChunkClaims(plan),
+								nativeRows.issued, vertexFacts)))) {
+					observation.stage = `replaced-source-release:${row.authorSequence}`; return undefined;
+				}
+			}
+			rows.push(creatorIssuanceCensusFields(terminallyCovered ? "authenticated-covered-native-issuance"
+				: release !== undefined ? "source-replaced-release" : dependencyKind,
 				scope, row.authorSequence, row.digest, terminallyCovered ? "covered-historical" : classified.kind));
 		}
 		if (page.length < 64) break;
@@ -11605,11 +12657,8 @@ async function readCreatorRecoveryDependencyCensus(
 			observation.stage = `settlement-plan-eligibility:${Number(activeObservation)}:${Number(plan?.fenceSequence !== null)}:${Number(plan !== undefined && settlementPlanPermitsAuthenticatedPruning(plan))}`;
 			return undefined;
 		}
-		if (
-			activeSource !== undefined &&
-			scope.author === activeSource.row.scope.author &&
-			settlementProfileFor(currentTrust.profileId) === "v1"
-		) {
+		for (const activeSource of activeSources) {
+			if (scope.author !== activeSource.row.scope.author || settlementProfileFor(currentTrust.profileId) !== "v1") continue;
 			const entry = plan?.entries.find((row) => row.sourceSequence === activeSource.row.authorSequence);
 			if (
 				entry === undefined ||
@@ -11728,14 +12777,21 @@ async function readCreatorRecoveryDependencyCensus(
 						: creatorRuntimeActiveCensusFields({
 								pendingRoots,
 								wireByteCharge,
-								...(activeSource === undefined
+								...(activeSources.length === 0
 									? {}
-									: {
-											activeSource: {
-												sourceSequence: activeSource.row.authorSequence,
-												sourceDigest: activeSource.row.digest,
-											},
-										}),
+									: activeSources.length === 1
+										? {
+												activeSource: {
+													sourceSequence: activeSources[0]!.row.authorSequence,
+													sourceDigest: activeSources[0]!.row.digest,
+												},
+											}
+										: {
+												activeBatch: activeSources.map((source) => ({
+													sourceSequence: source.row.authorSequence,
+													sourceDigest: source.row.digest,
+												})),
+											}),
 								unsettledSources,
 								cursor: rebaseCursor ?? null,
 								cacheSourceSequences: rebaseSnapshot?.map((row) => row.row.authorSequence) ?? [],
@@ -12009,7 +13065,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		parameters: ObjectFreeze({...registration.payload.parameters}),
 		blueprint: ObjectFreeze({blueprintDigest: base.blueprintDigest, baseStateDigest: base.stateDigest,
 			exactCanonicalBaseStateBytes: new Uint8ArrayConstructor(base.exactCanonicalStateBytes),
-			maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes, maxDepth: 16 as const, maxItems: 16384 as const,
+			maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes, maxDepth: 16 as const, maxItems: 16384 as const,
 			catalog: ObjectFreeze({artifactId: catalog.artifactId, artifactDigest: catalog.artifactDigest, catalogDigest: catalog.catalogDigest,
 				runtimeProfile: catalog.runtimeProfile, exactArtifactBytes: new Uint8ArrayConstructor(catalog.exactArtifactBytes),
 				canonicalBlueprintPackageBytes: new Uint8ArrayConstructor(catalog.canonicalBlueprintPackageBytes)})}),
@@ -12171,7 +13227,13 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 	// the request itself discharges no halt and authorizes no new selection.
 	// The trusted close owner below must reach terminal native verification,
 	// and every admitted hold/release must join before the gate can reopen.
-	const recoveryRequestMatches = (): boolean => resumeControl !== undefined &&
+	// A turnover receipt with no resumable native control is the same request: the
+	// snapshot pool turned over before the native store recorded that turnover's
+	// intent (a death in between), so a durable reopen halts on the receipt alone.
+	// The close resumes it (creatorCloseRetirementResumeRequired); this boundary
+	// must too, or the reopened owner can never prepare readiness. It is
+	// discharged only by the same original reconstruction completing.
+	const recoveryRequestMatches = (): boolean => (resumeControl === undefined ? reconstruction !== undefined :
 		resumeControl.objectId === payload.provenance.objectId &&
 		(resumeControl.active !== null
 			? resumeControl.active.preparation?.head.kind === "present" &&
@@ -12180,10 +13242,11 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 				resumeControl.active.preparation.floorEpoch + 1 === epoch && resumeControl.nominee == null
 			: resumeControl.completed !== null &&
 				(resumeControl.completed.domains !== undefined || registration.roomRetentionResumeControl === resumeControl) &&
-				resumeControl.completed.throughEpoch + 1 === epoch) &&
+				resumeControl.completed.throughEpoch + 1 === epoch)) &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
-	const recoveryResume = registration.operationAdmissionHalted && recoveryRequestMatches() ? resumeControl : undefined;
+	const recoveryResume = registration.operationAdmissionHalted && recoveryRequestMatches()
+		? resumeControl ?? reconstruction : undefined;
 	const admissionStateCurrent = (): boolean => registration.retirementResumeControl === resumeControl &&
 		registration.retirementReconstruction === reconstruction && (recoveryResume === undefined
 			? !registration.operationAdmissionHalted
@@ -12436,7 +13499,7 @@ function sealCreatorOrdinaryIssuanceRuntime(registration: V3PlaneRegistration, c
 async function sealCreatorRecoveryDependencies(
 	registration: V3PlaneRegistration,
 	required = false,
-	activeSource?: ClassifiedRebaseRow,
+	activeSource?: ClassifiedRebaseRow | readonly ClassifiedRebaseRow[],
 	closePlane: V3PlaneHandle = registration.handle,
 	observation?: "issuance-preview" | "received-replacement" | "received-append",
 	received?: Readonly<{ signing: CreatorSigningRecoveryOwner; completeRetirement(observation: object): Promise<void> }>,
@@ -12458,7 +13521,7 @@ async function sealCreatorRecoveryDependencies(
 		registration.terminalPublicationEntered;
 	let stage = "live";
 	const unavailable = (): undefined => {
-		if (required) throw new TypeError(`creator recovery dependency hold unavailable:${stage}`);
+		if (required) throw new CreatorRecoveryHoldUnavailable(`creator recovery dependency hold unavailable:${stage}`);
 		return undefined;
 	};
 	if (quiescentBoundary !== undefined && (activeObservation || received !== undefined || !quiescentBoundary.available()))
@@ -12507,8 +13570,10 @@ async function sealCreatorRecoveryDependencies(
 				}
 			: {}),
 	};
+	let completeCensusReads = 0;
 	const captureCensus = async (heldIssuance?: CreatorHeldIssuanceCensusRead,
 		capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
+		completeCensusReads += 1;
 		try {
 			const result = await readCreatorRecoveryDependencyCensus(registration, censusObservation, heldIssuance, capturedInputs);
 			if (result === undefined) return undefined;
@@ -12585,8 +13650,14 @@ async function sealCreatorRecoveryDependencies(
 	};
 	const census = (capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
 		const held = issuanceRead;
-		return held === undefined ? captureCensus() : held.read(() => captureCensus(held, capturedInputs));
+		return held === undefined ? captureCensus(undefined, capturedInputs) : held.read(() => captureCensus(held, capturedInputs));
 	};
+	const emptyCensusInputs = (): CreatorRecoveryCensusInputCapture =>
+		({pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false});
+	// The hold's own unchanged-census cell (see prepareCreatorUnchangedHeldCensusRead without a lease):
+	// it outlives the hold's issuance leases and serves its unheld checks, always by actual complete reads.
+	let unchangedCensusBytes: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
+	let unchangedCensusInputs: CreatorRecoveryCensusInputCapture | undefined;
 	try {
 		if (migrationSource !== undefined)
 			sourceDependencies = await acquireCreatorDisplacedSourceDependencies(
@@ -12599,12 +13670,19 @@ async function sealCreatorRecoveryDependencies(
 				nativeBranchSource,
 				registration.issuanceStore
 			);
-		const sealed = await census();
-		if (sealed === undefined) return unavailable();
-		let mayPrepareUnchanged = sourceDependencies === undefined && activeSource === undefined &&
+		const censusBytesEligible = sourceDependencies === undefined && activeSource === undefined &&
 			runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
+		const sealInputs = censusBytesEligible ? emptyCensusInputs() : undefined;
+		const sealed = await census(sealInputs);
+		if (sealed === undefined) return unavailable();
+		if (sealInputs !== undefined) {
+			unchangedCensusInputs = sealInputs;
+			unchangedCensusBytes = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, sealInputs, undefined);
+		}
+		let mayPrepareUnchanged = censusBytesEligible;
 		let unchangedHeldCensus: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
 		const capability = ObjectFreeze({});
+		recoveryCloseHoldCensusReads.set(capability, () => completeCensusReads);
 		recoveryCloseHolds.set(capability, {
 			kind: "full-census",
 			...(ownedReceivedAppend === undefined ? {} : {receivedAppend: ownedReceivedAppend}),
@@ -12638,25 +13716,56 @@ async function sealCreatorRecoveryDependencies(
 				const held = issuanceRead;
 				const journalAtStart = journalCurrent;
 				const fast = unchangedHeldCensus;
-				// First check AFTER native enrollment is always the original full
-				// held walk, not the pre-enrollment seal. Only its exact input view can
-				// initialize reuse. Never carry a view into another lease/reopen.
-				const capturedInputs = mayPrepareUnchanged && held !== undefined && unchangedHeldCensus === undefined
-					? {pages: [], applicationPolicyRead: false, retainedBytes: 0, overCapacity: false} : undefined;
-				const reopened = fast !== undefined && held !== undefined
-					? await held.read(async () => {
+				const bytes = unchangedCensusBytes;
+				// The first check of a lease establishes that lease's currency cell from a
+				// complete read in the lease: the complete census, or the hold's cell (an
+				// actual complete native and page read whose inputs equal the classified
+				// ones). Never carry a lease's probe into another lease/reopen.
+				const capturedInputs = censusBytesEligible || mayPrepareUnchanged && held !== undefined && unchangedHeldCensus === undefined
+					? emptyCensusInputs() : undefined;
+				let leaseInputs: CreatorRecoveryCensusInputCapture | undefined;
+				let complete = false;
+				const crossCheckReuse = async (heldRead: CreatorHeldIssuanceCensusRead | undefined): Promise<void> => {
+					const fresh = await captureCensus(heldRead);
+					if (fresh === undefined || !sameBytes(fresh, sealed))
+						throw new TypeError("creator recovery census reuse diverged from a complete census");
+				};
+				let reopened: Uint8Array | undefined;
+				if (fast !== undefined && held !== undefined)
+					reopened = await held.read(async () => {
 						const unchanged = await fast(held);
+						if (unchanged === true && censusReuseDebug()) await crossCheckReuse(held);
 						return unchanged === undefined ? captureCensus(held) : unchanged ? sealed : undefined;
-					})
-					: await census(capturedInputs);
+					});
+				else if (bytes !== undefined) {
+					const classified = unchangedCensusInputs;
+					const probe: {nativeCurrent?: CreatorRecoveryCensusInputCapture["nativeCurrent"]} | undefined =
+						held !== undefined && mayPrepareUnchanged && unchangedHeldCensus === undefined ? {} : undefined;
+					const reuse = async (): Promise<Uint8Array | undefined> => {
+						const unchanged = await bytes(held, probe);
+						if (unchanged === undefined) { complete = true; return captureCensus(held, capturedInputs); }
+						if (unchanged && censusReuseDebug()) await crossCheckReuse(held);
+						if (unchanged && probe?.nativeCurrent !== undefined && classified !== undefined)
+							leaseInputs = {...emptyCensusInputs(), pages: classified.pages, retainedBytes: classified.retainedBytes, nativeCurrent: probe.nativeCurrent};
+						return unchanged ? sealed : undefined;
+					};
+					reopened = held === undefined ? await reuse() : await held.read(reuse);
+				} else { complete = true; reopened = await census(capturedInputs); }
 				if (reopened === undefined || !sameBytes(sealed, reopened))
 					throw new TypeError("creator recovery dependency census is stale or unclassified");
-				if (capturedInputs !== undefined && held !== undefined) {
+				// A complete census (re)classifies the hold's cell from the exact inputs it read.
+				if (complete && censusBytesEligible && capturedInputs !== undefined && capturedInputs.pages.length !== 0) {
+					const {nativeCurrent: _leaseProbe, ...view} = capturedInputs;
+					unchangedCensusInputs = view;
+					unchangedCensusBytes = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, unchangedCensusInputs, undefined);
+				}
+				const leaseView = leaseInputs ?? (complete ? capturedInputs : undefined);
+				if (leaseView !== undefined && held !== undefined && mayPrepareUnchanged && unchangedHeldCensus === undefined) {
 					mayPrepareUnchanged = false;
-					unchangedHeldCensus = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, capturedInputs, held,
+					unchangedHeldCensus = prepareCreatorUnchangedHeldCensusRead(registration, runtime, replay, sealed, live, leaseView, held,
 						readJournalCurrent);
 				}
-				// Enrollment itself never skips validation. This exact check must
+				// Enrollment itself never skips the reads. This exact check must
 				// first complete the original replay read/equality inside the same
 				// issuance/native journal holds; only subsequent checks may use its
 				// nominal native currency port plus the retained graph guards.
@@ -12678,9 +13787,13 @@ async function sealCreatorRecoveryDependencies(
 				const facts = fullRecoveryCloseHoldFacts(capability);
 				if (facts === undefined || facts.releasing || issuanceRead !== undefined || !live())
 					throw new TypeError("creator held issuance census is unavailable");
-				// Releasing an OLD hold permanently revokes its fast cell. A NEW
+				// Releasing an OLD lease permanently revokes its currency cell. A NEW
 				// genuine enrollment may prepare a NEW cell, but only AFTER its first
-				// complete actual census check below succeeds under this new hold.
+				// check succeeds under this new lease with an actual complete read: the
+				// complete census, or the hold's cell (a complete native census read and
+				// a read of every classified page in this lease, plus the replay
+				// verification, all byte-identical to the classified inputs). Its probe
+				// is captured on that read, so a lease's probe never crosses leases.
 				unchangedHeldCensus = undefined;
 				mayPrepareUnchanged = sourceDependencies === undefined && activeSource === undefined &&
 					runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
@@ -12768,18 +13881,21 @@ async function sealCreatorRecoveryDependencies(
 /** The original queue admits a bounded read turn; native views end before settlement writes. */
 async function withActiveRebaseDependencies(
 	registration: V3PlaneRegistration,
-	selected: ClassifiedRebaseRow | undefined,
+	selected: ClassifiedRebaseRow | readonly ClassifiedRebaseRow[] | undefined,
 	consume: (read: CreatorSnapshotRecoveryCloseDependencyRead, proofByteCharge: number) => Promise<void>,
 	ownedIssueCustody?: LocalReplacementCustody,
 	additionalProtectedBytes: readonly Uint8Array[] = []
 ): Promise<void> {
 	if (typeof consume !== "function") throw new TypeError("active dependency consumer is invalid");
+	v3SettlementWorkCounts.dependencyTurns += 1;
 	const reservations: NativeReadReservation[] = [];
 	let reader: AheBoundedActiveRead | undefined;
 	let lifetime: CreatorSnapshotRecoveryCloseLifetime | undefined;
 	let child: CreatorSnapshotRecoveryCloseDependencyRead | undefined;
 	let failed = false,
 		primary: unknown;
+	let issuanceReservationIndex: number | undefined;
+	let turnHold: CreatorSnapshotRecoveryCloseHold | undefined;
 	try {
 		if (!currentRegistration(registration)) throw new TypeError("active dependency owner is stale");
 		for (const owner of [registration.payload.input.store, registration.liveJournalStore, registration.issuanceStore]) {
@@ -12789,6 +13905,7 @@ async function withActiveRebaseDependencies(
 			}
 			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
 			if (typeof acquire !== "function") throw new TypeError("active native dependency exclusion is unsupported");
+			if (owner === registration.issuanceStore) issuanceReservationIndex = reservations.length;
 			reservations.push(
 				(await ReflectApply(acquire, owner, [
 					{ objectId: registration.payload.provenance.objectId },
@@ -12822,6 +13939,27 @@ async function withActiveRebaseDependencies(
 			currentTrust: registration.payload.trust.trust,
 		});
 		if (lifetime === undefined) throw new TypeError("active dependency custody is unavailable");
+		turnHold = hold;
+		// The turn's own issuance reservation becomes the hold's held issuance read, so the hold's
+		// checks in this turn may use the unchanged-held census (prepareCreatorUnchangedHeldCensusRead).
+		// Safety: this reservation is the issuance store's native write exclusion; it was acquired
+		// before the seal and is released only after the child, the lifetime and the reader are
+		// released below, so it is held for every check of this turn and no writer can change the
+		// issuance store between them. The first check after enrollment stays the complete held walk
+		// (it alone initializes reuse), every later check still verifies the native current probe,
+		// replay, context and graph bindings, and any input the reuse does not bind (an active source,
+		// source or migration dependencies, pending ingress, a rebase snapshot) keeps the complete read.
+		// Enrollment is optional reuse: a hold that refuses it keeps the original reservation.
+		if (issuanceReservationIndex !== undefined) {
+			const original = reservations[issuanceReservationIndex]!;
+			let enrolled: NativeReadReservation | undefined;
+			try {
+				enrolled = hold === undefined ? undefined : fullRecoveryCloseHoldFacts(hold)?.ownIssuanceReservation?.(original);
+			} catch {
+				enrolled = undefined;
+			}
+			if (enrolled !== undefined) reservations[issuanceReservationIndex] = enrolled;
+		}
 		child = await lifetime.borrowDependencies();
 		// This owner authenticates already-admitted historical settlement work,
 		// not a new ordinary operation. Use its existing maintenance entitlement;
@@ -12878,6 +14016,14 @@ async function withActiveRebaseDependencies(
 	} catch (error) {
 		failed = true;
 		primary = error;
+	}
+	const turnCensusReads = turnHold === undefined ? undefined : recoveryCloseHoldCensusReads.get(turnHold)?.();
+	if (turnCensusReads !== undefined) {
+		v3SettlementWorkCounts.dependencyTurnCensusReads += turnCensusReads;
+		v3SettlementWorkCounts.maxDependencyTurnCensusReads = Math.max(
+			v3SettlementWorkCounts.maxDependencyTurnCensusReads,
+			turnCensusReads
+		);
 	}
 	const heldChild = child,
 		heldLifetime = lifetime,
@@ -13038,8 +14184,13 @@ function classifyPlaneVertex(
 				);
 	if (matches(pinned)) return ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
 	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance, undefined, vertexFacts);
-	return matches(historical)
-		? ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const })
+	if (matches(historical)) return ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const });
+	// A removed author's own row admitted before its removal: the creator's signed admitted sequence
+	// from its last install as a member (persisted once at the removing close) covers it.
+	const settled = historicalIssuance?.memberFrontier === undefined ? undefined :
+		authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance, "member-frontier", vertexFacts);
+	return matches(settled)
+		? ObjectFreeze({ authenticated: settled, kind: "covered-historical" as const, terminal: true as const })
 		: undefined;
 }
 
@@ -13185,8 +14336,23 @@ function previewCreatorOrdinarySuccessorSettlement(input: Readonly<{
 	if (plan.revision !== (priorPlan === null ? 0 : priorPlan.revision + (priorPlan.fenceSequence === null ? 0 : 1)) ||
 		!sameBytes(encodeCanonical(plan.entries), encodeCanonical(priorPlan?.entries ?? [])))
 		throw new TypeError("prospective successor settlement plan differs from original merge");
-	const previewBytes = encodeCanonical(readout);
-	return ObjectFreeze({plan, checkPreview: () => sameBytes(encodeCanonical(preview(previewInput)), previewBytes)});
+	// The successor census charges the fence's clock over its whole domain (never this
+	// readout's value), so only the plan is sizing input. The room clock may advance after
+	// this quote: a creator move takes the next logical time as it passes the barriers, even
+	// one an adoption then holds. A re-read plan must be the same; its clock only stays valid.
+	try {
+		// Diagnostic observer only: the previewed successor fence clock, never sizing or authority.
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({kind: "successor-settlement-preview", author: scope.author, successorEpoch: epoch + 1,
+				fenceLogicalTime: readout.fenceLogicalTime});
+	} catch { /* Observation cannot alter the preview. */ }
+	const planBytes = encodeCanonical(readout.plan);
+	return ObjectFreeze({plan, checkPreview: () => {
+		const current = preview(previewInput);
+		return sameBytes(encodeCanonical(current.plan), planBytes) &&
+			NumberIsSafeInteger(current.fenceLogicalTime) && current.fenceLogicalTime >= lastTime + 2;
+	}});
 }
 
 function settlementOwnRowClass(
@@ -13200,6 +14366,314 @@ function settlementOwnRowClass(
 	if (epoch < admissionEpoch) return "old-incarnation";
 	if (epoch < currentEpoch) return "displaced";
 	return "current";
+}
+
+/**
+ * The own-row settlement window, in epochs. A displaced own row (its epoch is closed and its sequence
+ * is above the creator-signed terminalThrough) is in no closed Cut: the frontier is contiguous
+ * (deriveCreatorAuthorSettlementFrontier; an author's admitted slots are causally closed) and
+ * monotone, and ingress admits only the current epoch's anchor, so the row can never enter history.
+ * A Writer whose settlements never reach the creator would otherwise retain every such row, and the
+ * journal scopes protecting them, until a fence of its is delivered: one more protected scope per
+ * epoch until the retirement preparation refuses (AHE_BOUNDED_READ_LIMITS.maxObjectGenerations = 7
+ * scopes, at the eighth unsettled epoch). Past this depth the Writer resolves such a row as expired
+ * on the creator's signed exclusion. Four is the age at which a connected Writer collects its own
+ * rows: the retirement's recovery trusts reach back current - 4, and a deeper window leaves a
+ * collected scope outside them (measured: depth 5 refuses "chain-invalid").
+ */
+export const V3_SETTLEMENT_OWN_WINDOW_EPOCHS = 4;
+function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boolean {
+	return NumberIsSafeInteger(epoch) && NumberIsSafeInteger(currentEpoch) &&
+		epoch <= currentEpoch - V3_SETTLEMENT_OWN_WINDOW_EPOCHS;
+}
+
+/**
+ * The source authorities a successor plane keeps from its live predecessor: the predecessor's displaced
+ * source and those it kept itself, the same authenticated objects (prepared payload and ACL), nothing
+ * reauthorized. Rule R defers an install's replacements while the creator's next offer is queued, so a
+ * displaced row of epoch E-1 is replaced by the install to E+1 or later, whose displaced source is E:
+ * without these, the authority of E-1 left with the predecessor registration. Only this object's own
+ * earlier epochs of the same genesis, before the predecessor's epoch (a migration source or a native
+ * branch has its own owners), and only inside the own-row settlement window: a row at or past it expires
+ * and its move is given back, so it is never replaced (at most V3_SETTLEMENT_OWN_WINDOW_EPOCHS - 2 kept).
+ * @param predecessor - The live predecessor registration (the transport handoff).
+ * @param successorEpoch - The successor plane's epoch.
+ * @returns The kept authorities, newest first.
+ */
+function keptDisplacedSources(
+	predecessor: Pick<V3PlaneRegistration, "payload" | "displacedSource" | "olderDisplacedSources">,
+	successorEpoch: number
+): readonly V3DisplacedSourceAuthority[] {
+	const provenance = predecessor.payload.provenance;
+	const kept: V3DisplacedSourceAuthority[] = [];
+	for (const source of [predecessor.displacedSource, ...(predecessor.olderDisplacedSources ?? [])]) {
+		if (
+			source === undefined ||
+			source.activationVertexDigest !== undefined ||
+			source.migrationTarget !== undefined ||
+			source.prepared.provenance.objectId !== provenance.objectId ||
+			source.prepared.provenance.blueprintDigest !== provenance.blueprintDigest ||
+			source.prepared.trust.trust.genesisAnchorDigest !== predecessor.payload.trust.trust.genesisAnchorDigest ||
+			!NumberIsSafeInteger(source.prepared.provenance.epoch) ||
+			source.prepared.provenance.epoch >= provenance.epoch ||
+			settlementOwnRowWindowExpired(source.prepared.provenance.epoch, successorEpoch) ||
+			kept.some((other) => other.prepared.provenance.epoch === source.prepared.provenance.epoch)
+		)
+			continue;
+		kept.push(
+			ObjectFreeze({
+				authorization: source.authorization,
+				pinnedGenesisAnchorDigest: source.pinnedGenesisAnchorDigest,
+				prepared: source.prepared,
+			})
+		);
+	}
+	return ObjectFreeze(kept);
+}
+
+/**
+ * The displaced-source authority of a displaced own row, selected by the row's own signed epoch and
+ * anchor: the plane's displaced source (the epoch it closed), or an authority it kept for an earlier
+ * epoch (keptDisplacedSources). Otherwise the displaced source, which the caller's own epoch/anchor
+ * check refuses exactly as before.
+ * @param registration - The plane.
+ * @param admitted - The row's signed epoch and anchor.
+ * @returns The authority, or undefined when the plane has no displaced source.
+ */
+function displacedSourceFor(
+	registration: Pick<V3PlaneRegistration, "displacedSource" | "olderDisplacedSources">,
+	admitted: Readonly<{ epoch: number; anchor: string }>
+): V3DisplacedSourceAuthority | undefined {
+	const source = registration.displacedSource;
+	const matches = (candidate: V3DisplacedSourceAuthority): boolean =>
+		candidate.prepared.provenance.epoch === admitted.epoch && candidate.prepared.provenance.anchorDigest === admitted.anchor;
+	if (source === undefined || matches(source)) return source;
+	return registration.olderDisplacedSources?.find(matches) ?? source;
+}
+
+/**
+ * The lowest own author fence (fenceSequence = its own sequence) of each epoch among the author's
+ * retained own rows. A local issue's dependencies are the plane's tips, so an author's admitted rows
+ * of one epoch are causally closed: when the author's fence of an epoch precedes a row of that epoch
+ * and the row was admitted, so were the fence and every row between, and the creator's frontier
+ * (boundary fence - 1, then contiguous slots) reaches the row. A displaced row so guarded was never
+ * admitted. A row with no such fence (the fence was withheld) may sit above a gap: its displaced
+ * class then proves nothing, and the settlement window never expires it.
+ * @param store - The author's original issuance store.
+ * @param scope - The author's own scope.
+ * @returns Epoch to lowest fence sequence.
+ */
+async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueScope): Promise<ReadonlyMap<number, number>> {
+	return (await scanOwnFences(store, scope)).lowest;
+}
+
+/** ownEpochFences for one read walk: the same (store, scope) is scanned once and every row of the walk
+ * reads that scan, as the walk's own windowFences. Lives only as long as the walk that created it. */
+type OwnEpochFenceReader = (store: DurableIssuanceStore, scope: DurableIssueScope) => Promise<ReadonlyMap<number, number>>;
+/** One classification's settled-source reads (its `walk` token) share one own-fence scan per
+ * (store, scope), as a census read walk's rows do: without it every settled local source the
+ * classification reads rescans the author's whole outbox. */
+const settledSourceWalkReaders = new WeakMap<object, OwnEpochFenceReader>();
+function settledSourceWalkFences(walk: object): OwnEpochFenceReader {
+	let reader = settledSourceWalkReaders.get(walk);
+	if (reader === undefined) settledSourceWalkReaders.set(walk, reader = createOwnEpochFenceReader());
+	return reader;
+}
+function createOwnEpochFenceReader(): OwnEpochFenceReader {
+	const scans = new Map<DurableIssuanceStore, Map<string, Promise<ReadonlyMap<number, number>>>>();
+	return (store, scope) => {
+		let byScope = scans.get(store);
+		if (byScope === undefined) scans.set(store, byScope = new Map());
+		const key = `${scope.author}\u0000${scope.objectId}`;
+		let scan = byScope.get(key);
+		if (scan === undefined) byScope.set(key, scan = ownEpochFences(store, scope));
+		return scan;
+	};
+}
+
+/**
+ * A stored own fence row that does not authenticate as this author's own signed vertex (G5: durable
+ * store bytes are carriers, not authenticity). Closed reasons: "signature" (the exact preimage does not
+ * verify under the author's key, or is not a well-formed fence vertex), "digest" (the stored digest is
+ * not the preimage's registered digest) and "identity" (the preimage names another object, author or
+ * sequence than the row it is stored as). Terminal for the scan: no settlement decision is made on it.
+ */
+export class V3OwnFenceUnauthenticated extends TypeError {
+	readonly code = "V3_OWN_FENCE_UNAUTHENTICATED";
+	constructor(
+		readonly author: string,
+		readonly authorSequence: number,
+		readonly reason: "signature" | "digest" | "identity"
+	) {
+		super(`V3_OWN_FENCE_UNAUTHENTICATED: own fence row ${authorSequence} does not authenticate (${reason})`);
+		this.name = "V3OwnFenceUnauthenticated";
+	}
+}
+
+/**
+ * Authenticates one stored own fence row before the scan reports it: its exact preimage verifies under
+ * the author's own key (verifyReceivedVertex: registered digest, Ed25519 through the exact-bytes verify
+ * memo, well-formed fence operation), the stored digest is that registered digest, and the preimage
+ * names the row's own object, author and sequence. Authenticity only: whether the fence was admitted is
+ * the creator's frontier's to say.
+ * @param row - The shape-checked outbox row.
+ * @param preimage - Its decoded preimage.
+ * @param scope - The author's own scope.
+ */
+function authenticateOwnFenceRow(row: SnapshottedOutboxRow, preimage: Readonly<Record<string, unknown>>,
+	scope: DurableIssueScope): void {
+	v3SettlementWorkCounts.ownFenceAuthentications += 1;
+	if (preimage.objectId !== scope.objectId || preimage.author !== scope.author || preimage.authorSequence !== row.authorSequence)
+		throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "identity");
+	const anchor = preimage.anchor;
+	const key = publicKeyBytes(scope.author);
+	const verified = typeof anchor !== "string" || key === undefined || typeof V3_VERTEX_SUITE_ID !== "string" ? undefined :
+		verifyReceivedVertex({domain: V3_VERTEX_DOMAIN, expectedAnchor: anchor, receivedCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			signature: row.signature, suiteId: V3_VERTEX_SUITE_ID,
+			resolveAuthorPublicKey: candidate => candidate === scope.author ? ObjectFreeze({bytes: key, format: "raw" as const}) : undefined});
+	if (verified?.accepted !== true || verified.digest === undefined)
+		throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "signature");
+	if (!sameBytes(verified.digest, row.digest)) throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "digest");
+}
+
+/**
+ * The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. Every
+ * fence row it reports is authenticated first (authenticateOwnFenceRow); one that does not authenticate
+ * ends the scan with V3OwnFenceUnauthenticated, so no guard, expiry, hand-back, frontier resolution or
+ * pruning decision rests on unauthenticated store bytes, whatever the caller or call order.
+ * Internal: exported for the native authentication tests.
+ */
+export async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
+	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined; highestEpoch: number | undefined }>> {
+	v3SettlementWorkCounts.ownFenceScans += 1;
+	const fences = new Map<number, number>();
+	let highest: number | undefined;
+	let highestEpoch: number | undefined;
+	let afterKey: readonly [string, string, number] | undefined;
+	for (let pages = 0; pages < 256; pages++) {
+		const page = captureOutboxPage(
+			await store.readOutboxPage(afterKey === undefined ? { limit: 64, scope } : { afterKey, limit: 64, scope }),
+			64
+		);
+		if (page === undefined) throw new TypeError("own fence scan page is invalid");
+		if (page.length === 0) return ObjectFreeze({ lowest: fences, highest, highestEpoch });
+		for (let index = 0; index < page.length; index++) {
+			const row = outboxRowSnapshot(page.read(index), scope);
+			if (row === undefined) throw new TypeError("own fence scan row is invalid");
+			afterKey = ObjectFreeze([scope.objectId, scope.author, row.authorSequence] as const);
+			const preimage = decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>;
+			const operation = preimage.operation;
+			const epoch = preimage.epoch;
+			const fenceRow = isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION;
+			if (fenceRow) authenticateOwnFenceRow(row, preimage, scope);
+			// Any own fence row (whatever its fenceSequence) bounds what contiguity can prove.
+			if (fenceRow && (highest === undefined || row.authorSequence > highest)) {
+				highest = row.authorSequence;
+				highestEpoch = typeof epoch === "number" && NumberIsSafeInteger(epoch) ? epoch : undefined;
+			}
+			if (!isObject(operation) || Reflect.get(operation, "action") !== AUTHOR_FENCE_ACTION ||
+				Reflect.get(operation, "version") !== 1 || Reflect.get(operation, "fenceSequence") !== row.authorSequence ||
+				typeof epoch !== "number" || !NumberIsSafeInteger(epoch)) continue;
+			const prior = fences.get(epoch);
+			if (prior === undefined || row.authorSequence < prior) fences.set(epoch, row.authorSequence);
+		}
+	}
+	throw new TypeError("own fence scan is unbounded");
+}
+
+/** A displaced own row provably never admitted (see ownEpochFences): the lowest unsettled sequence,
+ * or preceded by its own epoch's fence. */
+function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch: number, sequence: number,
+	terminalThrough: number | null): boolean {
+	const fence = fences.get(epoch);
+	return sequence === (terminalThrough ?? -1) + 1 || (fence !== undefined && fence <= sequence);
+}
+
+/**
+ * What the creator's signed settlement frontier (in the installed checkpoint) proves about one own
+ * row retained as unknown accepted work by an install more than one epoch ahead. The row's epoch must
+ * be closed in that frontier.
+ * - "never-admitted": displaced and fence-guarded (see ownEpochFences): it is in no closed Cut and
+ *   ingress admits only the current anchor, so it can never enter history; its move may be offered
+ *   again exactly once.
+ * - "committed": within terminalThrough while no own fence follows it: the frontier reached it only
+ *   through contiguous admitted slots (a fence is the only other way to the boundary), so it is in a
+ *   closed Cut. Or within terminalThrough and followed, in its own epoch, by the author's highest
+ *   fence row while that fence is within terminalThrough too: that fence was admitted (it is the
+ *   frontier's boundary or inside its contiguous run; no higher own fence can be the boundary), and
+ *   it follows the row in the row's epoch, so it depends on it (a local issue depends on the plane's
+ *   tips): its admission admitted the row (fence closure).
+ * Anything else (an old incarnation, a fence after it, an unguarded gap) proves nothing and stays
+ * manual-review.
+ * @param registration - The live plane whose installed history holds the frontier.
+ * @param sourceSequence - The retained row's author sequence.
+ * @param sourceEpoch - The retained row's own signed epoch.
+ * @returns The proven outcome, or undefined.
+ */
+async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number,
+	scan?: () => ReturnType<typeof scanOwnFences>):
+	Promise<"committed" | "never-admitted" | undefined> {
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	if (frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier) ||
+		!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
+	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
+		frontier.terminalThrough);
+	const fences = await (scan ?? (() => scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope)))();
+	if (rowClass === "displaced" && settlementOwnRowFenceGuarded(fences.lowest, sourceEpoch, sourceSequence, frontier.terminalThrough))
+		return "never-admitted";
+	if (rowClass === "terminal" && frontier.terminalThrough !== null && sourceSequence <= frontier.terminalThrough &&
+		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence ||
+			(fences.highest <= frontier.terminalThrough && fences.highestEpoch === sourceEpoch))) return "committed";
+	return undefined;
+}
+
+/**
+ * Why the creator's frontier proves nothing about a retained own row (frontierRetainedResolution
+ * returned undefined), and whether a later frontier still could.
+ * - "awaiting-frontier": no valid frontier for this author is installed, or the row's epoch is not
+ *   closed in it. A later install's frontier may prove the row, so the author fence stays withheld
+ *   (a fence admitted first would carry terminalThrough past the row and leave it unprovable).
+ * - "never": no frontier can ever prove it. An earlier incarnation's row (its epoch is before the
+ *   author's admission epoch, which only grows); a row within terminalThrough that an own fence of a
+ *   later epoch follows (terminalThrough and the author's fences only grow); or a displaced row no own
+ *   fence of its epoch precedes and that is not the lowest unsettled sequence (its epoch is closed, so
+ *   no fence of it can be signed now, and terminalThrough reaches it only through a later own fence).
+ *   A fence cannot make such a row less provable, so it does not withhold the author fence: it stays
+ *   manual-review for the user either way.
+ * - "provable": displaced and fence-guarded, so the frontier does prove it (never admitted), but its
+ *   resolution did not happen in this drain (for example, no hand-back record was free for it).
+ * @param frontier - The installed frontier for this author, if any is valid.
+ * @param sourceEpoch - The retained row's own signed epoch.
+ * @param sourceSequence - The retained row's author sequence.
+ * @param lowestFences - The author's lowest own fence sequence by epoch (scanOwnFences).
+ * @returns The classification.
+ */
+export function retainedRowUnprovenKind(frontier: SettlementFrontierContext | undefined, sourceEpoch: number,
+	sourceSequence: number, lowestFences: ReadonlyMap<number, number>): "awaiting-frontier" | "never" | "provable" {
+	if (frontier === undefined || !NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return "awaiting-frontier";
+	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
+		frontier.terminalThrough);
+	if (rowClass === "displaced")
+		return settlementOwnRowFenceGuarded(lowestFences, sourceEpoch, sourceSequence, frontier.terminalThrough) ? "provable" : "never";
+	return rowClass === "current" ? "awaiting-frontier" : "never";
+}
+
+async function frontierRetainedUnproven(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number,
+	scan: () => ReturnType<typeof scanOwnFences>): Promise<"awaiting-frontier" | "never" | "provable"> {
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	const valid = frontier !== undefined && validSettlementFrontierContext(registration.payload, frontier) ? frontier : undefined;
+	return retainedRowUnprovenKind(valid, sourceEpoch, sourceSequence, valid === undefined ? new IntrinsicMap() : (await scan()).lowest);
+}
+
+/** One own-fence scan per rebase snapshot (the scan the settlement window classifies against). */
+const rebaseSnapshotFenceScans = new WeakMap<object, Promise<ReadonlyMap<number, number>>>();
+function rebaseSnapshotFences(registration: V3PlaneRegistration, snapshot: object): Promise<ReadonlyMap<number, number>> {
+	let scan = rebaseSnapshotFenceScans.get(snapshot);
+	if (scan === undefined) {
+		scan = ownEpochFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+		rebaseSnapshotFenceScans.set(snapshot, scan);
+	}
+	return scan;
 }
 
 const settlementSourceByVertex = new WeakMap<EpochVertex, Readonly<Record<string, unknown>>>();
@@ -13299,12 +14773,12 @@ function authenticatedCoveredHistoricalOutboxRow(
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
 	historicalIssuance: HistoricalIssuanceContext | undefined,
-	coverage: "historical" | "closed" = "historical",
+	coverage: "historical" | "closed" | "member-frontier" = "historical",
 	vertexFacts?: CreatorCensusVertexFacts
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
 		if (
-			(coverage === "historical" && row.authorSequence === 0) ||
+			(coverage !== "closed" && row.authorSequence === 0) ||
 			historicalIssuance === undefined ||
 			V3_VERTEX_DOMAIN !== vertexRegistry.domain ||
 			typeof V3_VERTEX_SUITE_ID !== "string"
@@ -13312,10 +14786,12 @@ function authenticatedCoveredHistoricalOutboxRow(
 			return undefined;
 		}
 		const suiteId = V3_VERTEX_SUITE_ID;
-		const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+		const identity = coverage === "member-frontier"
+			? historicalIssuance.memberFrontier === undefined ? undefined : resolveCreatorMemberFrontier(historicalIssuance.memberFrontier)
+			: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
 		if (
 			identity === undefined ||
-			historicalIssuance.scopeAuthorMatches !== true ||
+			(coverage !== "member-frontier" && historicalIssuance.scopeAuthorMatches !== true) ||
 			identity.objectId !== issuanceScope.objectId ||
 			identity.author !== issuanceScope.author ||
 			identity.admittedAuthorSequence === null ||
@@ -13331,7 +14807,9 @@ function authenticatedCoveredHistoricalOutboxRow(
 			!isDigestHex(anchor) ||
 			!NumberIsSafeInteger(epoch) ||
 			(epoch as number) < 0 ||
-			(coverage === "historical"
+			(coverage === "member-frontier"
+				? epoch > identity.closedEpoch
+				: coverage === "historical"
 				? epoch >= identity.closedEpoch
 				: filterPayload.trust.trust.profileId !== "creator-trusted-v1" ||
 					identity.admissionEpoch !== undefined ||
@@ -13357,7 +14835,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 		});
 		if (
 			!extracted.ok ||
-			(coverage === "historical" && extracted.vertex.authorSequence === 0) ||
+			(coverage !== "closed" && extracted.vertex.authorSequence === 0) ||
 			extracted.vertex.anchor !== anchor ||
 			extracted.vertex.epoch !== epoch ||
 			extracted.vertex.objectId !== issuanceScope.objectId ||
@@ -13390,6 +14868,11 @@ function creatorFilteredIssuanceStore(
 	)
 		throw new TypeError("filtered issuance original owner is unavailable");
 	const acquireNativeReadReservation: unknown = Reflect.get(issuanceStore, "acquireNativeReadReservation");
+	// A call that fills its page reads past its last visible row and authenticates the
+	// filtered rows there. The very next call that continues from that visible row resumes
+	// after them instead of authenticating and reading their issued records again, so a scan
+	// reads each row once. Any other call discards the cursor; rows appended later are read.
+	let verifiedSkip: Readonly<{ after: number; resume: readonly [string, string, number] }> | undefined;
 	const filtered = ObjectFreeze({
 		...(typeof acquireNativeReadReservation !== "function"
 			? {}
@@ -13412,6 +14895,18 @@ function creatorFilteredIssuanceStore(
 			const vertexFacts = historicalIssuance?.vertexFacts;
 			const visible: DurableIssuanceOutboxRecord[] = [];
 			let afterKey = input?.afterKey;
+			const skip = verifiedSkip;
+			verifiedSkip = undefined;
+			if (
+				skip !== undefined &&
+				afterKey !== undefined &&
+				afterKey !== null &&
+				afterKey[0] === issuanceScope.objectId &&
+				afterKey[1] === issuanceScope.author &&
+				afterKey[2] === skip.after
+			)
+				afterKey = skip.resume;
+			let lastVisible: number | undefined;
 			for (;;) {
 				await checkpoint();
 				const nativePage = await issuanceStore.readOutboxPage({
@@ -13420,7 +14915,13 @@ function creatorFilteredIssuanceStore(
 					scope: issuanceScope,
 				});
 				const page = captureOutboxPage(nativePage, 64);
-				if (page === undefined || page.length === 0) return visible.length === 0 ? nativePage : ObjectFreeze(visible);
+				if (page === undefined || page.length === 0) {
+					if (visible.length === 0) return nativePage;
+					if (page !== undefined && lastVisible !== undefined && afterKey !== undefined && afterKey !== null &&
+						afterKey[2] > lastVisible)
+						verifiedSkip = ObjectFreeze({ after: lastVisible, resume: afterKey });
+					return ObjectFreeze(visible);
+				}
 				for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
 					await checkpoint();
 					const raw = page.read(pageIndex) as DurableIssuanceOutboxRecord;
@@ -13441,6 +14942,7 @@ function creatorFilteredIssuanceStore(
 						// which verifies their fresh plan/context and terminal consumers.
 						// A detached historical contract is not a signed-frontier filter.
 						visible.push(raw);
+						lastVisible = row.authorSequence;
 						afterKey = [issuanceScope.objectId, issuanceScope.author, row.authorSequence];
 						if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 						continue;
@@ -13525,6 +15027,7 @@ function creatorFilteredIssuanceStore(
 							(authenticatedGenesisRow !== undefined || authenticatedHistoricalRow !== undefined)
 						) {
 							visible.push(raw);
+							lastVisible = row.authorSequence;
 							afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 								string,
 								string,
@@ -13541,6 +15044,7 @@ function creatorFilteredIssuanceStore(
 						continue;
 					}
 					visible.push(raw);
+					lastVisible = row.authorSequence;
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
 						string,
@@ -14445,6 +15949,11 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 						continue;
 					}
 				}
+				if (classified?.terminal === true) {
+					// Settled before the author's removal (persisted last-member frontier): terminal history.
+					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+					continue;
+				}
 				if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
 					if (
 						!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
@@ -14839,6 +16348,10 @@ async function acquireLocalReplacementCustody(
 			if (owner === registration.liveJournalStore) journalReservation = reservation;
 			else reservations.push(reservation);
 		}
+		// Test seam, like the __warmProofEvent observer: a hook may hold this custody open while
+		// it holds the store's and the live journal's native read reservations. Unset in production.
+		const hold = Reflect.get(globalThis, "__replacementCustodyHold");
+		if (typeof hold === "function") await hold();
 		const floorReservation = await floor.acquireNativeReadReservation({ scope: floorScope });
 		reservations.push(floorReservation);
 		byOwner.set(floor, floorReservation);
@@ -15129,6 +16642,47 @@ function applicationBatchOperation(
 	});
 }
 
+/**
+ * The longest proper prefix of a refused batch of new moves that the room's application state check
+ * admits, judged as that prefix's own vertex would be (applicationStateAdmits, depending on every tip,
+ * so it sorts last), or 0 when not even the first move fits. Advisory for the split only: the prefix
+ * is then issued as its own vertex and judged again on its exact bytes before signing.
+ * @param registration - The current plane.
+ * @param operations - The refused batch's moves, in order.
+ * @returns The prefix length, from 0 to operations.length - 1.
+ */
+function applicationStateAdmittedPrefix(
+	registration: V3PlaneRegistration,
+	operations: readonly Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[]
+): number {
+	const dependencies = registration.index.tips();
+	for (let length = operations.length - 1; length >= 1; length -= 1) {
+		const operation =
+			length === 1 ? batchElement(operations, 0, "operation").operation : applicationBatchOperation(operations.slice(0, length));
+		let bytes: Uint8Array;
+		try {
+			bytes = encodeCanonical(operation, APPLICATION_BATCH_LIMITS);
+		} catch {
+			continue;
+		}
+		if (
+			applicationStateAdmits(
+				registration,
+				ObjectFreeze({
+					digest: bytesToLowerHex(hashDomain("ts-drp/v3-local-state-prefix-probe/v1", bytes)),
+					author: registration.issuanceScope.author,
+					dependencies,
+					operation,
+					byteCharge: bytes.byteLength,
+				}),
+				"local"
+			)
+		)
+			return length;
+	}
+	return 0;
+}
+
 function applicationBatchFits(operation: Readonly<Record<string, unknown>>): boolean {
 	try {
 		const bytes = encodeCanonical(operation, APPLICATION_BATCH_LIMITS);
@@ -15152,14 +16706,27 @@ function capturedLocalIssueInput(
 	}
 	let planEffect: NonNullable<DurableIssueCommit["planEffect"]> | undefined;
 	if (ObjectGetOwnPropertyDescriptor(input, "planEffect") !== undefined) {
-		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+		const handBack = snapshotClosedRecord(input.planEffect, ["intent", "kind", "sourceSequence"]);
+		const fence = handBack === undefined ? snapshotClosedRecord(input.planEffect, ["kind"]) : undefined;
 		const replacement =
 			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
 		const progressReplacement =
 			fence === undefined && replacement === undefined
 				? snapshotClosedRecord(input.planEffect, PROGRESS_REPLACEMENT_EFFECT_KEYS)
 				: undefined;
-		if (fence?.kind === "fence") {
+		if (
+			handBack?.kind === "hand-back" &&
+			NumberIsSafeInteger(handBack.sourceSequence) &&
+			(handBack.sourceSequence as number) >= 0 &&
+			NumberIsSafeInteger(handBack.intent) &&
+			(handBack.intent as number) >= 0
+		) {
+			planEffect = ObjectFreeze({
+				intent: handBack.intent as number,
+				kind: "hand-back" as const,
+				sourceSequence: handBack.sourceSequence as number,
+			});
+		} else if (fence?.kind === "fence") {
 			planEffect = ObjectFreeze({ kind: "fence" as const });
 		} else if (
 			replacement?.kind === "replacement" &&
@@ -15244,6 +16811,9 @@ function capturedLocalIssueInput(
 	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
 	}
+	if (planEffect?.kind === "hand-back" && operations.length !== 1) {
+		return localIssueFailure("malformed-input", "v3 local issue hand-back carries exactly its one operation");
+	}
 	if (
 		planEffect?.kind === "replacement" &&
 		"fromIntent" in planEffect &&
@@ -15256,6 +16826,28 @@ function capturedLocalIssueInput(
 		...(planEffect === undefined ? {} : { planEffect }),
 		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
 	});
+}
+
+/**
+ * Whether the creator's own close of `epoch` died before adopting: that close's
+ * snapshot scope (temporary or retained) is on disk at an epoch >= `epoch`. The
+ * one predicate for every creator reopen path (successor durable reopen and the
+ * genesis plane's close binding).
+ * @param store - The creator's native snapshot owner.
+ * @param objectId - The room.
+ * @param epoch - The reopened (current) epoch.
+ * @returns Whether an interrupted close scope is on disk; rejects when the image is unavailable.
+ */
+async function creatorCloseScopeOnDisk(
+	store: SnapshotQuarantineStore<SnapshotVerificationReceipt>,
+	objectId: string,
+	epoch: number
+): Promise<boolean> {
+	const reader = (store as Partial<Pick<SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+		"readRetirementAdmissionImage">>).readRetirementAdmissionImage;
+	if (reader === undefined) return false;
+	const admissionImage = await reader.call(store, { objectId });
+	return admissionImage.image.scopes.some((pair) => pair.scope.objectId === objectId && pair.scope.epoch >= epoch);
 }
 
 /** Capture the genuine native reader once; subsequent bindings cannot retarget it. */
@@ -15348,11 +16940,42 @@ async function issueOneVertex(
 		? undefined
 		: reserveOperation(registration.operationAdmissionPolicy, operation, scope.author);
 	if (reservation === null) {
-		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+		return localIssueFailure("admission-rejected", V3_LOCAL_POLICY_REFUSAL_DETAIL);
 	}
 
+	const admittedFrontier = localAdmittedFrontier(registration, scope);
+	// A settlement-profile Writer's own new move (or a handed-back move offered again, or a join
+	// before either) reserves one settlement replacement per own row of this epoch in its store's
+	// admission: the creator may close the epoch without any of them, and the Writer must replace
+	// them at its successor's install under the same bound. Fence and replacement work never
+	// reserve (they are the settlement); the creator closes its own epoch and needs none.
+	const settlementReplacementReserve =
+		input.settlementSource === undefined &&
+		(planEffect === undefined || planEffect.kind === "hand-back") &&
+		!registration.creatorMaintenanceBound &&
+		registration.payload.trust.trust.profileId === "creator-trusted-settlement-v1" &&
+		resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== scope.author
+			? ObjectFreeze({ maxDependencies: registration.payload.parameters.maxDependencies })
+			: undefined;
 	let commit: unknown;
 	let capacityRejected = false;
+	let stateLimitRejected = false;
+	let stateBoundAdmitted: Uint8Array | undefined;
+	const stateBoundAdmits = (bytes: Uint8Array, author: string): boolean => {
+		// The pre-signing check already judged these exact bytes; judge each candidate once.
+		if (controlOperation || (stateBoundAdmitted !== undefined && sameBytes(stateBoundAdmitted, bytes))) return true;
+		const unsigned = decodeCanonical(bytes);
+		const unsignedDependencies = ownDataValue(unsigned, "dependencies");
+		const admitted = applicationStateAdmits(registration, {
+			digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+			author,
+			dependencies: ArrayIsArray(unsignedDependencies) ? (unsignedDependencies as string[]) : [],
+			operation,
+			byteCharge: bytes.byteLength,
+		}, "local");
+		if (admitted) stateBoundAdmitted = bytes;
+		return admitted;
+	};
 	let cryptoEntered = false;
 	let signerResolved = false;
 	let terminalTransactionStarted = false;
@@ -15384,6 +17007,10 @@ async function issueOneVertex(
 					});
 				};
 				const buildInNativeJob: DurableBuildAndSign = async (authorSequence, nativeSignAdmission) => {
+					// Every local signature (ordinary, fence, replacement, reissue) passes here
+					// with the store's CAS-selected sequence, before anything is signed.
+					if (admittedFrontier !== null && authorSequence <= admittedFrontier)
+						throw new V3LocalLineageBehindFrontier(selectedScope.author, authorSequence, admittedFrontier);
 					if (replacementContext !== undefined && nativeSignAdmission === undefined)
 						throw new TypeError("source-bound replacement requires its original native job");
 					if (registration.creatorMaintenanceBound && nativeSignAdmission === undefined)
@@ -15424,6 +17051,10 @@ async function issueOneVertex(
 										capacityRejected = true;
 										throw new TypeError("v3 local issue graph is at capacity");
 									}
+									if (!stateBoundAdmits(bytes, selectedScope.author)) {
+										stateLimitRejected = true;
+										throw new TypeError("v3 local operation would pass the room's application state limit");
+									}
 									if (registration.creatorMaintenanceBound) {
 										const consumer = registration.creatorMaintenanceAdmission;
 										if (consumer === undefined || maintenanceAdmission !== undefined)
@@ -15447,7 +17078,10 @@ async function issueOneVertex(
 									return nativeSignAdmission(
 										bytes,
 										sourceSign,
-										replacementContext ?? (planEffect === undefined ? undefined : { planEffect })
+										replacementContext ??
+											(settlementReplacementReserve === undefined
+												? planEffect === undefined ? undefined : { planEffect }
+												: ObjectFreeze({ ...(planEffect === undefined ? {} : { planEffect }), settlementReplacementReserve }))
 									);
 								};
 					const builtCommit = await buildAndSign(authorSequence, admittedSign);
@@ -15462,6 +17096,10 @@ async function issueOneVertex(
 					) {
 						capacityRejected = true;
 						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					if (candidateRow !== undefined && !stateBoundAdmits(candidateRow.canonicalPreimageBytes, selectedScope.author)) {
+						stateLimitRejected = true;
+						throw new TypeError("v3 local operation would pass the room's application state limit");
 					}
 					return candidateCommit;
 				};
@@ -15557,7 +17195,7 @@ async function issueOneVertex(
 			if (issuanceOutcomeUnknown || cryptoEntered) {
 				// Durable entered debt is not disproved by this callback's entry count.
 				registration.operationAdmissionHalted = true;
-			} else if (!terminalTransactionStarted || capacityRejected) {
+			} else if (!terminalTransactionStarted || capacityRejected || stateLimitRejected) {
 				releaseOperationReservation(reservation);
 			} else if (reservation !== undefined) {
 				registration.operationAdmissionHalted = true;
@@ -15574,201 +17212,814 @@ async function issueOneVertex(
 			}
 			return capacityRejected
 				? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+				: stateLimitRejected
+					? localIssueFailure(
+							"application-state-limit",
+							`v3 local operation would pass the room's application state limit (${registration.payload.parameters.maxApplicationStateBytes} bytes)`
+						)
 				: signerResolved
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
 					: localIssueFailure(
 							"issuance-rejected",
-							`v3 local issue transaction failed: ${error instanceof Error ? error.message : String(error)}`
+							// A Writer's (or creator's) own store bound is the same typed capacity refusal.
+							`v3 local issue transaction failed: ${issuanceCapacityRefusalOf(error) ??
+								(error instanceof Error ? error.message : String(error))}`
 						);
 		}
-		const committedFailure = (
-			kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
-			detail: string
-		): InternalLocalIssueResult => {
-			registration.operationAdmissionHalted = true;
-			return requireTerminalAuthorization
-				? internalLocalIssueFailure(kind, detail, "outcome-unknown")
-				: localIssueFailure(kind, detail);
-		};
-		const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
-		if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
-
-		let authenticated: AuthenticatedRecoveryVertex | undefined;
-		const retained: RetainedCloseSignedAdmissionCapture = {};
-		try {
-			authenticated = authenticateRecoveryVertex(
-				registration.payload,
-				registration.authorization,
-				row.canonicalPreimageBytes,
-				row.signature, undefined, retained
-			);
-		} catch {
-			return committedFailure("admission-rejected", "v3 local issue authentication failed");
-		}
-		if (
-			authenticated === undefined ||
-			authenticated.digest !== lowerHexDigest(row.digest) ||
-			authenticated.author !== scope.author ||
-			authenticated.authorSequence !== row.authorSequence ||
-			registration.index.has(authenticated.digest)
-		) {
-			return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
-		}
-		if (!hasBoundedDependencies(registration.payload, authenticated)) {
-			return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
-		}
-		if (requireTerminalAuthorization) {
-			let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
-			try {
-				classification =
-					registration.classifyTerminalVertex?.(
-						ObjectFreeze({
-							author: authenticated.author,
-							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
-							signature: new Uint8ArrayConstructor(row.signature),
-							vertex: authenticated.admitted,
-						})
-					) ?? "reject";
-			} catch {
-				classification = "reject";
-			}
-			if (classification !== "terminal-authorized") {
-				return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
-			}
-		}
-		const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-		if (
-			!controlOperation &&
-			!validateLatchedOperation(
-				registration.authorization,
-				registration.latchedOperations,
-				acceptedAcl,
-				authenticated.author,
-				registration.payload.trust.trust.profileId,
-				requireTerminalAuthorization,
-				input.settlementSource !== undefined && input.settlementAuthorization !== undefined
-			)
-		) {
-			return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
-		}
-		if (!hasGraphCapacity(registration, authenticated.author, authenticated.byteCharge)) {
-			return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-		}
-
-		let appended;
-		try {
-			const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
-			if (custodyImage !== undefined && maintenanceImage !== undefined &&
-				(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
-					!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
-				throw new TypeError("local journal contexts disagree");
-			const expectedNativeImage = custodyImage ?? maintenanceImage;
-			appended = await registration.liveJournalStore.appendAccepted({
-				author: scope.author,
-				authorSequence: row.authorSequence,
-				scope: liveJournalScope(registration.payload),
-				sourceKind: "local-issued",
-				vertexDigest: authenticated.digest,
-				...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
-			});
-			if (input.settlementCustody !== undefined) {
-				if (!appended.ok || appended.nativeImage === undefined)
-					throw new TypeError("replacement journal source-bound readback is unavailable");
-				await input.settlementCustody.resumeJournalReads(appended.nativeImage);
-			}
-			if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
-				throw new TypeError("ordinary local journal postimage is unavailable");
-		} catch {
-			return committedFailure("journal-rejected", "v3 local issue journal append failed");
-		}
-		if (
-			!appended.ok ||
-			appended.idempotent ||
-			appended.sourceKind !== "local-issued" ||
-			appended.vertexDigest !== authenticated.digest ||
-			!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
-		) {
-			return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
-		}
-
-		const updatedEpochBytes = nextEpochBytes(
-			registration.epochBytes,
-			authenticated.byteCharge,
-			registration.payload.parameters.maxEpochBytes
+		return await admitCommittedLocalVertex(
+			registration,
+			input,
+			scope,
+			commit,
+			controlOperation,
+			reservation,
+			requireTerminalAuthorization,
+			maintenanceAdmission
 		);
-		if (updatedEpochBytes === undefined) {
-			return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-		}
-		try {
-			const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
-			if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
-			registration.epochBytes = updatedEpochBytes;
-		} catch {
-			return committedFailure("graph-rejected", "v3 local issue graph append failed");
-		}
-		retainCloseVertex(
-			registration.closeVertices,
-			registration.closeAuthors,
-			registration.authorVertexCounts,
-			authenticated,
-			registration.closeCharges,
-			input.settlementSource !== undefined && input.settlementAuthorization !== undefined,
-			retained.value,
-			registration.vertexFacts
-		);
-		if (controlOperation) registration.controlVertices.add(authenticated.digest);
-		registration.graphVersion += 1;
-		if (acceptedAcl !== null && acceptedAcl !== undefined) {
-			registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
-		}
-		if (!commitOperationReservation(reservation)) {
-			registration.operationAdmissionHalted = true;
-			return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
-		}
-		const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
-		advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
-			appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
-			acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
-				byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
-				detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
-			{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
-				canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
-		maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
-			detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
-			...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
-		let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
-		try {
-			await input.settlementCustody?.check();
-		} catch {
-			return committedFailure("admission-rejected", "replacement currency changed before delivery");
-		}
-		if (currentRegistration(registration) && !controlOperation) {
-			try {
-				const disposition = await registration.onAdmittedVertex(
-					ObjectFreeze({
-						vertex: authenticated.admitted,
-						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
-						signature: new Uint8ArrayConstructor(row.signature),
-						transportSender: registration.networkNode.peerId,
-					})
-				);
-				terminalDisposition = disposition?.kind;
-			} catch {
-				ingressFailureLog("sink-rejected");
-			}
-		}
-		try {
-			await input.settlementCustody?.check();
-		} catch {
-			return committedFailure("admission-rejected", "replacement currency changed at delivery");
-		}
-		return ObjectFreeze({
-			...localIssueSuccess(row.authorSequence, authenticated.digest),
-			...(terminalDisposition === undefined ? {} : { terminalDisposition }),
-		});
 	} finally {
 		await maintenanceAdmission?.release();
 	}
+}
+
+/**
+ * Everything after a local vertex's issuance commit, in order: authentication of the committed row,
+ * its journal append (under the replacement custody's journal join when one is held), graph index,
+ * close retention, reservation commit and delivery. One vertex per call; a batched issuance admits
+ * its committed rows through this one at a time, in sequence order, exactly as singles do.
+ * @param registration - The live plane that issued the row.
+ * @param input - The captured issue input (settlement source/custody when a replacement).
+ * @param scope - The issuance scope the commit belongs to.
+ * @param commit - The committed issuance (unchecked; authenticated here).
+ * @param controlOperation - Whether the row's operation is a control operation.
+ * @param reservation - The row's fresh operation reservation, committed on success.
+ * @param requireTerminalAuthorization - Whether the row must classify terminal-authorized.
+ * @param maintenanceAdmission - The creator maintenance admission the issue held, if any.
+ * @returns The local issue result of this row.
+ */
+type CommittedLocalFailure = (
+	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+	detail: string
+) => InternalLocalIssueResult;
+
+/** One committed local row's checks before its journal append (admitCommittedLocalVertex). */
+interface PreparedCommittedLocalVertex {
+	readonly row: SnapshottedOutboxRow;
+	readonly authenticated: AuthenticatedRecoveryVertex;
+	readonly retained: RetainedCloseSignedAdmissionCapture;
+	readonly acceptedAcl: ReturnType<typeof aclOperation>;
+}
+
+async function admitCommittedLocalVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	scope: DurableIssueScope,
+	commit: unknown,
+	controlOperation: boolean,
+	reservation: FreshOperationAdmissionReservation | undefined,
+	requireTerminalAuthorization: boolean,
+	maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined
+): Promise<InternalLocalIssueResult> {
+	const committedFailure: CommittedLocalFailure = (kind, detail) => {
+		registration.operationAdmissionHalted = true;
+		return requireTerminalAuthorization
+			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+			: localIssueFailure(kind, detail);
+	};
+	const prepared = prepareCommittedLocalVertex(
+		registration,
+		input,
+		scope,
+		commit,
+		controlOperation,
+		requireTerminalAuthorization,
+		committedFailure
+	);
+	if ("ok" in prepared) return prepared;
+	const { row, authenticated } = prepared;
+	let appended;
+	try {
+		const custodyImage = await input.settlementCustody?.joinJournalReads(), maintenanceImage = maintenanceAdmission?.journalContext;
+		if (custodyImage !== undefined && maintenanceImage !== undefined &&
+			(custodyImage.imageDigest !== maintenanceImage.imageDigest ||
+				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
+			throw new TypeError("local journal contexts disagree");
+		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		appended = await registration.liveJournalStore.appendAccepted({
+			author: scope.author,
+			authorSequence: row.authorSequence,
+			scope: liveJournalScope(registration.payload),
+			sourceKind: "local-issued",
+			vertexDigest: authenticated.digest,
+			...(expectedNativeImage === undefined ? {} : { expectedNativeImage }),
+		});
+		if (input.settlementCustody !== undefined) {
+			if (!appended.ok || appended.nativeImage === undefined)
+				throw new TypeError("replacement journal source-bound readback is unavailable");
+			await input.settlementCustody.resumeJournalReads(appended.nativeImage);
+		}
+		if (maintenanceImage !== undefined && (!appended.ok || appended.nativeImage === undefined))
+			throw new TypeError("ordinary local journal postimage is unavailable");
+	} catch {
+		return committedFailure("journal-rejected", "v3 local issue journal append failed");
+	}
+	if (
+		!appended.ok ||
+		appended.idempotent ||
+		appended.sourceKind !== "local-issued" ||
+		appended.vertexDigest !== authenticated.digest ||
+		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
+	) {
+		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
+	}
+	return finishCommittedLocalVertex(
+		registration,
+		input,
+		scope,
+		prepared,
+		appended,
+		controlOperation,
+		reservation,
+		maintenanceAdmission,
+		committedFailure
+	);
+}
+
+/**
+ * Every check admitCommittedLocalVertex makes of one committed local row before its journal append
+ * (authentication, terminal authorization, ACL, graph capacity). No side effect.
+ * @param registration - The live plane.
+ * @param input - The row's captured issue input.
+ * @param scope - The issuance scope.
+ * @param commit - The row's durable commit.
+ * @param controlOperation - Whether the row is a control operation.
+ * @param requireTerminalAuthorization - Whether the row must classify as terminal-authorized.
+ * @param committedFailure - The halting failure of a committed row.
+ * @param pending - Rows of the same batch already prepared, not yet admitted (counted against capacity).
+ * @returns The prepared row, or its failure.
+ */
+function prepareCommittedLocalVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	scope: DurableIssueScope,
+	commit: unknown,
+	controlOperation: boolean,
+	requireTerminalAuthorization: boolean,
+	committedFailure: CommittedLocalFailure,
+	pending: Readonly<{ byteCharge: number; vertices: number }> = { byteCharge: 0, vertices: 0 }
+): PreparedCommittedLocalVertex | InternalLocalIssueResult {
+	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+
+	let authenticated: AuthenticatedRecoveryVertex | undefined;
+	const retained: RetainedCloseSignedAdmissionCapture = {};
+	try {
+		authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			row.canonicalPreimageBytes,
+			row.signature, undefined, retained
+		);
+	} catch {
+		return committedFailure("admission-rejected", "v3 local issue authentication failed");
+	}
+	if (
+		authenticated === undefined ||
+		authenticated.digest !== lowerHexDigest(row.digest) ||
+		authenticated.author !== scope.author ||
+		authenticated.authorSequence !== row.authorSequence ||
+		registration.index.has(authenticated.digest)
+	) {
+		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
+	}
+	if (!hasBoundedDependencies(registration.payload, authenticated)) {
+		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	if (requireTerminalAuthorization) {
+		let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+		try {
+			classification =
+				registration.classifyTerminalVertex?.(
+					ObjectFreeze({
+						author: authenticated.author,
+						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+						signature: new Uint8ArrayConstructor(row.signature),
+						vertex: authenticated.admitted,
+					})
+				) ?? "reject";
+		} catch {
+			classification = "reject";
+		}
+		if (classification !== "terminal-authorized") {
+			return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
+		}
+	}
+	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+	if (
+		!controlOperation &&
+		!validateLatchedOperation(
+			registration.authorization,
+			registration.latchedOperations,
+			acceptedAcl,
+			authenticated.author,
+			registration.payload.trust.trust.profileId,
+			requireTerminalAuthorization,
+			input.settlementSource !== undefined && input.settlementAuthorization !== undefined
+		)
+	) {
+		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	if (
+		!hasGraphCapacity(
+			registration,
+			authenticated.author,
+			pending.byteCharge + authenticated.byteCharge,
+			pending.vertices + 1
+		)
+	) {
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	return ObjectFreeze({ row, authenticated, retained, acceptedAcl });
+}
+
+/**
+ * Everything admitCommittedLocalVertex does after one committed local row is journaled: the graph and
+ * close admission, the policy commit, the capacity geometry, and the delivery.
+ * @param registration - The live plane.
+ * @param input - The row's captured issue input.
+ * @param scope - The issuance scope.
+ * @param prepared - The row as prepareCommittedLocalVertex checked it.
+ * @param appended - The row's journal sequence, and the journal postimage right after the row (undefined: none observed).
+ * @param controlOperation - Whether the row is a control operation.
+ * @param reservation - The row's operation admission reservation.
+ * @param maintenanceAdmission - The creator maintenance admission, if any.
+ * @param committedFailure - The halting failure of a committed row.
+ * @returns The row's local issue result.
+ */
+async function finishCommittedLocalVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	scope: DurableIssueScope,
+	prepared: PreparedCommittedLocalVertex,
+	appended: Readonly<{
+		journalSequence: number;
+		nativeImage?: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
+	}>,
+	controlOperation: boolean,
+	reservation: FreshOperationAdmissionReservation | undefined,
+	maintenanceAdmission: CreatorIssuanceMaintenanceAdmission | undefined,
+	committedFailure: CommittedLocalFailure
+): Promise<InternalLocalIssueResult> {
+	const { row, authenticated, retained, acceptedAcl } = prepared;
+	const updatedEpochBytes = nextEpochBytes(
+		registration.epochBytes,
+		authenticated.byteCharge,
+		registration.payload.parameters.maxEpochBytes
+	);
+	if (updatedEpochBytes === undefined) {
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	try {
+		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+		if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+		registration.epochBytes = updatedEpochBytes;
+	} catch {
+		return committedFailure("graph-rejected", "v3 local issue graph append failed");
+	}
+	retainCloseVertex(
+		registration.closeVertices,
+		registration.closeAuthors,
+		registration.authorVertexCounts,
+		authenticated,
+		registration.closeCharges,
+		input.settlementSource !== undefined && input.settlementAuthorization !== undefined,
+		retained.value,
+		registration.vertexFacts
+	);
+	if (controlOperation) registration.controlVertices.add(authenticated.digest);
+	registration.graphVersion += 1;
+	if (acceptedAcl !== null && acceptedAcl !== undefined) {
+		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
+	}
+	if (!commitOperationReservation(reservation)) {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
+	}
+	const acceptedEffect = registration.closeAuthors.get(authenticated.digest)?.applicationEffect;
+	advanceCreatorOrdinaryRuntimeCapacityGeometry(registration, creatorLocalJournalCensusFields(
+		appended.journalSequence, scope, row.authorSequence, authenticated.byteCharge, authenticated.digest), appended.nativeImage,
+		acceptedEffect === undefined ? undefined : {journalSequence: appended.journalSequence, sourceKind: "local-issued",
+			byteCharge: authenticated.byteCharge, digest: authenticated.digest, exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			detachedSignature: row.signature, exactCanonicalVertexBytes: acceptedEffect.exactCanonicalEpochVertexBytes},
+		{objectId: scope.objectId, author: scope.author, authorSequence: row.authorSequence,
+			canonicalPreimageBytes: row.canonicalPreimageBytes, digest: row.digest, signature: row.signature});
+	maintenanceAdmission?.accepted?.(acceptedEffect === undefined ? undefined : {exactCanonicalPreimageBytes: row.canonicalPreimageBytes,
+		detachedSignature: row.signature, exactCanonicalEpochVertexBytes: new Uint8ArrayConstructor(acceptedEffect.exactCanonicalEpochVertexBytes),
+		...(appended.nativeImage === undefined ? {} : {nativeJournal: appended.nativeImage})});
+	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
+	try {
+		await input.settlementCustody?.check();
+	} catch {
+		return committedFailure("admission-rejected", "replacement currency changed before delivery");
+	}
+	if (currentRegistration(registration) && !controlOperation) {
+		try {
+			const disposition = await registration.onAdmittedVertex(
+				ObjectFreeze({
+					vertex: authenticated.admitted,
+					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(row.signature),
+					transportSender: registration.networkNode.peerId,
+				})
+			);
+			terminalDisposition = disposition?.kind;
+		} catch {
+			ingressFailureLog("sink-rejected");
+		}
+	}
+	try {
+		await input.settlementCustody?.check();
+	} catch {
+		return committedFailure("admission-rejected", "replacement currency changed at delivery");
+	}
+	return ObjectFreeze({
+		...localIssueSuccess(row.authorSequence, authenticated.digest),
+		...(terminalDisposition === undefined ? {} : { terminalDisposition }),
+	});
+}
+
+/**
+ * The element of a batch's parallel arrays at index (equal-length by construction), or a typed failure.
+ * @param values - One of the batch's parallel arrays.
+ * @param index - The row's index in the batch.
+ * @param what - What the array holds, for the failure.
+ * @returns The element.
+ */
+function batchElement<T>(values: readonly T[], index: number, what: string): T {
+	const value = values[index];
+	if (value === undefined) throw new TypeError(`v3 replacement batch ${what} is missing at ${index}`);
+	return value;
+}
+
+/**
+ * One drain chunk's legacy nonportable replacements in ONE batched issuance (transactIssueBatch):
+ * one entered marker and one commit for every row, instead of one marker and one commit per row.
+ * Every row passes the checks issueLocal and issueOneVertex make of it alone (source derivation,
+ * ACL, reservation, native source/plan currency against the chunk's one census, the exact owned
+ * bytes before its signature); the first row depends on the current frontier and each later row on
+ * its predecessor alone (the frontier the same singles see without foreign ingress). The committed
+ * rows are then journaled in one native write (journalReplacementBatch) and admitted in sequence order
+ * exactly as singles are after their own appends (finishCommittedLocalVertex), or, when the journal
+ * cannot batch them, admitted a row at a time (admitCommittedLocalVertex).
+ * Anything a single would split, join or refuse is `batch-unavailable` before anything is reserved,
+ * so the drain issues those rows singly and gets the single's own outcome.
+ * @param registration - The live plane issuing the chunk.
+ * @param inputs - The chunk's captured replacement inputs (shared custody, no portable authorization).
+ * @param custody - The one native replacement custody held for the chunk.
+ * @param expectedPlanRevision - The settlement plan revision the drain re-checked the chunk against.
+ * @returns The chunk's outcome (see V3ReplacementBatchResult).
+ */
+async function issueReplacementBatch(
+	registration: V3PlaneRegistration,
+	inputs: readonly CapturedLocalIssueInput[],
+	custody: LocalReplacementCustody,
+	expectedPlanRevision: number,
+	stopBefore?: () => boolean
+): Promise<V3ReplacementBatchResult> {
+	const unavailable = (detail: string): V3ReplacementBatchResult =>
+		ObjectFreeze({ ok: false as const, kind: "batch-unavailable" as const, detail });
+	const transactIssueBatch = registration.issuanceStore.transactIssueBatch;
+	if (transactIssueBatch === undefined) return unavailable("the issuance store has no batched transaction");
+	if (inputs.length === 0 || inputs.length > MAXIMUM_DURABLE_ISSUE_BATCH_COMMITS)
+		return unavailable("replacement batch size is outside the store bound");
+	if (registration.receiveOnly) return localIssueFailure("authorization-rejected", "v3 plane is receive-only");
+	if (currentRegistration(registration) && creatorInterruptedClosePending(registration))
+		return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold
+	)
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	if (registration.operationAdmissionHalted)
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	const readinessFailure = await localSnapshotAdmissionFailure(registration);
+	if (readinessFailure !== undefined) return readinessFailure;
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold ||
+		creatorInterruptedClosePending(registration)
+	)
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	// The creator's maintenance admission sizes one issuance at a time.
+	if (registration.creatorMaintenanceBound) return unavailable("creator maintenance issues singly");
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId)
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	const profileId = registration.payload.trust.trust.profileId;
+	const tips = registration.index.tips();
+	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies)
+		return unavailable("the frontier needs a causal join first");
+	if (!hasGraphCapacity(registration, scope.author, undefined, inputs.length))
+		return unavailable("the graph has no room for the whole batch");
+	const rows: Readonly<{
+		input: CapturedLocalIssueInput;
+		operation: Readonly<Record<string, unknown>>;
+		logicalTime: number;
+		planEffect: NonNullable<DurableIssueCommit["planEffect"]>;
+	}>[] = [];
+	for (const input of inputs) {
+		const effect = input.planEffect;
+		const first = input.operations[0];
+		const source = input.settlementSource;
+		if (
+			effect?.kind !== "replacement" ||
+			"fromIntent" in effect ||
+			first === undefined ||
+			source === undefined ||
+			input.settlementAuthorization !== undefined ||
+			input.settlementCustody !== custody ||
+			source.row.scope.objectId !== scope.objectId
+		)
+			return unavailable("only own-object legacy nonportable replacements batch");
+		try {
+			deriveOwnedReplacement(registration, source, input);
+		} catch {
+			return localIssueFailure("authorization-rejected", "v3 settlement replacement is not source authorized");
+		}
+		if (isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+			return unavailable("a reserved action issues singly");
+		let operation = first.operation;
+		if (input.operations.length > 1) {
+			if (
+				typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function" ||
+				input.operations.length > APPLICATION_BATCH_MAX_ENTRIES
+			)
+				return unavailable("an application batch row issues singly");
+			operation = applicationBatchOperation(input.operations);
+			if (!applicationBatchFits(operation)) return unavailable("a row needs a split");
+		}
+		if (
+			isControlOperation(operation, profileId) ||
+			!validateLatchedOperation(
+				registration.authorization,
+				registration.latchedOperations,
+				aclOperation(scope.author, "0".repeat(64), operation),
+				scope.author,
+				profileId,
+				false,
+				false
+			)
+		)
+			return unavailable("a row's operation issues singly");
+		rows.push(ObjectFreeze({ input, operation, logicalTime: first.logicalTime, planEffect: effect }));
+	}
+	const reservations: (FreshOperationAdmissionReservation | undefined)[] = [];
+	const releaseReservations = (): void => {
+		for (const reservation of reservations) releaseOperationReservation(reservation);
+	};
+	for (const row of rows) {
+		const reservation = reserveOperation(registration.operationAdmissionPolicy, row.operation, scope.author);
+		if (reservation === null) {
+			releaseReservations();
+			return localIssueFailure("admission-rejected", V3_LOCAL_POLICY_REFUSAL_DETAIL);
+		}
+		reservations.push(reservation);
+	}
+	const admittedFrontier = localAdmittedFrontier(registration, scope);
+	let commits: readonly DurableIssueCommit[];
+	let cryptoEntered = false;
+	let signerResolved = false;
+	let capacityRejected = false;
+	let stateLimitRejected = false;
+	let signingRow: (typeof rows)[number] | undefined;
+	// Rule R: the row before whose signature the caller stopped the chunk (the store commits the signed
+	// prefix alone). An observation that cannot answer never stops a chunk.
+	let stoppedAt: number | undefined;
+	const proceed =
+		stopBefore === undefined
+			? undefined
+			: (index: number): boolean => {
+					let stop = false;
+					try {
+						stop = stopBefore() === true;
+					} catch {
+						stop = false;
+					}
+					if (stop) stoppedAt = index;
+					return !stop;
+				};
+	try {
+		const maintenance = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration));
+		if (maintenance?.readBoundedRecoveryCensus === undefined)
+			throw new TypeError("replacement source is outside its native issuance custody");
+		// One census for the chunk; every row is checked against it as against its own read.
+		const census = await maintenance.readBoundedRecoveryCensus({
+			objectId: scope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		});
+		let context: Readonly<{ expectedIssuanceImageDigest?: string; expectedIssuanceControlBytes?: Uint8Array | null }> | undefined;
+		for (const row of rows) {
+			const quoted = await ownedReplacementSignContext(registration, row.input, census);
+			context ??= ObjectFreeze({
+				expectedIssuanceImageDigest: quoted.expectedIssuanceImageDigest,
+				expectedIssuanceControlBytes: quoted.expectedIssuanceControlBytes,
+			});
+		}
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
+			author: scope.author,
+			preparedBlueprintAdmission: registration.payload.admission,
+			publicKey: authorized,
+			signRegisteredVertexDigest: async (digest, request) => {
+				const row = signingRow;
+				if (row === undefined) throw new TypeError("replacement batch signer has no owned row");
+				cryptoEntered = true;
+				const signature = await row.input.signRegisteredVertexDigest(digest, request);
+				signerResolved = true;
+				return signature;
+			},
+			transactIssue: () => Promise.reject(new TypeError("a replacement batch issues only through its batched transaction")),
+		});
+		const transact: TransactIssueBatch = (selectedScope, count, buildAndSign) =>
+			transactIssueBatch({ scope: selectedScope, count, expectedPlanRevision }, async (firstSequence, nativeSignAdmission) => {
+				// Every local signature passes here with the store's CAS-selected sequences first.
+				if (admittedFrontier !== null && firstSequence <= admittedFrontier)
+					throw new V3LocalLineageBehindFrontier(selectedScope.author, firstSequence, admittedFrontier);
+				if (nativeSignAdmission === undefined) throw new TypeError("source-bound replacement requires its original native job");
+				const built = await buildAndSign(firstSequence, async (preimages, sign) => {
+					let byteCharge = 0;
+					for (const bytes of preimages) byteCharge += bytes.byteLength;
+					if (!hasGraphCapacity(registration, selectedScope.author, byteCharge, preimages.length)) {
+						capacityRejected = true;
+						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					// The room's application state limit, judged as each single row's issue judges it, over the
+					// whole chain, before anything is signed. A chunk that would pass it is issued singly, so the
+					// singles' own check refuses exactly the crossing row (and its replay is handed back).
+					if (
+						!applicationStateAdmitsChain(
+							registration,
+							preimages.map((bytes, index) => {
+								const unsigned = decodeCanonical(bytes);
+								const dependencies = ownDataValue(unsigned, "dependencies");
+								return ObjectFreeze({
+									digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
+									author: selectedScope.author,
+									dependencies: ArrayIsArray(dependencies) ? (dependencies as string[]) : [],
+									operation: batchElement(rows, index, "row").operation,
+									byteCharge: bytes.byteLength,
+								});
+							})
+						)
+					) {
+						stateLimitRejected = true;
+						throw new TypeError("v3 local operation would pass the room's application state limit");
+					}
+					return nativeSignAdmission(
+						preimages.map((bytes, index) =>
+							ObjectFreeze({ exactCanonicalUnsignedVertexBytes: bytes, planEffect: batchElement(rows, index, "row").planEffect })
+						),
+						async (index) => {
+							const row = rows[index];
+							const bytes = preimages[index];
+							if (row === undefined || bytes === undefined) throw new TypeError("replacement batch index is invalid");
+							const source = row.input.settlementSource;
+							if (source === undefined) throw new TypeError("replacement batch row has no settlement source");
+							deriveOwnedReplacement(registration, source, row.input);
+							await custody.check();
+							const decoded = decodeCanonical(bytes);
+							if (
+								!isObject(decoded) ||
+								!sameBytes(encodeCanonical(Reflect.get(decoded, "operation")), encodeCanonical(row.operation)) ||
+								Reflect.get(decoded, "settlementSource") !== undefined
+							)
+								throw new TypeError("native replacement bytes differ from owned candidate");
+							signingRow = row;
+							try {
+								return await sign(index);
+							} finally {
+								signingRow = undefined;
+							}
+						},
+						context,
+						proceed
+					);
+				});
+				return built.map((commit, index) => ObjectFreeze({ ...commit, planEffect: batchElement(rows, index, "row").planEffect }));
+			});
+		commits = await issuer.issueBatch(
+			{
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies: tips,
+				epoch: registration.payload.provenance.epoch,
+				objectId: scope.objectId,
+				entries: rows.map((row) => ({ logicalTime: row.logicalTime, operation: row.operation })),
+			},
+			transact
+		);
+	} catch (error) {
+		const code = isObject(error) ? Reflect.get(error, "code") : undefined;
+		if (code === "ISSUANCE_OUTCOME_UNKNOWN" || cryptoEntered) {
+			// Durable entered debt (the whole batch's marker) is resumed whole, never re-issued singly.
+			registration.operationAdmissionHalted = true;
+		} else {
+			releaseReservations();
+			if (code === "ISSUANCE_RETRY_REQUIRED")
+				return ObjectFreeze({
+					ok: false as const,
+					kind: "batch-retry" as const,
+					detail: error instanceof Error ? error.message : "settlement plan revision changed",
+				});
+			// A chunk past the room's application state limit: nothing was signed or written; singles judge each row.
+			if (stateLimitRejected) return unavailable("a row would pass the room's application state limit");
+			// The store's sizing refused the whole batch before anything was written: singles size each row.
+			const refusal = issuanceCapacityRefusalOf(error);
+			if (refusal !== undefined && !capacityRejected) return unavailable(`batch sizing refused: ${refusal}`);
+		}
+		return capacityRejected
+			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+			: signerResolved
+				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+				: localIssueFailure(
+						"issuance-rejected",
+						`v3 local issue transaction failed: ${issuanceCapacityRefusalOf(error) ??
+							(error instanceof Error ? error.message : String(error))}`
+					);
+	}
+	// A chunk the caller stopped committed exactly the rows signed before the stop; their reservations are
+	// kept and the rest released (those rows were never signed and stay unreplaced).
+	if (commits.length !== rows.length && (stoppedAt === undefined || commits.length !== stoppedAt || commits.length < 1)) {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("issuance-rejected", "v3 replacement batch commit is incomplete");
+	}
+	for (const reservation of reservations.slice(commits.length)) releaseOperationReservation(reservation);
+	const accepted: Readonly<{ authorSequence: number; digest: string }>[] = [];
+	const committedRecord = (index: number) => {
+		const committed = batchElement(commits, index, "commit");
+		return ObjectFreeze({
+			authorSequence: committed.authorSequence,
+			envelope: committed.envelope,
+			issuedRecord: committed.issuedRecord,
+			outboxEntry: committed.outboxEntry,
+		});
+	};
+	// The chunk's rows journaled in ONE native write (appendAcceptedLocalBatch) and read back once, then each
+	// row admitted in sequence order exactly as admitCommittedLocalVertex admits it after its own append.
+	const journaled = await journalReplacementBatch(
+		registration,
+		rows.slice(0, commits.length).map((row) => row.input),
+		scope,
+		commits.map((_, index) => committedRecord(index)),
+		custody
+	);
+	if (journaled !== undefined && "ok" in journaled)
+		return journaled.ok || journaled.kind === "split-required"
+			? localIssueFailure("issuance-rejected", "v3 replacement batch admission is invalid")
+			: journaled;
+	for (let index = 0; index < commits.length; index += 1) {
+		const row = batchElement(rows, index, "row");
+		const admitted =
+			journaled === undefined
+				? await admitCommittedLocalVertex(
+						registration,
+						row.input,
+						scope,
+						committedRecord(index),
+						false,
+						reservations[index],
+						false,
+						undefined
+					)
+				: await finishCommittedLocalVertex(
+						registration,
+						row.input,
+						scope,
+						batchElement(journaled.prepared, index, "prepared row"),
+						{
+							journalSequence: batchElement(journaled.sequences, index, "journal sequence"),
+							nativeImage: index === commits.length - 1 ? journaled.nativeImage : undefined,
+						},
+						false,
+						reservations[index],
+						undefined,
+						haltedLocalFailure(registration)
+					);
+		if (!admitted.ok) {
+			// The rest are durably committed: recovery admits them from the outbox, never re-issues them.
+			registration.operationAdmissionHalted = true;
+			return admitted.kind === "split-required"
+				? localIssueFailure("issuance-rejected", "v3 replacement batch admission is invalid")
+				: admitted;
+		}
+		accepted.push(ObjectFreeze({ authorSequence: admitted.authorSequence, digest: admitted.digest }));
+	}
+	await drainPendingIngress(registration);
+	return ObjectFreeze({
+		ok: true as const,
+		kind: "accepted" as const,
+		rows: ObjectFreeze(accepted),
+		journal: journaled === undefined ? ("rows" as const) : ("batch" as const),
+	});
+}
+
+function haltedLocalFailure(registration: V3PlaneRegistration): CommittedLocalFailure {
+	return (kind, detail) => {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure(kind, detail);
+	};
+}
+
+/**
+ * Journals one committed replacement chunk in ONE native write when the journal offers
+ * appendAcceptedLocalBatch: every row is first checked exactly as admitCommittedLocalVertex checks it
+ * (prepareCommittedLocalVertex, counting the chunk's earlier rows against capacity), then the rows are
+ * appended against the chunk custody's one journal checkpoint and the custody resumes on the one
+ * postimage. Undefined: the chunk is admitted a row at a time instead (no batch journal, an ACL row, or a
+ * plane tracking ordinary runtime geometry, which records each row's own postimage). A failure after
+ * the commit halts admission; recovery admits the committed rows from the outbox.
+ * @param registration - The live plane.
+ * @param inputs - The chunk's captured inputs, in commit order.
+ * @param scope - The issuance scope.
+ * @param commits - The chunk's durable commits, in order.
+ * @param custody - The chunk's one native replacement custody.
+ * @returns The prepared rows, their journal sequences and the postimage; a failure; or undefined.
+ */
+async function journalReplacementBatch(
+	registration: V3PlaneRegistration,
+	inputs: readonly CapturedLocalIssueInput[],
+	scope: DurableIssueScope,
+	commits: readonly unknown[],
+	custody: LocalReplacementCustody
+): Promise<
+	| Readonly<{
+			prepared: readonly PreparedCommittedLocalVertex[];
+			sequences: readonly number[];
+			nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }>;
+	  }>
+	| InternalLocalIssueResult
+	| undefined
+> {
+	const journal = registration.liveJournalStore;
+	const appendBatch = journal.appendAcceptedLocalBatch;
+	if (typeof appendBatch !== "function" || ordinaryRuntimeCapacityGeometry.has(registration)) return undefined;
+	const committedFailure = haltedLocalFailure(registration);
+	const prepared: PreparedCommittedLocalVertex[] = [];
+	let byteCharge = 0;
+	for (let index = 0; index < commits.length; index += 1) {
+		const row = prepareCommittedLocalVertex(
+			registration,
+			batchElement(inputs, index, "input"),
+			scope,
+			commits[index],
+			false,
+			false,
+			committedFailure,
+			{ byteCharge, vertices: index }
+		);
+		if ("ok" in row) return row;
+		if (row.acceptedAcl !== null && row.acceptedAcl !== undefined) return undefined;
+		byteCharge += row.authenticated.byteCharge;
+		prepared.push(row);
+	}
+	const journalScope = liveJournalScope(registration.payload);
+	let appended: Awaited<ReturnType<typeof appendBatch>>;
+	try {
+		const expectedNativeImage = await custody.joinJournalReads();
+		appended = await ReflectApply(appendBatch, journal, [
+			ObjectFreeze({
+				scope: journalScope,
+				rows: ObjectFreeze(
+					prepared.map((row) =>
+						ObjectFreeze({ author: scope.author, authorSequence: row.row.authorSequence, vertexDigest: row.authenticated.digest })
+					)
+				),
+				expectedNativeImage,
+			}),
+		]) as Awaited<ReturnType<typeof appendBatch>>;
+		if (!appended.ok) throw new TypeError(`replacement batch journal append refused: ${appended.kind}`);
+		await custody.resumeJournalReads(appended.nativeImage);
+	} catch {
+		return committedFailure("journal-rejected", "v3 replacement batch journal append failed");
+	}
+	const sequences = appended.rows.map((row) => row.journalSequence);
+	const firstSequence = sequences[0];
+	if (
+		firstSequence === undefined ||
+		!sameLiveJournalScope(appended.scope, journalScope) ||
+		appended.rows.length !== prepared.length ||
+		appended.rows.some(
+			(row, index) =>
+				row.vertexDigest !== prepared[index]?.authenticated.digest ||
+				!NumberIsSafeInteger(row.journalSequence) ||
+				row.journalSequence !== firstSequence + index
+		)
+	)
+		return committedFailure("journal-rejected", "v3 replacement batch journal append was rejected");
+	return ObjectFreeze({ prepared: ObjectFreeze(prepared), sequences: ObjectFreeze(sequences), nativeImage: appended.nativeImage });
 }
 
 async function issueAuthorFence(
@@ -15848,7 +18099,16 @@ async function issueAuthorFence(
 		false,
 		ObjectFreeze({ kind: "fence" as const })
 	);
-	if (issued.ok) await drainPendingIngress(registration);
+	if (issued.ok) {
+		// Diagnostic observer only: the clock this fence was issued with, never authority.
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({kind: "author-fence-issued", author: registration.issuanceScope.author,
+					epoch: registration.payload.provenance.epoch, logicalTime: fenceLogicalTime});
+		} catch { /* Observation cannot alter the issued fence. */ }
+		await drainPendingIngress(registration);
+	}
 	return issued;
 }
 
@@ -15857,6 +18117,9 @@ async function issueLocal(
 	input: CapturedLocalIssueInput
 ): Promise<V3LocalIssueResult> {
 	if (registration.receiveOnly) return localIssueFailure("authorization-rejected", "v3 plane is receive-only");
+	// An interrupted close holds its (possibly still staged) plane: one refusal.
+	if (currentRegistration(registration) && creatorInterruptedClosePending(registration))
+		return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
 	if (
 		!currentRegistration(registration) ||
 		registration.blueprintClosing ||
@@ -15873,13 +18136,14 @@ async function issueLocal(
 	if (readinessFailure !== undefined) return readinessFailure;
 	if (registration.blueprintClosing || registration.terminalState !== "active" || registration.retainedBootstrapHold)
 		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	if (creatorInterruptedClosePending(registration)) return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
 	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
 	// Plain local work has no historical source/effect binding. Use the existing
 	// NEW-operation owner before frontier joins can sign or mutate native state;
 	// settlement-profile membership alone does not grant current Writer rights.
 	// A halted native debt retains the original issuer's admission-rejected
 	// outcome; the public preflight's not-active result is not its substitute.
-	if (input.planEffect === undefined && !registration.operationAdmissionHalted) {
+	if ((input.planEffect === undefined || input.planEffect.kind === "hand-back") && !registration.operationAdmissionHalted) {
 		for (const { operation } of input.operations) {
 			const authorized = authorizeV3NewLocalOperation({ plane: registration.handle, operation });
 			if (!authorized.ok) return authorized;
@@ -15887,9 +18151,46 @@ async function issueLocal(
 	}
 	if (
 		input.planEffect !== undefined &&
-		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+		((input.planEffect.kind !== "replacement" && input.planEffect.kind !== "hand-back") ||
+			isReservedBatchAction(String(Reflect.get(first.operation, "action"))) ||
+			(input.planEffect.kind === "hand-back" && (input.operations.length !== 1 || input.settlementSource !== undefined)))
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
+	// The effect the row commits. A hand-back effect carries the record's move origin, so the same issuance
+	// transaction adds the reissue's origin entry (SettlementPlan.reissueOrigins); the store refuses an
+	// origin other than the record's.
+	let planEffect = input.planEffect;
+	if (input.planEffect?.kind === "hand-back") {
+		// A move the settlement window (or the creator's frontier) gave back, offered again as a new move:
+		// its row consumes the durable hand-back record in its own issuance transaction (the store
+		// refuses a consumed or absent record). It must carry exactly the handed-back operation.
+		const effect = input.planEffect;
+		let plan;
+		try {
+			plan = copySettlementPlan(
+				await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+				registration.issuanceScope
+			);
+		} catch {
+			return localIssueFailure("issuance-rejected", "v3 settlement hand-back plan read failed");
+		}
+		const record = plan?.handBacks?.find(
+			(candidate) => candidate.sourceSequence === effect.sourceSequence && candidate.intent === effect.intent
+		);
+		if (
+			record === undefined ||
+			record.reissueSequence !== null ||
+			!sameBytes(record.exactCanonicalOperationBytes, encodeCanonical(first.operation))
+		) {
+			return localIssueFailure("issuance-rejected", "v3 settlement hand-back is unavailable");
+		}
+		planEffect = ObjectFreeze({
+			intent: effect.intent,
+			kind: "hand-back" as const,
+			originSequence: record.originSequence ?? record.sourceSequence,
+			sourceSequence: effect.sourceSequence,
+		});
 	}
 	if (input.planEffect?.kind === "replacement" && input.settlementSource === undefined) {
 		return localIssueFailure(
@@ -16001,15 +18302,28 @@ async function issueLocal(
 				first.logicalTime,
 				applicationOperation,
 				false,
-				input.planEffect
+				planEffect
 			);
 			if (issued.ok) await drainPendingIngress(registration);
+			// A batch of new moves whose later moves would pass the room's application state limit: like
+			// the batch budget's split above, the caller issues the moves that fit and then the rest, so
+			// only the crossing moves are refused (settlement replays keep their own hand-back path).
+			if (
+				!issued.ok &&
+				issued.kind === "application-state-limit" &&
+				input.operations.length > 1 &&
+				input.planEffect === undefined &&
+				input.settlementSource === undefined
+			) {
+				const prefixLength = applicationStateAdmittedPrefix(registration, input.operations);
+				if (prefixLength > 0) return localIssueSplit(prefixLength);
+			}
 			return issued;
 		}
 		const joined = await issueOneVertex(
 			registration,
 			input,
-			tips.slice(0, maxDependencies),
+			causalJoinDependencies(registration, tips, maxDependencies),
 			first.logicalTime,
 			ObjectFreeze({ action: "causalJoin" }), false, undefined, finishingSuffix
 		);
@@ -16018,9 +18332,46 @@ async function issueLocal(
 	}
 }
 
+/**
+ * A causalJoin's dependencies: the first `maxDependencies` tips in hash order, except that the author's
+ * latest own row of this plane is always covered (that row when it is a tip, else the first tip that
+ * descends from it, in place of the last hash-ordered one). Every other own row already depends on all
+ * tips, so an author's own rows of one epoch stay a causal chain: admitting any of them admits every
+ * earlier one, and the creator's contiguous settlement frontier (deriveCreatorAuthorSettlementFrontier)
+ * separates admitted rows from rows that never entered history. Node-local: any `maxDependencies` tips
+ * are a valid join.
+ * @param registration - The live plane issuing the join.
+ * @param tips - Its current hash-sorted tips (more than `maxDependencies`).
+ * @param maxDependencies - The plane's dependency bound.
+ * @returns Sorted, distinct dependencies, at most `maxDependencies`.
+ */
+function causalJoinDependencies(
+	registration: V3PlaneRegistration,
+	tips: readonly string[],
+	maxDependencies: number
+): readonly string[] {
+	const selected = tips.slice(0, maxDependencies);
+	const author = registration.issuanceScope.author;
+	let own: string | undefined;
+	let ownSequence = -1;
+	for (const [digest, identity] of registration.closeAuthors)
+		if (identity.author === author && identity.authorSequence > ownSequence) {
+			own = digest;
+			ownSequence = identity.authorSequence;
+		}
+	if (own === undefined) return selected;
+	const index = registration.index;
+	const covers = (tip: string): boolean => tip === own || index.isAncestor(own, tip);
+	if (selected.some(covers)) return selected;
+	const covering = tips.find(covers);
+	if (covering === undefined) return selected;
+	return ObjectFreeze([...tips.slice(0, maxDependencies - 1), covering].sort());
+}
+
 function enqueueLocalIssue(
 	registration: V3PlaneRegistration,
-	rawInput: V3LocalIssueInput
+	rawInput: V3LocalIssueInput,
+	pool: "input" | "settlement" = "input"
 ): Promise<V3LocalIssueResult> {
 	if (registration.receiveOnly)
 		return Promise.resolve(localIssueFailure("authorization-rejected", "v3 plane is receive-only"));
@@ -16041,6 +18392,7 @@ function enqueueLocalIssue(
 					};
 		},
 		{
+			pool,
 			refuse: () =>
 				localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
 			refuseCapture: (capacity) =>
@@ -16058,9 +18410,207 @@ type ClassifiedRebaseRow = Readonly<{
 	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 	row: SnapshottedOutboxRow;
 	sourceContract?: CreatorRetainedSourceContract;
+	terminal?: true;
 }>;
 
 const verifiedNestedNativeSources = new WeakSet<ClassifiedRebaseRow>();
+
+type ReplacementIssuedRow = Readonly<{ objectId: string; author: string; authorSequence: number; canonicalPreimageBytes: Uint8Array;
+	signature: Uint8Array; digest: Uint8Array }>;
+
+/**
+ * How one proven replacement chunk ends (proveReplacementLink is the single owner of this classification):
+ * terminal (committed, expired, covered), live (current, open: unresolved displaced work), or a completed
+ * displaced link to walk on.
+ */
+type ReplacementChunkEnd = "committed" | "expired" | "current" | "covered" | "open" | "completed";
+
+/**
+ * One node of a replacement link (a replaced source or a replacement chunk), authenticated under its own
+ * retained source contract (custody) or, without one, through this plane's classification. A retained
+ * contract that does not authenticate the row refuses (never falls back to classification).
+ */
+function classifyReplacementNode(registration: CreatorRecoveryCensusContext, row: SnapshottedOutboxRow,
+	vertexFacts?: CreatorCensusVertexFacts): Readonly<{ node: ClassifiedRebaseRow; classified: boolean }> | undefined {
+	const retained = registration.historicalIssuance?.retainedSources?.get(row.authorSequence);
+	const retainedVertex = retained === undefined || !sameBytes(retained.sourceDigest, row.digest) ? undefined
+		: authenticateRetainedSourceVertex(retained.contract, row.canonicalPreimageBytes, row.signature, row.digest,
+			row.scope.author, row.authorSequence, vertexFacts);
+	if (retainedVertex !== undefined)
+		return ObjectFreeze({ node: ObjectFreeze({ row, authenticated: retainedVertex, kind: "displaced" as const,
+			sourceContract: retained!.contract }), classified: false });
+	if (retained !== undefined) return undefined;
+	const node = classifyRebaseRow(registration, row, undefined, vertexFacts);
+	return node === undefined ? undefined : ObjectFreeze({ node, classified: true });
+}
+
+/** Every chunk named by every entry of the plan, counted (a chunk replaces exactly one source). */
+function replacementChunkClaims(plan: SettlementPlan): ReadonlyMap<number, number> {
+	const claims = new IntrinsicMap<number, number>();
+	for (const value of plan.entries)
+		for (const chunk of value.replacementProgress?.chunks.map(item => item.replacementSequence) ??
+			(value.replacementSequence === null ? [] : [value.replacementSequence]))
+			claims.set(chunk, (claims.get(chunk) ?? 0) + 1);
+	return claims;
+}
+
+/**
+ * The one owner of a replacement link's proof (lost-twice's chain walk and the replaced-source
+ * resolution's committed-replacement basis both use it). Given an authenticated displaced source and its
+ * completed rebase/transform entry, proves every replacement chunk from signed content, never from plan
+ * rows alone:
+ * - the chunk is after its source, claimed by exactly this one entry, present once in the native rows,
+ *   and authenticates (under its own retained source contract, or through this plane's classification),
+ *   signed by the author in a later epoch than the source;
+ * - the link is signed content: a portable chunk's settlementSource names exactly the source's signed row
+ *   and intent range; the chunks' signed operations together are exactly the source's permitted
+ *   replacement operations, derived again from the source's signed operations by the immutable policy,
+ *   with the entry's disposition and refusal;
+ * - its end: durably committed (retained completion proof matching the plan), expired (a signed abandonment
+ *   receipt matching the plan, or an `expire` entry still awaiting it: window-expired and handed back),
+ *   covered by a creator-signed frontier, current in this plane, open (an unresolved displaced entry), or a
+ *   completed displaced link.
+ * @returns One proven step per chunk in plan order, or undefined when any of it is not proven.
+ */
+function proveReplacementLink(payload: PreparedV3LivePayload, registration: CreatorRecoveryCensusContext,
+	source: ClassifiedRebaseRow, entry: SettlementPlan["entries"][number], plan: SettlementPlan,
+	claims: ReadonlyMap<number, number>, issued: readonly ReplacementIssuedRow[], vertexFacts?: CreatorCensusVertexFacts):
+	readonly Readonly<{ chunk: number; replacement: ClassifiedRebaseRow; classified: boolean; end: ReplacementChunkEnd }>[] | undefined {
+	const policy = payload.input.settlementPolicy, scope = source.row.scope, sequence = source.row.authorSequence;
+	if (policy === undefined || policy.blueprintDigest !== payload.provenance.blueprintDigest || entry.replacementSequence === null ||
+		!sameBytes(entry.sourceDigest, source.row.digest) || (entry.disposition !== "rebase" && entry.disposition !== "transform") ||
+		source.authenticated.digest !== lowerHexDigest(source.row.digest)) return undefined;
+	const sourceOperations = settlementSourceOperations(payload, source.authenticated.vertex.operation);
+	if (sourceOperations === undefined || sourceOperations.length === 0) return undefined;
+	let derived: ReturnType<typeof derivePolicySettlement>;
+	try { derived = derivePolicySettlement(policy, sourceOperations); } catch { return undefined; }
+	const refusal = entry.transformRefusal;
+	if (derived.disposition !== entry.disposition || refusal !== undefined && (derived.disposition !== "transform" ||
+		!sameBytes(refusal.proposedIntentDigest, hashDomain("ts-drp/settlement-transform-proposal/v1",
+			encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS))))) return undefined;
+	const expected = refusal === undefined ? derived.operations : sourceOperations;
+	const retainedSources = registration.historicalIssuance?.retainedSources;
+	const chunks = entry.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [entry.replacementSequence];
+	const replaced: Readonly<Record<string, unknown>>[] = [];
+	const steps: Readonly<{ chunk: number; replacement: ClassifiedRebaseRow; classified: boolean; end: ReplacementChunkEnd }>[] = [];
+	let throughIntent = 0, portable = 0;
+	for (const [index, chunk] of chunks.entries()) {
+		if (chunk <= sequence || claims.get(chunk) !== 1 || steps.some(step => step.chunk === chunk)) return undefined;
+		const rows = issued.filter(value => value.objectId === scope.objectId && value.author === scope.author &&
+			value.authorSequence === chunk);
+		if (rows.length !== 1) return undefined;
+		const replacementRow = ObjectFreeze({ scope, authorSequence: chunk, canonicalPreimageBytes: rows[0]!.canonicalPreimageBytes,
+			signature: rows[0]!.signature, digest: rows[0]!.digest, publishState: "pending" as const }) as SnapshottedOutboxRow;
+		const retained = retainedSources?.get(chunk);
+		const node = classifyReplacementNode(registration, replacementRow, vertexFacts);
+		const replacement = node?.node, retainedVertex = node?.classified === false ? node.node.authenticated : undefined;
+		if (replacement === undefined || replacement.authenticated.digest !== lowerHexDigest(rows[0]!.digest) ||
+			replacement.authenticated.author !== scope.author || replacement.authenticated.authorSequence !== chunk ||
+			replacement.authenticated.admitted.epoch <= source.authenticated.admitted.epoch) return undefined;
+		const operations = settlementSourceOperations(payload, replacement.authenticated.vertex.operation);
+		if (operations === undefined) return undefined;
+		replaced.push(...operations);
+		const proof = replacement.authenticated.admitted.settlementSource;
+		const record = proof === undefined ? undefined : snapshotClosedRecord({ ...proof }, PORTABLE_SETTLEMENT_SOURCE_KEYS);
+		if (proof !== undefined && (record === undefined || record.sourceSequence !== sequence || record.sourceAuthor !== scope.author ||
+			record.sourceObjectId !== scope.objectId || record.sourceDigest !== lowerHexDigest(source.row.digest) ||
+			!sameBytes(record.sourcePreimage as Uint8Array, source.row.canonicalPreimageBytes) ||
+			!sameBytes(record.sourceSignature as Uint8Array, source.row.signature) || record.fromIntent !== throughIntent ||
+			!NumberIsSafeInteger(record.throughIntent) || (record.throughIntent as number) <= throughIntent ||
+			(entry.replacementProgress !== undefined && (record.intentDigest !== lowerHexDigest(entry.replacementProgress.intentDigest) ||
+				record.throughIntent !== entry.replacementProgress.chunks[index]!.throughIntent)))) return undefined;
+		if (record !== undefined) { throughIntent = record.throughIntent as number; portable++; }
+		const step = (end: ReplacementChunkEnd) => steps.push(ObjectFreeze({ chunk, replacement, classified: retainedVertex === undefined, end }));
+		if (retained?.completion !== undefined) {
+			if (!creatorRetainedCompletionMatchesPlan(retained, chunk, plan)) return undefined;
+			step("committed"); continue;
+		}
+		if (retained?.expiry !== undefined) {
+			if (!creatorRetainedExpiryMatchesPlan(retained, chunk, plan)) return undefined;
+			step("expired"); continue;
+		}
+		if (replacement.kind === "current") { step("current"); continue; }
+		if (replacement.kind === "covered-historical") { step("covered"); continue; }
+		const next = plan.entries.find(value => value.sourceSequence === chunk);
+		if (replacement.kind !== "displaced" || next === undefined || !sameBytes(next.sourceDigest, rows[0]!.digest) ||
+			next.disposition === "committed" || next.disposition === "inherited" ||
+			next.disposition === "expire" && next.replacementSequence !== null) return undefined;
+		// An `expire` entry without a replacement is terminal (window-expired and handed back, or abandoned),
+		// with or without its signed receipt yet: never walked on, never re-offered by the chain.
+		step(next.disposition === "expire" ? "expired" : next.replacementSequence === null ? "open" : "completed");
+	}
+	// Every chunk is either portable or not; the signed operations are exactly the permitted ones.
+	if (portable !== 0 && portable !== chunks.length ||
+		portable !== 0 && entry.replacementProgress !== undefined && throughIntent !== entry.replacementProgress.intentCount ||
+		!sameBytes(encodeCanonical(replaced), encodeCanonical(expected))) return undefined;
+	return ObjectFreeze(steps);
+}
+
+/**
+ * The committed-replacement basis of a replaced-source resolution (design (b)): the entry's single
+ * replacement link is proven (proveReplacementLink, the one owner) and ends committed, and the resolution
+ * names exactly that replacement's retained completion proof (creator-signed Cut membership).
+ * @returns Whether the basis holds.
+ */
+function replacementCommittedResolution(registration: CreatorRecoveryCensusContext, plan: SettlementPlan,
+	entry: SettlementPlan["entries"][number] | undefined,
+	steps: ReturnType<typeof proveReplacementLink>): boolean {
+	const step = steps?.length === 1 ? steps[0] : undefined;
+	const completion = step === undefined ? undefined : registration.historicalIssuance?.retainedSources?.get(step.chunk)?.completion;
+	const replacement = step === undefined ? undefined : plan.entries.find(value => value.sourceSequence === step.chunk);
+	return entry !== undefined && step !== undefined && step.end === "committed" && entry.replacementSequence === step.chunk &&
+		entry.replacementProgress === undefined && completion !== undefined && replacement?.disposition === "committed" &&
+		replacement.sourceResolutionDigest !== undefined && sameBytes(replacement.sourceResolutionDigest, completion.digest) &&
+		(entry.sourceResolutionDigest === undefined || sameBytes(entry.sourceResolutionDigest, completion.digest));
+}
+
+/**
+ * Whether the replacement chain of a pending completed-replacement source is live (lost-twice, design
+ * (1)). Walks source -> replacement chunks -> ..., bounded by the plan's entry count; a revisit or the
+ * bound REFUSES. Each link is proven by proveReplacementLink (the one owner); each walked node
+ * authenticates by custody (the root and every aged node: its entry carries its displaced plane's
+ * context and the row authenticates under that retained source contract) or, inside this plane's
+ * displaced adjacency, through this plane's classification. A completed link is walked on; every other
+ * end (committed, expired, covered, current, open) is live or terminal.
+ * @returns True only when every step is proven.
+ */
+async function replacementChainLive(live: V3PlaneRegistration, registration: CreatorRecoveryCensusContext,
+	source: ClassifiedRebaseRow, plan: SettlementPlan | null, issued: readonly ReplacementIssuedRow[],
+	vertexFacts?: CreatorCensusVertexFacts): Promise<boolean> {
+	if (plan === null) return false;
+	const scope = source.row.scope;
+	const retainedSources = registration.historicalIssuance?.retainedSources;
+	const bound = plan.entries.length;
+	const claims = replacementChunkClaims(plan);
+	const classifiedNodes = new WeakSet<ClassifiedRebaseRow>();
+	const visited = new IntrinsicSet<number>();
+	const stack: ClassifiedRebaseRow[] = [source];
+	let steps = 0;
+	while (stack.length > 0) {
+		const node = stack.pop()!;
+		const sequence = node.row.authorSequence;
+		if (visited.has(sequence) || ++steps > bound) return false;
+		visited.add(sequence);
+		const entry = plan.entries.find(value => value.sourceSequence === sequence);
+		if (entry === undefined || node.kind !== "displaced") return false;
+		const custody = retainedSources?.get(sequence);
+		const inCustody = custody !== undefined && custody.completion === undefined && custody.expiry === undefined &&
+			sameBytes(custody.sourceDigest, node.row.digest) && entry.sourceContextDigest !== undefined &&
+			node.sourceContract !== undefined && creatorRetainedSourceMatchesPlan(custody, sequence, plan) &&
+			authenticateRetainedSourceVertex(custody.contract, node.row.canonicalPreimageBytes, node.row.signature, node.row.digest,
+				scope.author, sequence, vertexFacts)?.digest === lowerHexDigest(node.row.digest);
+		if (!inCustody && (node === source || custody !== undefined || !classifiedNodes.has(node))) return false;
+		const proven = proveReplacementLink(live.payload, registration, node, entry, plan, claims, issued, vertexFacts);
+		if (proven === undefined) return false;
+		for (const step of proven) {
+			if (visited.has(step.chunk)) return false;
+			if (step.end !== "completed") { visited.add(step.chunk); continue; }
+			if (step.classified) classifiedNodes.add(step.replacement);
+			stack.push(step.replacement);
+		}
+	}
+	return true;
+}
 
 /** Protected native completion, not a portable source-membership grant. */
 async function ownSourceSettlementIsComplete(
@@ -16068,7 +18618,8 @@ async function ownSourceSettlementIsComplete(
 	selected: ClassifiedRebaseRow,
 	plan: SettlementPlan | null,
 	vertexFacts?: CreatorCensusVertexFacts,
-	sharedAccounting?: CreatorClosedRollbackProofAccounting
+	sharedAccounting?: CreatorClosedRollbackProofAccounting,
+	ownFences?: OwnEpochFenceReader
 ): Promise<boolean> {
 	const source = selected.authenticated;
 	const scope = registration.issuanceScope;
@@ -16092,6 +18643,21 @@ async function ownSourceSettlementIsComplete(
 		derived = derivePolicySettlement(policy, operations);
 		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicySettlement(policy, operations)))) return false;
 	} catch { return false; }
+	// Settlement window (V3_SETTLEMENT_OWN_WINDOW_EPOCHS): the room's drain resolved this displaced
+	// source as expired instead of replacing it again, and handed its operations back to the
+	// application. Its epoch is closed and the creator's signed frontier excluded it (the drain
+	// expires only frontier-displaced sources), so no plane can admit it and no replacement of it
+	// is ever signed: the exact entry with no replacement is its complete settlement.
+	if (entry.disposition === "expire" && (derived.disposition === "rebase" || derived.disposition === "transform")) {
+		const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+		return frontier !== undefined && validSettlementFrontierContext(registration.payload, frontier) &&
+			source.admitted.epoch < frontier.currentEpoch &&
+			settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, source.authorSequence,
+				frontier.admissionEpoch, frontier.terminalThrough) !== "current" &&
+			entry.replacementSequence === null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
+			settlementOwnRowFenceGuarded(await (ownFences ?? ownEpochFences)(creatorOriginalIssuanceStore(registration), scope),
+				source.admitted.epoch, source.authorSequence, frontier.terminalThrough);
+	}
 	if (derived.disposition !== entry.disposition || derived.disposition === "manual-review") return false;
 	if (derived.disposition === "expire") return entry.replacementSequence === null &&
 		entry.replacementProgress === undefined && entry.transformRefusal === undefined;
@@ -16339,7 +18905,8 @@ function settlementSourceOperations(
  * authenticates these original bytes against the scope's own closed ACL. */
 async function settledLocalSourceFacts(
 	registration: V3PlaneRegistration,
-	source: CreatorSettledLocalSource
+	source: CreatorSettledLocalSource,
+	fences: OwnEpochFenceReader = ownEpochFences
 ): Promise<CreatorSettledLocalSourceRead | undefined> {
 	try {
 		const scope = registration.issuanceScope;
@@ -16355,8 +18922,23 @@ async function settledLocalSourceFacts(
 			frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)) return undefined;
 		const terminal = settlementOwnRowClass(selected.authenticated.admitted.epoch, frontier.currentEpoch,
 			source.authorSequence, frontier.admissionEpoch, frontier.terminalThrough);
-		if ((terminal !== "terminal" && terminal !== "old-incarnation") ||
-			!await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope))) return undefined;
+		const expired = terminal === "displaced" &&
+			settlementOwnRowWindowExpired(selected.authenticated.admitted.epoch, frontier.currentEpoch) &&
+			settlementOwnRowFenceGuarded(await fences(store, scope), selected.authenticated.admitted.epoch,
+				source.authorSequence, frontier.terminalThrough);
+		const pinnedBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		// This author's own pinned bootstrap (its sequence 0 at the genesis anchor) is no application
+		// move and has no settlement entry: once the creator's frontier has passed it (terminal) or
+		// closed its epoch without it (expired), nothing replays or replaces it. Otherwise its journal
+		// scope 0 is never collectible, so it and every later own row stay retirement holes.
+		// Only "terminal" (or expired): an old-incarnation bootstrap still needs its own settlement entry.
+		const settledBootstrap = (expired || terminal === "terminal") && pinnedBytes !== undefined &&
+			selected.authenticated.admitted.epoch === 0 &&
+			authenticatedPinnedGenesisOutboxRow(row, scope, registration.payload, registration.payload.trust.trust.genesisAnchorDigest,
+				pinnedBytes)?.digest === source.vertexDigest;
+		const settled = settledBootstrap ||
+			await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope));
+		if ((terminal !== "terminal" && terminal !== "old-incarnation" && !expired) || !settled) return undefined;
 		return ObjectFreeze({ exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
 			detachedSignature: new Uint8ArrayConstructor(row.signature) });
 	} catch { return undefined; }
@@ -16572,13 +19154,24 @@ function deriveOwnedReplacement(
 		selected.authenticated.author !== registration.issuanceScope.author
 	)
 		throw new TypeError("local replacement owning source/policy is unavailable");
-	const source = registration.displacedSource;
-	let original = selected.kind === "current" ? registration.payload : source?.prepared;
-	let authority = selected.kind === "current" ? registration.authorization : source?.authorization;
+	// The source epoch's authority: the plane's displaced source (the epoch it closed); else the plan's
+	// durable source-authority record of that epoch (the same on a live and a cold-reopened plane: a row
+	// rule R deferred past one install); else an authority kept from a live predecessor; else the
+	// historical issuance ACL (immediately closed epoch only). The original semantics with a record
+	// are the plane's own (one blueprint, as for the historical ACL).
+	const admitted = selected.authenticated.admitted;
+	const displaced = registration.displacedSource;
+	const displacedMatches = displaced !== undefined && displaced.prepared.provenance.epoch === admitted.epoch &&
+		displaced.prepared.provenance.anchorDigest === admitted.anchor;
+	const recorded = selected.kind === "current" || displacedMatches ? undefined : settlementSourceAuthorityFor(registration, admitted);
+	const source = selected.kind === "current" || recorded !== undefined ? undefined : displacedSourceFor(registration, admitted);
+	let original = selected.kind === "current" || recorded !== undefined ? registration.payload : source?.prepared;
+	let authority = selected.kind === "current" ? registration.authorization : recorded ?? source?.authorization;
 	if (
 		original === undefined ||
-		selected.authenticated.admitted.epoch !== original.provenance.epoch ||
-		selected.authenticated.admitted.anchor !== original.provenance.anchorDigest
+		(recorded === undefined && (
+			selected.authenticated.admitted.epoch !== original.provenance.epoch ||
+			selected.authenticated.admitted.anchor !== original.provenance.anchorDigest))
 	) {
 		const historical = registration.historicalIssuance;
 		const acl =
@@ -16684,7 +19277,10 @@ function deriveOwnedReplacement(
 /** Captures mechanical source/plan currency for the existing native reservation. */
 async function ownedReplacementSignContext(
 	registration: V3PlaneRegistration,
-	input: CapturedLocalIssueInput
+	input: CapturedLocalIssueInput,
+	// One census a batched chunk read once for all its rows (own-object sources only); every row is
+	// still checked against it exactly as against its own read.
+	sharedCensus?: import("@ts-drp/issuance-store/maintenance").DurableIssuanceRecoveryCensus
 ): Promise<DurableIssueSignContext> {
 	const selected = input.settlementSource;
 	if (selected === undefined) throw new TypeError("replacement owning source is unavailable");
@@ -16704,10 +19300,13 @@ async function ownedReplacementSignContext(
 			: sourceMaintenance !== maintenance)
 	)
 		throw new TypeError("replacement source is outside its native issuance custody");
-	const census = await maintenance.readBoundedRecoveryCensus({
-		objectId: registration.issuanceScope.objectId,
-		limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
-	});
+	if (sharedCensus !== undefined && externalSource) throw new TypeError("a shared replacement census is own-object only");
+	const census =
+		sharedCensus ??
+		(await maintenance.readBoundedRecoveryCensus({
+			objectId: registration.issuanceScope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		}));
 	if (!currentRegistration(registration)) throw new TypeError("replacement source owner was revoked");
 	await input.settlementCustody?.check();
 	let sourceCensus = census;
@@ -16889,6 +19488,8 @@ async function readRebaseOutbox(
 					});
 				}
 				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
+				// Settled before the author's removal (persisted last-member frontier): never re-offered.
+				if (classified.terminal === true) continue;
 				if (settlementFrontier !== undefined) {
 					const ownRowClass = settlementOwnRowClass(
 						classified.authenticated.admitted.epoch,
@@ -17010,6 +19611,16 @@ async function readRebaseOutbox(
 	const commonSource = {
 		author: selected.authenticated.author,
 		authorSequence: selected.row.authorSequence,
+		epoch: selected.authenticated.admitted.epoch,
+		frontierDisplaced:
+			settlementFrontier !== undefined &&
+			selected.row.scope.objectId === registration.payload.provenance.objectId &&
+			selected.authenticated.author === registration.issuanceScope.author &&
+			validSettlementFrontierContext(registration.payload, settlementFrontier) &&
+			settlementOwnRowClass(selected.authenticated.admitted.epoch, settlementFrontier.currentEpoch,
+				selected.row.authorSequence, settlementFrontier.admissionEpoch, settlementFrontier.terminalThrough) === "displaced" &&
+			settlementOwnRowFenceGuarded(await rebaseSnapshotFences(registration, snapshot),
+				selected.authenticated.admitted.epoch, selected.row.authorSequence, settlementFrontier.terminalThrough),
 		intents: ObjectFreeze(intents),
 		vertexDigest: selected.authenticated.digest,
 	};
@@ -17173,6 +19784,8 @@ async function readRebaseOutbox(
 				};
 			},
 			{
+				// A replacement is the settlement drain's own work: the settlement lane.
+				pool: "settlement",
 				refuse: () =>
 					localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
 				refuseCapture: (capacity) =>
@@ -17180,6 +19793,123 @@ async function readRebaseOutbox(
 						"admission-rejected",
 						`v3 input ${capacity} capacity exhausted; retry after admitted work joins`
 					),
+			}
+		);
+	}
+	function issueReplacements(
+		this: V3RebaseSource,
+		peers: readonly V3RebaseSource[],
+		rawInputs: readonly (V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>)[],
+		expectedPlanRevision: number,
+		stopBefore?: () => boolean
+	): Promise<V3ReplacementBatchResult> {
+		if (this !== resultSource)
+			return Promise.resolve(localIssueFailure("authorization-rejected", "active replacement source is foreign"));
+		if (!currentRegistration(registration))
+			return Promise.resolve(localIssueFailure("not-active", "active replacement source is revoked"));
+		if (
+			!ArrayIsArray(peers) ||
+			!ArrayIsArray(rawInputs) ||
+			peers.length === 0 ||
+			peers.length !== rawInputs.length ||
+			peers.length > V3_SETTLEMENT_DRAIN_TURN_ROWS ||
+			!NumberIsSafeInteger(expectedPlanRevision) ||
+			expectedPlanRevision < 0 ||
+			(stopBefore !== undefined && typeof stopBefore !== "function")
+		)
+			return Promise.resolve(localIssueFailure("malformed-input", "replacement batch is malformed"));
+		const owners: RebaseSourceOwner[] = [];
+		const seen = new Set<object>();
+		for (const peer of peers) {
+			const owner = rebaseSourceOwners.get(peer);
+			if (owner === undefined || owner.registration !== registration || seen.has(peer))
+				return Promise.resolve(localIssueFailure("authorization-rejected", "replacement batch source is foreign or repeated"));
+			seen.add(peer);
+			owners.push(owner);
+		}
+		const unavailable = (detail: string): V3ReplacementBatchResult =>
+			ObjectFreeze({ ok: false as const, kind: "batch-unavailable" as const, detail });
+		return enqueueRegistrationTask<V3ReplacementBatchResult>(
+			registration,
+			(captureCustody) => {
+				const captured: CapturedLocalIssueInput[] = [];
+				for (let index = 0; index < rawInputs.length; index += 1) {
+					const rawInput = rawInputs[index];
+					const owner = owners[index];
+					if (rawInput === undefined || owner === undefined) {
+						const missing = localIssueFailure("malformed-input", "replacement batch input is missing");
+						return () => Promise.resolve(missing);
+					}
+					const input = capturedLocalIssueInput(registration.payload, rawInput, captureCustody);
+					if ("ok" in input) {
+						const refused: V3ReplacementBatchResult = input.ok ? localIssueFailure("malformed-input", "replacement batch input is invalid") : input;
+						return () => Promise.resolve(refused);
+					}
+					captured.push(ObjectFreeze({ ...input, settlementSource: owner.source }));
+				}
+				return async () => {
+					// Only what issueReplacement issues nonportable batches: no creator selection held,
+					// a non-creator Writer the target still authorizes, own-object native custody.
+					const floors = owners.map((owner) => owner.batchFloor());
+					const floor = floors[0];
+					if (floor === undefined || floors.some((value) => value === undefined || !sameBytes(value, floor)))
+						return unavailable("a replacement source holds a creator selection or no common floor checkpoint");
+					if (
+						resolveCreatorSettlementAuthor(registration.payload.trust.trust) === registration.issuanceScope.author ||
+						!isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
+					)
+						return unavailable("portable replacements issue singly");
+					if (
+						registration.displacedSource !== undefined &&
+						registration.displacedSource.prepared.provenance.objectId !== registration.payload.provenance.objectId
+					)
+						return unavailable("external-source replacements issue singly");
+					if (registration.issuanceStore.transactIssueBatch === undefined)
+						return unavailable("the issuance store has no batched transaction");
+					let custody: LocalReplacementCustody | undefined;
+					let outcome: V3ReplacementBatchResult;
+					let releaseFailed = false;
+					try {
+						for (const input of captured) {
+							if (input.settlementSource === undefined) throw new TypeError("replacement batch input has no settlement source");
+							deriveOwnedReplacement(registration, input.settlementSource, input);
+						}
+						custody = await acquireLocalReplacementCustody(registration, floor);
+						if (registration.currentReplacementCustody !== undefined)
+							throw new TypeError("replacement native custody is already entered");
+						registration.currentReplacementCustody = custody;
+						const held = custody;
+						outcome = await issueReplacementBatch(
+							registration,
+							captured.map((input) => ObjectFreeze({ ...input, settlementCustody: held, settlementAuthorization: undefined })),
+							held,
+							expectedPlanRevision,
+							stopBefore
+						);
+					} catch (error) {
+						outcome = localIssueFailure(
+							"authorization-rejected",
+							`active replacement source custody refused: ${error instanceof Error ? error.message : "unknown"}`
+						);
+					} finally {
+						if (registration.currentReplacementCustody === custody) registration.currentReplacementCustody = undefined;
+						try {
+							await custody?.release();
+						} catch {
+							// As issueReplacement: joined custody failure halts further issues.
+							registration.operationAdmissionHalted = true;
+							releaseFailed = true;
+						}
+					}
+					return releaseFailed
+						? localIssueFailure("admission-rejected", "replacement native custody joined release failed")
+						: outcome;
+				};
+			},
+			{
+				pool: "settlement",
+				refuse: () => unavailable("v3 input task capacity exhausted"),
+				refuseCapture: (capacity) => unavailable(`v3 input ${capacity} capacity exhausted`),
 			}
 		);
 	}
@@ -17221,6 +19951,59 @@ async function readRebaseOutbox(
 				});
 				if (decision === undefined) throw new TypeError("replacement preparation source check failed");
 				return decision;
+			},
+			{
+				pool: "read-control",
+				refuse: (): never => {
+					throw new TypeError("replacement preparation admission capacity exhausted");
+				},
+			}
+		);
+	}
+	// One drain's preparations in ONE dependency turn (per-drain batching): every source's decision is
+	// derived inside one check bracket from one consistent native view, the turn's reservations
+	// excluding every writer for its whole duration, and the census authenticates every source row
+	// (not only one). The decisions are the same pure derivations prepareReplacement makes for each
+	// source alone; none reads another source's refusal or replacement (all are written after).
+	function prepareReplacements(
+		this: V3RebaseSource,
+		peers: readonly V3RebaseSource[]
+	): Promise<readonly NativeReplacementPreparation[]> {
+		if (this !== resultSource || !currentRegistration(registration))
+			return Promise.reject(new TypeError("replacement preparation owner is stale or foreign"));
+		if (!ArrayIsArray(peers) || peers.length === 0 || peers.length > V3_SETTLEMENT_DRAIN_TURN_ROWS)
+			return Promise.reject(new TypeError("replacement preparation batch is malformed"));
+		const sources: ClassifiedRebaseRow[] = [];
+		const seen = new Set<object>();
+		for (const peer of peers) {
+			const owner = rebaseSourceOwners.get(peer);
+			if (owner === undefined || owner.registration !== registration || seen.has(peer))
+				return Promise.reject(new TypeError("replacement preparation batch source is foreign or repeated"));
+			seen.add(peer);
+			sources.push(owner.source);
+		}
+		const batch = ObjectFreeze(sources);
+		return enqueueRegistrationTask(
+			registration,
+			() => async () => {
+				const decisions: NativeReplacementPreparation[] = [];
+				await withActiveRebaseDependencies(registration, batch, async (read) => {
+					await read.checkWhile(async () => {
+						decisions.length = 0;
+						for (const source of batch)
+							decisions.push(
+								deriveOwnedReplacement(
+									registration,
+									source,
+									{ planEffect: { kind: "replacement", sourceSequence: source.row.authorSequence }, operations: [] },
+									true
+								)
+							);
+						await Promise.resolve();
+					});
+				});
+				if (decisions.length !== batch.length) throw new TypeError("replacement preparation source check failed");
+				return ObjectFreeze(decisions);
 			},
 			{
 				pool: "read-control",
@@ -17298,7 +20081,9 @@ async function readRebaseOutbox(
 							resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== commonSource.author),
 					withDependencies,
 					issueReplacement,
+					issueReplacements,
 					prepareReplacement,
+					prepareReplacements,
 					authorizeReplacement,
 				})
 			: ObjectFreeze({
@@ -17310,9 +20095,19 @@ async function readRebaseOutbox(
 					publishState: selected.row.publishState,
 					withDependencies,
 					issueReplacement,
+					issueReplacements,
 					prepareReplacement,
+					prepareReplacements,
 					authorizeReplacement,
 				});
+	rebaseSourceOwners.set(
+		resultSource,
+		ObjectFreeze({
+			registration,
+			source: heldSource,
+			batchFloor: () => (creatorSelection === undefined ? expectedFloorBytes : undefined),
+		})
+	);
 	return ObjectFreeze({ kind: "displaced" as const, ok: true as const, source: resultSource });
 }
 
@@ -17902,8 +20697,12 @@ async function republishRetained(
 			if (targetPeerId === undefined) {
 				published = await registration.networkNode.publishMessage(registration.topic, message);
 			} else {
+				// Track 46: the replay paces itself by awaiting each row, so each waits for the
+				// target's receipt; a send that resolved on the local write would land the
+				// whole window in the target's input pool at once.
 				await registration.networkNode.sendMessage(targetPeerId, message, {
 					signal: AbortSignal.any([signal, AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)]),
+					acknowledged: true,
 				});
 				published = true;
 			}
@@ -18157,7 +20956,8 @@ function terminalFailure(
 
 function terminalIssueFailure(result: Exclude<V3LocalIssueResult, { readonly ok: true }>): V3TerminalPublishResult {
 	return terminalFailure(
-		result.kind === "split-required" ? "malformed-input" : result.kind,
+		// A terminal is a control operation, which the application state bound never judges.
+		result.kind === "split-required" ? "malformed-input" : result.kind === "application-state-limit" ? "admission-rejected" : result.kind,
 		result.detail,
 		Reflect.get(result, "terminalIntent") === "outcome-unknown" ? "outcome-unknown" : "absent"
 	);
@@ -18503,6 +21303,37 @@ function deriveApplicationProjectionOrder(
 	}
 }
 
+const applicationProjectionOrderMemo = new WeakMap<
+	V3PlaneRegistration,
+	Readonly<{
+		payload: PreparedV3LivePayload;
+		graphVersion: number;
+		index: CausalityIndex;
+		indexSize: number;
+		closeVertices: Map<string, EpochVertex>;
+		closeSize: number;
+		controlVertices: ReadonlySet<string>;
+		controlSize: number;
+		result: V3ApplicationProjectionOrderResult;
+	}>
+>();
+
+/** A fresh frozen copy of a memoized order result: every read returns its own detached arrays. */
+function detachedApplicationProjectionOrder(
+	result: V3ApplicationProjectionOrderResult
+): V3ApplicationProjectionOrderResult {
+	if (!result.ok) return ObjectFreeze({ ...result });
+	const order = result.order;
+	return ObjectFreeze({
+		ok: true,
+		order: ObjectFreeze({
+			...order,
+			digests: ObjectFreeze([...order.digests]),
+			controlDigests: ObjectFreeze([...order.controlDigests]),
+		}),
+	});
+}
+
 /**
  * Reads the canonical application order from one authenticated active plane.
  * @param input - Exact capability-bearing request; copied handles have no provenance.
@@ -18525,15 +21356,45 @@ export function readV3ApplicationProjectionOrder(
 		if (!currentRegistration(registration)) {
 			return ObjectFreeze({ ok: false, kind: "not-active", detail: "v3 application order plane is not active" });
 		}
+		// The order is a pure function of the plane's payload, close vertices, control vertices and
+		// causality index. Those only grow (append, each with a graphVersion bump) or are replaced
+		// whole (a new index object); the memo key carries every one of them, so a hit proves the
+		// derivation inputs are the ones the memoized order was derived from.
+		const memo = applicationProjectionOrderMemo.get(registration);
+		if (
+			memo !== undefined &&
+			memo.payload === registration.payload &&
+			memo.graphVersion === registration.graphVersion &&
+			memo.index === registration.index &&
+			memo.indexSize === registration.index.size &&
+			memo.closeVertices === registration.closeVertices &&
+			memo.closeSize === registration.closeVertices.size &&
+			memo.controlVertices === registration.controlVertices &&
+			memo.controlSize === registration.controlVertices.size
+		)
+			return detachedApplicationProjectionOrder(memo.result);
 		const projection = deriveApplicationProjectionOrder(
 			registration.payload,
 			registration.closeVertices,
 			registration.controlVertices,
 			registration.index
 		);
-		return projection === undefined
-			? ObjectFreeze({ ok: false, kind: "graph-rejected", detail: "v3 application order graph is unavailable" })
-			: ObjectFreeze({ ok: true, order: projection.order });
+		const result: V3ApplicationProjectionOrderResult =
+			projection === undefined
+				? ObjectFreeze({ ok: false, kind: "graph-rejected", detail: "v3 application order graph is unavailable" })
+				: ObjectFreeze({ ok: true, order: projection.order });
+		applicationProjectionOrderMemo.set(registration, {
+			payload: registration.payload,
+			graphVersion: registration.graphVersion,
+			index: registration.index,
+			indexSize: registration.index.size,
+			closeVertices: registration.closeVertices,
+			closeSize: registration.closeVertices.size,
+			controlVertices: registration.controlVertices,
+			controlSize: registration.controlVertices.size,
+			result,
+		});
+		return detachedApplicationProjectionOrder(result);
 	} catch {
 		return ObjectFreeze({ ok: false, kind: "malformed-input", detail: "v3 application order input is invalid" });
 	}
@@ -18666,6 +21527,8 @@ function stageClosedBlueprintEpoch(
 			vertices: projection.vertices,
 		});
 	} catch (error) {
+		const unsound = applicationStateBoundUnsound(registration, error);
+		if (unsound !== undefined) return blueprintFoldFailure("fold-rejected", unsound);
 		return blueprintFoldFailure(
 			"fold-rejected",
 			`v3 blueprint epoch fold was rejected: ${error instanceof Error ? error.message : "unknown failure"}`
@@ -18685,6 +21548,16 @@ function stageClosedBlueprintEpoch(
 			try {
 				const snapshot = staged.adopt();
 				registration.blueprintFolded = true;
+				// A folded plane never admits ingress again: the fold is never undone, and
+				// authenticateV3Ingress drops every row once blueprintClosing is set. Its
+				// closing recovery hold (the close's inline pool and generation maintenance)
+				// requires an empty pending ingress, so a retained row would refuse every
+				// retry of the close. Release the retained rows now: the hot handoff clears
+				// them anyway. A released copy counts as lost for this plane; the successor
+				// snapshot or its author's re-offer delivers the move (the same rule as the
+				// received close; model: member-received-close-pending-release.qnt).
+				registration.pendingIngress.clear();
+				registration.pendingIngressBytes = 0;
 				return ObjectFreeze({ kind: "adopted" as const, ok: true as const, snapshot });
 			} catch {
 				return blueprintAdoptFailure("adopt-rejected", "v3 blueprint fold adoption was rejected");
@@ -19468,8 +22341,10 @@ function prospectiveCreatorRuntimeCensusOverhead(
 		facts.releasing ||
 		facts.retirementAllowed ||
 		!currentRegistration(registration) ||
-		(facts.receivedAppend === undefined && (registration.pendingIngress.size !== 0 ||
-		registration.pendingIngressBytes !== 0 || registration.drainingPendingIngress)) ||
+		// Case 1: a local append carries foreign pending ingress in its census (exact roots,
+		// below). It still refuses while a drain runs or when a pending row is its own.
+		(facts.receivedAppend === undefined && (registration.drainingPendingIngress ||
+		creatorOwnPendingIngress(registration))) ||
 		(registration.rebaseSnapshot?.length ?? 0) !== 0 ||
 		registration.rebaseCursor !== undefined
 	)
@@ -19487,7 +22362,7 @@ function prospectiveCreatorRuntimeCensusOverhead(
 		!ArrayIsArray(census.nativeIssuance.rows.plans) ||
 		!prospectiveCensusRecord(census.pendingIngress) ||
 		!ArrayIsArray(census.pendingIngress.roots) ||
-		(facts.receivedAppend === undefined && census.pendingIngress.roots.length !== 0) ||
+		(facts.receivedAppend === undefined && census.pendingIngress.roots.length !== registration.pendingIngress.size) ||
 		!prospectiveCensusRecord(census.activeUnsettled) ||
 		!ArrayIsArray(census.activeUnsettled.sources) ||
 		census.activeUnsettled.cursor !== null ||
@@ -19587,6 +22462,12 @@ function prospectiveCreatorRuntimeCensusOverhead(
 		...capturedPending, roots: pendingRoots,
 		wireByteCharge: pendingRoots.reduce((sum, root) => sum + Number(root.wireByteCharge), 0),
 		graphClosure: pendingRoots.length === 0 ? "no-pending-roots" : "incomplete"};
+	// Existing isolated diagnostic hook only (case 1): the pending roots this census charges.
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({kind: "creator-census-pending-charge", received: facts.receivedAppend !== undefined,
+			roots: (pendingIngress.roots as unknown[]).length, wireByteCharge: pendingIngress.wireByteCharge});
+	} catch { /* Diagnostics cannot alter sizing. */ }
 	// Exclude the separately charged native leaf, not its enclosing key/map entry.
 	const originalWidth = prospectiveCensusRecordWidth(
 			{
@@ -19765,9 +22646,14 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 		plan === candidatePlan && settlement?.planEffect !== undefined && !receivedAppend ?
 			applySettlementPlanEffect(plan, settlement.planEffect, candidate.sequence,
 				settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes)) : plan);
-	const custodySourceCount = nativeRows.issued.filter(row => sameScope(row, candidate.scope)).length + Number(!receivedAppend) + futureJobs.length;
+	// Rule B/HB (issuance-image-capacity.qnt): only rows that can still become sources, and the
+	// widest own source preimage bounds a hand-back record's operation.
+	const potentialSources = issuancePotentialSourceCustody({issued: nativeRows.issued, plans: nativeRows.plans}, candidate.scope, sourceCustody);
+	const custodySourceCount = potentialSources.count + Number(!receivedAppend) + futureJobs.length;
+	const handBackOperationBytes = Math.max(potentialSources.maxPreimageByteLength, candidate.bytes.byteLength,
+		...futureJobs.map(job => job.intent.canonicalPreimageBytes.byteLength));
 	const currentPlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(currentPlans, sourceCustody === undefined ? undefined :
-		{scope: candidate.scope, maxSourceCount: custodySourceCount, geometry: sourceCustody});
+		{scope: candidate.scope, maxSourceCount: custodySourceCount, geometry: sourceCustody, maxHandBackOperationByteLength: handBackOperationBytes});
 	const currentPublishedCensusSizing = ObjectFreeze({
 		runtimeCensusOverheadByteLength: currentRuntimeOverhead,
 		nativeRowsByteLength: currentNativeRowsByteLength,
@@ -20231,7 +23117,8 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			planIndex: planOrder.findIndex((row) => row.scope.author === author),
 		}));
 		const nativePlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(plans, sourceCustody === undefined ? undefined :
-			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody});
+			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody,
+				maxHandBackOperationByteLength: handBackOperationBytes});
 		const results: CreatorPostAdoptionCensusSizing[] = [];
 		// An original signed settlement frontier selects the raw successor
 		// store (installCreatorSuccessorLive); unlike the no-settlement branch
@@ -20553,6 +23440,556 @@ function resolvePostAdoptionCensusSizing(
 	}
 }
 
+/** One plane's running application fold: its machine after folding the admitted epoch graph (at
+ * `graphVersion`, on `base`) in the derived projection order. Never adopted into the plane. */
+type ApplicationStateFold = Readonly<{
+	base: BlueprintStateMachine;
+	/** The epoch graph's index and payload: a reset plane replaces both, so a fold cannot outlive it. */
+	index: V3PlaneRegistration["index"];
+	payload: V3PlaneRegistration["payload"];
+	graphVersion: number;
+	digest: string | undefined;
+	machine: BlueprintStateMachine;
+	/** The running fold this one extends by one apply, when it was forked from it. */
+	from?: BlueprintStateMachine;
+}>;
+/** One plane's application state bound, advanced with its admitted non-control operations. */
+type ApplicationStateBoundCache = {
+	base: BlueprintStateMachine;
+	index: V3PlaneRegistration["index"];
+	payload: V3PlaneRegistration["payload"];
+	/** Undefined once the bound does not cover this plane's material: the exact fold judges instead. */
+	bound: V3ApplicationStateBound | undefined;
+	advanced: Set<string>;
+	pending?: Readonly<{ digest: string; operation: unknown }>;
+	/** The bound admitted a candidate on this plane (the seal names the bound if its fold refuses). */
+	admittedByBound: boolean;
+};
+const applicationStateBounds = new WeakMap<V3PlaneRegistration, ApplicationStateBoundCache>();
+
+/** A deferred seed turn stops stepping after this long (plus at most one step), so each turn stays under 1 ms. */
+const APPLICATION_STATE_SEED_TURN_MS = 0.8;
+/** Base bytes per seed step (a few dozen Grid blocks): one step is a small fraction of a turn. */
+const APPLICATION_STATE_SEED_STEP_BYTES = 512;
+const HostSetImmediate: unknown = Reflect.get(globalThis, "setImmediate");
+const HostMessageChannel: unknown = Reflect.get(globalThis, "MessageChannel");
+let seedTurnChannel: Readonly<{ queue: (() => void)[]; post(): void }> | undefined;
+/**
+ * Runs a seed turn in the next host task, back to back with the previous one but never inside it: the
+ * host's own work (I/O, timers, a browser's frames) runs between turns. Node's setImmediate, else a
+ * MessageChannel task (unclamped, unlike a nested setTimeout), else setTimeout.
+ */
+function scheduleSeedTurn(turn: () => void): void {
+	if (typeof HostSetImmediate === "function") {
+		ReflectApply(HostSetImmediate, globalThis, [turn]);
+		return;
+	}
+	if (typeof HostMessageChannel === "function") {
+		if (seedTurnChannel === undefined) {
+			const channel = new (HostMessageChannel as typeof MessageChannel)();
+			const queue: (() => void)[] = [];
+			channel.port1.onmessage = () => queue.shift()?.();
+			seedTurnChannel = ObjectFreeze({ queue, post: () => channel.port2.postMessage(undefined) });
+		}
+		seedTurnChannel.queue.push(turn);
+		seedTurnChannel.post();
+		return;
+	}
+	setTimeout(turn, 0);
+}
+/**
+ * Seeds each plane's bound after its machine install, in host turns of under 1 ms run back to back (one
+ * live seed per plane), so the seed has usually finished before the first move after the install.
+ */
+const applicationStateBoundSeeds = createDeferredSeedRunner<V3PlaneRegistration, V3ApplicationStateBound>({
+	schedule: scheduleSeedTurn,
+	now: () => (typeof performance === "undefined" ? Date.now() : performance.now()),
+	turnMs: APPLICATION_STATE_SEED_TURN_MS,
+	stepBytes: APPLICATION_STATE_SEED_STEP_BYTES,
+});
+
+/**
+ * The application's bound when it fits this room: the closed shape, and a base bound within the room's
+ * limit. A bound that does not fit the limit even before any operation (a constant ceiling above the
+ * room's limit) cannot decide this room's moves: the exact fold judges them.
+ */
+function fittingApplicationStateBound(created: unknown, limitBytes: number): V3ApplicationStateBound | undefined {
+	const bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
+		typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
+		? created as V3ApplicationStateBound : undefined;
+	const quotedBase = bound?.quoteBase();
+	return quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > limitBytes
+		? undefined : bound;
+}
+
+/** Records a plane's seeded bound over its base (fresh: nothing advanced yet but the anchor). */
+function installApplicationStateBound(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	bound: V3ApplicationStateBound | undefined,
+	event: Readonly<Record<string, unknown>>
+): ApplicationStateBoundCache {
+	const cache: ApplicationStateBoundCache = { base, index: registration.index, payload: registration.payload, bound,
+		advanced: new IntrinsicSet(), admittedByBound: false };
+	cache.advanced.add(registration.payload.provenance.anchorDigest);
+	applicationStateBounds.set(registration, cache);
+	emitApplicationStateBoundSeed(registration, { covered: bound !== undefined, ...event });
+	return cache;
+}
+
+function emitApplicationStateBoundSeed(registration: V3PlaneRegistration, event: Readonly<Record<string, unknown>>, kind =
+	"application-state-bound-seed"): void {
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({ kind, receiver: registration.issuanceScope.author, ...event });
+	} catch { /* Diagnostics cannot alter admission. */ }
+}
+
+/**
+ * Seeds a plane's application state bound over its base in one call: the application decodes the base
+ * state once. The fallback seed: an application without a resumable seed at install, and any admission
+ * check that finds no finished seed for the current base (a self-seed, counted by its mode).
+ * @returns The seeded cache, or undefined when the plane's policy offers no bound.
+ */
+function seedApplicationStateBound(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	mode: "install" | "self"
+): ApplicationStateBoundCache | undefined {
+	const policy = registration.operationAdmissionPolicy;
+	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
+	if (typeof create !== "function") return undefined;
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	let bound: V3ApplicationStateBound | undefined;
+	try {
+		bound = fittingApplicationStateBound(ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]), registration.payload.parameters.maxApplicationStateBytes);
+	} catch {
+		bound = undefined;
+	}
+	const durationUs = typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000);
+	return installApplicationStateBound(registration, base, bound, { mode, durationUs, maxTurnUs: durationUs, turns: 1 });
+}
+
+/** Whether the plane still has the machine, index and payload a seed was begun for. */
+function applicationStateBoundBaseCurrent(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	index: V3PlaneRegistration["index"],
+	payload: V3PlaneRegistration["payload"]
+): boolean {
+	return registration.active && registration.blueprintMachine === base && registration.index === index &&
+		registration.payload === payload && !registration.blueprintClosing && !registration.blueprintFolded;
+}
+
+/**
+ * Seeds the plane's application state bound when its machine is installed (genesis bind, successor or
+ * recovery install), never failing the install. With the application's resumable seed, the seed runs in
+ * short host turns after the install (each well under 1 ms), so no move's admission check and no install
+ * turn pays the base decode; the next install abandons an unfinished seed and begins one over its own
+ * base. Without one, the install seeds in one call, as before.
+ */
+function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): void {
+	try {
+		const base = registration.blueprintMachine;
+		if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return;
+		const policy = registration.operationAdmissionPolicy;
+		const begin = policy === undefined ? undefined : Reflect.get(policy, "beginApplicationStateBound");
+		if (typeof begin !== "function") {
+			applicationStateBoundSeeds.cancel(registration);
+			seedApplicationStateBound(registration, base, "install");
+			return;
+		}
+		const index = registration.index;
+		const payload = registration.payload;
+		applicationStateBoundSeeds.begin(registration, {
+			start: () => {
+				const exactCanonicalStateBytes = base.snapshot().exactCanonicalStateBytes;
+				const seed: unknown = ReflectApply(begin, policy, [exactCanonicalStateBytes]);
+				if (!isObject(seed) || typeof Reflect.get(seed, "step") !== "function" || typeof Reflect.get(seed, "finish") !== "function") {
+					// No resumable seed for this base: the synchronous seed, in this deferred turn.
+					const create = Reflect.get(policy as object, "createApplicationStateBound");
+					return typeof create !== "function" ? undefined : ObjectFreeze({
+						step: () => true,
+						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes]), registration.payload.parameters.maxApplicationStateBytes),
+					});
+				}
+				return ObjectFreeze({
+					step: (byteBudget: number) => ReflectApply(Reflect.get(seed, "step") as (budget: number) => unknown, seed, [byteBudget]) === true,
+					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, []), registration.payload.parameters.maxApplicationStateBytes),
+				});
+			},
+			current: () => applicationStateBoundBaseCurrent(registration, base, index, payload),
+			done: (bound, stats) => {
+				if (!applicationStateBoundBaseCurrent(registration, base, index, payload)) return;
+				// A check that self-seeded this same base meanwhile keeps its cache (and what it advanced).
+				const existing = applicationStateBounds.get(registration);
+				if (existing !== undefined && existing.base === base && existing.index === index && existing.payload === payload) return;
+				// A forced seed was finished inside an admission check: durationUs is the residual that check paid.
+				installApplicationStateBound(registration, base, bound, { ...stats, mode: stats.forced ? "forced" : "deferred",
+					durationUs: stats.forced ? stats.forcedUs : stats.busyUs });
+			},
+			discarded: (stats) => emitApplicationStateBoundSeed(registration, stats, "application-state-bound-seed-discarded"),
+		});
+	} catch { /* A seed is an optimization: the first admission check seeds instead. */ }
+}
+
+/**
+ * The bound path of the application state check: whether the application's own state bound, over this
+ * plane's base and admitted operations plus the candidate, stays within the room's limit. O(operation).
+ * The exact state is at most the bound (the application's theorem, property-tested per shipped app), so
+ * a vertex admitted here never makes the seal's fold refuse; the seal names the bound if it ever does.
+ * Conservative near the limit: the usable state there is bounded by the application's bound.
+ *
+ * While the plane's deferred seed has not finished, a candidate that sorts last is judged by the exact
+ * fold instead (its running fold plus one apply), so no move pays the seed; the bound catches up over
+ * the epoch graph once it is seeded (the exact fold never admits past the limit, and the bound covers
+ * every admitted vertex). Any other candidate would refold the epoch: it finishes the pending seed in
+ * this turn, paying only the walk the seed's own turns had not done yet.
+ * @returns The verdict and the quoted bound; "seed-pending" when the exact fold judges this candidate while
+ * the seed finishes; undefined when the plane has no bound covering this material.
+ */
+function applicationStateBoundAdmits(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>,
+	sortsLast: boolean
+): Readonly<{ admitted: boolean; quoted: number; rebuilt: boolean }> | "seed-pending" | undefined {
+	const stale = (cache: ApplicationStateBoundCache | undefined): boolean =>
+		cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload;
+	let cache = applicationStateBounds.get(registration);
+	let rebuilt = false;
+	if (stale(cache) && applicationStateBoundSeeds.pending(registration)) {
+		if (sortsLast) return "seed-pending";
+		applicationStateBoundSeeds.finishNow(registration);
+		cache = applicationStateBounds.get(registration);
+		rebuilt = true;
+	}
+	if (stale(cache)) {
+		// No seed over this base, finished or pending (the plane was reset since its install): self-seed
+		// now, in this turn.
+		applicationStateBoundSeeds.cancel(registration);
+		cache = seedApplicationStateBound(registration, base, "self");
+		rebuilt = true;
+	}
+	if (cache === undefined) return undefined;
+	const disable = (): undefined => {
+		cache.bound = undefined;
+		return undefined;
+	};
+	const pending = cache.pending;
+	cache.pending = undefined;
+	if (cache.bound === undefined) return undefined;
+	try {
+		// Advance with what was admitted since: the last admitted candidate at once, any other vertex
+		// (received under another path, or control) by a catch-up over the epoch graph.
+		if (pending !== undefined && !cache.advanced.has(pending.digest) && registration.closeVertices.has(pending.digest)) {
+			if (!cache.bound.advance([pending.operation])) return disable();
+			cache.advanced.add(pending.digest);
+		}
+		if (cache.advanced.size !== registration.closeVertices.size) {
+			const operations: unknown[] = [];
+			for (const [hash, vertex] of registration.closeVertices) {
+				if (cache.advanced.has(hash)) continue;
+				cache.advanced.add(hash);
+				if (!registration.controlVertices.has(hash) && vertex.operation !== undefined) operations.push(vertex.operation);
+			}
+			if (operations.length !== 0 && !cache.bound.advance(operations)) return disable();
+		}
+		const quoted = cache.bound.quote(candidate.operation);
+		if (quoted === undefined || !NumberIsSafeInteger(quoted) || quoted < 1) return disable();
+		const admitted = quoted <= registration.payload.parameters.maxApplicationStateBytes;
+		if (admitted) {
+			cache.pending = ObjectFreeze({ digest: candidate.digest, operation: candidate.operation });
+			cache.admittedByBound = true;
+		}
+		return ObjectFreeze({ admitted, quoted, rebuilt });
+	} catch {
+		return disable();
+	}
+}
+
+/**
+ * The typed internal error when the seal's exact fold passes the room's application state limit although
+ * the application's state bound admitted this plane's vertices: the bound is wrong (it claims to cover
+ * every reachable state), never a silent stall.
+ * @returns The error detail, or undefined when the failure is not that.
+ */
+function applicationStateBoundUnsound(registration: V3PlaneRegistration, error: unknown): string | undefined {
+	if (!isObject(error) || Reflect.get(error, "code") !== "INVALID_APPLICATION_STATE" || !applicationStateBoundUsed(registration))
+		return undefined;
+	const detail = `APPLICATION_STATE_BOUND_UNSOUND: the application's state bound (readOrdinaryApplicationResourceBound) admitted ` +
+		`operations whose exact fold passes the room's application state limit (${registration.payload.parameters.maxApplicationStateBytes} bytes); ` +
+		`the application's bound is wrong: ${error instanceof Error ? error.message : "unknown failure"}`;
+	try {
+		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-application-state", detail]);
+	} catch { /* Diagnostics only. */ }
+	return detail;
+}
+
+/** Whether this plane admitted any vertex on the application's state bound (the seal names it). */
+function applicationStateBoundUsed(registration: V3PlaneRegistration): boolean {
+	const cache = applicationStateBounds.get(registration);
+	return cache !== undefined && cache.admittedByBound && cache.base === registration.blueprintMachine;
+}
+
+const applicationStateFolds = new WeakMap<
+	V3PlaneRegistration,
+	{ running?: ApplicationStateFold; pending?: ApplicationStateFold }
+>();
+
+/**
+ * Whether this epoch's application fold, with one more non-control vertex, stays within the room's
+ * application state limit.
+ *
+ * Invariant: the fold judged here is exactly the fold the seal runs (the admitted epoch graph plus
+ * the candidate, in the derived projection order, on the plane's machine, whose limits are the
+ * room's). The creator is the authoritative admitter: every vertex that enters its epoch graph
+ * passes this check there, so no admitted vertex can make the seal's fold refuse. A Writer runs the
+ * same check on its own view; that refusal is early and advisory (another Writer's concurrent move
+ * may change the creator's fold), and correctness never rests on it.
+ *
+ * Incremental by construction. The plane keeps a running fold of its admitted graph. A candidate
+ * that depends on every tip of the epoch graph is a descendant of every vertex, so it sorts last in
+ * the derived order and the new fold is the running fold plus one apply: O(operation + state). The
+ * creator sequences, so its own and received moves are almost always such candidates. Otherwise
+ * (or when the running fold is stale) the epoch is refolded once and the running fold is rebuilt.
+ * Authorization and the application's own admission are judged elsewhere; only the state bound is
+ * judged here.
+ * @param registration - The current plane.
+ * @param candidate - The candidate vertex: its digest, author, dependencies, operation and byte charge.
+ * @param path - Diagnostics label of the admission path.
+ * @returns False only when the fold passes the room's state limit.
+ */
+function applicationStateAdmits(
+	registration: V3PlaneRegistration,
+	candidate: Readonly<{
+		digest: string;
+		author: string;
+		dependencies: readonly string[];
+		operation: Readonly<Record<string, unknown>>;
+		byteCharge: number;
+	}>,
+	path: "local" | "received"
+): boolean {
+	const base = registration.blueprintMachine;
+	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
+	if (registration.closeVertices.has(candidate.digest)) return true;
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	const emit = (event: Readonly<Record<string, unknown>>): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "application-state-bound", path, author: candidate.author, receiver: registration.issuanceScope.author,
+					durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000), ...event });
+		} catch { /* Diagnostics cannot alter admission. */ }
+	};
+	const tips = registration.index.tips();
+	const sortsLast = tips.every((tip) => candidate.dependencies.includes(tip));
+	// The application's own state bound, when it covers this material: O(operation), no fold.
+	const bounded = applicationStateBoundAdmits(registration, base, candidate, sortsLast);
+	const seedPending = bounded === "seed-pending";
+	if (bounded !== undefined && bounded !== "seed-pending") {
+		emit({ mode: "bound", refolded: bounded.rebuilt, admitted: bounded.admitted, sortsLast, stateBytes: bounded.quoted });
+		return bounded.admitted;
+	}
+	const limitRefusal = (error: unknown): boolean =>
+		isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE";
+	const context = ObjectFreeze({ author: candidate.author });
+	let cache = applicationStateFolds.get(registration);
+	if (cache === undefined) {
+		cache = {};
+		applicationStateFolds.set(registration, cache);
+	}
+	const graphVersion = registration.graphVersion;
+	if (
+		cache.pending !== undefined &&
+		cache.pending.base === base &&
+		cache.pending.index === registration.index &&
+		cache.pending.payload === registration.payload &&
+		cache.pending.graphVersion === graphVersion &&
+		cache.pending.digest !== undefined &&
+		registration.closeVertices.has(cache.pending.digest)
+	) {
+		const pending = cache.pending;
+		const previous = cache.running;
+		let machine: BlueprintStateMachine | undefined = pending.machine;
+		if (previous !== undefined && pending.from === previous.machine) {
+			// Advance the running machine in place, so an admission never retains the previous state
+			// through its fork's parent link: memory stays one running state per plane.
+			try {
+				previous.machine.adopt(pending.machine);
+				machine = previous.machine;
+			} catch {
+				machine = undefined;
+			}
+		}
+		cache.running = machine === undefined ? undefined : ObjectFreeze({ base, index: registration.index,
+			payload: registration.payload, graphVersion, digest: pending.digest, machine });
+	}
+	cache.pending = undefined;
+	let running = cache.running !== undefined && cache.running.base === base && cache.running.graphVersion === graphVersion &&
+		cache.running.index === registration.index && cache.running.payload === registration.payload
+		? cache.running : undefined;
+	let refolded = false;
+	let admitted = true;
+	try {
+		if (running === undefined) {
+			// Rebuild the running fold of the admitted graph, in the seal's order.
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			if (vertices === undefined || authors === undefined) return true;
+			const fold = foldApplicationProjection(registration, base, vertices, authors, new IntrinsicMap(registration.closeCharges));
+			if (fold === undefined) return true;
+			running = ObjectFreeze({ base, index: registration.index, payload: registration.payload, graphVersion,
+				digest: undefined, machine: fold });
+			cache.running = running;
+			refolded = true;
+		}
+		let next: BlueprintStateMachine | undefined;
+		let from: BlueprintStateMachine | undefined;
+		if (sortsLast) {
+			from = running.machine;
+			next = running.machine.fork();
+			next.apply(candidate.operation, context);
+		} else {
+			refolded = true;
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			if (vertices === undefined || authors === undefined) return true;
+			vertices.set(
+				candidate.digest,
+				ObjectFreeze({
+					hash: candidate.digest,
+					kind: "drp-vertex",
+					objectId: registration.payload.provenance.objectId,
+					epoch: registration.payload.provenance.epoch,
+					anchor: registration.payload.provenance.anchorDigest,
+					dependencies: [...candidate.dependencies],
+					operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+				})
+			);
+			authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+			const charges = new IntrinsicMap(registration.closeCharges);
+			charges.set(candidate.digest, candidate.byteCharge);
+			next = foldApplicationProjection(registration, base, vertices, authors, charges);
+		}
+		if (next !== undefined)
+			cache.pending = ObjectFreeze({ base, index: registration.index, payload: registration.payload,
+				graphVersion: graphVersion + 1, digest: candidate.digest, machine: next,
+				...(from === undefined ? {} : { from }) });
+	} catch (error) {
+		// Only the state bound is judged here; any other fold failure is another check's to refuse.
+		if (limitRefusal(error)) admitted = false;
+	}
+	const staged = cache.pending?.digest === candidate.digest ? cache.pending.machine : undefined;
+	emit({ mode: "exact", refolded, admitted, sortsLast, ...(seedPending ? { seedPending } : {}),
+		...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
+	return admitted;
+}
+
+/**
+ * The application state check of one settlement drain chunk issued as a batch (issueReplacementBatch):
+ * whether the epoch's fold with ALL the chunk's rows (a chain: the first depends on the tips, each later
+ * one on its predecessor) stays within the room's application state limit. A single row is judged
+ * exactly as a single local issue judges it (applicationStateAdmits). Several rows are judged by one
+ * exact refold of the admitted graph with the whole chain inserted (the seal's fold), on a staged fork:
+ * applicationStateAdmits stages one candidate at a time and cannot judge a row whose predecessor is not
+ * admitted yet. Nothing here is cached or staged; the admitted rows are caught up by the next check.
+ * @returns False only when the chain's fold passes the room's state limit.
+ */
+function applicationStateAdmitsChain(
+	registration: V3PlaneRegistration,
+	candidates: readonly Readonly<{
+		digest: string;
+		author: string;
+		dependencies: readonly string[];
+		operation: Readonly<Record<string, unknown>>;
+		byteCharge: number;
+	}>[]
+): boolean {
+	const [only] = candidates;
+	if (only !== undefined && candidates.length === 1) return applicationStateAdmits(registration, only, "local");
+	const base = registration.blueprintMachine;
+	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
+	const vertices = copyCloseVertices(registration.closeVertices);
+	const authors = copyCloseAuthors(registration.closeAuthors);
+	if (vertices === undefined || authors === undefined) return true;
+	const charges = new IntrinsicMap(registration.closeCharges);
+	for (const candidate of candidates) {
+		if (registration.closeVertices.has(candidate.digest)) continue;
+		vertices.set(
+			candidate.digest,
+			ObjectFreeze({
+				hash: candidate.digest,
+				kind: "drp-vertex",
+				objectId: registration.payload.provenance.objectId,
+				epoch: registration.payload.provenance.epoch,
+				anchor: registration.payload.provenance.anchorDigest,
+				dependencies: [...candidate.dependencies],
+				operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+			})
+		);
+		authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+		charges.set(candidate.digest, candidate.byteCharge);
+	}
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	let admitted = true;
+	let stateBytes: number | undefined;
+	try {
+		stateBytes = foldApplicationProjection(registration, base, vertices, authors, charges)?.exactStateByteLength;
+	} catch (error) {
+		// Only the state bound is judged here; any other fold failure is another check's to refuse.
+		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") admitted = false;
+	}
+	// Observation only (the "__warmProofEvent" proof hook): the chunk's refold cost, for the batch bench.
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({ kind: "application-state-bound-chain", rows: candidates.length, admitted,
+				receiver: registration.issuanceScope.author,
+				durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000),
+				...(stateBytes === undefined ? {} : { stateBytes }) });
+	} catch { /* Diagnostics cannot alter admission. */ }
+	return admitted;
+}
+
+/**
+ * The plane's machine after folding the given epoch graph in the derived projection order, exactly
+ * as the seal folds it, on a staged fork that is never adopted.
+ * @returns The staged machine, or undefined when the graph has no projection order.
+ */
+function foldApplicationProjection(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	vertices: Map<string, EpochVertex>,
+	authors: Map<string, CloseVertexIdentity>,
+	charges: Map<string, number>
+): BlueprintStateMachine | undefined {
+	const anchorDigest = registration.payload.provenance.anchorDigest;
+	let projection: ReturnType<typeof deriveApplicationProjectionOrder>;
+	try {
+		const index = new CausalityIndex(vertices, topologicalOrder(vertices, anchorDigest), {
+			initialByteCharges: charges,
+			maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+			maxEpochVertices: registration.payload.parameters.maxEpochVertices,
+		});
+		projection = deriveApplicationProjectionOrder(registration.payload, vertices, new IntrinsicSet(registration.controlVertices), index);
+	} catch {
+		// Graph capacity and shape are judged by their own checks, not by this bound.
+		return undefined;
+	}
+	if (projection === undefined) return undefined;
+	const machine = base.fork();
+	for (const hash of topologicalOrder(projection.vertices, anchorDigest)) {
+		if (hash === anchorDigest) continue;
+		const vertex = projection.vertices.get(hash);
+		const identity = authors.get(hash);
+		if (vertex === undefined || identity === undefined) return undefined;
+		machine.apply(vertex.operation, ObjectFreeze({ author: identity.author }));
+	}
+	return machine;
+}
+
 /**
  * Pure sizing data from the original prepared issuer, never an admitted vertex.
  * @param registration - Original captured registration facts.
@@ -20643,7 +24080,7 @@ function previewCreatorIssuanceClose(
 	if (projection === undefined || aclPreview === undefined || metadata === undefined)
 		throw new TypeError("creator issuance close preview projection is invalid");
 	const machine = registration.blueprintMachine.fork();
-	foldBlueprintEpoch({
+	try { foldBlueprintEpoch({
 		anchorHash: registration.payload.provenance.anchorDigest,
 		machine,
 		vertices: projection.vertices,
@@ -20660,7 +24097,10 @@ function previewCreatorIssuanceClose(
 			if (identity === undefined) throw new TypeError("creator issuance close preview author is unavailable");
 			return ObjectFreeze({ author: identity.author });
 		},
-	}).adopt();
+	}).adopt(); } catch (error) {
+		const unsound = applicationStateBoundUnsound(registration, error);
+		throw unsound === undefined ? error : new TypeError(unsound, { cause: error });
+	}
 	const exactCanonicalSuccessorAclBytes = encodeCanonical(aclPreview.next, {
 		maxBytes: registration.payload.parameters.maxSnapshotBytes,
 	});
@@ -20747,6 +24187,8 @@ function importLiveSnapshotMachine(
 			expectedPayloadDigest: input.expectedPayloadDigest as string,
 			expectedSchemaVersion: SNAPSHOT_SCHEMA_VERSION,
 			maxSnapshotBytes: payload.parameters.maxSnapshotBytes,
+			// The room's authenticated limit bounds the imported state, as it bounds a successor install.
+			maxApplicationStateBytes: payload.parameters.maxApplicationStateBytes,
 			preparedBlueprintRuntime: payload.runtime,
 		});
 		return imported.machine;
@@ -20780,7 +24222,7 @@ function importCreatorSuccessorInitialMachine(
 			return undefined;
 		}
 		return new BlueprintStateMachine({
-			maxApplicationStateBytes: recovered.prepared.parameters.maxSnapshotBytes,
+			maxApplicationStateBytes: recovered.prepared.parameters.maxApplicationStateBytes,
 			exactCanonicalInitialStateBytes,
 			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
 			expectedInitialStateDigest: input.expectedApplicationStateDigest,
@@ -20876,7 +24318,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		let machine: BlueprintStateMachine;
 		try {
 			machine = new BlueprintStateMachine({
-				maxApplicationStateBytes: registration.payload.parameters.maxSnapshotBytes,
+				maxApplicationStateBytes: registration.payload.parameters.maxApplicationStateBytes,
 				exactCanonicalInitialStateBytes: initialStateBytes,
 				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
 				expectedInitialStateDigest: initialStateDigest,
@@ -20893,6 +24335,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		});
 		const handle = makeV3BlueprintLiveHandle(registration);
 		registration.blueprintHandle = handle;
+		seedApplicationStateBoundAtInstall(registration);
 		return ObjectFreeze({ handle, ok: true as const });
 	} catch {
 		return activationFailure("internal-invariant", "v3 blueprint binding failed");
@@ -21065,7 +24508,9 @@ async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration,
 			original.authorSequence !== identity.authorSequence || graph.charges.get(row.digest) !== row.byteCharge ||
 			row.byteCharge !== row.exactCanonicalPreimageBytes.byteLength) return undefined;
 		const sequences = identities.get(identity.author) ?? new Set<number>();
-		if (sequences.has(identity.authorSequence)) return undefined;
+		// Only the issuance author must be unique here; a foreign same-slot duplicate stays
+		// in the graph and the settlement frontier freezes that author (case 23).
+		if (sequences.has(identity.authorSequence) && identity.author === registration.issuanceScope.author) return undefined;
 		sequences.add(identity.authorSequence); identities.set(identity.author, sequences); digests.add(row.digest);
 	}
 	return ObjectFreeze({ graph, rows });
@@ -21444,8 +24889,17 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 		sameHead(resumeControl.active.preparation.head, payload.trust.head) &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
-	const requestMatches = (): boolean => completedRequestMatches() || activeRequestMatches();
-	const completedResume = resume && registration.operationAdmissionHalted && requestMatches() ? resumeControl : undefined;
+	// A turnover receipt with no resumable native control is the same request: the
+	// snapshot pool turned over before the native store recorded that turnover's
+	// intent (a death in between), so a durable reopen halts on the receipt alone.
+	// The creator's readiness boundary discharges it the same way; without this the
+	// member's resume defers, the halt stays and the reopened session fails.
+	const receiptRequestMatches = (): boolean => resumeControl === undefined && reconstruction !== undefined &&
+		sameHead(reconstruction.head, payload.trust.head) && sameCreatorRoomHead(reconstruction.roomHead, trust) &&
+		creatorRetirementResumeRequested(registration);
+	const requestMatches = (): boolean => completedRequestMatches() || activeRequestMatches() || receiptRequestMatches();
+	const completedResume = resume && registration.operationAdmissionHalted && requestMatches()
+		? resumeControl ?? reconstruction : undefined;
 	if (resume && completedResume === undefined) return "deferred";
 	const admissionStateCurrent = (): boolean => completedResume === undefined
 		? !registration.operationAdmissionHalted
@@ -21576,7 +25030,16 @@ function creatorCloseRegistration(
 			registration.blueprintClosing = true;
 			return enqueueRegistrationTask(registration, () => () => {
 				const current = currentRegistration(registration);
-				if (current) registration.receivedTransition = true;
+				if (current) {
+					registration.receivedTransition = true;
+					// The closing plane admits no more ingress, and its received recovery hold
+					// requires an empty pending ingress. Release the retained rows now: the hot
+					// handoff clears them anyway. A released copy counts as lost here; the
+					// successor snapshot or its author's re-offer delivers the move (model:
+					// member-received-close-pending-release.qnt).
+					registration.pendingIngress.clear();
+					registration.pendingIngressBytes = 0;
+				}
 				return Promise.resolve(current);
 			});
 		},
@@ -21596,6 +25059,11 @@ function creatorCloseRegistration(
 			registration.blueprintClosing = false;
 			return true;
 		},
+		markInterruptedClose: (): void => {
+			if (currentRegistration(registration)) registration.creatorInterruptedClose = true;
+		},
+		interruptedClosePending: (): boolean =>
+			currentRegistration(registration) && creatorInterruptedClosePending(registration),
 		captureCloseGraph: () => captureCreatorCloseGraph(registration),
 		prepareClosedEpochArchive: (hold: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[0],
 			limits: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[1],
@@ -21710,6 +25178,10 @@ function creatorCloseRegistration(
 			receivedMembership = observed;
 			return true;
 		},
+		recordReceivedDepartedClosedMembership: async (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalCloseMembershipBytes: Uint8Array,
+			receivedAuthority: ReceivedCloseAuthorityRecords): Promise<boolean> =>
+			await recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, null,
+				exactCanonicalCloseMembershipBytes, receivedAuthority) !== false,
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>
@@ -21735,6 +25207,7 @@ function creatorCloseRegistration(
 		// source is reflected at once (decision row 73).
 		hasMigrationSourceForOrdinaryPrime: (): boolean => migrationDisplacedSource(registration) !== undefined,
 		sealIssuanceMaintenanceDependencies: (receipt?: object) => {
+			if (receipt === undefined) evictCreatorPendingIngressForCensus(registration);
 			const received = receipt === undefined ? undefined : receivedAppendFacts(registration, receipt);
 			return sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
 				received === undefined ? "issuance-preview" : "received-append", undefined, received?.custody, received);
@@ -21744,14 +25217,10 @@ function creatorCloseRegistration(
 			if (!currentRegistration(registration)) throw new TypeError("creator ordinary readiness owner is unavailable");
 			return registration.operationAdmissionHalted || creatorRetirementResumeRequested(registration);
 		},
-		resumePendingIngress: (): void => {
-			// Received work refused while a maintenance job held the consumer stays
-			// retained, authenticated and charged. Drain it through the original
-			// queue and full admission path once that job joins; never a grant.
-			if (!currentRegistration(registration) || registration.pendingIngress.size === 0) return;
-			void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
-				.catch(() => ingressFailureLog("admission-rejected"));
-		},
+		// Received work refused while a maintenance job held the consumer stays
+		// retained, authenticated and charged. Drain it through the original
+		// queue and full admission path once that job joins; never a grant.
+		resumePendingIngress: (): void => resumePendingIngress(registration),
 		holdIngressForReadiness: (): Promise<(successful: boolean) => void> => holdV3IngressForReadiness(registration),
 		runOrdinaryReadinessMaintenance: (
 			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
@@ -21804,8 +25273,24 @@ function creatorCloseRegistration(
 				if (registration.creatorMaintenanceAdmission === consumer) registration.creatorMaintenanceAdmission = undefined;
 			};
 		},
-		bindSnapshotReadinessOwner: (store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean =>
-			bindSnapshotReadinessOwner(registration, store),
+		bindSnapshotReadinessOwner: async (store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): Promise<boolean> => {
+			// A successor captured its owner (and detected its interrupted close) at
+			// activation. The genesis plane captures its owner here, at close binding:
+			// detect its own interrupted close before the capture, so a failed read
+			// leaves the owner uncaptured and the binding refused.
+			if (registration.snapshotReadiness !== undefined || registration.receiveOnly)
+				return bindSnapshotReadinessOwner(registration, store);
+			let interruptedClose: boolean;
+			try {
+				interruptedClose = await creatorCloseScopeOnDisk(store, registration.payload.input.objectId,
+					registration.payload.trust.trust.currentEpoch);
+			} catch {
+				return false;
+			}
+			if (!bindSnapshotReadinessOwner(registration, store)) return false;
+			if (interruptedClose) registration.creatorInterruptedClose = true;
+			return true;
+		},
 		store: registration.payload.input.store,
 		terminalize: (sealed: Parameters<V3CreatorCloseRegistration["terminalize"]>[0]): boolean => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
@@ -21869,6 +25354,10 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			registration.receiveOnly || registration.mode === "snapshot-closed"
 				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
 				: enqueueLocalIssue(registration, input),
+		issueSettlementLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> =>
+			registration.receiveOnly || registration.mode === "snapshot-closed"
+				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
+				: enqueueLocalIssue(registration, input, "settlement"),
 		readRebaseOutbox: (): Promise<V3RebaseOutboxResult> =>
 			registration.receiveOnly || registration.mode === "snapshot-closed" || !currentRegistration(registration)
 				? Promise.resolve(
@@ -21885,6 +25374,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 							refuse: () => ObjectFreeze({ kind: "admission-rejected" as const, ok: false as const }),
 						}
 					),
+		settlementSourceAuthority: (sourceEpoch: number) => settlementSourceAuthorityRecord(registration, sourceEpoch),
 		completeRebaseSource: (
 			input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
 		): Promise<V3EgressResult> =>
@@ -22091,6 +25581,11 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				controlVertices: recovered.controlVertices,
 				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
 				displacedSource: recovered.displacedSource,
+				// A successor keeps the source authorities its live predecessor held for earlier epochs, for
+				// the replacements rule R deferred past them.
+				...(transportHandoff === undefined || recovered.displacedSource === undefined
+					? {}
+					: { olderDisplacedSources: keptDisplacedSources(transportHandoff, payload.provenance.epoch) }),
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
 				exactCanonicalPinnedGenesisBootstrapOperationBytes:
@@ -22134,6 +25629,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				joinedWork: new IntrinsicSet<Promise<void>>(),
 				admittedInputJobs: 0,
 				admittedInputBytes: 0,
+				admittedSettlementJobs: 0,
+				admittedSettlementBytes: 0,
 				admittedReadControlJobs: 0,
 				admittedPendingPublicationJobs: 0,
 				admittedEgressControlJobs: 0,
@@ -22142,6 +25639,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			};
 			registration.handle = makeV3PlaneHandle(registration);
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
+			seedApplicationStateBoundAtInstall(registration);
 			v3HandleRegistrations.set(registration.handle, registration);
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			if (reusesTransport) {
@@ -22236,7 +25734,8 @@ async function cleanupCreatorSettlementSuccessor(
 					observed.control.completed.sourceProofDigest !== control.completed.sourceProofDigest ||
 					control.completed.generationDrain?.phase === "pending") return;
 				coordinatedIssuance = observed.control.completed.protectedRecords;
-				coordinatedThroughEpoch = observed.control.completed.throughEpoch;
+				// Rule H: rows above the completed floor are kept by the floor, not listed as holes.
+				coordinatedThroughEpoch = issuanceRetirementFloor(observed.control.completed);
 			} finally {await observed.release();}
 		}
 	}
@@ -22442,6 +25941,7 @@ async function cleanupCreatorSettlementSuccessor(
 		publishState: "pending" | "published";
 	}[] = [];
 	let throughAuthorSequence: number | null = null;
+	let windowFences: Promise<ReadonlyMap<number, number>> | undefined;
 	const journalConsumers = new Map<string, boolean>();
 	const journalScopeConsumes = async (epoch: number, anchorDigest: string): Promise<boolean> => {
 		const key = JSON.stringify([epoch, anchorDigest]);
@@ -22469,6 +25969,14 @@ async function cleanupCreatorSettlementSuccessor(
 					done = true;
 					break;
 				}
+				// Rule H: a row above the coordinated floor is protected without a listed hole.
+				const rowEpoch = coordinatedIssuance === undefined ? undefined :
+					(decodeCanonical(row.canonicalPreimageBytes) as {epoch?: unknown}).epoch;
+				if (coordinatedThroughEpoch !== undefined && (typeof rowEpoch !== "number" || rowEpoch > coordinatedThroughEpoch) &&
+					coordinatedIssuance !== undefined) {
+					done = true;
+					break;
+				}
 				const source = authenticatedSettlementSourceRow(
 					payload,
 					authorization,
@@ -22488,7 +25996,15 @@ async function cleanupCreatorSettlementSuccessor(
 						(source.admitted.epoch > classifiedThroughEpoch || row.publishState !== "published")) ||
 					!(
 						source.admitted.epoch < frontier.admissionEpoch ||
-						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
+						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough) ||
+						// Past the own-row window a displaced row is resolved as expired; only the
+						// closed-retirement coordinator (which left it unprotected) may drain it.
+						(coordinatedIssuance !== undefined &&
+							settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, row.authorSequence,
+								frontier.admissionEpoch, frontier.terminalThrough) === "displaced" &&
+							settlementOwnRowWindowExpired(source.admitted.epoch, frontier.currentEpoch) &&
+							settlementOwnRowFenceGuarded(await (windowFences ??= ownEpochFences(material.issuanceStore,
+								material.issuanceScope)), source.admitted.epoch, row.authorSequence, frontier.terminalThrough))
 					)
 				) {
 					done = true;
@@ -22676,6 +26192,12 @@ async function activateCreatorSuccessorLive(
 		if (sourcePlan === undefined) return rejected("preparation-rejected", "creator source custody plan is invalid");
 		const retainedSources = await prepareCreatorRetainedSourceContracts(sourcePlan, material.successor.trust, material.catalog);
 		const retainedSourceCustody = retainedSources.values().next().value?.contract.capability;
+		// The persisted last-member frontier is re-verified at every open; a stored one that does not
+		// verify under the installed trust fails the install closed.
+		const memberFrontier = sourcePlan?.memberFrontier === undefined ? undefined : openCreatorMemberFrontier({
+			currentTrust: material.successor.trust, context: sourcePlan.memberFrontier, author: material.issuanceScope.author});
+		if (sourcePlan?.memberFrontier !== undefined && memberFrontier === undefined)
+			return rejected("preparation-rejected", "creator member frontier proof is invalid");
 		const attachment = material.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(material.checkpoint);
 		const closedTrust = attachment?.remoteCheckpoint.predecessorTrust ?? material.predecessor.trust;
 		const openHistoricalIssuance = (): HistoricalIssuanceContext | undefined => {
@@ -22688,6 +26210,7 @@ async function activateCreatorSuccessorLive(
 				floorTrust: material.successor.trust,
 				sourceTrust: closedTrust,
 				...(retainedSourceCustody === undefined ? {} : {retainedSourceCustody}),
+				captureMemberFrontier: true,
 			});
 			const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
 			return capability === undefined ||
@@ -22702,6 +26225,7 @@ async function activateCreatorSuccessorLive(
 						capability,
 						...(material.checkpoint === undefined ? {} : {checkpoint: material.checkpoint}),
 						retainedSources,
+						...(memberFrontier === undefined ? {} : {memberFrontier}),
 						originalIssuanceStore: nativeIssuanceStore,
 						vertexFacts,
 						count: 0,
@@ -22974,6 +26498,17 @@ async function activateCreatorSuccessorLive(
 			return rejected("recovery-rejected", "creator successor is not the addressed retirement source");
 		if (retirementControl?.nominee != null && retirementControl.active !== null)
 			return rejected("recovery-rejected", "creator successor retirement source has an unresolved nominee");
+		// A close at this epoch that died before adopting left its own snapshot
+		// scope (temporary or retained) at an epoch >= the reopened one.
+		let interruptedClose = false;
+		if (material.origin === "durable-reopen" && material.receiveOnly !== true) {
+			try {
+				interruptedClose = await creatorCloseScopeOnDisk(material.snapshotStore, material.successor.trust.objectId,
+					material.successor.trust.currentEpoch);
+			} catch (cause) {
+				return rejected("recovery-rejected", "creator successor snapshot admission image is unavailable", cause);
+			}
+		}
 		const receipt = material.retirementReconstruction;
 		if (
 			receipt !== undefined &&
@@ -22998,6 +26533,7 @@ async function activateCreatorSuccessorLive(
 		// actual activation and this gate on the SAME private registration.
 		if (!bindSnapshotReadinessOwner(activatedRegistration, material.snapshotStore))
 			return await rejectReplacement("recovery-rejected", "creator successor snapshot readiness owner is unavailable");
+		if (interruptedClose) activatedRegistration.creatorInterruptedClose = true;
 		const resumeCheckpoint =
 			(retirementControl?.active !== null && retirementControl?.active !== undefined) ||
 			// First-successor classification fences retain every byte and have no
@@ -23669,7 +27205,6 @@ async function readSettlementSources(
 	registration: V3PlaneRegistration,
 	settlementFrontier?: SettlementFrontierContext
 ): Promise<V3RebaseOutboxResult> {
-	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
 	let plan;
 	try {
 		plan = copySettlementPlan(
@@ -23677,19 +27212,120 @@ async function readSettlementSources(
 			registration.issuanceScope
 		);
 	} catch {
+		if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
 		return ObjectFreeze({
 			detail: "v3 settlement plan read failed",
 			kind: "store-failed" as const,
 			ok: false as const,
 		});
 	}
+	// The replacements this scan leads to take an owed row's source authority from the plan's records.
+	refreshSettlementSourceAuthorities(registration, plan ?? null);
+	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
+	// Open work keeps its source in the scan even where the frontier calls the row terminal or an old
+	// incarnation: a split replacement, a retained source, and a row the plan still owes a replacement
+	// (rebase or transform, not replaced). The drain issues its fence before its replacements, so a row
+	// rule R deferred (a newer offer queued, or a chunk stopped mid-signing) stays below that fence; once
+	// the creator admits the fence its frontier calls the row terminal. That boundary only records the
+	// author's own fence: the row's epoch closed without it when its entry was written, so it can never be
+	// admitted, and its move is carried by the replacement issued above the fence.
 	const openProgressSources = new Set(
 		plan?.entries
-			.filter((entry) => (entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
-				entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.replacementSequence === null)
+			.filter((entry) => entry.replacementSequence === null && (
+				(entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
+					entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" ||
+				entry.disposition === "rebase" || entry.disposition === "transform"))
 			.map((entry) => entry.sourceSequence) ?? []
 	);
 	return readRebaseOutbox(registration, true, settlementFrontier, openProgressSources);
+}
+
+/** Store domain of a source-authority record's digest (SETTLEMENT_SOURCE_AUTHORITY_DOMAIN). */
+function settlementSourceAuthorityDigest(bytes: Uint8Array): Uint8Array {
+	return hashDomain(SETTLEMENT_SOURCE_AUTHORITY_DOMAIN, bytes);
+}
+
+/**
+ * The source-authority record of the plane's displaced source epoch: that epoch's creator source
+ * context (anchor, signature, ACL, parameters), the same bytes creator custody captures. Only the
+ * displaced epoch: it is the epoch whose owed entries the room's merge at this install adds, and the
+ * one the issuance sizing charged a record for (minSourceEpoch at that epoch). Captured once per plane.
+ * @param registration - The plane.
+ * @param sourceEpoch - The epoch the room asks for.
+ * @returns The record bytes and digest, or undefined.
+ */
+function settlementSourceAuthorityRecord(registration: V3PlaneRegistration, sourceEpoch: number):
+	Readonly<{ digest: Uint8Array; exactCanonicalAuthorityBytes: Uint8Array }> | undefined {
+	const source = registration.displacedSource;
+	if (source === undefined || source.prepared.provenance.epoch !== sourceEpoch ||
+		source.prepared.provenance.objectId !== registration.payload.provenance.objectId ||
+		source.authorization.kind !== "latched-acl" ||
+		settlementProfileFor(source.prepared.trust.trust.profileId) !== "v1" ||
+		source.prepared.provenance.blueprintDigest !== registration.payload.provenance.blueprintDigest) return undefined;
+	if (registration.displacedSourceAuthorityRecord?.source !== source) {
+		const context = captureCreatorSourceContext(source.prepared.trust.trust, encodeCanonical(source.authorization.value),
+			source.prepared.provenance.blueprintDigest, source.prepared.input.exactCanonicalParametersCarrierBytes);
+		const bytes = new Uint8ArrayConstructor(context.exactCanonicalContextBytes);
+		registration.displacedSourceAuthorityRecord = ObjectFreeze({
+			source, digest: settlementSourceAuthorityDigest(bytes), exactCanonicalAuthorityBytes: bytes });
+	}
+	const record = registration.displacedSourceAuthorityRecord!;
+	return ObjectFreeze({ digest: new Uint8ArrayConstructor(record.digest),
+		exactCanonicalAuthorityBytes: new Uint8ArrayConstructor(record.exactCanonicalAuthorityBytes) });
+}
+
+/**
+ * Authenticates the plan's source-authority records against this plane's current trust (G5: bytes
+ * are carriers, opened on every plane) and keeps them by source epoch and anchor. A record already
+ * opened by this plane (same digest) is kept without reopening; a record that does not open is
+ * ignored (its row then has no authority, as before the record existed).
+ * @param registration - The plane.
+ * @param plan - The plan just read.
+ */
+function refreshSettlementSourceAuthorities(registration: V3PlaneRegistration, plan: SettlementPlan | null): void {
+	const records = plan?.sourceAuthorities;
+	if (records === undefined) {
+		registration.settlementSourceAuthorities = undefined;
+		return;
+	}
+	const prior = registration.settlementSourceAuthorities;
+	const opened = new Map<string, Readonly<{ digest: string; authorization: V3LiveAuthorization; context: SettlementSourceContext }>>();
+	for (const record of records) {
+		const digest = lowerHexDigest(record.digest)!;
+		const kept = prior === undefined ? undefined : [...prior].find(([, value]) => value.digest === digest);
+		if (kept !== undefined) {
+			opened.set(kept[0], kept[1]);
+			continue;
+		}
+		const source = openCreatorSourceAuthority(registration.payload.trust.trust, record.exactCanonicalAuthorityBytes,
+			registration.payload.provenance.blueprintDigest);
+		if (source === undefined || source.trust.currentEpoch !== record.sourceEpoch ||
+			source.trust.currentEpoch >= registration.payload.provenance.epoch) continue;
+		let writerCount = 0;
+		for (const member of source.acl.members)
+			if (source.acl.permissionless || member.groups.includes("writer")) writerCount += 1;
+		opened.set(`${source.trust.currentEpoch}\n${source.trust.currentAnchorDigest}`, ObjectFreeze({ digest, context: source.context,
+			authorization: ObjectFreeze({ kind: "latched-acl" as const, value: source.acl, writerCount }) }));
+	}
+	registration.settlementSourceAuthorities = opened;
+}
+
+/**
+ * The authenticated source-authority record of an owed row's signed source epoch and anchor.
+ * @param registration - The plane.
+ * @param admitted - The row's signed epoch and anchor.
+ * @returns The source epoch's ACL authority, or undefined.
+ */
+function settlementSourceAuthorityFor(registration: Pick<V3PlaneRegistration, "settlementSourceAuthorities">,
+	admitted: Readonly<{ epoch: number; anchor: string }>): V3LiveAuthorization | undefined {
+	return settlementSourceAuthorityRecordFor(registration, admitted)?.authorization;
+}
+
+/** The authenticated record (authority and source context) of a row's signed source epoch and anchor. */
+function settlementSourceAuthorityRecordFor(registration: Pick<V3PlaneRegistration, "settlementSourceAuthorities">,
+	admitted: Readonly<{ epoch: number; anchor: string }>):
+	Readonly<{ authorization: V3LiveAuthorization; context: SettlementSourceContext }> | undefined {
+	return registration.settlementSourceAuthorities?.get(`${admitted.epoch}\n${admitted.anchor}`);
 }
 
 export { prepareV3LiveGeneration };
@@ -23748,11 +27384,104 @@ async function readCreatorUnresolvedAcceptedWork(registration: V3PlaneRegistrati
 		return ObjectFreeze(result);
 }
 
+/** One retained own row and what the creator's signed frontier proves about it (frontierRetainedResolution). */
+export interface V3RetainedWorkFrontier {
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+	readonly sourceEpoch: number;
+	/** Already resolved by a signed local-author expiry receipt. */
+	readonly resolved: boolean;
+	readonly frontier: "committed" | "never-admitted" | undefined;
+	/**
+	 * When the frontier proves nothing (frontier undefined): whether a later frontier still could
+	 * (retainedRowUnprovenKind).
+	 */
+	readonly unproven: "awaiting-frontier" | "never" | "provable" | undefined;
+	readonly operations: readonly Readonly<Record<string, unknown>>[];
+}
+
+/**
+ * Retained own work (unresolved, or resolved by a signed expiry) with the creator frontier's proof
+ * for each row. Fresh native/source verification, as inspectV3UnresolvedAcceptedWork.
+ * @param plane - Original live handle.
+ * @returns Every retained application row with its frontier proof.
+ */
+/**
+ * The creator-signed settlement frontier in this plane's installed settlement capability: the highest
+ * own author sequence it admitted (terminalThrough; null when none), or undefined without a valid one.
+ * Signed evidence only, never local acceptance or relay evidence: the room drops a reissue-origin entry
+ * (SettlementPlan.reissueOrigins) once this reaches its chain's last carrier.
+ * @param plane - The live plane.
+ * @returns The admitted author sequence, null, or undefined.
+ */
+export function v3InstalledSettlementAdmittedThrough(plane: V3PlaneHandle): number | null | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration)) return undefined;
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	return frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)
+		? undefined
+		: frontier.terminalThrough;
+}
+
+export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promise<readonly V3RetainedWorkFrontier[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration)) throw new TypeError("creator source custody owner is unavailable");
+	return enqueueRegistrationTask(registration, () => async () => {
+		const payload = registration.payload, scope = registration.issuanceScope;
+		const store = creatorOriginalIssuanceStore(registration);
+		const read = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+		if (read === undefined) throw new TypeError("creator source custody census is unavailable");
+		const readInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+			maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+		const before = await read(readInput);
+		const plan = before.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined)) return ObjectFreeze([]);
+		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
+		const result: V3RetainedWorkFrontier[] = [];
+		// One own-fence scan for the whole inspection (one registration task; the image check below
+		// refuses a changed store), not one full outbox scan per retained entry.
+		let fences: ReturnType<typeof scanOwnFences> | undefined;
+		const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
+		for (const entry of plan.entries) {
+			if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null || entry.replacementProgress !== undefined) continue;
+			const resolved = entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined;
+			if (!resolved && (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
+				entry.sourceResolutionDigest !== undefined)) continue;
+			const retained = sources.get(entry.sourceSequence);
+			const issued = before.rows.issued.find(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+			if (retained === undefined || issued === undefined || !sameBytes(issued.digest, entry.sourceDigest)) continue;
+			const authenticated = authenticateRetainedSourceVertex(retained.contract, issued.canonicalPreimageBytes, issued.signature,
+				issued.digest, scope.author, issued.authorSequence);
+			const intents = authenticated === undefined ? undefined : rebaseIntents(retained.contract, authenticated);
+			if (authenticated === undefined || intents === undefined || intents.length === 0) continue;
+			const sourceEpoch = retained.contract.identity.trust.currentEpoch;
+			if (authenticated.vertex.epoch !== sourceEpoch) continue;
+			const frontier = await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan);
+			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
+				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved, frontier,
+				unproven: resolved || frontier !== undefined ? undefined
+					: await frontierRetainedUnproven(registration, entry.sourceSequence, sourceEpoch, scan),
+				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
+		}
+		const after = await read(readInput);
+		if (!currentRegistration(registration) || registration.payload !== payload || before.image.imageDigest !== after.image.imageDigest)
+			throw new TypeError("creator retained source currency changed");
+		return ObjectFreeze(result);
+	});
+}
+
 export interface V3SourceAbandonmentRequest {
 	readonly sourceSequence: number;
 	readonly sourceDigest: string;
 	readonly sourceContextDigest: string;
 	readonly signal?: AbortSignal;
+	/**
+	 * Resolve on the creator's signed frontier instead of the user's word: the row's epoch is closed and
+	 * the frontier proves it committed or never admitted (frontierRetainedResolution). Published work
+	 * qualifies; nothing else does.
+	 */
+	readonly frontierProof?: true;
 }
 
 /** Terminal local-author abandonment. Never claims publication or commitment. */
@@ -23775,6 +27504,189 @@ function creatorSourceAbandonmentResult(author: string, entry: SettlementPlan["e
 const digestBytesFromHex = (value: string): Uint8Array =>
 	Uint8ArrayConstructor.from(value.match(/../gu)!.map(byte => Number.parseInt(byte, 16)));
 
+/** What resuming a pending unsigned intent concluded. Only "resumed" signed. */
+export type V3PendingIntentResume =
+	| Readonly<{ ok: true; kind: "none" }>
+	| Readonly<{ ok: true; kind: "resumed"; currentEpoch: boolean }>
+	| Readonly<{ ok: false; kind: "not-current" | "behind-frontier"; authorSequence: number; detail: string }>;
+
+/**
+ * C03 layer 2. A crash between entering an intent's signature and committing it leaves the intent
+ * as pending unsigned custody at lineage.next: the store refuses every settlement plan write and
+ * every other intent at that ordinal until the identical intent commits, and has no abandonment.
+ * An intent built in an earlier epoch can never be rebuilt identically (its epoch and dependencies
+ * are gone), so the next epoch's startup drain was refused at its first plan write. This commits
+ * the exact pending intent, with its plan effect, before any plan write: the state a crash just
+ * after that commit leaves. An intent of a closed epoch is then read by the rebase outbox as a
+ * displaced source of that epoch, like every other unpublished row; one of the plane's own epoch
+ * (its rebuild is not identical once the plane has moved on) joins the plane when the room
+ * recovers the plane from storage, as after that crash.
+ * It signs only when the room is current (sync before sending: this author's live frontier is
+ * below lineage.next, which is the pending ordinal) and the ordinal is above the plane's
+ * authenticated closed frontier. Otherwise the intent stays pending and nothing is signed.
+ * Model: packages/node/formal/creator-pending-intent-resume.qnt.
+ * @param plane - Original live handle.
+ * @param raw - Whether the room is current, and the owned signer.
+ * @returns What was concluded.
+ */
+export function resumeV3PendingIssuanceIntent(
+	plane: V3PlaneHandle,
+	raw: Readonly<{ current: boolean; signRegisteredVertexDigest: SignRegisteredVertexDigest }>
+): Promise<V3PendingIntentResume> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("v3 pending intent resume owner is unavailable"));
+	const current = raw.current === true;
+	const sign = raw.signRegisteredVertexDigest;
+	if (typeof sign !== "function") return Promise.reject(new TypeError("v3 pending intent resume signer is invalid"));
+	if (registration.receiveOnly) return Promise.resolve(ObjectFreeze({ ok: true as const, kind: "none" as const }));
+	return enqueueRegistrationTask(registration, () => async (): Promise<V3PendingIntentResume> => {
+		const scope = registration.issuanceScope;
+		const read = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration))?.readBoundedRecoveryCensus;
+		if (read === undefined) return ObjectFreeze({ ok: true as const, kind: "none" as const });
+		const census = await read({
+			objectId: scope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		});
+		if (!currentRegistration(registration)) throw new TypeError("v3 pending intent resume owner is stale");
+		const pending = census.rows.lineages.find((row) => row.author === scope.author && row.objectId === scope.objectId)
+			?.pendingUnsigned;
+		if (pending === undefined) return ObjectFreeze({ ok: true as const, kind: "none" as const });
+		const preimage = decodeCanonical(pending.canonicalPreimageBytes);
+		const epoch = isObject(preimage) ? Reflect.get(preimage, "epoch") : undefined;
+		if (
+			!isObject(preimage) ||
+			Reflect.get(preimage, "author") !== scope.author ||
+			Reflect.get(preimage, "objectId") !== scope.objectId ||
+			Reflect.get(preimage, "authorSequence") !== pending.authorSequence ||
+			!NumberIsSafeInteger(epoch) ||
+			(epoch as number) > registration.payload.provenance.epoch
+		)
+			throw new TypeError("v3 pending unsigned intent is not this author's");
+		const admitted = localAdmittedFrontier(registration, scope);
+		if (admitted !== null && pending.authorSequence <= admitted)
+			return ObjectFreeze({
+				ok: false as const,
+				kind: "behind-frontier" as const,
+				authorSequence: pending.authorSequence,
+				detail: `the room admitted sequence ${admitted} of this author; the pending intent is at ${pending.authorSequence}`,
+			});
+		if (!current)
+			return ObjectFreeze({
+				ok: false as const,
+				kind: "not-current" as const,
+				authorSequence: pending.authorSequence,
+				detail: "a pending intent is signed only once this session is current",
+			});
+		const following = pending.followingIntents ?? [];
+		if (following.length !== 0) {
+			// A batched marker (one drain chunk) is resumed whole, through the batched transaction
+			// that entered it: never a row at a time, never re-derived.
+			const transactIssueBatch = registration.issuanceStore.transactIssueBatch;
+			if (transactIssueBatch === undefined) throw new TypeError("v3 pending batch intent requires its batched store");
+			const intents = [pending, ...following];
+			for (const [index, intent] of intents.entries()) {
+				const decoded = decodeCanonical(intent.canonicalPreimageBytes);
+				if (
+					!isObject(decoded) ||
+					intent.authorSequence !== pending.authorSequence + index ||
+					Reflect.get(decoded, "author") !== scope.author ||
+					Reflect.get(decoded, "objectId") !== scope.objectId ||
+					Reflect.get(decoded, "authorSequence") !== intent.authorSequence ||
+					Reflect.get(decoded, "epoch") !== epoch
+				)
+					throw new TypeError("v3 pending batch intent is not this author's");
+			}
+			// The marker binds the exact plan it was entered against (exactCanonicalPlanBytes); the store
+			// requires those bytes again, so the revision passed is the plan's own as the census read it.
+			const plan = census.rows.plans.find((candidate) => sameScope(candidate.scope, scope));
+			await transactIssueBatch(
+				{ scope, count: intents.length, expectedPlanRevision: plan === undefined ? null : plan.revision },
+				async (firstSequence, nativeSignAdmission) => {
+					if (firstSequence !== pending.authorSequence) throw new TypeError("v3 pending intent ordinal changed");
+					if (nativeSignAdmission === undefined) throw new TypeError("v3 pending intent resume requires its native job");
+					const preimages = intents.map((intent) => new Uint8ArrayConstructor(intent.canonicalPreimageBytes));
+					const digests = preimages.map((bytes, index) => {
+						const digest = hashDomain(V3_VERTEX_DOMAIN, bytes);
+						if (!sameBytes(digest, batchElement(intents, index, "pending intent").digest))
+							throw new TypeError("v3 pending intent digest differs");
+						return digest;
+					});
+					const signed = await nativeSignAdmission(
+						intents.map((intent, index) =>
+							ObjectFreeze({
+								exactCanonicalUnsignedVertexBytes: new Uint8ArrayConstructor(batchElement(preimages, index, "preimage")),
+								...(intent.planEffect === undefined ? {} : { planEffect: intent.planEffect }),
+							})
+						),
+						(index) =>
+							withAuthoredOperationSigningRequest(batchElement(preimages, index, "preimage"), (request) =>
+								sign(new Uint8ArrayConstructor(batchElement(digests, index, "digest")), request)
+							)
+					);
+					if (signed.length !== intents.length) throw new TypeError("v3 pending batch signatures are incomplete");
+					return signed.map((value, index) => {
+						const signature = copyDetachedBytes(value);
+						if (signature === undefined || signature.byteLength !== 64)
+							throw new TypeError("v3 pending intent signature is invalid");
+						const intent = batchElement(intents, index, "pending intent");
+						const authorSequence = intent.authorSequence;
+						const envelope = ObjectFreeze({
+							canonicalPreimageBytes: batchElement(preimages, index, "preimage"),
+							digest: batchElement(digests, index, "digest"),
+							signature,
+						});
+						const commit = ObjectFreeze({
+							authorSequence,
+							envelope,
+							issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+							outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+						});
+						const planEffect = intent.planEffect;
+						return planEffect === undefined ? commit : ObjectFreeze({ ...commit, planEffect });
+					});
+				}
+			);
+			return ObjectFreeze({
+				ok: true as const,
+				kind: "resumed" as const,
+				currentEpoch: epoch === registration.payload.provenance.epoch,
+			});
+		}
+		await registration.issuanceStore.transactIssue(scope, async (authorSequence, nativeSignAdmission) => {
+			if (authorSequence !== pending.authorSequence) throw new TypeError("v3 pending intent ordinal changed");
+			if (nativeSignAdmission === undefined) throw new TypeError("v3 pending intent resume requires its native job");
+			const canonicalPreimageBytes = new Uint8ArrayConstructor(pending.canonicalPreimageBytes);
+			const digest = hashDomain(V3_VERTEX_DOMAIN, canonicalPreimageBytes);
+			if (!sameBytes(digest, pending.digest)) throw new TypeError("v3 pending intent digest differs");
+			const signed = await nativeSignAdmission(
+				new Uint8ArrayConstructor(canonicalPreimageBytes),
+				() =>
+					withAuthoredOperationSigningRequest(canonicalPreimageBytes, (request) =>
+						sign(new Uint8ArrayConstructor(digest), request)
+					),
+				pending.planEffect === undefined ? undefined : { planEffect: pending.planEffect }
+			);
+			const signature = copyDetachedBytes(signed);
+			if (signature === undefined || signature.byteLength !== 64)
+				throw new TypeError("v3 pending intent signature is invalid");
+			const envelope = ObjectFreeze({ canonicalPreimageBytes, digest, signature });
+			const commit = ObjectFreeze({
+				authorSequence,
+				envelope,
+				issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+				outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+			});
+			return pending.planEffect === undefined ? commit : ObjectFreeze({ ...commit, planEffect: pending.planEffect });
+		});
+		return ObjectFreeze({
+			ok: true as const,
+			kind: "resumed" as const,
+			currentEpoch: epoch === registration.payload.provenance.epoch,
+		});
+	});
+}
+
 /**
  * Explicit local-author abandonment of one durable unresolved accepted source:
  * the original registration FIFO signs an exact expiry receipt with the owned
@@ -23791,8 +27703,10 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 		return Promise.reject(new TypeError("creator source abandonment owner is unavailable"));
 	return enqueueRegistrationTask(registration, (inputCustody) => {
 		const keys = ["sourceSequence", "sourceDigest", "sourceContextDigest", "signRegisteredVertexDigest"];
-		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]);
+		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]) ??
+			snapshotClosedRecord(raw, [...keys, "frontierProof"]) ?? snapshotClosedRecord(raw, [...keys, "signal", "frontierProof"]);
 		if (input === undefined || !NumberIsSafeInteger(input.sourceSequence) || (input.sourceSequence as number) < 0 ||
+			(Object.hasOwn(input, "frontierProof") && input.frontierProof !== true) ||
 			!isDigestHex(input.sourceDigest) || !isDigestHex(input.sourceContextDigest) ||
 			typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
 			throw new TypeError("creator source abandonment input is invalid");
@@ -23817,7 +27731,8 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 			if (signal?.aborted) cancel();
 			let custody: LocalReplacementCustody | undefined;
 			try {
-				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; });
+				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; },
+					input.frontierProof === true);
 			} finally {
 				signal?.removeEventListener("abort", cancel);
 				registration.settlementSelectionControllers.delete(controller);
@@ -23833,7 +27748,8 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 
 async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	selector: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>,
-	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<V3SourceAbandonment> {
+	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void,
+	frontierProof = false): Promise<V3SourceAbandonment> {
 	const payload = registration.payload, scope = registration.issuanceScope;
 	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
 		registration.issuanceScope === scope;
@@ -23864,20 +27780,26 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		if (first.retained.expiry === undefined) throw new TypeError("creator source expiry proof is invalid");
 		return creatorSourceAbandonmentResult(scope.author, first.entry);
 	}
-	const unresolved = (value: typeof first): boolean => {
+	const unresolved = async (value: typeof first): Promise<boolean> => {
 		const {read, entry, retained} = value;
 		if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
 			entry.replacementSequence !== null || entry.replacementProgress !== undefined || entry.sourceResolutionDigest !== undefined) return false;
 		const issued = read.rows.issued.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
 		const outbox = read.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
-		// Replay after publication is refused: only never-acknowledged work may be abandoned.
+		// Replay after publication is refused: only never-acknowledged work may be abandoned on the
+		// user's word. The creator's signed frontier may resolve published work too: its epoch is closed
+		// and the frontier proves the row committed or never admitted.
 		if (issued.length !== 1 || outbox.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
-			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || outbox[0]!.publishState !== "pending") return false;
+			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || (!frontierProof && outbox[0]!.publishState !== "pending")) return false;
 		const authenticated = authenticateRetainedSourceVertex(retained.contract, issued[0]!.canonicalPreimageBytes, issued[0]!.signature,
 			issued[0]!.digest, scope.author, issued[0]!.authorSequence);
-		return authenticated !== undefined && authenticated.digest === lowerHexDigest(entry.sourceDigest);
+		if (authenticated === undefined || authenticated.digest !== lowerHexDigest(entry.sourceDigest)) return false;
+		return !frontierProof || (authenticated.vertex.epoch === retained.contract.identity.trust.currentEpoch &&
+			await frontierRetainedResolution(registration, entry.sourceSequence, authenticated.vertex.epoch) !== undefined);
 	};
-	if (!unresolved(first)) throw new TypeError("creator source abandonment requires unresolved never-published work");
+	if (!await unresolved(first)) throw new TypeError(frontierProof
+		? "creator source frontier resolution requires a row the creator's frontier proves"
+		: "creator source abandonment requires unresolved never-published work");
 	const sourceEpoch = first.retained.contract.identity.trust.currentEpoch;
 	if (payload.trust.trust.currentEpoch <= sourceEpoch) throw new TypeError("creator source abandonment requires a later epoch");
 	// Whole-floor capture under the original native custody, without the issuance reservation.
@@ -23902,7 +27824,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		if (!current()) return false;
 		try {
 			const now = await inspect();
-			return current() && now.read.image.imageDigest === first.read.image.imageDigest && unresolved(now);
+			return current() && now.read.image.imageDigest === first.read.image.imageDigest && await unresolved(now);
 		} catch { return false; }
 	};
 	let signature: Uint8Array | undefined;
@@ -23911,6 +27833,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, custody, read, bytes, valid,
 			request => sign(new Uint8ArrayConstructor(digest), request)));
 	}), custody, [bytes, new Uint8ArrayConstructor(64)]);
+	if (signature !== undefined) v3SettlementWorkCounts.sourceExpirySignatures += 1;
 	const expiry = signature === undefined || signature.byteLength !== 64 ? undefined : captureCreatorSourceExpiry(bytes, signature);
 	if (expiry === undefined || openCreatorSourceExpiry(first.retained.contract.capability, expiry,
 		{sourceAuthor: scope.author, sourceSequence: first.entry.sourceSequence, sourceDigest: first.entry.sourceDigest}) === undefined)
@@ -23920,15 +27843,71 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	await custody.check();
 	const second = await inspect();
 	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision ||
-		!unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
+		!await unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
 	const prior = second.plan;
+	// The moves of a row the creator's frontier proves was never admitted are given back to the
+	// application in this same plan write (durable hand-back records, consumed by their reissue).
+	// The author's own pinned bootstrap row (epoch 0 at the genesis anchor, carrying exactly the
+	// registered bootstrap operation, Grid's installRoster) is not a move: offered again it would be a
+	// row no settlement policy derives once displaced. It is expired unrecorded; every other row's
+	// operations are given back.
+	let handBacks = prior.handBacks;
+	let reissueOrigins = prior.reissueOrigins;
+	if (frontierProof) {
+		const row = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === selector.sourceSequence);
+		const authenticated = row === undefined ? undefined : authenticateRetainedSourceVertex(second.retained.contract,
+			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
+		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
+		const pinnedBootstrap = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		const bootstrapRow = pinnedBootstrap !== undefined && authenticated !== undefined && intents?.length === 1 &&
+			authenticated.vertex.epoch === 0 && authenticated.vertex.anchor === registration.payload.trust.trust.genesisAnchorDigest &&
+			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
+			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted") {
+			// Each record keeps its move's origin (a reissued or replaced row's move began earlier).
+			const recorded = settlementHandBacksAtOrigin(
+				prior,
+				prior.handBacks,
+				prior.reissueOrigins,
+				intents.map((intent, index) =>
+					ObjectFreeze({
+						sourceSequence: selector.sourceSequence,
+						sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
+						sourceEpoch: authenticated.vertex.epoch,
+						intent: index,
+						exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+						reissueSequence: null,
+					})
+				)
+			);
+			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
+			// retained (the next drain resolves it once a record is free).
+			if (recorded === undefined) throw new TypeError("creator source abandonment hand-back records are full");
+			handBacks = recorded.handBacks;
+			reissueOrigins = recorded.reissueOrigins;
+		}
+	}
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
-		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest)});
+		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest),
+			...(frontierProof ? {sourceResolutionKind: "frontier" as const} : {})});
 	const contexts = [...(prior.sourceContexts ?? [])];
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
-	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts}, scope);
+	const plan = copySettlementPlan(
+		normalizeSettlementSourceAuthorities({
+			scope,
+			revision: prior.revision + 1,
+			fenceSequence: prior.fenceSequence,
+			entries,
+			sourceContexts: contexts,
+			...(handBacks === undefined ? {} : { handBacks }),
+			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
+			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
+			...(reissueOrigins === undefined ? {} : { reissueOrigins }),
+			...(prior.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+		} as SettlementPlan),
+		scope
+	);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -23947,4 +27926,586 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	const recorded = plan.entries.find(entry => entry.sourceSequence === selector.sourceSequence);
 	if (recorded === undefined) throw new TypeError("creator source abandonment plan readback differs");
 	return creatorSourceAbandonmentResult(scope.author, recorded);
+}
+
+/** One retained row selected for frontier resolution (inspectV3RetainedWorkFrontier). */
+export interface V3RetainedFrontierSelector {
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+}
+
+/**
+ * Resolves retained own rows on the creator's signed frontier in ONE registration turn: what
+ * abandonV3UnresolvedAcceptedWork with frontierProof does for one row, done for every selected
+ * row with one native source read, one retained contract preparation, one whole-floor custody,
+ * one charged dependency turn (each receipt still signed under its own exact owned request and
+ * currency checks) and one settlement plan write. Per row, the same checks decide: the row is
+ * retained work of a closed epoch, still unresolved, and the frontier proves it committed or
+ * never admitted; a never-admitted row's moves are given back in the same plan write. A row the
+ * frontier proves nothing about, or whose hand-back records do not fit, stays retained (the next
+ * drain tries again). Rows already resolved return their existing receipt, never a second one.
+ * @param plane - Original live handle.
+ * @param raw - The selected retained rows and the owned signer.
+ * @returns The terminal record of every row resolved (now or before).
+ */
+export function resolveV3RetainedWorkFromFrontier(plane: V3PlaneHandle, raw: Readonly<{
+	selectors: readonly V3RetainedFrontierSelector[];
+	signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}>): Promise<readonly V3SourceAbandonment[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("creator source frontier resolution owner is unavailable"));
+	return enqueueRegistrationTask(registration, (inputCustody) => {
+		const input = snapshotClosedRecord(raw, ["selectors", "signRegisteredVertexDigest"]);
+		const listed: unknown = input?.selectors;
+		if (input === undefined || !ArrayIsArray(listed) || listed.length === 0 || listed.length > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+			typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
+			throw new TypeError("creator source frontier resolution input is invalid");
+		const selectors: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>[] = [];
+		for (let index = 0; index < listed.length; index += 1) {
+			const value = snapshotClosedRecord(listed[index], ["sourceSequence", "sourceDigest", "sourceContextDigest"]);
+			if (value === undefined || !NumberIsSafeInteger(value.sourceSequence) || (value.sourceSequence as number) < 0 ||
+				!isDigestHex(value.sourceDigest) || !isDigestHex(value.sourceContextDigest) ||
+				selectors.some(selected => selected.sourceSequence === value.sourceSequence))
+				throw new TypeError("creator source frontier resolution input is invalid");
+			selectors.push(ObjectFreeze({sourceSequence: value.sourceSequence as number, sourceDigest: digestBytesFromHex(value.sourceDigest as string),
+				sourceContextDigest: digestBytesFromHex(value.sourceContextDigest as string)}));
+		}
+		const scope = registration.issuanceScope;
+		// The exact receipt geometry of abandonV3UnresolvedAcceptedWork, charged once per selected row.
+		const receiptBound = encodeCanonical(creatorSourceExpiryFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8ArrayConstructor(32), sourceContextDigest: new Uint8ArrayConstructor(32),
+			signingEpoch: Number.MAX_SAFE_INTEGER, signingAnchorDigest: "0".repeat(64), signingNativeHeadDigest: new Uint8ArrayConstructor(32),
+			signingFloorDigest: new Uint8ArrayConstructor(32)})).byteLength;
+		inputCustody.chargeBytes((receiptBound + 64 + 72) * selectors.length);
+		const sign = input.signRegisteredVertexDigest as SignRegisteredVertexDigest;
+		return async () => {
+			const controller = new AbortController();
+			registration.settlementSelectionControllers ??= new Set();
+			registration.settlementSelectionControllers.add(controller);
+			let custody: LocalReplacementCustody | undefined;
+			try {
+				return await resolveCreatorRetainedSourcesFromFrontier(registration, ObjectFreeze(selectors), sign, controller.signal,
+					(owned) => { custody = owned; });
+			} finally {
+				registration.settlementSelectionControllers.delete(controller);
+				await custody?.release();
+			}
+		};
+	}, {
+		// Only the settlement drain resolves rows from its frontier: the settlement lane.
+		pool: "settlement",
+		refuse: (): never => { throw new TypeError("creator source frontier resolution task capacity exhausted"); },
+		refuseCapture: (): never => { throw new TypeError("creator source frontier resolution input capacity exhausted"); },
+	});
+}
+
+async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRegistration,
+	selectors: readonly Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>[],
+	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<readonly V3SourceAbandonment[]> {
+	const payload = registration.payload, scope = registration.issuanceScope, history = registration.historicalIssuance,
+		frontierCapability = history?.capability;
+	// The frontier verdicts read the installed history's verified capability; it must stay the same.
+	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
+		registration.issuanceScope === scope && registration.historicalIssuance === history &&
+		registration.historicalIssuance?.capability === frontierCapability;
+	if (!current()) throw new TypeError("creator source frontier resolution owner is unavailable");
+	const store = creatorOriginalIssuanceStore(registration);
+	const census = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+	if (census === undefined) throw new TypeError("creator source frontier resolution census is unavailable");
+	const censusInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+		maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+	// Fresh native source state for every selected row: one census, one contract preparation and one
+	// own-fence scan per read (abandonCreatorUnresolvedSource's inspect, for all rows at once).
+	const inspect = async () => {
+		const read = await census(censusInput);
+		const plan = read.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+		if (plan === null) throw new TypeError("creator source frontier resolution plan is unavailable");
+		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
+		let fences: ReturnType<typeof scanOwnFences> | undefined;
+		const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
+		const rows = selectors.map(selector => {
+			const entry = plan.entries.find(value => value.sourceSequence === selector.sourceSequence);
+			if (entry === undefined || !sameBytes(entry.sourceDigest, selector.sourceDigest) || entry.sourceContextDigest === undefined ||
+				!sameBytes(entry.sourceContextDigest, selector.sourceContextDigest))
+				throw new TypeError("creator source frontier resolution selector differs from the retained source");
+			const retained = sources.get(entry.sourceSequence);
+			if (retained === undefined || !creatorRetainedSourceMatchesPlan(retained, entry.sourceSequence, plan))
+				throw new TypeError("creator source frontier resolution retained contract is unavailable");
+			return ObjectFreeze({selector, entry, retained});
+		});
+		return {read, plan, rows, scan};
+	};
+	type Inspection = Awaited<ReturnType<typeof inspect>>;
+	type Row = Inspection["rows"][number];
+	// abandonCreatorUnresolvedSource's `unresolved` with frontierProof, per row of one inspection.
+	const unresolved = async (value: Inspection, row: Row): Promise<boolean> => {
+		const {read, scan} = value, {entry, retained} = row;
+		if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
+			entry.replacementSequence !== null || entry.replacementProgress !== undefined || entry.sourceResolutionDigest !== undefined) return false;
+		const issued = read.rows.issued.filter(candidate => sameScope(candidate, scope) && candidate.authorSequence === entry.sourceSequence);
+		const outbox = read.rows.outbox.filter(candidate => sameScope(candidate, scope) && candidate.authorSequence === entry.sourceSequence);
+		if (issued.length !== 1 || outbox.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
+			!sameBytes(outbox[0]!.digest, entry.sourceDigest)) return false;
+		const authenticated = authenticateRetainedSourceVertex(retained.contract, issued[0]!.canonicalPreimageBytes, issued[0]!.signature,
+			issued[0]!.digest, scope.author, issued[0]!.authorSequence);
+		if (authenticated === undefined || authenticated.digest !== lowerHexDigest(entry.sourceDigest)) return false;
+		return authenticated.vertex.epoch === retained.contract.identity.trust.currentEpoch &&
+			await frontierRetainedResolution(registration, entry.sourceSequence, authenticated.vertex.epoch, scan) !== undefined;
+	};
+	const first = await inspect();
+	if (!current()) throw new TypeError("creator source frontier resolution owner changed during native read");
+	const results: V3SourceAbandonment[] = [];
+	const pending: Row[] = [];
+	for (const row of first.rows) {
+		// Idempotent retry: the same authenticated receipt, never a second signature.
+		if (row.entry.disposition === "expire" && row.entry.sourceResolutionDigest !== undefined) {
+			if (row.retained.expiry === undefined) throw new TypeError("creator source expiry proof is invalid");
+			results.push(creatorSourceAbandonmentResult(scope.author, row.entry));
+			continue;
+		}
+		if (payload.trust.trust.currentEpoch > row.retained.contract.identity.trust.currentEpoch && await unresolved(first, row))
+			pending.push(row);
+	}
+	if (pending.length === 0) return ObjectFreeze(results);
+	// Whole-floor capture under the original native custody, without the issuance reservation.
+	const floor = payload.input.settlementFloor;
+	if (floor === undefined) throw new TypeError("creator source frontier resolution whole-floor owner is unavailable");
+	const image = await floor.readRetirementImage({scope: {objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest}});
+	if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, payload.trust.trust) || !isDigestHex(image.imageDigest))
+		throw new TypeError("creator source frontier resolution whole-floor is stale");
+	const custody = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+	own(custody);
+	await custody.check();
+	const receipts = pending.map(row => {
+		const bytes = encodeCanonical(creatorSourceExpiryFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: row.entry.sourceSequence, sourceDigest: new Uint8ArrayConstructor(row.entry.sourceDigest),
+			sourceContextDigest: new Uint8ArrayConstructor(row.entry.sourceContextDigest!), signingEpoch: payload.trust.trust.currentEpoch,
+			signingAnchorDigest: payload.trust.trust.currentAnchorDigest,
+			signingNativeHeadDigest: hashDomain(CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN, encodeHeadRecordV1(payload.trust.head)),
+			signingFloorDigest: digestBytesFromHex(image.imageDigest)}));
+		return ObjectFreeze({row, bytes, digest: creatorSourceExpiryDigest(bytes)});
+	});
+	// Every currency check reads the native source afresh. The per-row facts (selected entry, retained
+	// contract, unresolved and frontier verdicts) are a function of the native image, the owning
+	// payload and its installed history; with all three unchanged they are the facts verified above.
+	const valid = async (): Promise<boolean> => {
+		if (!current()) return false;
+		try {
+			const now = await census(censusInput);
+			return current() && now.image.imageDigest === first.read.image.imageDigest;
+		} catch { return false; }
+	};
+	const signatures: (Uint8Array | undefined)[] = [];
+	await withActiveRebaseDependencies(registration, undefined, (read) => read.checkWhile(async () => {
+		if (!(await valid())) throw new TypeError("creator source frontier resolution source currency changed");
+		for (const receipt of receipts) {
+			const signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, custody, read, receipt.bytes, valid,
+				request => sign(new Uint8ArrayConstructor(receipt.digest), request)));
+			if (signature !== undefined) v3SettlementWorkCounts.sourceExpirySignatures += 1;
+			signatures.push(signature);
+		}
+	}), custody, receipts.flatMap(receipt => [receipt.bytes, new Uint8ArrayConstructor(64)]));
+	const expiries = receipts.map((receipt, index) => {
+		const signature = signatures[index];
+		const expiry = signature === undefined || signature.byteLength !== 64 ? undefined : captureCreatorSourceExpiry(receipt.bytes, signature);
+		if (expiry === undefined || openCreatorSourceExpiry(receipt.row.retained.contract.capability, expiry,
+			{sourceAuthor: scope.author, sourceSequence: receipt.row.entry.sourceSequence, sourceDigest: receipt.row.entry.sourceDigest}) === undefined)
+			throw new TypeError("creator source frontier resolution signed receipt is invalid");
+		return expiry;
+	});
+	// Plan CAS after leaving the charged dependency turn (outside the issuance read reservation),
+	// still under the original whole-floor custody.
+	await custody.check();
+	const second = await inspect();
+	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision)
+		throw new TypeError("creator source frontier resolution source currency changed");
+	const prior = second.plan;
+	let handBacks = prior.handBacks;
+	let reissueOrigins = prior.reissueOrigins;
+	const resolved = new Map<number, (typeof expiries)[number]>();
+	const pinnedBootstrap = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+	for (let index = 0; index < receipts.length; index += 1) {
+		const row = second.rows.find(candidate => candidate.selector.sourceSequence === receipts[index]!.row.selector.sourceSequence);
+		if (row === undefined || !await unresolved(second, row)) throw new TypeError("creator source frontier resolution source currency changed");
+		// The moves of a row the frontier proves was never admitted are given back in this same plan
+		// write; the author's pinned bootstrap row is expired unrecorded (abandonCreatorUnresolvedSource).
+		const issued = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === row.selector.sourceSequence);
+		const authenticated = issued === undefined ? undefined : authenticateRetainedSourceVertex(row.retained.contract,
+			issued.canonicalPreimageBytes, issued.signature, issued.digest, scope.author, issued.authorSequence);
+		const intents = authenticated === undefined ? undefined : rebaseIntents(row.retained.contract, authenticated);
+		const bootstrapRow = pinnedBootstrap !== undefined && authenticated !== undefined && intents?.length === 1 &&
+			authenticated.vertex.epoch === 0 && authenticated.vertex.anchor === payload.trust.trust.genesisAnchorDigest &&
+			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
+			await frontierRetainedResolution(registration, row.selector.sourceSequence, authenticated.vertex.epoch, second.scan) === "never-admitted") {
+			// Each record keeps its move's origin (a reissued or replaced row's move began earlier).
+			const next = settlementHandBacksAtOrigin(
+				prior,
+				handBacks,
+				reissueOrigins,
+				intents.map((intent, intentIndex) =>
+					ObjectFreeze({
+						sourceSequence: row.selector.sourceSequence,
+						sourceDigest: new Uint8ArrayConstructor(row.entry.sourceDigest),
+						sourceEpoch: authenticated.vertex.epoch,
+						intent: intentIndex,
+						exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+						reissueSequence: null,
+					})
+				)
+			);
+			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
+			// retained (the next drain resolves it once a record is free).
+			if (next === undefined) continue;
+			handBacks = next.handBacks;
+			reissueOrigins = next.reissueOrigins;
+		}
+		resolved.set(row.selector.sourceSequence, expiries[index]!);
+	}
+	if (resolved.size === 0) return ObjectFreeze(results);
+	const entries = prior.entries.map(entry => {
+		const expiry = resolved.get(entry.sourceSequence);
+		return expiry === undefined ? entry : {...entry, disposition: "expire" as const, replacementSequence: null,
+			sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest), sourceResolutionKind: "frontier" as const};
+	});
+	const contexts = [...(prior.sourceContexts ?? [])];
+	for (const expiry of resolved.values())
+		if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
+	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
+	const plan = copySettlementPlan(
+		normalizeSettlementSourceAuthorities({
+			scope,
+			revision: prior.revision + 1,
+			fenceSequence: prior.fenceSequence,
+			entries,
+			sourceContexts: contexts,
+			...(handBacks === undefined ? {} : { handBacks }),
+			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
+			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
+			...(reissueOrigins === undefined ? {} : { reissueOrigins }),
+			...(prior.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+		} as SettlementPlan),
+		scope
+	);
+	if (plan == null) throw new TypeError("creator source frontier resolution plan is invalid");
+	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
+	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
+	const nativeBytes = future.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + row.signature.byteLength + row.digest.byteLength, 0) +
+		future.plans.reduce((sum, value) => sum + issuanceSettlementPlanStorageByteLength(value), 0) +
+		future.lineages.reduce((sum, value) => sum + (value.pendingUnsigned === undefined ? 0 : encodeCanonical(value.pendingUnsigned).byteLength), 0);
+	if (nativeBytes > censusInput.limits.maxBytes) throw new TypeError("creator source frontier resolution exceeds reserved native material");
+	const written = await store.transactWriteSettlementPlan({expectedRevision: prior.revision, plan, scope});
+	const limits = {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxDepth: 32, maxItems: 65536};
+	const after = await census(censusInput);
+	const stored = after.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+	if (written === null || stored === null || !sameBytes(encodeCanonical(written, limits), encodeCanonical(plan, limits)) ||
+		!sameBytes(encodeCanonical(stored, limits), encodeCanonical(plan, limits)))
+		throw new TypeError("creator source frontier resolution plan readback differs");
+	await custody.check();
+	for (const sequence of resolved.keys()) {
+		const recorded = plan.entries.find(entry => entry.sourceSequence === sequence);
+		if (recorded === undefined) throw new TypeError("creator source frontier resolution plan readback differs");
+		results.push(creatorSourceAbandonmentResult(scope.author, recorded));
+	}
+	return ObjectFreeze(results);
+}
+
+/** At most this many replaced sources are resolved per drain (bounded input charge); the rest next drain. */
+const REPLACED_SOURCE_RESOLUTION_BATCH = 16;
+
+/**
+ * What the creator's signed frontier proves about the source of one completed replacement entry
+ * (fix/creator-replaced-source-resolution; held-anchor-retention.qnt `resolved`): settled when its epoch
+ * is closed in the frontier and the frontier passed it (terminalThrough reached it: admitted, or below an
+ * admitted own fence), or when it is displaced, fence-guarded (settlementOwnRowFenceGuarded) and past the
+ * settlement window. A replaced source was never admitted by construction (it was replaced because its
+ * closed epoch did not contain it); the statement is what the author signs so the store may stop
+ * protecting it without the plan's current fence.
+ * @param frontier - The valid installed frontier for this author.
+ * @param sourceSequence - The source's author sequence.
+ * @param sourceEpoch - The source's own signed epoch.
+ * @param scan - The author's own-fence scan.
+ * @returns The guarding own fence (null: the frontier passed it, or it is the first unsettled sequence), or undefined.
+ */
+async function replacedSourceFrontierStatement(frontier: SettlementFrontierContext, sourceSequence: number, sourceEpoch: number,
+	scan: () => ReturnType<typeof scanOwnFences>): Promise<Readonly<{guard: number | null}> | undefined> {
+	if (!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
+	const tt = frontier.terminalThrough;
+	if (tt !== null && sourceSequence <= tt) return ObjectFreeze({guard: null});
+	if (sourceEpoch < frontier.admissionEpoch || sourceEpoch > frontier.currentEpoch - V3_SETTLEMENT_OWN_WINDOW_EPOCHS) return undefined;
+	if (sourceSequence === (tt ?? -1) + 1) return ObjectFreeze({guard: null});
+	const fence = (await scan()).lowest.get(sourceEpoch);
+	return fence !== undefined && fence <= sourceSequence ? ObjectFreeze({guard: fence}) : undefined;
+}
+
+/** A completed single replacement that may still gain a replaced-source resolution (store contract law). */
+function replacedSourceResolvable(entry: SettlementPlan["entries"][number]): boolean {
+	return entry.sourceResolutionDigest === undefined && (entry.disposition === "rebase" || entry.disposition === "transform") &&
+		entry.replacementSequence !== null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
+		entry.sourceObjectId === undefined && entry.inheritance === undefined;
+}
+
+/**
+ * Replaced-source resolution (fix/creator-replaced-source-resolution, design (b)): a plan whose author
+ * fence is withheld (a non-member) or awaited keeps every completed replacement entry's source protected,
+ * because the store lets a replaced source go only under the plan's current fence. Two bases, recorded
+ * on the entry write-once in one plan write:
+ * - committed replacement (kind "replacement", first; no signature, no installed frontier, so it also
+ *   serves a removed author): the entry's single replacement link, proven from signed content by the
+ *   lost-twice link step (proveReplacementLink), ends committed, and the resolution names that
+ *   replacement's retained completion proof (replacementCommittedResolution);
+ * - frontier (kind "frontier"): the installed frontier proves the source settled
+ *   (replacedSourceFrontierStatement); the author signs a replaced-source receipt with its owned key (the
+ *   expiry signing path, a distinct receipt kind).
+ * Before anything, every stored resolution is verified again (a committed one by the same link step; a
+ * frontier one by signature, binding, statement and monotone agreement with the frontier): any that fails
+ * refuses (fails closed). Nothing about the move changes: the replacement carries it.
+ * @param plane - Original live handle.
+ * @param raw - The owned signer.
+ * @returns The source sequences resolved by this call.
+ */
+export function resolveV3ReplacedSources(plane: V3PlaneHandle, raw: Readonly<{
+	signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}>): Promise<readonly number[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("creator replaced source resolution owner is unavailable"));
+	return enqueueRegistrationTask(registration, (inputCustody) => {
+		const input = snapshotClosedRecord(raw, ["signRegisteredVertexDigest"]);
+		if (input === undefined || typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
+			throw new TypeError("creator replaced source resolution input is invalid");
+		const scope = registration.issuanceScope;
+		const receiptBound = encodeCanonical(creatorReplacedSourceFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8ArrayConstructor(32), sourceEpoch: Number.MAX_SAFE_INTEGER,
+			replacementSequence: Number.MAX_SAFE_INTEGER, frontierCurrentEpoch: Number.MAX_SAFE_INTEGER,
+			frontierAdmissionEpoch: Number.MAX_SAFE_INTEGER, frontierTerminalThrough: Number.MAX_SAFE_INTEGER,
+			guardSequence: Number.MAX_SAFE_INTEGER, signingEpoch: Number.MAX_SAFE_INTEGER, signingAnchorDigest: "0".repeat(64),
+			signingNativeHeadDigest: new Uint8ArrayConstructor(32), signingFloorDigest: new Uint8ArrayConstructor(32)})).byteLength;
+		inputCustody.chargeBytes((receiptBound + 64 + 72) * REPLACED_SOURCE_RESOLUTION_BATCH);
+		const sign = input.signRegisteredVertexDigest as SignRegisteredVertexDigest;
+		return async () => {
+			const controller = new AbortController();
+			registration.settlementSelectionControllers ??= new Set();
+			registration.settlementSelectionControllers.add(controller);
+			let custody: LocalReplacementCustody | undefined;
+			try {
+				return await resolveCreatorReplacedSources(registration, sign, controller.signal, (owned) => { custody = owned; });
+			} finally {
+				registration.settlementSelectionControllers.delete(controller);
+				await custody?.release();
+			}
+		};
+	}, {
+		pool: "input",
+		refuse: (): never => { throw new TypeError("creator replaced source resolution task capacity exhausted"); },
+		refuseCapture: (): never => { throw new TypeError("creator replaced source resolution input capacity exhausted"); },
+	});
+}
+
+async function resolveCreatorReplacedSources(registration: V3PlaneRegistration, sign: SignRegisteredVertexDigest,
+	aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<readonly number[]> {
+	const payload = registration.payload, scope = registration.issuanceScope, history = registration.historicalIssuance,
+		frontierCapability = history?.capability;
+	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
+		registration.issuanceScope === scope && registration.historicalIssuance === history &&
+		registration.historicalIssuance?.capability === frontierCapability;
+	if (!current()) throw new TypeError("creator replaced source resolution owner is unavailable");
+	const store = creatorOriginalIssuanceStore(registration);
+	const census = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+	if (census === undefined) throw new TypeError("creator replaced source resolution census is unavailable");
+	const censusInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+		maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+	const inspect = async () => {
+		const read = await census(censusInput);
+		return {read, plan: read.rows.plans.find(value => sameScope(value.scope, scope)) ?? null};
+	};
+	const first = await inspect();
+	if (!current()) throw new TypeError("creator replaced source resolution owner changed during native read");
+	if (first.plan === null) return ObjectFreeze([]);
+	const installed = settlementFrontierFromHistory(history);
+	const frontier = installed !== undefined && validSettlementFrontierContext(payload, installed) ? installed : undefined;
+	// A removed author has no installed frontier; its persisted last-member frontier (re-verified at this
+	// open) still bounds every stored resolution: none may claim a later frontier than it.
+	const memberIdentity = history?.memberFrontier === undefined ? undefined : resolveCreatorMemberFrontier(history.memberFrontier);
+	const bound: SettlementFrontierContext | undefined = frontier ?? (memberIdentity?.admissionEpoch === undefined ? undefined
+		: ObjectFreeze({admissionEpoch: memberIdentity.admissionEpoch, currentEpoch: memberIdentity.successorEpoch,
+			terminalThrough: memberIdentity.admittedAuthorSequence}));
+	const expected = (entry: SettlementPlan["entries"][number]) => ({objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+		sourceSequence: entry.sourceSequence, sourceDigest: entry.sourceDigest, replacementSequence: entry.replacementSequence ?? -1,
+		currentEpoch: payload.trust.trust.currentEpoch});
+	// The committed-replacement basis: this entry's single replacement link, proven from signed content by
+	// the one link owner (proveReplacementLink), ends committed (its retained completion proof).
+	const plannedRows = first.read.rows.issued.filter(row => sameScope(row, scope));
+	const committedBasis = (plan: SettlementPlan, entry: SettlementPlan["entries"][number]): Uint8Array | undefined => {
+		const issued = plannedRows.filter(row => row.authorSequence === entry.sourceSequence);
+		if (issued.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest)) return undefined;
+		const source = classifyReplacementNode(registration, ObjectFreeze({scope, authorSequence: entry.sourceSequence,
+			canonicalPreimageBytes: issued[0]!.canonicalPreimageBytes, signature: issued[0]!.signature, digest: issued[0]!.digest,
+			publishState: "pending" as const}) as SnapshottedOutboxRow, registration.vertexFacts)?.node;
+		// The census releases exactly these classes (displaced, or covered by a creator-signed frontier).
+		const steps = source === undefined || (source.kind !== "displaced" && source.kind !== "covered-historical") ? undefined : proveReplacementLink(payload, registration, source, entry, plan,
+			replacementChunkClaims(plan), plannedRows, registration.vertexFacts);
+		return replacementCommittedResolution(registration, plan, entry, steps)
+			? registration.historicalIssuance?.retainedSources?.get(steps![0]!.chunk)?.completion?.digest : undefined;
+	};
+	// Every stored resolution authenticates again, and the installed frontier never contradicts it (the
+	// frontier's epoch and terminalThrough only grow): otherwise refuse, retaining everything.
+	for (const entry of first.plan.entries) {
+		if (entry.sourceResolutionScope === undefined) continue;
+		if (entry.sourceResolutionKind === "replacement") {
+			const digest = committedBasis(first.plan, entry);
+			if (digest === undefined || entry.sourceResolutionDigest === undefined || !sameBytes(digest, entry.sourceResolutionDigest))
+				throw new TypeError("creator replaced source proof is invalid");
+			continue;
+		}
+		const resolution = first.plan.sourceContexts?.find(value => entry.sourceResolutionDigest !== undefined &&
+			sameBytes(value.digest, entry.sourceResolutionDigest));
+		const receipt = resolution === undefined || entry.replacementSequence === null ? undefined
+			: openCreatorReplacedSourceResolution(resolution, expected(entry), V3_SETTLEMENT_OWN_WINDOW_EPOCHS);
+		if (receipt === undefined || (bound !== undefined && (receipt.frontierCurrentEpoch > bound.currentEpoch ||
+			(receipt.frontierTerminalThrough !== null && (bound.terminalThrough === null ||
+				bound.terminalThrough < receipt.frontierTerminalThrough)))))
+			throw new TypeError("creator replaced source proof is invalid");
+	}
+	// The committed basis first (no signature: the creator-signed completion is the evidence; it needs no
+	// installed frontier, so it also serves a removed author), then the frontier statement (signed receipt).
+	const committed = new Map<number, Uint8Array>();
+	for (const entry of first.plan.entries) {
+		if (committed.size >= REPLACED_SOURCE_RESOLUTION_BATCH) break;
+		if (!replacedSourceResolvable(entry)) continue;
+		const digest = committedBasis(first.plan, entry);
+		if (digest !== undefined) committed.set(entry.sourceSequence, digest);
+	}
+	const frontierCurrent = frontier !== undefined && payload.trust.trust.currentEpoch === frontier.currentEpoch ? frontier : undefined;
+	let fences: ReturnType<typeof scanOwnFences> | undefined;
+	const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
+	const candidates: Readonly<{entry: SettlementPlan["entries"][number]; sourceEpoch: number; guard: number | null}>[] = [];
+	for (const entry of frontierCurrent === undefined ? [] : first.plan.entries) {
+		if (committed.size + candidates.length >= REPLACED_SOURCE_RESOLUTION_BATCH) break;
+		if (!replacedSourceResolvable(entry) || committed.has(entry.sourceSequence)) continue;
+		const issued = first.read.rows.issued.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+		const outbox = first.read.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+		if (issued.length !== 1 || outbox.length > 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
+			(outbox.length === 1 && !sameBytes(outbox[0]!.digest, entry.sourceDigest)) ||
+			!first.read.rows.issued.some(row => sameScope(row, scope) && row.authorSequence === entry.replacementSequence)) continue;
+		let decoded: unknown;
+		try { decoded = decodeCanonical(issued[0]!.canonicalPreimageBytes); } catch { continue; }
+		const sourceEpoch = isObject(decoded) && Reflect.get(decoded, "author") === scope.author &&
+			Reflect.get(decoded, "authorSequence") === entry.sourceSequence ? Reflect.get(decoded, "epoch") : undefined;
+		if (typeof sourceEpoch !== "number" || !NumberIsSafeInteger(sourceEpoch)) continue;
+		const statement = await replacedSourceFrontierStatement(frontierCurrent!, entry.sourceSequence, sourceEpoch, scan);
+		if (statement !== undefined) candidates.push(ObjectFreeze({entry, sourceEpoch, guard: statement.guard}));
+	}
+	if ((candidates.length === 0 && committed.size === 0) || !current()) return ObjectFreeze([]);
+	const signed = new Map<number, SettlementSourceContext>();
+	let custody: LocalReplacementCustody | undefined;
+	if (candidates.length !== 0) {
+		const signingFrontier = frontierCurrent!;
+		const floor = payload.input.settlementFloor;
+		if (floor === undefined) throw new TypeError("creator replaced source resolution whole-floor owner is unavailable");
+		const image = await floor.readRetirementImage({scope: {objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest}});
+		if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, payload.trust.trust) || !isDigestHex(image.imageDigest))
+			throw new TypeError("creator replaced source resolution whole-floor is stale");
+		const owned = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+		custody = owned;
+		own(owned);
+		await owned.check();
+		const receipts = candidates.map(candidate => {
+			const bytes = encodeCanonical(creatorReplacedSourceFields({objectId: scope.objectId,
+				pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+				sourceSequence: candidate.entry.sourceSequence, sourceDigest: new Uint8ArrayConstructor(candidate.entry.sourceDigest),
+				sourceEpoch: candidate.sourceEpoch, replacementSequence: candidate.entry.replacementSequence,
+				frontierCurrentEpoch: signingFrontier.currentEpoch, frontierAdmissionEpoch: signingFrontier.admissionEpoch,
+				frontierTerminalThrough: signingFrontier.terminalThrough, guardSequence: candidate.guard, signingEpoch: signingFrontier.currentEpoch,
+				signingAnchorDigest: payload.trust.trust.currentAnchorDigest,
+				signingNativeHeadDigest: hashDomain(CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN, encodeHeadRecordV1(payload.trust.head)),
+				signingFloorDigest: digestBytesFromHex(image.imageDigest)}));
+			return ObjectFreeze({candidate, bytes, digest: creatorSourceExpiryDigest(bytes)});
+		});
+		const valid = async (): Promise<boolean> => {
+			if (!current()) return false;
+			try {
+				const now = await census(censusInput);
+				return current() && now.image.imageDigest === first.read.image.imageDigest;
+			} catch { return false; }
+		};
+		const signatures: (Uint8Array | undefined)[] = [];
+		await withActiveRebaseDependencies(registration, undefined, (read) => read.checkWhile(async () => {
+			if (!(await valid())) throw new TypeError("creator replaced source resolution source currency changed");
+			for (const receipt of receipts) {
+				const signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, owned, read, receipt.bytes, valid,
+					request => sign(new Uint8ArrayConstructor(receipt.digest), request)));
+				if (signature !== undefined) v3SettlementWorkCounts.sourceExpirySignatures += 1;
+				signatures.push(signature);
+			}
+		}), owned, receipts.flatMap(receipt => [receipt.bytes, new Uint8ArrayConstructor(64)]));
+		receipts.forEach((receipt, index) => {
+			const signature = signatures[index];
+			const context = signature === undefined || signature.byteLength !== 64 ? undefined
+				: captureCreatorReplacedSourceResolution(receipt.bytes, signature);
+			if (context === undefined || openCreatorReplacedSourceResolution(context, expected(receipt.candidate.entry),
+				V3_SETTLEMENT_OWN_WINDOW_EPOCHS) === undefined)
+				throw new TypeError("creator replaced source resolution signed receipt is invalid");
+			signed.set(receipt.candidate.entry.sourceSequence, context);
+		});
+		await owned.check();
+	}
+	const second = await inspect();
+	if (!current() || second.plan === null || second.read.image.imageDigest !== first.read.image.imageDigest ||
+		second.plan.revision !== first.plan.revision)
+		throw new TypeError("creator replaced source resolution source currency changed");
+	const prior = second.plan;
+	const entries = prior.entries.map(entry => {
+		if (!replacedSourceResolvable(entry)) return entry;
+		const completion = committed.get(entry.sourceSequence), resolution = signed.get(entry.sourceSequence);
+		if (completion !== undefined) return {...entry, sourceResolutionDigest: new Uint8ArrayConstructor(completion),
+			sourceResolutionKind: "replacement" as const, sourceResolutionScope: "replaced-source" as const};
+		return resolution === undefined ? entry : {...entry,
+			sourceResolutionDigest: new Uint8ArrayConstructor(resolution.digest), sourceResolutionKind: "frontier" as const,
+			sourceResolutionScope: "replaced-source" as const};
+	});
+	// A committed-replacement resolution names a completion context the plan already holds.
+	const contexts = [...(prior.sourceContexts ?? [])];
+	for (const resolution of signed.values())
+		if (!contexts.some(value => sameBytes(value.digest, resolution.digest))) contexts.push(resolution);
+	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
+	const plan = copySettlementPlan(
+		normalizeSettlementSourceAuthorities({
+			scope,
+			revision: prior.revision + 1,
+			fenceSequence: prior.fenceSequence,
+			entries,
+			sourceContexts: contexts,
+			...(prior.handBacks === undefined ? {} : { handBacks: prior.handBacks }),
+			...(prior.memberFrontier === undefined ? {} : { memberFrontier: prior.memberFrontier }),
+			...(prior.completedSourceCustody === true ? { completedSourceCustody: true } : {}),
+			...(prior.reissueOrigins === undefined ? {} : { reissueOrigins: prior.reissueOrigins }),
+			...(prior.sourceAuthorities === undefined ? {} : { sourceAuthorities: prior.sourceAuthorities }),
+		} as SettlementPlan),
+		scope
+	);
+	if (plan == null) throw new TypeError("creator replaced source resolution plan is invalid");
+	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
+	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
+	const nativeBytes = future.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + row.signature.byteLength + row.digest.byteLength, 0) +
+		future.plans.reduce((sum, value) => sum + issuanceSettlementPlanStorageByteLength(value), 0) +
+		future.lineages.reduce((sum, value) => sum + (value.pendingUnsigned === undefined ? 0 : encodeCanonical(value.pendingUnsigned).byteLength), 0);
+	if (nativeBytes > censusInput.limits.maxBytes) throw new TypeError("creator replaced source resolution exceeds reserved native material");
+	const written = await store.transactWriteSettlementPlan({expectedRevision: prior.revision, plan, scope});
+	const limits = {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxDepth: 32, maxItems: 65536};
+	const after = await census(censusInput);
+	const stored = after.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+	if (written === null || stored === null || !sameBytes(encodeCanonical(written, limits), encodeCanonical(plan, limits)) ||
+		!sameBytes(encodeCanonical(stored, limits), encodeCanonical(plan, limits)))
+		throw new TypeError("creator replaced source resolution plan readback differs");
+	await custody?.check();
+	return ObjectFreeze([...committed.keys(), ...signed.keys()]);
 }

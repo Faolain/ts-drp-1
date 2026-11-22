@@ -6,7 +6,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { driveActiveAppEndurance } from "./driver.js";
+import { APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS, driveActiveAppEndurance } from "./driver.js";
 import type { AppKind, RoleEndpoint } from "../track-m-apps/long-room-driver.js";
 
 const output = process.env.ACTIVE_ENDURANCE_OUT ?? join(tmpdir(), `active-browser-${Date.now()}`);
@@ -14,6 +14,14 @@ const epochs = Number(process.env.ACTIVE_ENDURANCE_EPOCHS ?? 6);
 const moves = Number(process.env.ACTIVE_ENDURANCE_MOVES ?? 2);
 const streamLimit = Number(process.env.ACTIVE_ENDURANCE_STREAM ?? 4);
 const apps = (process.env.ACTIVE_ENDURANCE_APPS ?? "canvas,grid,chat").split(",") as AppKind[];
+// ACTIVE_ENDURANCE_ROLLOVER=app: each page runs its app's own rollover policy and successor delivery
+// (the pages' delivery frames cross between the two pages over the driver's scripted wire, as the
+// signed rows do); ACTIVE_ENDURANCE_EPOCHS then counts adopted epochs. Default "harness".
+const rollover = process.env.ACTIVE_ENDURANCE_ROLLOVER ?? "harness";
+if (rollover !== "harness" && rollover !== "app") throw new Error(`ENDURANCE_ROLLOVER:${rollover}`);
+const memberRolloverIssueBoundMs = Number(
+	process.env.ACTIVE_ENDURANCE_MEMBER_ROLLOVER_ISSUE_BOUND_MS ?? APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS
+);
 const servers: Server[] = [];
 const origins: string[] = [];
 
@@ -70,6 +78,7 @@ for (const app of apps)
 			epochs,
 			moves,
 			chatFormat: "shares",
+			...(rollover === "app" ? { rollover: "app" } : {}),
 		};
 		const metadata = {
 			kind: "configuration",
@@ -78,6 +87,14 @@ for (const app of apps)
 			browserName,
 			transport: "scripted signed bytes with native v2 successor membership",
 			streamLimit,
+			rollover,
+			...(rollover === "app"
+				? {
+						epochsCount: "adopted epochs (the creator room's authenticated epoch), not driver rounds",
+						successorOffers: "pages' own successor delivery over the scripted wire; harness offer passing refused",
+						memberRolloverIssueBoundMs,
+					}
+				: {}),
 		};
 		const sourceDiff = execFileSync("git", ["diff", "--no-ext-diff", "HEAD"], {
 			encoding: "utf8",
@@ -114,6 +131,8 @@ for (const app of apps)
 				moves,
 				streamLimit,
 				peers: [creator, recipient],
+				rollover,
+				...(rollover === "app" ? { memberRolloverIssueBoundMs } : {}),
 				write: (record) => appendFileSync(log, JSON.stringify(record) + "\n"),
 			});
 			writeFileSync(

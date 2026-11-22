@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createNodeSnapshotQuarantineStore as createLegacy } from "./fixtures/legacy-snapshot-transfer.mjs";
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
 import { createSnapshotQuarantineFixture } from "../../../tests/fixtures/phase-4c-v3/snapshot-quarantine-contract.js";
 import type {
 	LegacyStore,
@@ -14,10 +15,13 @@ import type {
 } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import { fixture, outcome, receiptFor, stable } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import {
+	expectedOrphanedCloseScopeCase,
 	expectedRetentionCase,
 	expectedTemporaryAdmissionCase,
+	ORPHANED_CLOSE_SCOPE_CASES,
 	RETENTION_CASES,
 	type RetentionEnvironment,
+	runOrphanedCloseScopeCase,
 	runRetentionCase,
 	runTemporaryAdmissionCase,
 	TEMPORARY_ADMISSION_CASES,
@@ -354,7 +358,8 @@ function environment(): RetentionEnvironment {
 			}
 		},
 		fault: (kind, objectId, charge): Promise<void> => {
-			const db = new DatabaseSync(filename);
+			// Storage damage is out-of-band: past the owner's snapshot_writer_v4 fence.
+			const db = allowOutOfBandWrites(new DatabaseSync(filename));
 			try {
 				db.exec("BEGIN IMMEDIATE");
 				if (kind === "identity-conflict")
@@ -394,6 +399,10 @@ describe("1a-1 native SQLite retention RED", () => {
 	for (const name of TEMPORARY_ADMISSION_CASES)
 		it(`native temporary admission ${name}`, async () => {
 			expect(await runTemporaryAdmissionCase(name, environment())).toEqual(expectedTemporaryAdmissionCase(name));
+		});
+	for (const name of ORPHANED_CLOSE_SCOPE_CASES)
+		it(`native orphaned close scope ${name} is visible to the admission image`, async () => {
+			expect(await runOrphanedCloseScopeCase(name, environment())).toEqual(expectedOrphanedCloseScopeCase(name));
 		});
 	for (const name of RETENTION_CASES)
 		it(name, async () => {

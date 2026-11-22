@@ -60,6 +60,7 @@ import type { SqliteAheDurableStoreOptions, NodeNativeReadPort } from "../index.
 import { applyNodeBoundedAheReclamation, registerNodeAheReclamationMaintenance } from "./ahe-reclamation.js";
 import { loadNodeBoundedReadRequest } from "./bounded-read.js";
 import { captureSqliteReadReservationObject, SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
+import { awaitNativeWriterFree, nativeWriterBusyError, nativeWriterHeld } from "./native-writer-gate.js";
 import {
 	admitNodeRetirementControl,
 	advanceNodeRetirementControl,
@@ -133,6 +134,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	private resolveBoundedClose: (() => void) | undefined;
 	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
 	private readonly readReservations: SqliteNativeReadReservationOwner;
+	readonly #filename: string;
 	#heldRetirementImage?: HeldAheRetirementAdmissionImage;
 
 	public constructor(
@@ -142,6 +144,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		private readonly crashObserver?: SqliteCrashCheckpointObserver,
 		private readonly session?: LocalSessionLifetime
 	) {
+		this.#filename = filename;
 		this.readReservations = new SqliteNativeReadReservationOwner(filename, session);
 		registerNodeAheReclamationMaintenance(this, connection, {
 			isClosed: () => this.closed,
@@ -701,7 +704,27 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		if (!prepared.ok) return Promise.resolve(prepared);
 		if (this.closed) return Promise.resolve({ ok: false, reason: "STORE_CLOSED" });
 		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
-		return Promise.resolve(this.recoverTransaction(objectId));
+		return this.#afterWriterFree(() => this.recoverTransaction(objectId));
+	}
+
+	/**
+	 * A main-connection BEGIN IMMEDIATE must not busy-wait on this file's in-process writer
+	 * reservations (a native read reservation holds one across awaits; see native-writer-gate.ts):
+	 * the busy handler would sleep the thread their release needs and always fail after
+	 * busy_timeout. Uncontended, the transaction begins synchronously as before. Contended, it
+	 * waits for the holders asynchronously within the same busy budget, then begins at once (no
+	 * await in between) or answers the busy substrate failure the synchronous wait would have.
+	 * @param begin - The synchronous transaction (begins BEGIN IMMEDIATE before any await).
+	 * @returns Its result.
+	 */
+	#afterWriterFree<Value>(begin: () => StoreResult<Value>): Promise<StoreResult<Value>> {
+		if (!nativeWriterHeld(this.#filename)) return Promise.resolve(begin());
+		return awaitNativeWriterFree(this.#filename, 1000).then((free): StoreResult<Value> => {
+			if (this.closed) return { ok: false, reason: "STORE_CLOSED" };
+			if (this.poisoned) return { ok: false, reason: "STORE_POISONED" };
+			if (!free) return { ok: false, reason: "SUBSTRATE_FAILURE", cause: nativeWriterBusyError() };
+			return begin();
+		});
 	}
 
 	public beginGeneration(input: {
@@ -776,7 +799,9 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			return Promise.resolve(evaluateStorageAdapterCommand(prepared.value, [{ kind: "store-closed" }]).result);
 		}
 		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
-		return Promise.resolve(this.execute(prepared.value));
+		const value = prepared.value;
+		if (!isMutation(value.command.kind)) return Promise.resolve(this.execute(value));
+		return this.#afterWriterFree(() => this.execute(value));
 	}
 
 	private execute(prepared: PreparedStorageAdapterCommand): StoreResult<unknown> {

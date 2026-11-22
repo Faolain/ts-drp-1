@@ -9,10 +9,10 @@ import {
 	inspectEphemeralDeliveryClass,
 } from "@ts-drp/ephemeral";
 import {
-	DRP_MESSAGE_PROTOCOL,
 	type DRPUnreliableWebRtcOwner,
 	type DRPUnreliableWebRtcRoute,
 	type DRPUnreliableWebRtcSnapshot,
+	isDirectMessageProtocol,
 } from "@ts-drp/network";
 import { type DRPNetworkNode, Message, MessageType } from "@ts-drp/types";
 
@@ -283,7 +283,7 @@ export class NodeEphemeralAdapter {
 			}
 		} else if (
 			transport.kind !== "authenticated-stream" ||
-			transport.protocol !== DRP_MESSAGE_PROTOCOL ||
+			!isDirectMessageProtocol(transport.protocol) ||
 			transport.sender !== evidence.message.sender
 		) {
 			return true;

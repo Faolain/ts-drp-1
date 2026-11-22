@@ -34,7 +34,7 @@ import { acquireSnapshotDependencyLock } from "./internal/snapshot-dependency-lo
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
 import { iterateSqliteRows } from "./internal/sqlite-iterator.js";
-import { cachedStatement } from "./internal/sqlite-statement-cache.js";
+import { cachedStatement, iterationStatement } from "./internal/sqlite-statement-cache.js";
 
 export interface NodeSnapshotQuarantineStoreOptions {
 	readonly primaryFilename: string;
@@ -708,7 +708,8 @@ export function createNodeSnapshotQuarantineStore(
 			imageDigest = snapshotRetirementContract.imageDigest({ prior: imageDigest, row: sourceRow });
 		}
 		if (remaining.size !== 0) throw failure("incomplete", "snapshot inherited source subset is missing");
-		const query = database.prepare(
+		const query = iterationStatement(
+			database,
 			"SELECT * FROM snapshot_chunks_v2 WHERE object_id=? ORDER BY epoch,anchor,manifest_digest,chunk_index"
 		);
 		for (const row of iterateSqliteRows(query, objectId)) {
@@ -1092,7 +1093,8 @@ export function createNodeSnapshotQuarantineStore(
 			throw failure("conflict", "snapshot quarantine declaration conflicts with durable state");
 		if (selector.descriptors === null) {
 			for (const row of iterateSqliteRows(
-				database.prepare(
+				iterationStatement(
+					database,
 					"SELECT chunk_index,chunk_digest,byte_length FROM snapshot_chunks_v2 WHERE object_id=? AND epoch=? AND anchor=? AND manifest_digest=?"
 				),
 				...keyParameters(declaration.scope)
@@ -1276,7 +1278,8 @@ export function createNodeSnapshotQuarantineStore(
 		)
 			throw failure("recovery-full", "snapshot inherited manifests exceed bounded work");
 		for (const key of iterateSqliteRows(
-			database.prepare(
+			iterationStatement(
+				database,
 				"SELECT epoch,anchor,manifest_digest FROM snapshot_scopes_v2 WHERE object_id=? AND retention='legacy-unclassified' ORDER BY epoch,anchor,manifest_digest"
 			),
 			objectId

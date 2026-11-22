@@ -150,7 +150,13 @@ function metadataGets(trace: Trace): Trace["reads"] {
 	return trace.reads.filter((r) => r.table === "generations" && r.operation === "get");
 }
 function isGenerationScan(read: Trace["reads"][number]): boolean {
-	return read.table === "generations" && ["getAll", "openCursor", "all"].includes(read.operation);
+	// Schema validation inside a mutation (ea4eb158: PRAGMA index_list/table_info/foreign_key_list
+	// per table, including "generations") reads metadata, not generation rows.
+	return (
+		read.table === "generations" &&
+		["getAll", "openCursor", "all"].includes(read.operation) &&
+		!(typeof read.query === "string" && /^\s*PRAGMA\b/iu.test(read.query))
+	);
 }
 function assertWhole(reader: RoleReader, image: Image, trace: Trace): void {
 	const head = nativeHead(image),
@@ -260,12 +266,19 @@ export async function roleSetup(name: RoleCase, env: Environment): Promise<Recor
 		} else {
 			for (let n = 1; n <= 3; n++)
 				head = await stage(store, n, head, large ? [payload(10, 65536)] : [payload(n), payload(90)]);
+			// The union remainder after the three shared B blobs. At U = 12B (ea4eb158) it is nine
+			// blobs, more than one closure may reference (F = 7), so the overflow moves into the
+			// fourth generation and both candidates keep the independent F/B limits.
+			const remainder = large
+				? Array.from({ length: Math.ceil((LIMITS.maxUnionBytes - 3 * LIMITS.maxBlobBytes) / LIMITS.maxBlobBytes) }, (_, index) =>
+						payload(13 + index, Math.min(LIMITS.maxBlobBytes, LIMITS.maxUnionBytes - (3 + index) * LIMITS.maxBlobBytes)))
+				: [];
+			const overflow = Math.max(0, remainder.length - LIMITS.maxClosureReferences);
 			for (let n = 4; n <= 5; n++) {
 				const bytes = large
 					? n === 4
-						? [payload(11, 65536), payload(12, 65536)]
-						: Array.from({ length: Math.ceil((LIMITS.maxUnionBytes - 3 * LIMITS.maxBlobBytes) / LIMITS.maxBlobBytes) }, (_, index) =>
-							payload(13 + index, Math.min(LIMITS.maxBlobBytes, LIMITS.maxUnionBytes - (3 + index) * LIMITS.maxBlobBytes)))
+						? [payload(11, 65536), payload(12, 65536), ...remainder.slice(0, overflow)]
+						: remainder.slice(overflow)
 					: [payload(n), payload(90)];
 				await stage(store, n, head, bytes, false);
 				must(await store.completeGeneration({ objectId: OBJECT, generationId: id(n) }));

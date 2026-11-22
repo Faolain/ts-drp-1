@@ -4,6 +4,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
+
 import {
 	derivedFilename,
 	loadPhase2lCNodeModule,
@@ -55,7 +57,8 @@ async function seedPair(
 	const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
 	const admitted = createNodeDurableIssuanceStore({ primaryFilename });
 	await admitted.close();
-	const database = new DatabaseSync(derivedFilename(primaryFilename));
+	// Out-of-band seeding fixture (ea4eb158 fences raw writers; see out-of-band-sqlite.ts).
+	const database = allowOutOfBandWrites(new DatabaseSync(derivedFilename(primaryFilename)));
 	try {
 		const candidate = phase2lCCommit(authorSequence);
 		database.exec("BEGIN IMMEDIATE");

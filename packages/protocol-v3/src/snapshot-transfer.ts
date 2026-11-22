@@ -315,10 +315,13 @@ export function encodeSnapshotTransfer(input: {
 	} catch (error) {
 		throw new SnapshotManifestError("manifest-invalid", "snapshot payload carrier is invalid", { cause: error });
 	}
+	// Each chunk is its own full-buffer carrier: every chunk consumer (the stream verifier,
+	// quarantine and store writes) accepts only an attached, unshared, full buffer, so a view into
+	// the payload would be refused as soon as the payload spans more than one chunk.
 	const chunks: Uint8Array[] = [];
 	for (let offset = 0; offset < payload.byteLength; offset += profile.snapshotChunkBytes) {
 		const length = Math.min(profile.snapshotChunkBytes, payload.byteLength - offset);
-		chunks.push(payload.subarray(offset, offset + length));
+		chunks.push(payload.slice(offset, offset + length));
 	}
 	const descriptors = Object.freeze(
 		chunks.map((chunk, index) =>

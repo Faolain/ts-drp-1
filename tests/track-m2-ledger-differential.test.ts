@@ -28,13 +28,16 @@ import { settlementRoom, settlementTransition } from "./fixtures/track-m/settlem
 type Event = Readonly<Record<string, unknown>>;
 const shadows: Event[] = [];
 const passes: Event[] = [];
+const ledgers: Event[] = [];
 let restore: (() => void) | undefined;
 beforeEach(() => {
 	shadows.length = 0;
 	passes.length = 0;
+	ledgers.length = 0;
 	restore = installEnvironment((event) => {
 		if (event.kind === "room-retention-ledger-shadow") shadows.push(event);
 		if (event.kind === "room-retention-pass") passes.push(event);
+		if (event.kind === "room-retention-ledger") ledgers.push(event);
 	});
 });
 afterEach(async () => {
@@ -121,6 +124,12 @@ it(`shadow: Track N's settlement room, ${EPOCHS} epochs`, async () => {
 	}
 	await fixture.stop(peers[1]);
 	await fixture.stop(peers[0]);
+	// The Writer recipient here is a settlement-v1 member on the native publication path (1515daab):
+	// its authenticated boundary holds one target per row carrying a live generation, as stage 1's
+	// own acquisition accepts. The ledger planner must accept the same shape, never refuse it as
+	// snapshot-unavailable and drop its facts (which left 0 recipient comparisons from 1515daab).
+	const refusedShape = ledgers.filter((event) => event.action === "dropped" && event.reason === "refused:snapshot-unavailable");
+	expect(refusedShape.map(stable)).toEqual([]);
 	for (const shadow of shadows) expect(shadow, stable(shadow)).toMatchObject({ equal: true });
 	expect(shadows.filter((shadow) => shadow.role === "creator").length).toBeGreaterThanOrEqual(4);
 	expect(shadows.filter((shadow) => shadow.role === "recipient").length).toBeGreaterThanOrEqual(4);

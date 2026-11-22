@@ -4,6 +4,7 @@ import {canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, ca
 	canonicalArrayResourceForSizing, canonicalArrayResourcesForSizing, canonicalValueResourceForSizing} from "@ts-drp/canonical/resource";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
+import { compileClosedJournalObservationOwner } from "./helpers/closed-journal-observation-owner.js";
 
 // Actual scalar/program expressions against the UNCHANGED original composer
 // literal and codec. These controls prove numerical lifetime composition, not
@@ -38,7 +39,9 @@ if (!originalJob || !observationLimits || initializers.size !== 5) throw new Err
 const bindings = {CREATOR_MAINTENANCE_PROOF_MAX_BYTES: limits.maxBytes, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720,
 	canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, canonicalRecordResourceForSizing,
 	canonicalArrayResourceForSizing, canonicalArrayResourcesForSizing, compareBytes,
-	closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0};
+	closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
+	// The owner's journal observation projection (C1).
+	closedJournalObservationControl: compileClosedJournalObservationOwner().closedJournalObservationControl};
 const original = execute<{compiler(): any; evaluate(program: any, parameters: Map<string, number>): Map<string, number> | undefined;
 	book(): any; parts(input: any): number[]; observations(input: any): any[]; exact(input: any): number}>(`
 	${["maintenanceWidthSum", "maintenanceVarUintWidth", "creatorCanonicalCapacityForSizing", "createCreatorNoneResourceProgramCompiler",
@@ -112,7 +115,7 @@ const compiled = execute<(f: any, compiler: any) => {program: any; parameters: M
 	 const successorJobTerms=${initializers.get("successorJobTerms")};${observationLimits}
 	 const roots=${initializers.get("roots")};roots.forEach((root,i)=>compiler.outputNumber("envelope."+i,root));
 	 return {program:compiler.finish(),parameters};};`, {sum, AHE_BOUNDED_READ_LIMITS: {maxUnionBytes: 786432},
-	LIVE_JOURNAL_RETIREMENT_LIMITS: {maxImageBytes: 786432}});
+	LIVE_JOURNAL_RETIREMENT_LIMITS: {maxImageBytes: 786432}, CLOSED_RETIREMENT_BYTES: {maxBytes: 786432, maxItems: 65_536, maxDepth: 128}});
 
 describe("successor native jobs use distinct complete proof lifetimes", () => {
 	it("matches the unchanged original formula, retaining six observations and every repeated readback within each job", () => {
@@ -154,6 +157,9 @@ describe("successor native jobs use distinct complete proof lifetimes", () => {
 	it("preserves observation and program limits and leaves NONE without successor jobs", () => {
 		const f = fixture(), {program, parameters} = compiled(f, original.compiler());
 		parameters.set("observation.5.bytes", 786433); expect(original.evaluate(program, parameters)).toBeUndefined();
+		// The journal observation (index 0) is one carrier under the close's per-carrier encode cap too.
+		const journal = compiled(f, original.compiler());
+		journal.parameters.set("observation.0.bytes", 786433); expect(original.evaluate(journal.program, journal.parameters)).toBeUndefined();
 		const none = fixture(4, 512, 2, 0), result = scalar(none), compiledNone = compiled(none, original.compiler());
 		expect(result[0]).toBe(none.base + none.physical + none.currentTurnover + none.generationTransitions +
 			2 * none.floorImage.byteLength + 6 * none.aheControl.byteLength);
@@ -163,5 +169,41 @@ describe("successor native jobs use distinct complete proof lifetimes", () => {
 		expect(cached).toContain('parameters.set("settlement.futureLeaf", futureNative.futureLeaf)');
 		expect(signing).toContain('outputNumber("signing.finalPhaseBytes"');
 		expect(signing).toContain("correlatedPhases[correlatedPhases.length - 1]!.frames.map");
+	});
+});
+
+// The exact composer bounds the issuance census point image by the AHE union limit only with FINAL
+// rows and each issuance control, and charges its post-adoption census (currentClose or successorFinal
+// runtime, FINAL rows) in close/adopt, turnover and serial lifetimes. Pending successor rows appear
+// only in its separate successor reserved/entered job envelopes.
+describe("the finishing program's census phases follow the exact composer's lifetimes", () => {
+	const body = declaration("buildCreatorOrdinaryFinishingResourceProgramForSizing");
+	const local = ts.createSourceFile("build.ts", body, ts.ScriptTarget.Latest, true);
+	const found = new Map<string, string>();
+	const walk = (node: ts.Node): void => {
+		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer &&
+			["phaseCensus", "unionCensus", "finalRuntimeTerms"].includes(node.name.text)) found.set(node.name.text, node.initializer.getText(local));
+		ts.forEachChild(node, walk);
+	};
+	walk(local);
+	it("charges successor reserved/entered jobs with pending rows and every other runtime phase with final rows", () => {
+		expect([...found.keys()].sort()).toEqual(["finalRuntimeTerms", "phaseCensus", "unionCensus"]);
+		const census = {rows: "all phases"}, unionCensus = {rows: "final"};
+		const phaseCensus = execute<(phase: string) => unknown>(`return ${found.get("phaseCensus")!};`, {census, unionCensus});
+		expect(["currentClose", "successorReserved", "successorEntered", "successorFinal"].map(phaseCensus))
+			.toEqual([unionCensus, census, census, unionCensus]);
+		// Close/serial lifetimes take only the post-adoption phases; successor jobs keep terms 1 and 2.
+		expect(execute<unknown[]>(`return ${found.get("finalRuntimeTerms")!};`, {runtimeEnvelopeTerms: ["close", "reserved", "entered", "final"]}))
+			.toEqual(["close", "final"]);
+		expect(initializers.get("successorJobs")).toContain("runtimeEnvelopeTerms[index]");
+	});
+	it("bounds the union-limited census with final rows, the native image and the issuance control bound", () => {
+		const control = {kind: "issuance control bound"}, image = {kind: "image"};
+		const union = execute<unknown>(`return ${found.get("unionCensus")!};`, {record: (fields: unknown) => fields,
+			inputResource: (key: string, value: unknown) => ({key, value}), futureNative: {unionRows: "final rows"},
+			nativeImage: image, participantBounds: [null, null, control]});
+		expect(union).toEqual({rows: {key: "native.unionRows", value: "final rows"}, image, control});
+		expect(body).toContain("if (unionCensus.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;");
+		expect(body).toContain("compiler?.limit(compiler.references(unionCensus).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);");
 	});
 });

@@ -211,7 +211,9 @@ async function delayedPublication(mode: "unpublished-fence" | "delayed-replaceme
 			required(before.rows.find((row) => row.commit.authorSequence === fence)).publishState,
 			"F5B_C04_FENCE_DURABLE_UNPUBLISHED"
 		).toBe("pending");
-		expect(sourceEntry.replacementSequence, "F5B_C04_NO_REPLACEMENT_BEFORE_FENCE_PUBLICATION").toBeNull();
+		// Decision row 51: a settlement session's startup drain issues its fence and
+		// replacements locally and publishes them after readiness, writers included,
+		// so a durable replacement may precede the fence's publication.
 		await fixture.stop(writer);
 		fixture.publicationFailures.delete(writer.databaseName);
 		await fixture.reopen(writer, 0);
@@ -418,8 +420,8 @@ async function staleLocalHead() {
 	await creator.room.adoptCreatorSuccessor();
 	// Only the genuinely newer floor is transported. Local AHE/snapshot and
 	// issuance bytes remain untouched; no old floor is restored or manufactured.
-	writer.floor.receive(creator.floor.read());
-	const newer = writer.floor.read();
+	await writer.floor.receive(await creator.floor.read());
+	const newer = await writer.floor.read();
 	const mutations = observed.commits.length;
 	await expect(fixture.reopen(writer, 0), "F5B_C24A_STALE_LOCAL_HEAD_FAILS_CLOSED").rejects.toThrow(
 		STALE_LOCAL_HEAD_FAILURE
@@ -428,7 +430,7 @@ async function staleLocalHead() {
 		encodeCanonical(await durable(writer)),
 		"F5B_C24A_PLAN_REVISION_FENCE_ENTRIES_PROGRESS_LINEAGE_UNCHANGED"
 	).toEqual(encodeCanonical(linked));
-	expect(writer.floor.read(), "F5B_C24A_NEWER_FLOOR_NEVER_REGRESSES").toEqual(newer);
+	expect(await writer.floor.read(), "F5B_C24A_NEWER_FLOOR_NEVER_REGRESSES").toEqual(newer);
 	expect(observed.commits.length, "F5B_C24A_REJECTED_REOPEN_ISSUES_NOTHING").toBe(mutations);
 	const offset = ownCommits(writer).length;
 	await fixture.reopen(writer, 1, true);
@@ -574,7 +576,7 @@ async function sixtyFourWriterGoldenPath() {
 						hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(acl)))
 					);
 					expect(current.profileId, "F5B_64_SETTLEMENT_AUTHORITY_NO_DOWNGRADE").toBe("creator-trusted-settlement-v1");
-					const floor = peer.floor.read();
+					const floor = await peer.floor.read();
 					expect(floor.pending).toBeNull();
 					expect(floor.stable).toMatchObject({ epoch, currentAnchorDigest: current.anchorDigest });
 					const ownRecovered = displaced.filter((row) => row.peer === peer && row.epoch === epoch - 1);
@@ -761,7 +763,7 @@ async function sixtyFourWriterGoldenPath() {
 			const head = await assertRetainedRollbackPair(creator);
 			expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
 			expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
-			expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
+			expect((await creator.floor.read()).stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
 			const previous = adopted.at(-1);
 			if (previous !== undefined)
 				expect(head.head.revision, "F5B_C24C_MONOTONE_ACTIVE_HEAD_REVISION").toBeGreaterThan(previous.revision);
@@ -907,6 +909,39 @@ async function positiveAuthenticatedPruning() {
 				expect(events, "F5B_C13_NO_PREFIX_DELETE_BEFORE_FULL_WINDOW_AND_OLDER_PREFIX").toHaveLength(0);
 				continue;
 			}
+			if (peer !== creator) {
+				// C13 classification A (stale expectation, coordinator 2026-10-28): the Writer's
+				// issuance retention is bounded by the retained cut window, not by an epoch-2
+				// prefix delete. Its rows stay protected while their journal scopes are replay
+				// scopes (closedJournalProtectedReplayScopes: the current scope and each retained
+				// Cut's closed and successor scope); the retained Cuts at closedEpoch e are
+				// e - 2 .. e here (cuts [0, 1, 2] at the epoch-3 turnover). In this 3-close room
+				// every Writer scope is inside that window: it keeps exactly its committed rows of
+				// the window's epochs and deletes none. (This grid fixture's 4th close fails
+				// recovery-full at the creator, so the window's lower edge moving past epoch 0,
+				// where those rows must go, is out of its reach.)
+				expect(events, "F5B_C13_WRITER_DELETES_NOTHING_INSIDE_THE_WINDOW").toHaveLength(0);
+				const windowStart = Math.max(0, epoch - 2);
+				const epochOf = (bytes: Uint8Array) => record(bytes).epoch as number;
+				const committed = [
+					...new Set(
+						ownCommits(peer)
+							.filter((row) => epochOf(row.envelope.canonicalPreimageBytes) >= windowStart)
+							.map((row) => row.authorSequence)
+					),
+				].sort((left, right) => left - right);
+				const retained = (await durable(peer)).rows;
+				expect(committed.length, "F5B_C13_WRITER_COMMITTED_IN_EVERY_EPOCH").toBeGreaterThanOrEqual(epoch + 1);
+				expect(
+					retained.map((row) => row.commit.authorSequence),
+					"F5B_C13_WRITER_RETAINS_EXACTLY_ITS_ROWS_INSIDE_THE_WINDOW"
+				).toEqual(committed);
+				expect(
+					retained.every((row) => epochOf(row.commit.envelope.canonicalPreimageBytes) >= windowStart),
+					"F5B_C13_WRITER_RETAINS_NOTHING_OUTSIDE_THE_WINDOW"
+				).toBe(true);
+				continue;
+			}
 			expect(events.length, "F5B_C13_PARENT_OWNER_ACTUALLY_DELETES_ISSUANCE").toBeGreaterThan(0);
 			const first = required(events[0]);
 			expect(
@@ -963,20 +998,15 @@ async function displacedControls() {
 	await fixture.close();
 	fixture.checkpoint();
 	await creator.room.adoptCreatorSuccessor();
-	const decisions: { action: string; commits: number; planWrites: number }[] = [];
+	// ea4eb158: displacementPolicies may name only batchable application actions
+	// (validateDisplacementPolicy), so the application can no longer give the displaced
+	// ACL control a policy. The room must still hold it durably as manual review.
 	const application: CreateV3RoomSessionInput["application"] = {
 		...writer.input.application,
 		displacedOperationIdentity: (operation) =>
 			operation.action === "acl"
 				? hex(encodeCanonical(operation))
 				: writer.input.application.displacedOperationIdentity(operation),
-		displacementPolicies: {
-			...writer.input.application.displacementPolicies,
-			get acl() {
-				decisions.push({ action: "acl", commits: ownCommits(writer).length, planWrites: observed.planWrites.length });
-				return "manual-review" as const;
-			},
-		},
 	};
 	const before = ownCommits(writer).length;
 	await fixture.reopen(writer, 0, true, application);
@@ -984,11 +1014,9 @@ async function displacedControls() {
 		fixture.issue(writer, "acl-review-barrier"),
 		"F5B_C21_DISPLACED_ACL_HOLDS_BEFORE_FENCE"
 	).rejects.toThrow();
-	expect(decisions.length, "F5B_C21_ACL_SURFACED_TO_REAL_APPLICATION_POLICY").toBeGreaterThan(0);
-	expect(
-		decisions.every((decision) => decision.commits === before),
-		"F5B_C21_POLICY_PRECEDES_ANY_NEW_ISSUE"
-	).toBe(true);
+	expect(ownCommits(writer).length, "F5B_C21_HOLD_PRECEDES_ANY_NEW_ISSUE").toBe(before);
+	// RED: today derive() throws "v3 room settlement policy is unavailable" on every issue
+	// and nothing durable records the displaced ACL (plan entries []).
 	const held = await durable(writer);
 	expect(held.plan).toMatchObject({
 		fenceSequence: null,
@@ -1070,12 +1098,29 @@ async function sameKeyReentry() {
 		"F5B_C09_STALE_INCARNATION_REJECTED_AT_REAL_INGRESS"
 	).not.toContain("old-incarnation-unadmitted");
 	await fixture.stop(writer);
-	// A fresh installation receives the very same published authenticated bytes;
-	// no issued/outbox/plan row from the returning device is copied to it.
-	const fresh = {
+	// The same key on a fresh installation in the incarnation the returning device is using.
+	const fresh = await freshInstallation(fixture, writer);
+	await fixture.reopen(fresh, 3, true);
+	await expectFreshDeviceBehindItsFrontier(fixture, creator, fresh, "fresh-device-reentry");
+	await fixture.stop(fresh);
+	await fixture.stop(creator);
+}
+
+/**
+ * A fresh installation of an existing Writer key. It receives the very same published
+ * authenticated bytes; no issued/outbox/plan row from the other device is copied to it.
+ * @param fixture
+ * @param writer
+ */
+async function freshInstallation(fixture: Awaited<ReturnType<typeof openRoom>>, writer: Peer): Promise<Peer> {
+	return {
 		...writer,
 		databaseName: `${writer.databaseName}-fresh`,
-		floor: floorOwner(),
+		// floorOwner now opens its own native floor for one database and scope (async).
+		floor: await floorOwner(`${writer.databaseName}-fresh`, {
+			objectId: fixture.objectId,
+			pinnedGenesisAnchorDigest: writer.input.creatorInvite.pinnedGenesisAnchorDigest,
+		}),
 		input: {
 			...writer.input,
 			databaseName: `${writer.databaseName}-fresh`,
@@ -1083,21 +1128,112 @@ async function sameKeyReentry() {
 			openTransport: fixture.transportFor(`${writer.databaseName}-fresh`),
 		},
 	};
-	await fixture.reopen(fresh, 3, true);
+}
+
+/**
+ * Decision B (sync before sending): a fresh installation whose key already has admitted
+ * sequences in the current incarnation is behind its own authenticated frontier (its lineage is
+ * at 0). Signing slot 0 there would fork the author's lineage while the other device may still
+ * hold the key (a Web Lock is per device), so the room refuses it and nothing is signed: a
+ * restored device stays failed closed until an explicit replacement (docs/realtime-latency/
+ * README.md, "Healing a restored device").
+ * @param fixture
+ * @param creator
+ * @param fresh
+ * @param clientOperationId
+ */
+async function expectFreshDeviceBehindItsFrontier(
+	fixture: Awaited<ReturnType<typeof openRoom>>,
+	creator: Peer,
+	fresh: Peer,
+	clientOperationId: string
+): Promise<void> {
+	expect(fresh.room.localIssueCurrency?.(), "F5B_C08_FRESH_DEVICE_BEHIND_ITS_FRONTIER").toBe("not-yet-current");
+	expect(
+		await fresh.room.confirmCurrent?.(required(creator.room.currencyStatement?.())),
+		"F5B_C08_FRESH_DEVICE_BEHIND_ITS_FRONTIER"
+	).toBe("behind-frontier");
+	await expect(
+		fixture.issue(fresh, clientOperationId),
+		"F5B_C08_FRESH_DEVICE_REFUSED_IN_THE_KEYS_CURRENT_INCARNATION"
+	).rejects.toMatchObject({ code: "V3_ROOM_NOT_YET_CURRENT", reason: "behind-frontier" });
+	expect((await durable(fresh)).lineage.next, "F5B_C08_REFUSED_FRESH_DEVICE_SIGNED_NOTHING").toBe(0);
+}
+
+/**
+ * Case 8 readmission. The explicit replacement is complete removal and regrant: the key gets a
+ * new authenticated incarnation with a null boundary, in which the fresh device is current at 0.
+ * (A separate room from cases 6-9: this grid fixture's creator refuses a fifth close with
+ * snapshot recovery-full, which is not a currency question; this room needs four.)
+ */
+async function freshDeviceReplacement() {
+	const fixture = await openRoom(2);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	// A fresh installation opens only where its key's boundary is null (a non-null boundary already
+	// refuses its reopen as chain-invalid): a new incarnation's first epoch. The key's other device
+	// reenters that incarnation first, which puts the fresh device behind its frontier.
+	await fixture.issue(creator, "replacement-creator-initial");
+	await fixture.issue(writer, "replacement-writer-initial");
+	await fixture.stop(writer);
+	const incarnation = await regrant(fixture, creator, writer);
+	await fixture.reopen(writer, incarnation - 1, true);
+	await fixture.issue(writer, "replacement-other-device");
+	await fixture.stop(writer);
+	const fresh = await freshInstallation(fixture, writer);
+	await fixture.reopen(fresh, incarnation - 1, true);
+	await expectFreshDeviceBehindItsFrontier(fixture, creator, fresh, "fresh-device-before-replacement");
+	await fixture.stop(fresh);
+	const replaced = await regrant(fixture, creator, writer);
+	expect(replaced, "F5B_C08_REPLACEMENT_IS_A_LATER_INCARNATION").toBeGreaterThan(incarnation);
+	await fixture.reopen(fresh, replaced - 1, true);
+	expect(fresh.room.localIssueCurrency?.(), "F5B_C08_FRESH_DEVICE_CURRENT_AFTER_REPLACEMENT").toBe("current");
 	await fixture.issue(fresh, "fresh-device-reentry");
-	expect((await durable(fresh)).lineage.next, "F5B_C08_FRESH_DEVICE_STARTS_AT_ZERO").toBeGreaterThanOrEqual(2);
+	expect((await durable(fresh)).lineage.next, "F5B_C08_FRESH_DEVICE_STARTS_AT_ZERO").toBeGreaterThanOrEqual(1);
 	const freshStore = await createBrowserDurableIssuanceStore({ primaryDatabaseName: fresh.databaseName });
 	try {
+		// A null-boundary member's first accountable vertex is a fence or slot 0 (plan v2,
+		// settlement profile): the fresh device's own first work is slot 0 in the new incarnation.
 		const zero = required(await freshStore.readIssued({ author: fresh.author, objectId: fixture.objectId }, 0));
-		expect(record(zero.envelope.canonicalPreimageBytes).operation, "F5B_C08_FRESH_DEVICE_FENCE_ZERO").toMatchObject({
-			action: "$drp.author-fence.v1",
-			fenceSequence: 0,
-		});
+		const vertex = record(zero.envelope.canonicalPreimageBytes);
+		expect(vertex.epoch, "F5B_C08_FRESH_DEVICE_SLOT_ZERO_IN_NEW_INCARNATION").toBe(replaced);
+		expect(
+			[
+				{ action: "$drp.author-fence.v1", fenceSequence: 0, version: 1 },
+				{ action: "message", clientOperationId: "fresh-device-reentry", text: "fresh-device-reentry" },
+			],
+			"F5B_C08_FRESH_DEVICE_FIRST_ACCOUNTABLE_VERTEX"
+		).toContainEqual(vertex.operation);
 	} finally {
 		await freshStore.close();
 	}
 	await fixture.stop(fresh);
 	await fixture.stop(creator);
+}
+
+/**
+ * The explicit replacement: complete removal (absent at one close) and regrant gives the key a
+ * new authenticated incarnation with a null boundary. Returns that incarnation's first epoch.
+ * @param fixture
+ * @param creator
+ * @param writer
+ */
+async function regrant(fixture: Awaited<ReturnType<typeof openRoom>>, creator: Peer, writer: Peer): Promise<number> {
+	await creator.room.issue({ action: "acl", group: "writer", kind: "revoke", target: writer.author });
+	await fixture.close();
+	expect(
+		frontierFor(fixture.checkpoint().capability, writer.author),
+		"F5B_C08_REPLACEMENT_REMOVES_THE_KEY"
+	).toBeUndefined();
+	await creator.room.adoptCreatorSuccessor();
+	await creator.room.issue({ action: "acl", group: "writer", kind: "grant", target: writer.author });
+	const closed = await fixture.close();
+	expect(
+		frontierFor(fixture.checkpoint().capability, writer.author),
+		"F5B_C08_REPLACEMENT_IS_A_NEW_INCARNATION"
+	).toEqual([writer.author, closed.successorEpoch, null]);
+	await creator.room.adoptCreatorSuccessor();
+	return closed.successorEpoch;
 }
 
 async function manualReviewHold() {
@@ -1255,6 +1391,58 @@ async function creatorFenceScan(duplicate = false, stale = false) {
 		frontierFor(second.capability, creator.author)?.[2],
 		duplicate ? "F5B_C23_OTHER_AUTHOR_ADVANCES_DESPITE_DUPLICATE" : "F5B_C12_BYZANTINE_JUMP_ONLY_BURNS_OWN_SPACE"
 	).toBeGreaterThan(required(frontierFor(first.capability, creator.author)?.[2]));
+	await creator.room.adoptCreatorSuccessor();
+	await fixture.stop(writer);
+	await fixture.stop(creator);
+}
+
+// Case 23, contiguous variant. The creator-trusted-v1 close derives its checkpoint from
+// the issuance frontiers (the settlement profile only sizes them), so this runs in a
+// legacy room. The Writer's duplicated slot is the next one after its prior boundary:
+// without the duplicate-author freeze, the contiguous scan would carry the Writer past it.
+async function creatorContiguousDuplicateFreeze() {
+	const fixture = await openRoom(2, true);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	const issuanceBoundary = (author: string) => {
+		const proposed = required(observed.advances.at(-1)).proposed as { candidates: { bytes: Uint8Array }[] };
+		const state = required(
+			proposed.candidates.find(({ bytes }) => record(bytes).kind === "drp-creator-author-issuance-frontiers-state")
+		);
+		const frontier = (record(state.bytes).frontiers as [string, number | null][]).find(([key]) => key === author);
+		return required(frontier)[1];
+	};
+	await fixture.issue(creator, "contiguous-creator-before");
+	await fixture.issue(writer, "contiguous-writer-before");
+	await fixture.close();
+	const priorWriter = issuanceBoundary(writer.author);
+	const priorCreator = issuanceBoundary(creator.author);
+	await creator.room.adoptCreatorSuccessor();
+	await fixture.reopen(writer, 0, true);
+	await fixture.issue(writer, "contiguous-writer-current");
+	const honest = required(ownCommits(writer).at(-1));
+	expect(honest.authorSequence, "F5B_C23C_DUPLICATED_SLOT_IS_CONTIGUOUS_WITH_THE_BOUNDARY").toBe(
+		required(priorWriter) + 1
+	);
+	// The Writer signs a second vertex at the same slot. Only these bytes are adversarial.
+	const preimage = record(honest.envelope.canonicalPreimageBytes);
+	const canonicalPreimage = encodeCanonical({ ...preimage, logicalTime: (preimage.logicalTime as number) + 1 });
+	const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimage);
+	fixture.deliver(
+		Message.create({
+			objectId: required(observed.planes.get(creator.databaseName)).topic,
+			data: V3Envelope.encode({ canonicalPreimage, signature: ed25519.sign(digest, writer.seed) }).finish(),
+			sender: writer.databaseName,
+			type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+		})
+	);
+	await fixture.issue(writer, "contiguous-writer-after"); // FIFO ingress acknowledgement
+	await fixture.issue(creator, "contiguous-independent-creator");
+	await fixture.close();
+	expect(issuanceBoundary(writer.author), "F5B_C23C_CONTIGUOUS_DUPLICATE_FREEZES_PRIOR_BOUNDARY").toBe(priorWriter);
+	expect(issuanceBoundary(creator.author), "F5B_C23C_OTHER_AUTHOR_ADVANCES_DESPITE_DUPLICATE").toBeGreaterThan(
+		required(priorCreator)
+	);
 	await creator.room.adoptCreatorSuccessor();
 	await fixture.stop(writer);
 	await fixture.stop(creator);
@@ -1695,10 +1883,14 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 			ownCommits(writer).filter((row) => row.authorSequence === prefixSequence),
 			"F5B_C03_SAME_EPOCH_RESTART_NO_PREFIX_REISSUE"
 		).toEqual([prefix]);
+		// Decision row 51: the startup drain publishes after readiness, so the committed
+		// prefix may still be unpublished while its suffix keeps failing. It is never
+		// published twice; each chunk's exactly-once publication is checked after completion.
 		expect(
-			observed.publications.filter((row) => row.database === writer.databaseName && row.sequence === prefixSequence),
+			observed.publications.filter((row) => row.database === writer.databaseName && row.sequence === prefixSequence)
+				.length,
 			"F5B_C03_SAME_EPOCH_RESTART_NO_PREFIX_REPUBLICATION"
-		).toHaveLength(1);
+		).toBeLessThanOrEqual(1);
 		await fixture.issue(creator, "creator-during-writer-crash");
 		expect(productState(creator).byteLength, "F5B_C03_PREFIX_FOLD_STATE_WITHIN_UNCHANGED_CEILING").toBeLessThan(32_768);
 		await fixture.close();
@@ -1800,7 +1992,11 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		"case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
 		delayedDependency
 	);
-	it("cases 6-9 authenticate same-key removal and same-device and fresh-device readmission", sameKeyReentry);
+	it(
+		"cases 6-9 authenticate same-key removal and same-device readmission, and refuse a fresh device behind its frontier",
+		sameKeyReentry
+	);
+	it("case 8 readmits a fresh same-key device only through removal and regrant", freshDeviceReplacement);
 	it(
 		"case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
 		manualReviewHold
@@ -1809,6 +2005,8 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 	it("case 12 ignores a stale fence at or below the authenticated terminal boundary", () =>
 		creatorFenceScan(false, true));
 	it("case 23 freezes only the equivocating author below a fence", () => creatorFenceScan(true));
+	it("case 23 freezes an equivocating author whose duplicated slot is contiguous with its boundary", () =>
+		creatorContiguousDuplicateFreeze());
 	it.each(["unpublished-fence", "delayed-replacement", "delayed-fence"] as const)(
 		"cases 4 15 16 preserve %s custody",
 		delayedPublication
@@ -1859,8 +2057,8 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		const untouched = await durable(floorWriter);
 		await floorControl.close();
 		await floorCreator.room.adoptCreatorSuccessor();
-		floorWriter.floor.receive(floorCreator.floor.read());
-		const currentFloor = floorWriter.floor.read();
+		await floorWriter.floor.receive(await floorCreator.floor.read());
+		const currentFloor = await floorWriter.floor.read();
 		// No live owner competes with this stale durable-copy probe. The newer
 		// creator floor stays committed; stopping a session never rewinds it.
 		await floorControl.stop(floorCreator);
@@ -1869,6 +2067,6 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 			"F5B_C24A_EXACT_REACHABLE_FLOOR_REJECTION_CONTROL"
 		).rejects.toThrow(STALE_LOCAL_HEAD_FAILURE);
 		expect(await durable(floorWriter)).toEqual(untouched);
-		expect(floorWriter.floor.read()).toEqual(currentFloor);
+		expect(await floorWriter.floor.read()).toEqual(currentFloor);
 	});
 });

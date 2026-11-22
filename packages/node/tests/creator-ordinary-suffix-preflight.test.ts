@@ -3,6 +3,8 @@ import {compareBytes, decodeCanonical, encodeCanonical} from "@ts-drp/canonical"
 import {canonicalBytesResourceForSizing, canonicalPrimitiveResourceForSizing,
 	canonicalRecordResourceForSizing, canonicalValueResourceForSizing} from "@ts-drp/canonical/resource";
 import * as ts from "typescript";
+import {prepareJournalOrdinaryFinishingCapacityProjection} from "../../live-journal/src/retirement.js";
+import {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE} from "../src/internal/creator-source-custody.js";
 import {describe, expect, it} from "vitest";
 
 // Execute the actual suffix/accepted-update bodies. Nominal proof, current
@@ -44,8 +46,12 @@ function fixture() {
 			[phase, {items: 50 + n * 3, maxDepth: 5}]))});
 	const runtimeWidths = {...runtimeResult(1), project: (input: any) => {calls.push(["runtime", input]); return runtimeResult(input.maxAdditionalCurrentJournalRows);}};
 	const rows = {lineages: [{...scope, next: 1, exhausted: false}], issued: [] as any[], outbox: [] as any[], plans: []};
-	const header = encodeCanonical(["scopes", ["room", 2, anchor], {nextJournalSequence: 1, exactCanonicalParametersCarrierBytes: encodeCanonical({version: 1})}]);
-	const oldReceived = encodeCanonical(["acceptedEntries", ["room", 2, anchor, 0], {sourceKind: "received", vertexDigest: digest,
+	// ea4eb158: the header drain is read from the genuine journal projection,
+	// which validates each row's own scope and journal sequence.
+	const header = encodeCanonical(["scopes", ["room", 2, anchor], {objectId: "room", epoch: 2, anchorDigest: anchor,
+		nextJournalSequence: 1, exactCanonicalParametersCarrierBytes: encodeCanonical({version: 1})}]);
+	const oldReceived = encodeCanonical(["acceptedEntries", ["room", 2, anchor, 0], {objectId: "room", epoch: 2, anchorDigest: anchor,
+		journalSequence: 0, sourceKind: "received", vertexDigest: digest,
 		exactCanonicalPreimageBytes: new Uint8Array(4096), detachedSignature: new Uint8Array(64)}]);
 	const journal = {canonicalRows: [header, oldReceived], image: {rowCount: 1, scopeCount: 1, byteCharge: 4200, imageDigest: digest}, control: null};
 	const reader = () => undefined, identity = {}, profile = {kind: "ordinary-resource-program", preparedMaterial: true,
@@ -60,7 +66,8 @@ function fixture() {
 			readiness: {reader, sourceIdentity: identity, geometry: {graphVersion: 3, baseGraphCount: 2, basePreimageCount: 1,
 				baseWitnessPayloadBytes: 4100, acceptedWitnessPayloadBytes: 0, acceptedCount: 0, localIssuedCount: 0,
 				runtimeWidths,
-				journalObservationFields: {control: resource(null), image: resource(journal.image), canonicalRows: resource(journal.canonicalRows)}}}}};
+				journalObservationFields: {control: resource(null), image: resource(journal.image), canonicalRows: resource(journal.canonicalRows)},
+				journalContextControlWidth: 0}}}};
 	const current = {runtime: {kind: "pending-local-issuance", objectId: "room", epoch: 2, anchorDigest: anchor,
 		profileId: "creator-trusted-settlement-v1", issuanceScope: scope, graphVersion: 3, epochBytes: 10000},
 		parameters: {maxEpochVertices: 8192, maxEpochBytes: 8388608}, currentEpochVertexCount: 2,
@@ -85,12 +92,22 @@ function fixture() {
 			["artifacts.anchor.bytes", 1024], ["membership.bytes", 2048], ...[0, 1, 2, 3].map(n =>
 				[`envelope.${n}`, excessM && through === undefined ? 4194305 : 500000 + n * 1000] as [string, number])]);
 	};
-	const preflight = actual<(...args: any[]) => any>(["creatorOrdinaryJournalDescriptorGroupsForSizing", "creatorOrdinaryJournalScopeCollectibleForSizing", "creatorOrdinaryResourceNativeCapacityForSizing", "creatorOrdinaryJournalRawSupplementForSizing", "creatorOrdinarySuffixCapacityForSizing"], "creatorOrdinarySuffixCapacityForSizing", {
+	const preflight = actual<(...args: any[]) => any>(["creatorOrdinaryJournalDescriptorGroupsForSizing", "creatorOrdinaryJournalScopeCollectibleForSizing", "creatorOrdinaryResourceNativeCapacityForSizing", "creatorOrdinaryJournalRawSupplementForSizing", "creatorOrdinarySuffixCapacityForSizing",
+		// 974f78d0/3a28ab80: the original retained-fence reserve helpers.
+		"settlementAdoptionReserveFences", "settlementAdoptionReserveProtections"], "creatorOrdinarySuffixCapacityForSizing", {
+		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE,
+		// 1515daab: source custody geometry is a controlled premise here (no custody
+		// alternative), as in creator-ordinary-readiness-producer.test.ts.
+		creatorSourceCustodyGeometryForSizing: () => undefined,
+		// ea4eb158: header drain comes from the genuine journal projection.
+		prepareJournalOrdinaryFinishingCapacityProjection,
 		decodeCanonical, compareBytes, canonicalBytesResourceForSizing, canonicalPrimitiveResourceForSizing, canonicalRecordResourceForSizing,
 		creatorOrdinarySizingRecord: (value: unknown) => value !== null && typeof value === "object" && !Array.isArray(value),
 		creatorOrdinarySizingRecordValue: decodeCanonical, closedRetirementEqual: equal, record: decodeCanonical,
 		settlementProfileFor: () => "v1", CREATOR_MAINTENANCE_PROOF_MAX_BYTES: 4194304, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1310720,
 		LIVE_JOURNAL_RETIREMENT_LIMITS: {maxRows: 8192},
+		// The close's per-carrier encode cap (CLOSED_RETIREMENT_BYTES, AHE maxUnionBytes).
+		CLOSED_RETIREMENT_BYTES: {maxBytes: 786_432, maxItems: 65_536, maxDepth: 128},
 		maintenanceWidthSum: (parts: readonly number[]) => {const n = parts.reduce((a, b) => a + b, 0); if (n > 4194304) throw Error("finite arithmetic"); return n;},
 		creatorOrdinaryPreimageResourceGeometryForSizing: ({canonicalOperationByteLength: n}: any) =>
 			({canonicalPreimageByteLength: Math.max(512, n) + 1536, canonicalEpochVertexByteLength: Math.max(512, n) + 1400}),
@@ -104,7 +121,8 @@ function fixture() {
 			canonicalRows: {byteLength: 5000 + input.maxAdditionalCurrentRows * 9000, items: 10 + input.maxAdditionalCurrentRows * 2, maxDepth: 1}, successorFenceFrameByteLength: 9000};},
 		issuanceOrdinaryFinishingCapacityWidths: (input: any) => {calls.push(["issuer", input]); const phase = {nativeCensusBytes: 1000 + input.maxAdditionalCurrentIssued * 9000};
 			return {ordinaryPending: phase, ordinaryFinal: phase, nativeImageByteLength: 1000, nativeImageShape: {items: 30, maxDepth: 5}};},
-		creatorOrdinaryFutureNativeResourceForSizing: () => ({rows: {byteLength: 5000, items: 50, maxDepth: 5}, futureLeaf: 9000}),
+		creatorOrdinaryFutureNativeResourceForSizing: () => ({rows: {byteLength: 5000, items: 50, maxDepth: 5},
+			unionRows: {byteLength: 4000, items: 40, maxDepth: 5}, futureLeaf: 9000}),
 		creatorOrdinaryFinishingLifetimeMaterialForSizing: () => ({currentTurnover: 20000, closeAdopt: 30000, successorJob: 20000, serial: 20000, cold: 20000}),
 	});
 	return {run: () => {
@@ -148,10 +166,10 @@ describe("same-proof first-genuine-join resource preflight", () => {
 		capture.nativeIssuance.rows.issued.push(issued);
 		capture.nativeIssuance.rows.outbox.push({...scope, authorSequence: 1, digest: issued.digest, publishState: "pending"});
 		for (let index = 1; index <= 3; index++) capture.journal.canonicalRows.push(encodeCanonical([
-			"acceptedEntries", ["room", 2, anchor, index], index === 1
+			"acceptedEntries", ["room", 2, anchor, index], {objectId: "room", epoch: 2, anchorDigest: anchor, journalSequence: index, ...(index === 1
 				? {sourceKind: "local-issued", vertexDigest: digest, localAuthor: author, localAuthorSequence: 1}
 				: {sourceKind: "received", vertexDigest: String(index).repeat(64), exactCanonicalPreimageBytes: acceptedPreimage,
-					detachedSignature: signature}]));
+					detachedSignature: signature})}]));
 		capture.journal.image.rowCount = 4;
 		state.acceptedCount = 3; state.localIssuedCount = 1; state.graphVersion = 6;
 		state.acceptedWitnessPayloadBytes = 3 * canonicalBytesResourceForSizing(acceptedPreimage.byteLength).byteLength;
@@ -173,7 +191,9 @@ describe("same-proof first-genuine-join resource preflight", () => {
 		expect(issuer.maxAdditionalCurrentIssued).toBe(4);
 		expect(journal.actualCanonicalRows).toBe(capture.journal.canonicalRows); expect(journal.maxAdditionalCurrentRows).toBe(4);
 		expect(journal.actualCanonicalRows).toEqual(exactBefore); expect(f.source.journal.canonicalRows).toHaveLength(2);
-		expect(f.evaluated.at(-1)!.get("issued.count")).toBe(6); // One actual local + four future + successor fence.
+		// One actual local + four future + successor fence, plus (974f78d0/3a28ab80)
+		// the one retained-fence reserve protection beyond that fence.
+		expect(f.evaluated.at(-1)!.get("issued.count")).toBe(7);
 		expect(f.evaluated.at(-1)!.get("witness.payloadSum")).toBe(state.baseWitnessPayloadBytes + state.acceptedWitnessPayloadBytes +
 			4 * canonicalBytesResourceForSizing(2048).byteLength);
 		expect(f.evaluated.at(-1)!.get("journal.group.0.receivedPayloadSum")).toBe(
@@ -187,7 +207,8 @@ describe("same-proof first-genuine-join resource preflight", () => {
 	it("retains the all-local paging branch and full suffix obligations without inventing received frames", () => {
 		const f = fixture();
 		const frame: any = decodeCanonical(f.facts.proofFacts.capture.journal.canonicalRows[1]);
-		frame[2] = {sourceKind: "local-issued", vertexDigest: digest, localAuthor: author, localAuthorSequence: 1};
+		frame[2] = {objectId: "room", epoch: 2, anchorDigest: anchor, journalSequence: 0,
+			sourceKind: "local-issued", vertexDigest: digest, localAuthor: author, localAuthorSequence: 1};
 		const raw = encodeCanonical(frame);
 		f.facts.proofFacts.capture.journal.canonicalRows[1] = raw;
 		f.source.journal.canonicalRows[1] = raw.slice();
@@ -198,7 +219,9 @@ describe("same-proof first-genuine-join resource preflight", () => {
 		expect(f.evaluated.at(-1)!.get("journal.group.0.receivedPayloadSum")).toBe(0);
 		expect(f.evaluated.at(-1)!.get("journal.group.0.pageCount")).toBe(5);
 		expect(f.evaluated.at(-1)!.get("witness.count")).toBe(5);
-		expect(f.evaluated.at(-1)!.get("issued.count")).toBe(5); // Four local rows plus the separate successor fence.
+		// Four local rows plus the separate successor fence, plus the one
+		// retained-fence reserve protection (974f78d0/3a28ab80).
+		expect(f.evaluated.at(-1)!.get("issued.count")).toBe(6);
 		expect(result.capacity.unknownEncodedLengths).toBe(f.result.capacity.unknownEncodedLengths);
 		expect(f.proof.accounting.chargedBytes).toBe(10000);
 	});

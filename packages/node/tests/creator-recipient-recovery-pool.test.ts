@@ -33,10 +33,34 @@ describe("recipient early recovery-pool maintenance", () => {
 	});
 
 	it("shares one turnover predicate and pass loop between install and the lull", () => {
-		expect(adoption.match(/receivedRecoveryTurnoverDue\(/gu)?.length).toBe(3);
+		// One predicate and one pass implementation. Their only callers: the install, the whole lull
+		// (maintainCreatorRecipientRecoveryPool: the resume, and its direct callers) and the stepped lull
+		// (stepCreatorRecipientRecoveryPool: one pass of the SAME loop per lifecycle admission).
+		expect(adoption.match(/async function receivedRecoveryTurnoverDue\(/gu)?.length).toBe(1);
+		expect(adoption.match(/async function beginReceivedRecoveryTurnoverPasses\(/gu)?.length).toBe(1);
+		expect(adoption.match(/async function runReceivedRecoveryTurnoverPass\(/gu)?.length).toBe(1);
+		expect(adoption.match(/receivedRecoveryTurnoverDue\(/gu)?.length).toBe(4);
 		expect(adoption.match(/runReceivedRecoveryTurnoverPasses\(/gu)?.length).toBe(3);
+		expect(adoption.match(/beginReceivedRecoveryTurnoverPasses\(/gu)?.length).toBe(3);
+		expect(adoption.match(/runReceivedRecoveryTurnoverPass\(/gu)?.length).toBe(3);
+		const loop = adoption.slice(adoption.indexOf("async function runReceivedRecoveryTurnoverPasses("));
+		const loopBody = loop.slice(0, loop.indexOf("\n}\n"));
+		expect(loopBody).toContain("await beginReceivedRecoveryTurnoverPasses(input)");
+		expect(loopBody).toContain("await runReceivedRecoveryTurnoverPass(input, state, seal)");
+		const whole = adoption.slice(adoption.indexOf("export async function maintainCreatorRecipientRecoveryPool("));
+		const wholeBody = whole.slice(0, whole.indexOf("\n}\n"));
+		expect(wholeBody).toContain("receivedRecoveryTurnoverDue(");
+		expect(wholeBody).toContain("runReceivedRecoveryTurnoverPasses(");
+		const stepped = adoption.slice(adoption.indexOf("export async function stepCreatorRecipientRecoveryPool("));
+		const steppedBody = stepped.slice(0, stepped.indexOf("\n}\n"));
+		expect(steppedBody).toContain("receivedRecoveryTurnoverDue(");
+		expect(steppedBody).toContain("beginReceivedRecoveryTurnoverPasses(passInput)");
+		expect(steppedBody).toContain("runReceivedRecoveryTurnoverPass(passInput, progress.state, seal)");
 		const install = adoption.slice(adoption.indexOf("const prepareReceivedRecoveryTurnover"));
-		expect(install.slice(0, install.indexOf("return true;"))).toContain("source.sealReceivedRecoveryDependencies(");
+		const installBody = install.slice(0, install.indexOf("return true;"));
+		expect(installBody).toContain("receivedRecoveryTurnoverDue(");
+		expect(installBody).toContain("runReceivedRecoveryTurnoverPasses(");
+		expect(installBody).toContain("source.sealReceivedRecoveryDependencies(");
 	});
 
 	it("runs the lull under the received gate and halts after any failure past entry", () => {
@@ -61,13 +85,23 @@ describe("recipient early recovery-pool maintenance", () => {
 	});
 
 	it("routes recipient sessions through the lifecycle FIFO with the issue barrier", () => {
-		const body = room.slice(room.indexOf("const maintainRecipientRecoveryPool = async"));
+		// Lull "A": every recipient lull step is its own lifecycle admission, holding the issue barrier.
+		const scheduler = room.slice(room.indexOf("const lullPasses = createLullPassScheduler("));
+		const admit = scheduler.slice(0, scheduler.indexOf("\n\t});\n"));
+		expect(admit).toContain("enqueueLifetimeTransition(");
+		expect(admit).toContain("poolMaintenanceBarrier = barrier;");
+		expect(admit).toContain("await drainPendingIssues();");
+		expect(admit).toContain("return await step();");
+		const body = room.slice(room.indexOf("const recipientLullStep = async"));
 		const recipient = body.slice(0, body.indexOf("\n\t};\n"));
-		expect(recipient).toContain("poolMaintenanceBarrier");
-		expect(recipient).toContain("await drainPendingIssues();");
+		expect(recipient).toContain("stepCreatorRecipientRecoveryPool(");
 		expect(recipient).toContain("creatorRecipientRecoveryRequired = true;");
 		expect(recipient).toContain("requestRetainedHistory()");
-		expect(room).toMatch(/if \(input\.receiveOnly \|\| creatorCloseHandle === undefined\) return maintainRecipientRecoveryPool\(\);/u);
+		expect(room).toMatch(/if \(input\.receiveOnly \|\| creatorCloseHandle === undefined\) return "recipient";/u);
+		expect(room).toContain('lullPasses.requestLullPass("recipient-turnover", recipientLullStep);');
+		// The stepped lull is the only recipient lull entry; the whole one is the startup resume.
+		expect(room.match(/stepCreatorRecipientRecoveryPool\(/gu)?.length).toBe(1);
+		expect(room.match(/maintainCreatorRecipientRecoveryPool\(/gu)?.length).toBe(1);
 	});
 
 	it("keeps install-path cuts bound to the same owners", () => {

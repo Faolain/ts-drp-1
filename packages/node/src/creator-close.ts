@@ -169,6 +169,7 @@ import {
 	readCreatorOrdinaryPreimageCapacityForSizing,
 	readProspectiveCreatorSnapshotTurnoverForSizing,
 	createCreatorSnapshotRecoveryMaintenanceJob,
+	JOURNAL_POSTIMAGE_NOT_GROWN,
 	reconcileCreatorRoomRetentionFromLedger,
 	reconcileCreatorSnapshotRecoveryRoles,
 	resolveCreatorForwardPromotionSource,
@@ -284,6 +285,8 @@ export interface CreatorLiveCloseHandle {
 		Readonly<{ head: PresentHead; references: readonly GenerationRef[]; trustRef: GenerationRef }>
 	>;
 	status(): CreatorLiveCloseStatus;
+	/** This epoch's close is interrupted and holds ordinary admission until it adopts; the room retries it itself. */
+	interruptedClosePending?(): boolean;
 	stop(): Promise<void>;
 }
 
@@ -420,7 +423,8 @@ export type CreatorIssuanceMaintenanceConsumer = (
 
 export interface V3CreatorCloseRegistration {
 	readonly receiveOnly?: true;
-	bindSnapshotReadinessOwner(store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean;
+	/** Captures the native snapshot owner; the genesis plane also detects its own interrupted close here. */
+	bindSnapshotReadinessOwner(store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): Promise<boolean>;
 	beginReceived(): Promise<boolean>;
 	terminalizeReceived(): boolean;
 	sealRecoveryDependencies(required?: boolean): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
@@ -497,6 +501,10 @@ export interface V3CreatorCloseRegistration {
 	): readonly CreatorPostAdoptionCensusSizing[];
 	installIssuanceMaintenanceConsumer(consumer: CreatorIssuanceMaintenanceConsumer): (() => void) | undefined;
 	abortSnapshotStage(): boolean;
+	/** This epoch's close failed after staging: hold ordinary admission (close-pending) until adoption. */
+	markInterruptedClose(): void;
+	/** This epoch's close is interrupted (reopen, genesis binding or in-process failure) and not yet adopted. */
+	interruptedClosePending(): boolean;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly retirementReconstruction?: CreatorSnapshotRetirementReconstructionRequest;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
@@ -551,6 +559,14 @@ export interface V3CreatorCloseRegistration {
 		exactCanonicalSettlementBytes?: Uint8Array | null,
 		exactCanonicalCloseMembershipBytes?: Uint8Array,
 		receivedAuthority?: import("./internal/creator-received-close-membership.js").ReceivedCloseAuthorityRecords
+	): Promise<boolean>;
+	/** The skip-install twin (fix/skip-scope-carrier): records the departed scope's transferred
+	 * membership with its authority exactly as recordReceivedClosedMembership does, without becoming
+	 * the adjacent completion evidence (a skip's target is not this Cut's successor). */
+	recordReceivedDepartedClosedMembership(
+		exactCanonicalCutValueBytes: Uint8Array,
+		exactCanonicalCloseMembershipBytes: Uint8Array,
+		receivedAuthority: import("./internal/creator-received-close-membership.js").ReceivedCloseAuthorityRecords
 	): Promise<boolean>;
 	/** Exact authenticated whole-source bytes, prepared and joined under this same genuine hold. */
 	prepareClosedEpochArchive(hold: CreatorSnapshotRecoveryCloseHold, limits: ArchiveLimits,
@@ -2990,24 +3006,63 @@ function creatorNextEpochAdmissionForecast(
 	return chargedBytes + sink.delta + snapshotEvidence + signing + CREATOR_NEXT_EPOCH_FIXED_CUSTODY_BYTES;
 }
 
+/** Typed admission refusal (model issuance-image-capacity.qnt, maintenanceAdmits): ordinary admission
+ * sizes the same maintenance forecast the creator's maintenance later charges, so a move whose
+ * forecast exceeds a bound is refused here, before signing, and never admitted for maintenance to
+ * refuse later. */
+export const ISSUANCE_CAPACITY_FORECAST_EXCEEDED = "ISSUANCE_CAPACITY_FORECAST_EXCEEDED";
+const CREATOR_ISSUANCE_CAPACITY_REFUSAL = new RegExp("MAINTENANCE_NATIVE_IMAGE_EXHAUSTED:|MAINTENANCE_FUTURE_PROOF_ENVELOPE_EXHAUSTED:|" +
+	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds (byte|row) bound|" +
+	// The creator's per-epoch maintenance proof book: this epoch's, or the room the next epoch's
+	// first cold admission needs after this one closes. Both clear with a rollover.
+	"creator (issuance maintenance|next-epoch admission) proof reserve is exhausted|" +
+	// This epoch's maintenance carrier is wider than its bound, or the creator's per-epoch closed
+	// rollback proof budget is spent: both clear with a rollover (several hot Writers reach them).
+	"creator maintenance encoded width exceeds its bound|creator closed rollback refusal: proof-budget-exceeded");
+/**
+ * The one typed capacity reason for a local issue (creator or Writer) refused before signing because
+ * the issuance image forecast would exceed its bound. A rollover clears it (retry after rollover).
+ * @param reason - The refusal's diagnostic text.
+ * @returns The typed text, or undefined when the reason is not an issuance capacity bound.
+ */
+export function issuanceCapacityRefusal(reason: string): string | undefined {
+	if (reason.includes(ISSUANCE_CAPACITY_FORECAST_EXCEEDED)) return reason;
+	return CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(reason)
+		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: issuance forecast exceeds its bound: ${reason}` : undefined;
+}
+/**
+ * The typed capacity reason of a thrown maintenance refusal, local or received. An Error is read by its
+ * message; a closed-rollback Refusal is typed data, not an Error, and names itself through its string
+ * form ("creator closed rollback refusal: proof-budget-exceeded"), never by its bare kind.
+ * @param error - The thrown value.
+ * @returns The typed text, or undefined when it is not an issuance capacity bound.
+ */
+export function issuanceCapacityRefusalOf(error: unknown): string | undefined {
+	return issuanceCapacityRefusal(error instanceof Error ? error.message : String(error));
+}
+
 async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,
 	unsignedBytes: Uint8Array,
 	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>,
-	source?: CreatorOrdinaryIssuanceProofSource
+	source?: CreatorOrdinaryIssuanceProofSource,
+	deferFirstCompile = false
 ): Promise<boolean> {
 	const {proof} = quote, accounting = proof.accounting;
+	const baselineBytes = accounting.chargedBytes;
 	const {knownBasis, receivedSignature, unknownBasis, fields} = creatorIssuanceMaintenanceQuoteSizing(quote, unsignedBytes, planEffect);
 	const nextEpochAdmissionForecast: CreatorNextEpochAdmissionForecastSink = {};
 	const prefixInput = {...fields, proof, nextEpochAdmissionForecast};
 	// Source capture and compilation precede every NEW UNKNOWN charge. The
 	// compiler retains numerical fields only in this handle's one source cell.
-	const captured = source === undefined ? undefined : await captureCreatorOrdinaryFinishingCapacityTemplate(prefixInput, source);
+	const captured = source === undefined ? undefined : await captureCreatorOrdinaryFinishingCapacityTemplate(prefixInput, source, {deferFirstCompile});
 	// The verified bound is used only through its genuine per-call owner. Cold
 	// fallback retains original exact sizing, without the extra diagnostic pass.
 	const { ordinaryFinishingCapacityDimensions: _diagnosticDimensions, ...exactPrefixInput } = prefixInput;
 	const prefixes = captured?.prefixes ?? await readProspectiveCreatorMaintenancePrefixesForSizing(exactPrefixInput);
-	if (!prefixes.ok) throw new TypeError(`creator issuance maintenance prefix sizing is unavailable: ${prefixes.reason}`);
+	if (!prefixes.ok) throw new TypeError(CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(prefixes.reason)
+		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: creator issuance maintenance forecast exceeds its bound: ${prefixes.reason}`
+		: `creator issuance maintenance prefix sizing is unavailable: ${prefixes.reason}`);
 	// Known original encodings receive only the existing byte-exact dedup law.
 	// Unknown signature/control leaves never receive identity or refund credit.
 	const known = [
@@ -3015,8 +3070,25 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...(prefixes.knownCarriers ?? []),
 		...receivedSignature,
 	];
+	// Measurement only: the book's standing material before this quote and this quote's terms.
+	const report = (outcome: string, nextEpochForecastBytes?: number): void => {
+		try {
+			const event = {kind: "creator-issuance-maintenance-book", outcome,
+				baselineBytes, chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes,
+				known: known.map(bytes => bytes.byteLength), unknown: [...unknownBasis, ...prefixes.unknownEncodedLengths]};
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer(event);
+			// A refusal is rare and ends the epoch's admission: say what filled the book.
+			if (outcome !== "charged") console.warn("::v3-issuance-book", JSON.stringify(event));
+		} catch { /* Diagnostics cannot alter admission. */ }
+	};
+	const exhausted = (need: number): TypeError => {
+		report("exhausted");
+		return new TypeError(
+			`creator issuance maintenance proof reserve is exhausted:${accounting.chargedBytes}+${need}/${accounting.maxBytes}`);
+	};
 	for (const bytes of known)
-		if (!accounting.charge(bytes)) throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+		if (!accounting.charge(bytes)) throw exhausted(bytes.byteLength);
 	// The private source owner has reserved complete future close/adopt and
 	// maintenance lifetimes against their fixed maintenance entitlement. They are not retained
 	// by this current issuance job; charge only its complete immediate phases.
@@ -3025,19 +3097,14 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...prefixes.unknownEncodedLengths,
 	];
 	for (const length of unknown)
-		if (!accounting.chargeUnknownEncodedLength(length))
-			throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+		if (!accounting.chargeUnknownEncodedLength(length)) throw exhausted(length);
 	// Admission must leave the next epoch's first cold admission room in the
 	// same ordinary book after this epoch closes and adopts; otherwise retained
 	// material strands admission with no protocol drain.
 	const forecast = creatorNextEpochAdmissionForecast(quote, accounting.chargedBytes, nextEpochAdmissionForecast, planEffect);
-	try {
-		const observer = Reflect.get(globalThis, "__warmProofEvent");
-		if (typeof observer === "function") observer({kind: "creator-issuance-maintenance-book",
-			chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes: forecast});
-	} catch { /* Diagnostics cannot alter admission. */ }
+	report(forecast !== undefined && forecast > accounting.maxBytes ? "next-epoch-exhausted" : "charged", forecast);
 	if (forecast !== undefined && forecast > accounting.maxBytes)
-		throw new TypeError("creator next-epoch admission proof reserve is exhausted");
+		throw new TypeError(`creator next-epoch admission proof reserve is exhausted:${forecast}/${accounting.maxBytes}`);
 	return captured?.captured ?? false;
 }
 
@@ -3525,7 +3592,7 @@ export async function bindCreatorLiveClose(
 		if (existing !== undefined) return Object.freeze({ handle: existing, ok: true as const });
 		const registration = claimCreatorCloseRegistration(input.plane);
 		if (registration === undefined) return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_UNAVAILABLE" });
-		if (!registration.bindSnapshotReadinessOwner(input.snapshotStore))
+		if (!(await registration.bindSnapshotReadinessOwner(input.snapshotStore)))
 			return Object.freeze({ ok: false as const, reason: "CREATOR_SNAPSHOT_OWNER_UNAVAILABLE" });
 		const epoch = registration.currentTrust.currentEpoch;
 		if (!Number.isSafeInteger(epoch) || epoch < 0 || epoch === Number.MAX_SAFE_INTEGER) {
@@ -3627,6 +3694,9 @@ export async function bindCreatorLiveClose(
 				releaseForeground();
 				maintenanceJobs.delete(joined);
 				finish();
+				// As the readiness and recovery-pool jobs do: received moves refused while this
+				// job held the consumer were retained, not dropped; admit them now.
+				registration.resumePendingIngress();
 			};
 			return Promise.resolve().then(async () => {
 				let quote: CreatorIssuanceMaintenanceQuote | CreatorOrdinaryIssuanceMaintenanceQuote | CreatorIncrementalIssuanceMaintenanceQuote | undefined;
@@ -3698,6 +3768,12 @@ export async function bindCreatorLiveClose(
 					if (quote === undefined) {
 						const cold = await prepareCreatorIssuanceMaintenanceQuote(registration, input, unsignedBytes, planEffect, receivedReceipt);
 						quote = cold;
+						// Test seam, like the __warmProofEvent observer: a hook may hold a settlement fence's
+						// quote between its sizing and its charge (the host turns below). Unset in production.
+						if (planEffect?.kind === "fence") {
+							const hold = Reflect.get(globalThis, "__creatorFenceQuoteHold");
+							if (typeof hold === "function") await hold(registration.currentTrust.currentEpoch);
+						}
 						await cooperate();
 						// The required fence already owns a complete authenticated cold
 						// source before its UNKNOWN forecast is charged. Retain only the
@@ -3716,7 +3792,9 @@ export async function bindCreatorLiveClose(
 							capture = await captureCreatorOrdinaryIssuanceProofSource(cold.proof);
 							report({kind: "ordinary-finishing-source-capture", ok: capture !== undefined});
 						}
-						const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture);
+						// Only the retained source defers its first compile of a role; a
+						// fresh capture is kept only if it compiles, as before.
+						const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture, capture !== undefined && capture === ordinaryProofSource);
 						await cooperate();
 						if (fenceSource !== undefined) {
 							ordinaryProofSource = fenceSource; ordinaryTemplateReady = false;
@@ -3768,6 +3846,12 @@ export async function bindCreatorLiveClose(
 					// its primary error. Never treat that uncertain release as a
 					// capacity refusal that permits a fresh close capture.
 					if (primary instanceof AggregateError) maintenanceReleaseFailure = primary;
+					// A journal postimage that did not grow over the retained source's capture: that
+					// capture no longer describes this admission's journal. Drop the hint so the
+					// retained row's next attempt primes a fresh source instead of repeating this one.
+					if (String((primary as {message?: unknown} | undefined)?.message ?? primary).includes(JOURNAL_POSTIMAGE_NOT_GROWN)) {
+						ordinaryProofSource = undefined; ordinaryTemplateReady = false;
+					}
 					try {
 						await quote?.proof.release();
 					} catch (cleanup) {
@@ -3896,9 +3980,15 @@ export async function bindCreatorLiveClose(
 			const finishRetainedReplayClose = registration.beginRetainedReplayClose();
 			maintenanceClosing = true;
 			ordinaryProofSource = undefined; ordinaryTemplateReady = false;
+			let releaseForeground: (() => void) | undefined;
 			closeTask = (async (): Promise<CreatorLiveCloseResult> => {
 				await Promise.all([...maintenanceJobs]);
 				if (maintenanceReleaseFailure !== undefined) throw maintenanceReleaseFailure;
+				// The close is the host's foreground from here until it settles: co-located
+				// background walks (another room's or a peer's recovery-pool lull) defer their
+				// host turns behind it. Not before the join above: a pool-maintenance job of this
+				// creator is background, and the close waits for it.
+				releaseForeground = beginForegroundWork();
 				// Stage before any promotion or recovery source. A source holds the live
 				// journal's native read reservation, which excludes every journal writer;
 				// the stage closes admission and then waits for the plane's admitted tasks,
@@ -4736,10 +4826,18 @@ export async function bindCreatorLiveClose(
 				}
 				finishRetainedReplayClose(true);
 				return result;
-			})().catch((error) => {
+			})().finally(() => {
+				releaseForeground?.();
+			}).catch((error) => {
 				closeTask = undefined;
 				if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";
-				else lifecycle = "sealed";
+				else {
+					lifecycle = "sealed";
+					// A staged close may have left its own snapshot scope on disk; its
+					// retry must run on exactly that state. Hold ordinary admission with
+					// the same close-pending gate a reopen sets, until adoption.
+					registration.markInterruptedClose();
+				}
 				maintenanceClosing = lifecycle !== "active";
 				finishRetainedReplayClose(false);
 				throw error;
@@ -4748,6 +4846,8 @@ export async function bindCreatorLiveClose(
 		};
 		const handle: CreatorLiveCloseHandle = Object.freeze({
 			close,
+			interruptedClosePending: (): boolean =>
+				!stopping && lifecycle !== "successor-adopted" && registration.interruptedClosePending(),
 			acquireLocalSessionWithdrawal: (author: string): Promise<CreatorLocalSessionWithdrawal> => {
 				if (stopping || maintenanceJobs.size !== 0 || acquisitionTask !== undefined || closeTask !== undefined ||
 					maintenanceReleaseFailure !== undefined || dependenciesReleased || dependencyReleaseTask !== undefined || actor.status().terminal ||
@@ -4927,6 +5027,11 @@ export async function bindCreatorLiveClose(
 						ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 						return Promise.resolve().then(async () => {
 							try {
+								// Test seam, like the __warmProofEvent observer: a test may hold this admitted
+								// job open (it holds the maintenance consumer) to put other work inside it.
+								// Unset in production; once per readiness boundary, never on an ordinary call.
+								const hold = Reflect.get(globalThis, "__creatorOrdinaryReadinessHold");
+								if (typeof hold === "function") await hold(registration.currentTrust.currentEpoch);
 								if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
 								let source: CreatorOrdinaryIssuanceProofSource | undefined;
 								let captured = false, maintenanceRan = false, preparationAttempts = 0;

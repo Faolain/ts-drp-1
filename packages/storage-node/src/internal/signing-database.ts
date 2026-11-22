@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 
 import { SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./local-session-lifetime.js";
+import { connectionRevision } from "./sqlite-revision.js";
 import { cachedStatement } from "./sqlite-statement-cache.js";
 
 export type SigningTable = "signerState" | "sealEvidence" | "voteSlots" | "voteOutbox";
@@ -79,6 +80,17 @@ export class SqliteSigningDatabase {
 	#writing = false;
 	#closing?: Promise<void>;
 	#readGroup?: { ready: Promise<NativeReadReservation>; children: number; releasing: boolean };
+	// Revision memo for the repeated mechanical checks (catalog shape, incarnation currency), keyed
+	// on the connection's exact revision (sqlite-revision.ts: total_changes, data_version,
+	// schema_version on this connection). Equal revisions prove no row and no schema changed:
+	// another connection's commit moves data_version, any own write (rolled back too) moves
+	// total_changes, any DDL moves schema_version. A memo is recorded only inside a read
+	// transaction (never where an own uncommitted write could later roll back), and own writes
+	// also clear it explicitly.
+	#catalogAt: string | undefined;
+	#currencyAt: string | undefined;
+	// A transaction pins one snapshot: its revision is read once, and again after an own write.
+	#transactionRevision: string | undefined;
 
 	get hasNativeReads(): boolean {
 		return this.#readGroup !== undefined;
@@ -195,8 +207,26 @@ export class SqliteSigningDatabase {
 	#write(): void {
 		this.#within();
 		if (!this.#writing) throw new Error("SIGNING_READ_ONLY");
+		this.#catalogAt = this.#currencyAt = this.#transactionRevision = undefined;
 	}
-	#mechanics(): void {
+	/** The transaction's exact revision (read once per snapshot; again after an own write). */
+	#revision(): string {
+		this.#within();
+		if (this.#transactionRevision !== undefined) return this.#transactionRevision;
+		let value: string;
+		try {
+			value = connectionRevision(this.#database);
+		} catch {
+			throw new Error("STORAGE_LOSS");
+		}
+		return (this.#transactionRevision = value);
+	}
+	/** A memo may be recorded only where no own uncommitted write can exist. */
+	#memoizable(): boolean {
+		return !this.#writing;
+	}
+	/** The path still names the file this connection opened. */
+	#identity(): void {
 		this.#open();
 		let identity: ReturnType<typeof statSync>;
 		try {
@@ -206,6 +236,18 @@ export class SqliteSigningDatabase {
 		}
 		if (identity.dev !== this.#fileIdentity.dev || identity.ino !== this.#fileIdentity.ino)
 			throw new Error("STORAGE_LOSS");
+	}
+	/**
+	 * File identity, and inside a transaction the catalog of that transaction's own snapshot (the
+	 * schema every statement of the transaction runs against). Outside a transaction only the identity:
+	 * every caller outside one enters a transaction next, whose snapshot catalog is checked before its
+	 * first read and again before its commit.
+	 */
+	#mechanics(): void {
+		this.#identity();
+		if (!this.#transaction) return;
+		const revision = this.#revision();
+		if (this.#catalogAt === revision) return;
 		const catalog = nativeLocalSessionSchemaRows(
 			this.#database,
 			cachedStatement(
@@ -223,6 +265,7 @@ export class SqliteSigningDatabase {
 			catalog[1]?.sql !== ROW_SCHEMA
 		)
 			throw new Error("SIGNING_UNSUPPORTED_SCHEMA");
+		if (this.#memoizable()) this.#catalogAt = revision;
 	}
 
 	/**
@@ -233,11 +276,13 @@ export class SqliteSigningDatabase {
 	transact<T>(write: boolean, action: () => T): T {
 		this.#open();
 		if (this.#transaction) throw new Error("SIGNING_NESTED_TRANSACTION");
-		this.#mechanics();
+		this.#identity();
 		this.#database.exec(write ? "BEGIN IMMEDIATE" : "BEGIN");
 		this.#transaction = true;
 		this.#writing = write;
+		this.#transactionRevision = undefined;
 		try {
+			this.#mechanics();
 			this.assertCurrency();
 			const result = action();
 			if (
@@ -249,7 +294,7 @@ export class SqliteSigningDatabase {
 			this.#mechanics();
 			this.assertCurrency();
 			this.#database.exec("COMMIT");
-			this.#mechanics();
+			this.#identity();
 			return result;
 		} catch (cause) {
 			try {
@@ -261,6 +306,7 @@ export class SqliteSigningDatabase {
 		} finally {
 			this.#transaction = false;
 			this.#writing = false;
+			this.#transactionRevision = undefined;
 		}
 	}
 
@@ -420,12 +466,16 @@ export class SqliteSigningDatabase {
 	 *
 	 */
 	assertCurrency(): void {
+		this.#within();
+		const revision = this.#revision();
+		if (this.#currencyAt === revision) return;
 		const meta = this.getMeta("incarnation");
 		if (
 			meta === undefined ||
 			compareBytes(encodeCanonical(meta), encodeCanonical({ key: "incarnation", value: this.incarnation })) !== 0
 		)
 			throw new Error("STORAGE_LOSS");
+		if (this.#memoizable()) this.#currencyAt = revision;
 	}
 
 	/**

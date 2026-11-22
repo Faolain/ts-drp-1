@@ -576,7 +576,16 @@ export async function runDiscoveryCase(name: string, env: DiscoveryEnvironment, 
 				};
 				declaration = { ...declaration, scope: key };
 				if (name === "corrupt:long-object") {
-					await store.openScope(declaration);
+					// The native owner (ea4eb158) refuses to write a scope whose object identifier exceeds
+					// the manifest protocol's 1024 characters, so the long row exists only as out-of-band
+					// damage (env.put below). The browser owner has no such bound and still opens it.
+					if (env.backend === "sqlite")
+						check(
+							(await outcome(() => store.openScope(declaration))).code,
+							"malformed-input",
+							"native owner refuses an over-long object identifier"
+						);
+					else await store.openScope(declaration);
 					rejectedMetadata = { value: key.objectId, maxBytes: 0 };
 				}
 			}

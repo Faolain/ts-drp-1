@@ -84,6 +84,7 @@ const METHODS = [
 	"inject",
 	"projectionAudit",
 	"acceptance",
+	"acceptedAt",
 	"settlementAudit",
 	"state",
 	"seal",

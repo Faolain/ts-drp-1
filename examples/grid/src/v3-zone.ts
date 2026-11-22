@@ -4,6 +4,8 @@ import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import { decodeEntityDeltaBatch, encodeEntityDeltaBatch, type EphemeralChannel } from "@ts-drp/ephemeral";
 import {
 	createV3RoomCreatorInviteMaterial,
+	createV3RoomRolloverPolicy,
+	openV3RoomSuccessorDelivery,
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
@@ -12,7 +14,11 @@ import {
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
 	type V3RoomProjectionInput,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
+	type V3RoomSuccessorDelivery,
 	type V3RoomSession,
+	prepareV3RoomPlayerDatabase,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
 import {
@@ -27,10 +33,28 @@ import {
 	verifyOutcomeCommitOperation,
 } from "@ts-drp/outcome-commit";
 
+import { GRID_GENESIS_PROFILE } from "./profile.js";
+import { fabricAgeOfInformation, fabricPercentile } from "./age-of-information.js";
+import { GRID_ROLLOVER_BUDGET } from "./rollover.js";
 import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
 import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
-import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
-const PARAMETERS = Object.freeze({
+import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZonePlacementGrowthProjection, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
+/**
+ * Grid's bounded board. A cell placement (placeCell) keys its block by its cell, so it overwrites
+ * whatever block the cell holds: a zone placing by cell holds at most one block per cell however long it
+ * plays, and its blocks are bounded by width x height x the widest cell. (placeBlock keeps its
+ * caller-chosen ids, so its blocks grow with unique ids; the room's application state limit refuses,
+ * typed, a move past it.)
+ */
+export const GRID_ZONE_BOARD = Object.freeze({ width: 32, height: 32, maxKindLength: 16 });
+/**
+ * The application state limit Grid creates its rooms with (the room's signed parameters): a full board
+ * of the widest cells is 52,771 canonical bytes; 98,304 leaves ~45 KB for the roster, trade outcomes and
+ * id-keyed placements, and is within the library ceiling (131,072).
+ */
+export const GRID_ZONE_STATE_LIMIT_BYTES = 98_304;
+/** The parameters Grid signs into every new room's genesis. */
+export const GRID_ZONE_ROOM_PARAMETERS = Object.freeze({
 	authorShareMultiplier: 4,
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -39,7 +63,34 @@ const PARAMETERS = Object.freeze({
 	maxSnapshotBytes: 268_435_456,
 	maxPendingEntries: 4096,
 	maxPendingBytes: 16_777_216,
+	maxApplicationStateBytes: GRID_ZONE_STATE_LIMIT_BYTES,
 });
+const PARAMETERS = GRID_ZONE_ROOM_PARAMETERS;
+
+/** A cell placement: the cell and the kind of block it now holds. */
+export interface ZoneCell {
+	readonly kind: string;
+	readonly x: number;
+	readonly y: number;
+}
+
+/**
+ * The placement operation of a cell: a placeBlock whose block id is the cell's, so the reducer's
+ * replace-by-id overwrites the block the cell holds (in the room's linearized order, last placement wins).
+ * @param input - The cell (on the board) and the kind (1 to 16 printable ASCII characters).
+ * @returns The frozen placeBlock operation.
+ */
+export function zoneCellPlacement(input: ZoneCell): Readonly<{ action: "placeBlock"; id: string; kind: string; x: number; y: number }> {
+	const { kind, x, y } = input ?? ({} as ZoneCell);
+	if (
+		!Number.isSafeInteger(x) || x < 0 || x >= GRID_ZONE_BOARD.width ||
+		!Number.isSafeInteger(y) || y < 0 || y >= GRID_ZONE_BOARD.height ||
+		typeof kind !== "string" || kind.length === 0 || kind.length > GRID_ZONE_BOARD.maxKindLength ||
+		!/^[\x21-\x7e]+$/u.test(kind)
+	)
+		throw new TypeError("v3 zone cell placement is outside the board or its kind is invalid");
+	return Object.freeze({ action: "placeBlock", id: `cell:${x}:${y}`, kind, x, y });
+}
 const FABRIC_CAMPAIGN_INTERVAL_MS = 33;
 const FABRIC_CAMPAIGN_SAMPLE_COUNT = 600;
 const FABRIC_RELIABLE_OBSERVATION_TAIL_MS = 15_000;
@@ -79,6 +130,12 @@ export type V3ZoneRoomHeadAuthorityForOpen = (
 export type V3ZoneSettlementSourceApproval = NonNullable<
 	Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["approveSettlementSourceSelection"]
 >;
+
+/**
+ * The application host's delivery of each adopted successor offer to the zone's other members,
+ * who install it with `installCreatorSuccessor`. Without it the creator still rolls over.
+ */
+export type V3ZoneSuccessorPublisher = NonNullable<V3RoomRolloverHooks["publishSuccessor"]>;
 
 type EntityDelta = ReturnType<typeof decodeEntityDeltaBatch>[number];
 
@@ -334,6 +391,8 @@ export interface V3ZoneApi {
 	join(invite: string): Promise<void>;
 	move(dx: number, dy: number): void;
 	placeBlock(input: ZoneBlock): Promise<void>;
+	/** Places a block of `kind` on a cell of the board, overwriting the block the cell holds. */
+	placeCell(input: ZoneCell): Promise<void>;
 	prepareTradeIntent(
 		input: Readonly<{
 			readonly clientOperationId: string;
@@ -375,6 +434,9 @@ export interface V3ZoneApi {
  * @param onProjection Observer for deterministic durable and transient projections.
  * @param roomHeadAuthorityForOpen Host-owned authority acquisition; initialization belongs to the host.
  * @param onTransient Optional UI-only position observer; full public snapshots remain fresh.
+ * @param publishSuccessor Test override of the creator's successor announcement. By default the
+ * zone's successor delivery (examples/v3-room) announces each adopted offer to the zone's members
+ * over this node and answers their requests; with this hook, the hook receives the offers instead.
  * @returns The bounded zone application API.
  */
 export function createV3ZoneApi(
@@ -382,7 +444,8 @@ export function createV3ZoneApi(
 	onProjection: (snapshot: ZoneSnapshot) => void,
 	roomHeadAuthorityForOpen: V3ZoneRoomHeadAuthorityForOpen,
 	approveSettlementSourceSelection?: V3ZoneSettlementSourceApproval,
-	onTransient?: (snapshot: ZoneTransientSnapshot) => void
+	onTransient?: (snapshot: ZoneTransientSnapshot) => void,
+	publishSuccessor?: V3ZoneSuccessorPublisher
 ): V3ZoneApi {
 	if (typeof roomHeadAuthorityForOpen !== "function") {
 		throw new TypeError("v3 zone room-head authority factory is required");
@@ -391,6 +454,8 @@ export function createV3ZoneApi(
 		throw new TypeError("v3 zone settlement approval policy is invalid");
 	if (onTransient !== undefined && typeof onTransient !== "function")
 		throw new TypeError("v3 zone transient presentation observer is invalid");
+	if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
+		throw new TypeError("v3 zone successor publisher is invalid");
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
@@ -401,6 +466,11 @@ export function createV3ZoneApi(
 	const fabricTrials = new Map<string, FabricTrialState>();
 	const transientPositions = new Map<string, Readonly<{ x: number; y: number }>>();
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
+	// The creator's rollover policy (examples/grid/src/rollover.ts); a member's only offers a refused
+	// block placement again once its room installed the next epoch.
+	let rollover: V3RoomRolloverPolicy | undefined;
+	// The zone's successor delivery: the creator announces offers, members install them.
+	let delivery: V3RoomSuccessorDelivery | undefined;
 	let ephemeral: EphemeralChannel | undefined;
 	let projection = emptyProjection(localAuthor, localPeerId);
 	// Accepted-history identity belongs to the durable projection, not to an
@@ -703,12 +773,68 @@ export function createV3ZoneApi(
 				localAuthor === creatorAuthor ? await node.keychain.acquireLocalAuthorFinalitySigner() : undefined;
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor, blueprintDigestFromInvite(creatorInvite));
+			// Delivery runs on the room's own object id and installs into its own session, so it
+			// follows a migration redirect: the migrated room's members (redirected or joined
+			// afterwards) are on the target's queue, and only the target session installs its offers.
+			const openDelivery = (objectId: string): V3RoomSuccessorDelivery =>
+				openV3RoomSuccessorDelivery(node, objectId, creatorFinalitySigner === undefined ? "member" : "creator", {
+					onError: (error) => console.warn("v3 zone successor delivery failed; it is retried", error),
+					onRefused: (error) => console.warn("v3 zone successor offer was refused", error),
+					// A successor the room adopted outside the policy (its own close retry) is published on a member's pull.
+					onMemberBehind: () => void rollover?.publishCurrent(),
+				});
+			delivery = openDelivery(selectedZoneId);
+			// Only the creator, which holds the finality signer, seals.
+			const policy = createV3RoomRolloverPolicy({
+				role: creatorFinalitySigner === undefined ? "member" : "creator",
+				budget: GRID_ROLLOVER_BUDGET,
+				// A later placement of a block supersedes an earlier one (the zone's displacement identity):
+				// a kept or given-back placement never lands after a newer accepted one of the same block.
+				identity: (operation) => {
+					const action = operation.action;
+					return typeof action === "string" && application.displacementPolicies[action] === "rebase"
+						? `${action}\u0000${application.displacedOperationIdentity(operation)}`
+						: undefined;
+				},
+				writerCapacity: { maxDependencies: PARAMETERS.maxDependencies, profileId: GRID_GENESIS_PROFILE.profileId },
+				hooks: {
+					publishSuccessor:
+						publishSuccessor ?? ((offer, epoch): Promise<void> => delivery?.publish(offer, epoch) ?? Promise.resolve()),
+					requestSuccessor: () => delivery?.request(),
+					// Between zones (no delivery yet) the creator is not judged unreachable.
+					creatorReachable: () => delivery?.creatorReachable() ?? true,
+					onStatus: (status) => {
+						if (status.state === "successor-unavailable")
+							console.warn("v3 zone is waiting for the creator's next epoch; kept placements", status.kept);
+						if (status.state === "not-reaching-host")
+							console.warn(
+								`v3 zone: your moves are not reaching the host (${status.unsettledEpochs} epochs); kept placements`,
+								status.kept
+							);
+						if (status.state === "read-only")
+							console.warn("v3 zone: the host is unreachable; read-only until it is back; kept placements", status.kept);
+					},
+					// A given-back placement the room refused again for good (its state limit or admission policy).
+					onDeclined: (declined) =>
+						console.warn(`v3 zone: a placement that did not reach the host was dropped: ${declined.message}`, declined.operation),
+					onError: (error) => console.warn("v3 zone rollover failed; it is retried", error),
+				},
+			});
+			rollover = policy;
+			// Decision A: this player's own room database; the shared (zoneId-only) one migrates once.
+			const { databaseName } = await prepareV3RoomPlayerDatabase({
+				application: "zone",
+				objectId: zoneId,
+				author: localAuthor,
+			});
 			opened = await createV3RoomSession<ZoneProjection>({
 				application,
 				author: localAuthor,
 				creatorInvite,
 				...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
 				...(creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner }),
+				// Creator restore currency: a reopened creator asks the zone's members before it signs.
+				...(delivery?.role === "creator" ? { creatorMemberView: delivery.creatorMemberView } : {}),
 				createOperationAdmissionPolicy: (context) =>
 					createOutcomeCommitAdmissionPolicy({
 						aclDigest: context.aclDigest,
@@ -716,21 +842,30 @@ export function createV3ZoneApi(
 						epoch: context.epoch,
 						objectId: context.objectId,
 						maxEntries: PARAMETERS.maxEpochVertices,
+						...(context.maxApplicationStateBytes === undefined
+							? {}
+							: { maxApplicationStateBytes: context.maxApplicationStateBytes }),
 						...(context.authenticatedApplicationStateBytes === undefined
 							? {}
 							: { authenticatedApplicationStateBytes: context.authenticatedApplicationStateBytes }),
 					}),
-				databaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
+				databaseName,
 				initialLogicalTime: 3,
-				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
+				issuanceDatabaseName: databaseName,
 				migrationDatabaseNamespace: `${localAuthor}:${zoneId}`,
 				objectId: zoneId,
-				onAcceptedVertex: () => undefined,
+				onAcceptedVertex: (vertex) => policy.observe(vertex),
+				// A hot Writer's move refused at the creator's capacity: seal now, it lands in the successor.
+				onIngressCapacityRefusal: (reason) => policy.refused(reason),
 				onMigrationTarget: (target, targetObjectId): void => {
 					redirectedDuringOpen = target;
 					if (sourceRoom !== undefined) retainedSourceBridges.add(sourceRoom);
 					room = target;
 					zoneId = targetObjectId;
+					delivery?.close();
+					const followed = openDelivery(targetObjectId);
+					delivery = followed;
+					followed.bind(target);
 					tradeIntent = undefined;
 					recoveredTradeIntent = false;
 					ephemeral?.close();
@@ -772,6 +907,10 @@ export function createV3ZoneApi(
 				signRegisteredVertexDigest: (registeredDigest) => node.keychain.signWithLocalAuthor(registeredDigest),
 			});
 			sourceRoom = opened;
+			// A migrated source forwards issue and seal to its target, so the policy stays bound to it.
+			// Delivery is bound to the target by the redirect instead.
+			policy.bind(opened);
+			if (redirectedDuringOpen === undefined) delivery?.bind(opened);
 			if (redirectedDuringOpen !== undefined) retainedSourceBridges.add(opened);
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			if (redirectedDuringOpen === undefined) {
@@ -785,6 +924,10 @@ export function createV3ZoneApi(
 			migrationMembers = Object.freeze(bootstrapMembers.map((member) => Object.freeze({ ...member })));
 			emit();
 		} catch (error) {
+			rollover?.close();
+			rollover = undefined;
+			delivery?.close();
+			delivery = undefined;
 			await Promise.allSettled([opened?.close(), redirectedDuringOpen?.close()]);
 			resetZoneState();
 			throw error;
@@ -982,6 +1125,10 @@ export function createV3ZoneApi(
 				const selectedEphemeral = ephemeral;
 				const sources = [...retainedSourceBridges];
 				retainedSourceBridges.clear();
+				rollover?.close();
+				rollover = undefined;
+				delivery?.close();
+				delivery = undefined;
 				room = undefined;
 				ephemeral = undefined;
 				resetZoneState();
@@ -1208,9 +1355,15 @@ export function createV3ZoneApi(
 			) {
 				throw new TypeError("v3 zone block is invalid");
 			}
-			await selected.issue(
+			// A placement refused at the epoch's capacity is offered again after the next rollover.
+			await (rollover ?? selected).issue(
 				Object.freeze({ action: "placeBlock", id: input.id, kind: input.kind, x: input.x, y: input.y })
 			);
+		},
+		async placeCell(input: ZoneCell): Promise<void> {
+			const selected = room;
+			if (selected === undefined) throw new TypeError("v3 zone is not open");
+			await (rollover ?? selected).issue(zoneCellPlacement(input));
 		},
 		prepareTradeIntent(input): Promise<PreparedTradeIntent> {
 			const selected = room;
@@ -1374,6 +1527,10 @@ export function createV3ZoneApplication(
 ): Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"] {
 	const material = applicationMaterial(blueprintDigest);
 	const kernel = createZoneStateKernel(creatorAuthor, creatorPeerId, material.artifactVersion);
+	// The projection is a pure fold. Keep this application's last fold so the next projection over
+	// the same base and an exact prefix of the same frozen accepted-operation records continues it
+	// instead of replaying the whole epoch.
+	let lastFold: ZoneFold | undefined;
 	const resolved = material.catalog.resolve(material.blueprintDigest);
 	// Capture this application's exact resolved entry once. Public catalog/package
 	// readouts cannot mutate these private expected carriers between invocations.
@@ -1407,6 +1564,12 @@ export function createV3ZoneApplication(
 	};
 	const resourceFootprint = (bound: CanonicalResourceFootprint | undefined): CanonicalResourceFootprint | undefined =>
 		bound === undefined ? undefined : Object.freeze({byteLength: bound.byteLength, items: bound.items, maxDepth: bound.maxDepth});
+	const projectionFacade = (projection: ZonePlacementGrowthProjection | undefined) => projection === undefined ? undefined : Object.freeze({
+		advance: (operations: readonly unknown[]) => projection.advance(operations),
+		quote: (candidateOperation: unknown) => resourceFootprint(projection.quote(candidateOperation)),
+		quoteWithoutApplicationCandidate: () => resourceFootprint(projection.quoteWithoutApplicationCandidate()),
+		quoteWindow: (declaration: Parameters<typeof projection.quoteWindow>[0]) => resourceFootprint(projection.quoteWindow(declaration)),
+	});
 	/** Local numerical policy only. The original source owner authenticates the
 	 * exact catalog/material and retains one source-bound projection. Neither
 	 * complete nor delta planning grants admission, authority or proof credit. */
@@ -1419,12 +1582,17 @@ export function createV3ZoneApplication(
 		createIncrementalProjection: (input: ResourceInput<Omit<ZonePlacementGrowthMaterial, "candidateOperation">>) => {
 			try {
 				const captured = captureResourceMaterial(input);
-				const projection = captured === undefined ? undefined : kernel.createPlacementGrowthProjection(captured);
-				return projection === undefined ? undefined : Object.freeze({
-					advance: (operations: readonly unknown[]) => projection.advance(operations),
-					quote: (candidateOperation: unknown) => resourceFootprint(projection.quote(candidateOperation)),
-					quoteWithoutApplicationCandidate: () => resourceFootprint(projection.quoteWithoutApplicationCandidate()),
-					quoteWindow: (declaration: Parameters<typeof projection.quoteWindow>[0]) => resourceFootprint(projection.quoteWindow(declaration)),
+				return projectionFacade(captured === undefined ? undefined : kernel.createPlacementGrowthProjection(captured));
+			} catch {return undefined;}
+		},
+		// The same projection, seeded in bounded steps over the base bytes (the room drives it in short turns).
+		beginIncrementalProjection: (input: ResourceInput<Omit<ZonePlacementGrowthMaterial, "candidateOperation">>) => {
+			try {
+				const captured = captureResourceMaterial(input);
+				const seed = captured === undefined ? undefined : kernel.beginPlacementGrowthProjection(captured);
+				return seed === undefined ? undefined : Object.freeze({
+					step: (byteBudget: number) => seed.step(byteBudget),
+					finish: () => projectionFacade(seed.finish()),
 				});
 			} catch {return undefined;}
 		},
@@ -1463,13 +1631,45 @@ export function createV3ZoneApplication(
 			},
 		}),
 		projectAcceptedOperations: (input: V3RoomProjectionInput) => {
+			const baseBytes = input.authenticatedBase?.exactCanonicalApplicationStateBytes;
+			const prior = continuableFold(lastFold, baseBytes, input.currentEpochOperations);
 			const base =
-				input.authenticatedBase === undefined
-					? undefined
-					: decodeZoneState(input.authenticatedBase.exactCanonicalApplicationStateBytes, kernel);
-			return projectZone(input.currentEpochOperations, kernel, base);
+				prior !== undefined || baseBytes === undefined ? undefined : decodeZoneState(baseBytes, kernel);
+			const fold = foldZone(input.currentEpochOperations, kernel, base, prior, baseBytes);
+			lastFold = fold;
+			return zoneProjection([...fold.acceptedDigests], fold.state);
 		},
 	});
+}
+
+/** One completed fold: its base bytes (a private copy), its exact operation records and its result. */
+type ZoneFold = Readonly<{
+	baseBytes: Uint8Array | undefined;
+	operations: readonly V3RoomAcceptedOperation[];
+	acceptedDigests: ReadonlySet<string>;
+	state: ZoneState;
+	continuable: boolean;
+}>;
+
+/**
+ * The prior fold, when the new projection only appends to it: equal base bytes, and the prior
+ * operations are the new list's prefix by identity of frozen accepted-operation records (whose
+ * operation is a frozen detached copy). Otherwise undefined: the caller folds from the base.
+ */
+function continuableFold(
+	prior: ZoneFold | undefined,
+	baseBytes: Uint8Array | undefined,
+	operations: readonly V3RoomAcceptedOperation[]
+): ZoneFold | undefined {
+	if (prior === undefined || !prior.continuable || prior.operations.length > operations.length) return undefined;
+	const sameBase =
+		baseBytes === undefined
+			? prior.baseBytes === undefined
+			: prior.baseBytes !== undefined && sameBytes(prior.baseBytes, baseBytes);
+	if (!sameBase) return undefined;
+	for (let index = 0; index < prior.operations.length; index++)
+		if (prior.operations[index] !== operations[index]) return undefined;
+	return prior;
 }
 
 function projectZone(
@@ -1477,19 +1677,33 @@ function projectZone(
 	kernel: ZoneStateKernel,
 	base?: ZoneProjection
 ): ZoneProjection {
+	const fold = foldZone(operations, kernel, base);
+	return zoneProjection([...fold.acceptedDigests], fold.state);
+}
+
+function foldZone(
+	operations: readonly V3RoomAcceptedOperation[],
+	kernel: ZoneStateKernel,
+	base?: ZoneProjection,
+	prior?: ZoneFold,
+	baseBytes?: Uint8Array
+): ZoneFold {
 	let state: ZoneState =
-		base === undefined
-			? kernel.emptyState()
-			: {
-					version: 2,
-					creatorAuthor: base.creatorAuthor,
-					creatorPeerId: base.creatorPeerId,
-					blocks: base.blocks,
-					outcomes: base.outcomes,
-					roster: base.roster,
-				};
-	const acceptedDigests = new Set<string>();
-	for (const accepted of operations) {
+		prior !== undefined
+			? prior.state
+			: base === undefined
+				? kernel.emptyState()
+				: {
+						version: 2,
+						creatorAuthor: base.creatorAuthor,
+						creatorPeerId: base.creatorPeerId,
+						blocks: base.blocks,
+						outcomes: base.outcomes,
+						roster: base.roster,
+					};
+	const acceptedDigests = new Set<string>(prior?.acceptedDigests);
+	const start = prior?.operations.length ?? 0;
+	for (const accepted of operations.slice(start)) {
 		acceptedDigests.add(accepted.vertexDigest);
 		// Signature and current-room admission remain owned by the authenticated
 		// boundary. The exact same pure transition owns live and folded state.
@@ -1499,7 +1713,20 @@ function projectZone(
 				: accepted.operation;
 		state = kernel.apply(state, operation, accepted.author).state;
 	}
-	return zoneProjection([...acceptedDigests], state);
+	// Continuable only over frozen records and a frozen (captured) state: identity then proves
+	// the prefix and its result are unchanged.
+	let continuable = Object.isFrozen(state);
+	for (let index = start; continuable && index < operations.length; index++) {
+		const record = operations[index];
+		continuable = Object.isFrozen(record) && Object.isFrozen(record?.operation);
+	}
+	return Object.freeze({
+		baseBytes: prior !== undefined ? prior.baseBytes : baseBytes === undefined ? undefined : baseBytes.slice(),
+		operations: Object.freeze([...operations]),
+		acceptedDigests,
+		state,
+		continuable,
+	});
 }
 
 function zoneProjection(acceptedDigests: readonly string[], state: ZoneState): ZoneProjection {
@@ -1818,32 +2045,6 @@ function fabricTrialView(trial: FabricTrialState, durableVertexCount: number): F
 	});
 }
 
-function fabricAgeOfInformation(
-	observations: readonly FabricObservation[],
-	startedAtMs: number,
-	deadlineMs: number,
-	intervalMs: number
-): readonly number[] {
-	const delivered = [...observations].sort((left, right) => left.receivedAtMs - right.receivedAtMs);
-	const ages: number[] = [];
-	let cursor = 0;
-	let freshestSentAt = startedAtMs;
-	for (let sampledAt = startedAtMs; sampledAt <= deadlineMs; sampledAt += intervalMs) {
-		while (cursor < delivered.length && (delivered[cursor]?.receivedAtMs ?? Number.POSITIVE_INFINITY) <= sampledAt) {
-			freshestSentAt = Math.max(freshestSentAt, delivered[cursor]?.sentAtMs ?? freshestSentAt);
-			cursor += 1;
-		}
-		ages.push(sampledAt - freshestSentAt);
-	}
-	return ages;
-}
-
-function fabricPercentile(values: readonly number[], quantile: number): number {
-	if (values.length === 0) return 0;
-	const sorted = [...values].sort((left, right) => left - right);
-	return sorted[Math.ceil(sorted.length * quantile) - 1] ?? 0;
-}
-
 function decodePosition(payload: Uint8Array): Readonly<{ x: number; y: number }> | undefined {
 	try {
 		const entities = decodeEntityDeltaBatch(payload);
@@ -1876,13 +2077,13 @@ async function createCreatorInviteMaterial(
 			.sort((left, right) => compareText(left.author, right.author)),
 		objectId,
 		permissionless: false,
-		version: 1,
+		version: GRID_GENESIS_PROFILE.latchedAclVersion,
 	});
 	const signerSet = Object.freeze([Object.freeze({ publicKey: node.keychain.localAuthorId, signerId: "creator" })]);
 	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
 	const exactCanonicalProfileBytes = encodeCanonical({
 		cryptoSuiteId: "ed25519-sha256-v3",
-		profileId: "creator-trusted-v1",
+		profileId: GRID_GENESIS_PROFILE.profileId,
 		quorum: 1,
 		signers: signerSet,
 	});

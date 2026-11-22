@@ -1940,7 +1940,7 @@ return (__criticalCensusValue:Parameters<typeof encodeCanonical>[0])=>{
 					}
 					// Keep only original accounting readouts after the phase diagnosis.
 					if (selectedEntry === "r8-source-binding" && path.endsWith("/creator-close.ts")) {
-						const marker = "const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture);";
+						const marker = "const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture, capture !== undefined && capture === ordinaryProofSource);";
 						const offset = raw.indexOf(marker);
 						if (offset < 0 || offset !== raw.lastIndexOf(marker))
 							throw new Error("STARTUP_MIGRATION_QUOTE_CHARGE_NOT_UNIQUE");

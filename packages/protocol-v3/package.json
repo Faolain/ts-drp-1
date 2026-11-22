@@ -58,6 +58,10 @@
 			"types": "./dist/src/settlement-profile.d.ts",
 			"import": "./dist/src/settlement-profile.js"
 		},
+		"./room-parameters": {
+			"types": "./dist/src/room-parameters.d.ts",
+			"import": "./dist/src/room-parameters.js"
+		},
 		"./seal": {
 			"types": "./dist/src/seal.d.ts",
 			"import": "./dist/src/seal.js"
@@ -89,6 +93,10 @@
 		"./internal/creator-forward-promotion": {
 			"types": "./dist/src/internal/creator-forward-promotion.d.ts",
 			"import": "./dist/src/internal/creator-forward-promotion.js"
+		},
+		"./instrumentation": {
+			"types": "./dist/src/instrumentation.d.ts",
+			"import": "./dist/src/instrumentation.js"
 		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",

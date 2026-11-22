@@ -55,6 +55,19 @@ import { createSqliteAheDurableStore } from "../src/index.js";
 import { createNodeDurableLiveJournalStore } from "../src/live-journal.js";
 import type { LiveJournalRetirementImageReader } from "@ts-drp/live-journal";
 
+
+/**
+ * The canonical native scope row as the journal captures it: an absent closed membership
+ * (NULL closed_membership_bytes, ea4eb158/9b41a0e4) is omitted, so a scope without one has
+ * the same exact bytes it had before the column existed.
+ * @param row - A raw `SELECT *` scopes row.
+ * @returns The row the retirement image encodes.
+ */
+function canonicalScopeRow<T extends Record<string, unknown>>(row: T): T {
+	const copy = { ...row };
+	if (copy.closed_membership_bytes === null) delete copy.closed_membership_bytes;
+	return copy;
+}
 test("journal invocation capture preserves original SQL image, frames, NULLs and detached lifetimes", () => {
 	const capture = createJournalRetirementImageCapture(), source = Uint8Array.of(7, 9),
 		scope = {object_id: "room", epoch: 2, anchor_digest: "a", next_journal_sequence: 1,
@@ -133,7 +146,10 @@ test("journal held current probe uses exact producer custody and fresh native ch
 		const before = imageReads;
 		const captured = must(await read(selector));
 		expect(captured).toEqual(unheld);
-		expect(imageReads - before).toBe(2);
+		// The unheld read verified these committed rows and the connection's currency (data_version,
+		// total_changes(), schema_version) is unchanged since, so the held capture reads no row. A changed
+		// currency scans again (journal-image-verify-once.test.ts).
+		expect(imageReads - before).toBe(0);
 		const probe = read.captureCurrentProbe?.call(read, captured);
 		expect(probe).toBeDefined();
 		expect(read.captureCurrentProbe?.call(read, captured)).toBeUndefined();
@@ -158,7 +174,8 @@ test("journal held current probe uses exact producer custody and fresh native ch
 		lease = await store.acquireNativeReadReservation(selector);
 		expect(await probe!.checkCurrent()).toEqual({ok: false, kind: "retirement-released"});
 		must(await read(selector));
-		expect(imageReads).toBe(beforeReplacement + 2);
+		// The replacement lease's capture: rows unchanged since they were verified (same currency).
+		expect(imageReads).toBe(beforeReplacement);
 	} finally {
 		spy.mockRestore();
 		await lease?.release(); raw.close(); await store.close();
@@ -386,7 +403,10 @@ test("journal source-bound append retains independent complete CAS postwrite and
 			result = await store.appendAccepted({scope: current.scope, sourceKind: "local-issued", author: "creator", authorSequence: 0,
 				vertexDigest: "a".repeat(64), expectedNativeImage: {imageDigest: before.image.imageDigest, controlBytes: null}});
 		} finally { nativeSpy.mockRestore(); }
-		expect(nativeReads).toBe(6); // BOTH tables, on original CAS/postwrite/readback captures.
+		// BOTH tables, on the postwrite and readback captures. The CAS precheck reads no row: the point
+		// read above verified these committed rows, and the connection's currency (data_version,
+		// total_changes(), schema_version) is unchanged since, so its remembered image is current.
+		expect(nativeReads).toBe(4);
 		const after = must(await store.readRetirementImage(selector));
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error("source-bound append refused");
@@ -431,6 +451,49 @@ test("journal source-bound append refuses an oversized actual postwrite image be
 		const restored = must(await store.readRetirementImage(selector));
 		expect(await store.appendAccepted({...candidate, expectedNativeImage: {imageDigest: restored.image.imageDigest, controlBytes: null}}))
 			.toMatchObject({ok: true, idempotent: false});
+	} finally { raw.close(); await store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
+test("journal source-bound append whose image fits but whose frames do not still commits exactly as a frameless capture", async () => {
+	// A frameless capture also keeps its rows' frames for the next point read. Frames have their own byte
+	// ceiling: a capture refused only there must be redone frameless, not refuse the append.
+	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-frame-ceiling-"));
+	const filename = join(directory, "journal.sqlite"), old = anchorMaterial(0), current = anchorMaterial(1), selector = {objectId: current.scope.objectId};
+	const store = createRetirementStore({primaryFilename: filename});
+	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+	const limit = LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes;
+	const frameBytes = (rows: readonly Uint8Array[]): number => rows.reduce((sum, bytes) => sum + bytes.byteLength, 0);
+	const candidate = (sequence: number) => ({scope: current.scope, sourceKind: "local-issued" as const, author: "creator",
+		authorSequence: sequence, vertexDigest: sequence.toString(16).repeat(64).slice(0, 64)});
+	try {
+		succeed(await store.installGenesis(old.install)); succeed(await store.installEpochAnchor(current.install));
+		raw.function("journal_retirement_allows", (_objectId, _epoch, _anchorDigest) => 1);
+		// One appended row's frame width (the next row's frame has the same width).
+		const empty = must(await store.readRetirementImage(selector));
+		succeed(await store.appendAccepted({...candidate(0), expectedNativeImage: {imageDigest: empty.image.imageDigest, controlBytes: null}}));
+		const one = must(await store.readRetirementImage(selector));
+		const rowFrame = frameBytes(one.canonicalRows) - frameBytes(empty.canonicalRows);
+		// Size the old scope's carrier so the frames after the next append are one byte over the ceiling:
+		// frames and image both grow one byte per carrier byte (same three-byte length prefix throughout).
+		const half = Math.floor(limit / 2);
+		raw.prepare("UPDATE scopes SET exact_parameters_carrier=? WHERE epoch=0").run(new Uint8Array(half));
+		const sized = must(await store.readRetirementImage(selector));
+		raw.prepare("UPDATE scopes SET exact_parameters_carrier=? WHERE epoch=0")
+			.run(new Uint8Array(half + limit + 1 - (frameBytes(sized.canonicalRows) + rowFrame)));
+		const before = must(await store.readRetirementImage(selector));
+		expect(frameBytes(before.canonicalRows) + rowFrame).toBe(limit + 1);
+		const appended = await store.appendAccepted({...candidate(1), expectedNativeImage: {imageDigest: before.image.imageDigest, controlBytes: null}});
+		expect(appended).toMatchObject({ok: true, idempotent: false});
+		if (!appended.ok || appended.nativeImage === undefined) throw new Error("source-bound append refused");
+		expect(raw.prepare("SELECT count(*) AS n FROM accepted_entries").get()?.n).toBe(2);
+		// The image itself fits; only a framed point read is over its ceiling, as before.
+		expect(await store.readRetirementImage(selector)).toMatchObject({ok: false});
+		const rows = raw.prepare("SELECT * FROM accepted_entries ORDER BY journal_sequence").all();
+		expect(rows.map((row) => row.local_author_sequence)).toEqual([0, 1]);
+		// Shrinking the carrier makes the same rows readable with frames; the image then matches its own capture.
+		raw.prepare("UPDATE scopes SET exact_parameters_carrier=? WHERE epoch=0").run(new Uint8Array(half));
+		const after = must(await store.readRetirementImage(selector));
+		expect(after.image.rowCount).toBe(2);
 	} finally { raw.close(); await store.close(); await rm(directory, {recursive: true, force: true}); }
 });
 
@@ -643,6 +706,24 @@ test.each([[64, 0], [128, 0], [128, 2]])("R10 received append capacity widths pr
 		const final = must(await store.readRetirementImage({ objectId: current.scope.objectId }));
 		check(predicted.afterSuccessorLocal, final.canonicalRows);
 		check(browser.afterSuccessorLocal, browserFrames(final.canonicalRows));
+		// fix/maintenance-image-capacity (j22, bx_6ytwadfw): readiness reserves exactly the horizon the successor's
+		// mandatory fence quote checks. That quote is this same function from the post-install journal (preclose:
+		// no membership), so the ordinary quote's fenceHorizon equals its after-successor phases, on both shapes.
+		const next = anchorMaterial(2);
+		const nextUnsigned = { objectId: next.install.objectId,
+			exactCanonicalAnchorPreimageBytes: next.install.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalParametersCarrierBytes: next.install.exactCanonicalParametersCarrierBytes };
+		const fenceAppend = local(fence.authorSequence, successor.scope), nextFence = { author: issuer, authorSequence: fence.authorSequence + 1 };
+		for (const [frames, shape] of [[(rows: readonly Uint8Array[]) => rows, "sqlite"], [browserFrames, "browser"]] as const) {
+			const horizon = journalFutureAppendPostimageWidths(frames(before.canonicalRows), candidate, unsigned, fence, continuations,
+				{ ...options, fenceHorizon: true }).fenceHorizon;
+			const fenceQuote = journalFutureAppendPostimageWidths(frames(installed.canonicalRows), fenceAppend, nextUnsigned, nextFence);
+			expect(horizon, shape).toEqual({ afterSuccessor: fenceQuote.afterSuccessor, afterSuccessorLocal: fenceQuote.afterSuccessorLocal });
+		}
+		expect(() => journalFutureAppendPostimageWidths(before.canonicalRows, candidate, unsigned, fence, continuations,
+			{ ...options, fenceHorizon: 1 as unknown as boolean })).toThrow("malformed-input");
+		expect(journalFutureAppendPostimageWidths(before.canonicalRows, candidate, unsigned, fence, continuations,
+			{ ...options, fenceHorizon: false }).fenceHorizon).toBeUndefined();
 		const nativeRows = final.canonicalRows.map(bytes => decodeCanonical(bytes) as [string, unknown, Record<string, unknown>]);
 		expect(nativeRows.filter(([table, , row]) => table !== "scopes" && row.source_kind === "received")).toHaveLength(writers);
 		expect(nativeRows.filter(([table, , row]) => table !== "scopes" && row.source_kind === "local-issued")).toHaveLength(2 + continuationCount);
@@ -1002,11 +1083,12 @@ test("journal native source image distinguishes byte ceilings from malformed row
 		expect(await store.installGenesis(material.install)).toMatchObject({ ok: true });
 		const original = raw.prepare("SELECT * FROM scopes").get();
 		if (original === undefined) throw new Error("missing original native scope");
-		const empty = { ...original, exact_parameters_carrier: new Uint8Array() };
+		const empty = { ...canonicalScopeRow(original), exact_parameters_carrier: new Uint8Array() };
 		const ceiling = LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes;
-		expect(ceiling).toBe(786_432);
+		// ea4eb158: the native journal image ceiling is LOCAL_WORKLOAD_CAPACITY.journalImageBytes.
+		expect(ceiling).toBe(2_097_152);
 		const bytes = new Uint8Array(ceiling - encodeCanonical(empty).length - 8);
-		const candidate = { ...original, exact_parameters_carrier: bytes };
+		const candidate = { ...canonicalScopeRow(original), exact_parameters_carrier: bytes };
 		const key = [original.object_id, original.epoch, original.anchor_digest];
 		expect(encodeCanonical(candidate).length).toBeLessThanOrEqual(ceiling);
 		expect(encodeCanonical(["scopes", key, candidate]).length).toBeGreaterThan(ceiling);
@@ -1036,7 +1118,7 @@ test("journal native source image distinguishes byte ceilings from malformed row
 		raw.prepare("UPDATE scopes SET next_journal_sequence=?").run(original.next_journal_sequence);
 		const restored = must(await store.readRetirementImage({ objectId: material.scope.objectId }));
 		expect(restored.control).toBeNull();
-		expect(restored.canonicalRows).toEqual([encodeCanonical(["scopes", key, { ...original }])]);
+		expect(restored.canonicalRows).toEqual([encodeCanonical(["scopes", key, canonicalScopeRow(original)])]);
 		expect(raw.prepare("SELECT count(*) AS n FROM retirement_controls").get()?.n).toBe(0);
 	} finally {
 		raw.close();
@@ -1249,7 +1331,9 @@ test("journal retirement exposes exact bounded native rows with joined one-use c
 		const scopes = raw.prepare("SELECT * FROM scopes ORDER BY epoch,anchor_digest").all();
 		const rows = raw.prepare("SELECT * FROM accepted_entries ORDER BY epoch,anchor_digest,journal_sequence").all();
 		const expected = [
-			...scopes.map((row) => encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], { ...row }])),
+			...scopes.map((row) =>
+				encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], canonicalScopeRow(row)])
+			),
 			...rows.map((row) =>
 				encodeCanonical([
 					"accepted_entries",
@@ -2827,7 +2911,9 @@ test("journal physical eight-header image is complete while role and resource bo
 			.map((row) => ({ ...row })),
 	});
 	try {
-		expect(LIVE_JOURNAL_RETIREMENT_LIMITS).toMatchObject({ maxScopes: 7, maxRows: 8192, maxImageBytes: 262_144 });
+		// ea4eb158: rows and image bytes are the local workload capacity (24576 rows, 2 MiB),
+		// distinct from the seven-scope AHE role bound.
+		expect(LIVE_JOURNAL_RETIREMENT_LIMITS).toMatchObject({ maxScopes: 7, maxRows: 24_576, maxImageBytes: 2_097_152 });
 		for (const [epoch, material] of materials.entries()) {
 			expect(
 				await (epoch === 0 ? store.installGenesis(material.install) : store.installEpochAnchor(material.install))
@@ -2844,7 +2930,9 @@ test("journal physical eight-header image is complete while role and resource bo
 		}
 		const before = native();
 		const expected = [
-			...before.scopes.map((row) => encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], row])),
+			...before.scopes.map((row) =>
+				encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], canonicalScopeRow(row)])
+			),
 			...before.rows.map((row) =>
 				encodeCanonical(["accepted_entries", [row.object_id, row.epoch, row.anchor_digest, row.journal_sequence], row])
 			),

@@ -29,7 +29,7 @@ if (["all", "test"].includes(mode)) {
   for (const file of [native, repair]) cases.push({ name: `${file === native ? "native" : "repair"}-typecheck`,
     command: "typecheck", args: [file], expected: "typecheck" });
   for (const [name, file, main, count] of [["native-small", native, "nativeRetirementCustodySmall", 9],
-    ["native-300", native, "nativeRetirementCustody300", 10],
+    ["native-today", native, "nativeRetirementCustodyToday", 9], ["native-300", native, "nativeRetirementCustody300", 6],
     ["repair-small", repair, "roomRepairCustodySmall", 6], ["repair-65", repair, "roomRepairCustody65", 6]]) {
     cases.push({ name, command: "test", args: [file, "--main", main], expected: "tests", count });
   }
@@ -37,16 +37,22 @@ if (["all", "test"].includes(mode)) {
 const verificationCases = [];
 if (["all", "verify"].includes(mode)) {
   verificationCases.push(
-    ["native-tlc", native, "nativeRetirementCustodySmall", "tlc", "step", "init", "safety", "ok"],
+    ["native-tlc", native, "nativeRetirementCustodySmall", "tlc", "step", "init", "inv", "ok"],
     ["repair-tlc", repair, "roomRepairCustodySmall", "tlc", "step", "init", "safety", "ok"],
-    ["native-mutation", native, "nativeRetirementCustodySmall", "tlc", "unsafeStep", "init", "safety", "violation"],
+    ["native-mutation", native, "nativeRetirementCustodySmall", "tlc", "unsafeStep", "init", "inv", "violation"],
     ["repair-mutation", repair, "roomRepairCustodySmall", "tlc", "unsafeStep", "init", "safety", "violation"],
     ["native-nonvacuity", native, "nativeRetirementCustodySmall", "tlc", "step", "init", "neverRewrite", "violation"],
+    ["native-custody-nonvacuity", native, "nativeRetirementCustodySmall", "tlc", "step", "init", "neverPrunedBehindCustody", "violation"],
+    // Today's rewrite: structurally safe, but it loses the entry of a held row and a later rebuild is refused.
+    ["native-today-safety", native, "nativeRetirementCustodyToday", "tlc", "step", "init", "safety", "ok"],
+    ["native-today-entry", native, "nativeRetirementCustodyToday", "tlc", "step", "init", "entryKept", "violation"],
+    ["native-today-refusal", native, "nativeRetirementCustodyToday", "tlc", "step", "init", "noRefusal", "violation"],
+    ["native-today-mutation", native, "nativeRetirementCustodyToday", "tlc", "unsafeStep", "init", "safety", "violation"],
     ["repair-nonvacuity", repair, "roomRepairCustodySmall", "tlc", "step", "init", "neverUnrememberedPeer", "violation"],
     ["repair-temporal", repair, "roomRepairCustodySmall", "tlc", "liveStep", "init", "fairRepair", "ok", "temporal"],
     ["repair-temporal-mutation", repair, "roomRepairCustodySmall", "tlc", "unsafeHintLiveStep", "init", "fairHintRepair", "violation", "temporal"],
-    ["native-apalache-base", native, "nativeRetirementCustody300", "apalache", "step", "init", "safety", "ok", "invariants", 0],
-    ["native-apalache-step", native, "nativeRetirementCustody300", "apalache", "step", "indInit", "safety", "ok", "invariants", 1],
+    ["native-apalache-base", native, "nativeRetirementCustody300", "apalache", "step", "init", "inv", "ok", "invariants", 0],
+    ["native-apalache-step", native, "nativeRetirementCustody300", "apalache", "step", "indInit", "inv", "ok", "invariants", 1],
   );
 }
 if (mode === "fence") {
