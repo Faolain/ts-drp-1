@@ -1,0 +1,12 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2022",
+		"paths": { "@ts-drp/*": ["./packages/*/dist/index.d.ts"] }
+	},
+	"include": ["./*.ts"],
+	"exclude": ["./contract.type.ts"]
+}

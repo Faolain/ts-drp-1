@@ -1,0 +1,6 @@
+{
+  "creatorLiveClose": { "status": 0, "expected": 9, "skipped": 0, "unexpected": 0, "flaky": 0 },
+  "creatorAdoptionCommit": { "status": 0, "passed": 6, "engines": ["chromium", "firefox", "webkit"] },
+  "creatorSuccessorActivation": { "status": 0, "passed": 24, "engines": ["chromium", "firefox", "webkit"] },
+  "creatorSuccessorProduct": { "status": 0, "passed": 27, "engines": ["chromium", "firefox", "webkit"] }
+}

@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "--filter",
+    "@ts-drp/node",
+    "--filter",
+    "@ts-drp/example-v3-room",
+    "build"
+  ],
+  "start": "2026-09-05T07:50:12.959Z"
+}

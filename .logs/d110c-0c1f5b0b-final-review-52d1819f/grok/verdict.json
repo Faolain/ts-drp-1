@@ -1,0 +1,54 @@
+{
+  "verdict": "PASS",
+  "summary": "Final tests-only RED a19e8454 is two test files only and causal: 27 selected, 24 pass, 3 assertion failures (legacy causalJoin empty-intent retirement, legacy join empty-intent retirement, legacy nonterminal ISSUANCE_OUTCOME_UNKNOWN kind). GREEN 802a647e is the exact two-hunk Node repair: rebaseIntents again returns [] for all legacy reserved actions so displaced join/causalJoin complete, while isControlOperation stays profile-gated so live legacy join/causalJoin remain application-visible and settlement fence/join/causalJoin stay control-only. Legacy signer-resolved nonterminal ambiguity falls through to admission-rejected; settlement unknown remains issuance-rejected; the terminal outcome-unknown latch still precedes the generic arm. Earlier blockers stay closed (same-store seq0, activation-digest exclusion, universal issued/outbox cross-check, copySettlementPlan typed fence refusal, halt). Scope is one production file; isolated rebuilt 27/27, 40/40, 1/1 match result.json. Remaining items are already-owned/inherited P2s.",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 6,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Authenticated settlement frontier is still not threaded into source classification",
+      "evidence": "packages/node/src/v3-live.ts:8642-8648 readSettlementSources still calls readRebaseOutbox with an optional frontier that production :8092-8093 never supplies, so classifier-local terminal/old-incarnation skips stay test-only.",
+      "required_action": "Thread the verified checkpoint frontier at the room/creator owner; do not invent a Node-local frontier.",
+      "owner": "f5b0c"
+    },
+    {
+      "severity": "P2",
+      "title": "Replacement planEffect authority remains a later room contract",
+      "evidence": "packages/node/src/v3-live.ts:6645-6649 still refuses replacement planEffect on reserved actions and leaves the public DurableIssueCommit planEffect shape unchanged.",
+      "required_action": "Own replacement linking, reserved-action policy, and terminal-entry validation in the room plan-merge slice.",
+      "owner": "f5b0c"
+    },
+    {
+      "severity": "P2",
+      "title": "Payload-seeded settlement control-set handling is still unowned here",
+      "evidence": ".logs/d110c-0c1f5b0b-review-9b02f9c2/review-ledger.md records the latent payload-seeded control-set observation as f5b0c/f5b work; 802a647e does not add a retained settlement-control payload.",
+      "required_action": "Handle settlement control operations on a retained/payload-seeded path in the later owner before such payloads exist.",
+      "owner": "f5b"
+    },
+    {
+      "severity": "P2",
+      "title": "Same-store activation-digest exclusion is covered only statically",
+      "evidence": "packages/node/src/v3-live.ts:6950-6956 excludes activationVertexDigest independently of cross-object mode, but focused/retained fixtures set that digest only on cross-object displacedSource.",
+      "required_action": "When f5b0c wires activation/frontier threading, add a same-store activationVertexDigest pin beside ordinary seq0 surfacing.",
+      "owner": "f5b0c"
+    },
+    {
+      "severity": "P2",
+      "title": "Historical [control] title names in immutable RED evidence remain misleading",
+      "evidence": ".logs/d110c-0c1f5b0b-corrective-review-bb94a03f/kimi/verdict.json notes 9a4b35f4 [control] titles failed on the seq0 pin rather than control classification; those RED roots are immutable diagnostics.",
+      "required_action": "No edit; keep the naming caveat for readers of the immutable RED evidence.",
+      "owner": "f5b0b"
+    },
+    {
+      "severity": "P2",
+      "title": "Node typecheck remains inherited exit 2",
+      "evidence": ".logs/d110c-0c1f5b0b-green-802a647e/result.json and node-typecheck.normalized vs parent-node-typecheck.normalized are byte-identical SHA-256 f1fe7cb5fed31ebcd1b48e34eaae0c2b5518d2deeafd8c1914967312d25171c8.",
+      "required_action": "Keep as inherited; do not treat the exit-2 typecheck as an f5b0b product failure.",
+      "owner": "inherited"
+    }
+  ],
+  "causal_red_confirmed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true
+}

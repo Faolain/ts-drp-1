@@ -1,0 +1,34 @@
+{
+	"verdict": "PASS",
+	"p0_count": 0,
+	"p1_count": 0,
+	"p2_count": 2,
+	"findings": [
+		{
+			"severity": "P2",
+			"title": "Isolated baseline-before-patch ordering is inferred from timestamps, not an explicit artifact",
+			"evidence": "The GREEN evidence has no standalone status artifact for applying the candidate patch in the isolated checkout. Its baseline-before-candidate order is supported by timestamps and by the exact candidate/baseline title-status-error comparison. The classification remains sound: all 18 failures are the accepted-anchor `truncated canonical value` Phase-3g fixture debt, outside the two changed production seams.",
+			"required_action": "Evidence-runner owner: prospectively record isolated candidate application as its own status artifact, or capture an explicit empty pre-patch diff. Do not reopen this slice or the separately owned Phase-3g fixture debt."
+		},
+		{
+			"severity": "P2",
+			"title": "Hold refusal precedes the closed-session check in rehearsal/activation but follows it in issue",
+			"evidence": "performMigrationRehearsal and performMigrationActivation order terminal failure, hold refusal, then closed-session refusal, whereas issue checks closed state before its post-rebase hold refusal. A held session closed by its owner therefore reports the manual-review error for migration calls but the closed-session error for issue. Both are fail closed and effect free; this is precedence consistency, not a liveness or safety defect.",
+			"required_action": "Parent f5b room-lifecycle owner: align private check ordering so closed-session precedence is consistent, with a retained collision/precedence control and no new API. This does not block f5b0w closure."
+		}
+	],
+	"blocking_union_empty": true,
+	"red_causal": true,
+	"scope_preserved": true,
+	"golden_path_fit": "Accepted RED is causal and complete for the frozen f5b0w contract, GREEN closes it without widening public or protocol behavior, and parent close/adopt, 64-writer, and long-horizon gates remain correctly unclaimed.",
+	"invocation": {
+		"cli_alias": "claude-phel",
+		"model": "claude-fable-5-1",
+		"effort": "xhigh",
+		"session_id": "a9158ed5-f908-4514-9b56-3f37902e8f17",
+		"continuation_uuid": "525e7ea9-0e7a-4831-903e-161dd19625d6",
+		"stop_reason": "end_turn",
+		"is_error": false,
+		"note": "The alias default high-effort inspection was continued in this exact session with explicit --effort xhigh; the xhigh verdict remained PASS and added the second P2."
+	}
+}

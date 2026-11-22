@@ -1,0 +1,29 @@
+{
+  "exactRoster": true,
+  "passed": 3,
+  "failed": 0,
+  "pendingSkippedTodoOrOther": 0,
+  "cases": 3,
+  "expectedCases": 3,
+  "assertions": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > accepts only the four frozen recovery key combinations",
+      "status": "passed"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > rejects malformed bounded policy bytes before consuming the prepared capability",
+      "status": "passed"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > freezes the one shared exact predicate and its custody boundaries",
+      "status": "passed"
+    }
+  ],
+  "postCustodyExact": true,
+  "isolatedCustodyExact": true,
+  "allInputsExact": true,
+  "green": true
+}

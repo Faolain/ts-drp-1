@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-w0-retained-consumer-red-b7e498bc/custody.mjs",
+    "after"
+  ],
+  "budgetMs": 120000,
+  "start": "2026-09-06T10:48:11.667Z"
+}

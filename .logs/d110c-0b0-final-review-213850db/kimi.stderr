@@ -1,0 +1,3393 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+213850db feat: add authenticated room head floor
+798489fd docs: accept D.110c-0b0b checkpoint design
+1db11664 docs: correct D.110c-0b0b genesis carrier contract
+22917252 docs: close D.110c-0b0a and freeze D.110c-0b0b design
+2b3080d6 feat: close D.110c-0b0a staged adoption GREEN
+---
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+ .../production-hardening-tdd-plan-v2.md            |  82 +++++
+ examples/v3-chat/src/index.ts                      |  53 +++
+ examples/v3-room/src/index.ts                      | 359 ++++++++++++++++++++-
+ packages/node/src/creator-adoption-activate.ts     |  32 +-
+ packages/node/src/internal/creator-room-head.ts    |  64 ++++
+ .../node/src/internal/creator-successor-live.ts    |   3 +
+ .../phase-6a-creator-successor-activation-entry.ts |   5 +
+ .../phase-6a-creator-successor-product-entry.ts    |  49 +++
+ .../tests/phase-6a-creator-successor-product.pw.ts |  34 ++
+ ...phase-6a-creator-successor-activation-child.mjs |  10 +
+ ...ase-6a-creator-successor-local-author-child.mjs |  15 +
+ .../creator-adoption-commit-contract.ts            |  14 +-
+ .../creator-successor-activation-contract.ts       |   8 +
+ .../creator-successor-product-contract.ts          |  13 +-
+ .../phase-6b/runtime-reclamation-contract.ts       |   5 +
+ tests/phase-3a1b-d9346-room-semantics-red.test.ts  |   2 +
+ tests/phase-3h-v3-room-rehearsal-red.test.ts       |   1 +
+ tests/phase-6a-creator-adoption-commit-red.test.ts |   3 +-
+ ...ase-6a-creator-successor-activation-red.test.ts |  48 ++-
+ ...a-creator-successor-handle-identity-red.test.ts |   5 +
+ .../phase-6a-creator-successor-product-red.test.ts |   2 +-
+ tests/phase-6b-d110c-0b0-floor-red.test.ts         |  64 ++--
+ .../phase-6b-d110c-0b0a-staged-handoff-red.test.ts |   5 +
+ 23 files changed, 827 insertions(+), 49 deletions(-)
+213850dbba5e4b3fca350592a3d1193c6d50e7b0
+ .../production-hardening-tdd-plan-v2.md            |  82 +++++
+ examples/v3-chat/src/index.ts                      |  53 +++
+ examples/v3-room/src/index.ts                      | 359 ++++++++++++++++++++-
+ packages/node/src/creator-adoption-activate.ts     |  32 +-
+ packages/node/src/internal/creator-room-head.ts    |  64 ++++
+ .../node/src/internal/creator-successor-live.ts    |   3 +
+ .../phase-6a-creator-successor-activation-entry.ts |   5 +
+ .../phase-6a-creator-successor-product-entry.ts    |  49 +++
+ .../tests/phase-6a-creator-successor-product.pw.ts |  34 ++
+ ...phase-6a-creator-successor-activation-child.mjs |  10 +
+ ...ase-6a-creator-successor-local-author-child.mjs |  15 +
+ .../creator-adoption-commit-contract.ts            |  14 +-
+ .../creator-successor-activation-contract.ts       |   8 +
+ .../creator-successor-product-contract.ts          |  13 +-
+ .../phase-6b/runtime-reclamation-contract.ts       |   5 +
+ tests/phase-3a1b-d9346-room-semantics-red.test.ts  |   2 +
+ tests/phase-3h-v3-room-rehearsal-red.test.ts       |   1 +
+ tests/phase-6a-creator-adoption-commit-red.test.ts |   3 +-
+ ...ase-6a-creator-successor-activation-red.test.ts |  48 ++-
+ ...a-creator-successor-handle-identity-red.test.ts |   5 +
+ .../phase-6a-creator-successor-product-red.test.ts |   2 +-
+ tests/phase-6b-d110c-0b0-floor-red.test.ts         |  64 ++--
+ .../phase-6b-d110c-0b0a-staged-handoff-red.test.ts |   5 +
+ 23 files changed, 827 insertions(+), 49 deletions(-)
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 73a56fa0..06eec656 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -93397,6 +93397,88 @@ may accept an absent floor in ordinary reopen regardless of local epoch. The
+ blocking confirmation union is empty, the exact design is accepted, and the
+ next state is `D110C_0A_PLAN_READY`.
+ 
++The D.110c-0b0 GREEN implementation now supplies the reviewed first-transition
++freshness owner without changing protocol records or cryptography. The product
++room requires an application-held `V3RoomHeadAuthority` with exact
++create/migrate/read/begin/commit operations over one stable and at most one
++pending `(objectId, epoch, currentAnchorDigest)` tuple. Hot adoption uses the
++0b0a make-before-publish seam in the frozen order: verify, stage the complete
++successor, begin the provider pending CAS, publish the AHE head, commit and
++reread the provider, then activate only after exact dual-owner equality. Cold
++reopen refuses a missing provider with `D110C_FLOOR_MIGRATION_REQUIRED`, checks
++an exact copied head in Node before activation, and completes an exact pending
++transition only through the existing authenticated non-activating 0b0a recovery
++owner. Explicit migration is caller-selected; ordinary reopen never derives or
++creates a floor from room bytes. The retained one-call commit remains available
++but has no product consumer, and the original cold reopen owner retains its
++no-AHE-mutation law. The browser model provider demonstrates capability
++composition only and is not evidence that same-origin IndexedDB is anti-rollback.
++
++The frozen focused command ran once. Its one test passed semantically with JSON
++`success:true`, zero failures, and zero pending, while the shell returned 1
++solely because that exact command inherited the repository-wide coverage
++percentage gate; it was not rerun. The first retained selection then passed
++95/97 and exposed two obsolete source-governance expectations for the removed
++direct-commit product consumer and old byte-identical chat owner. After one
++test-only correction batch, the exact retained nine-file selection passed
++97/97 across 20 suites. The first browser integration attempt exposed a genuine
++test-harness module-realm mismatch: verification was instrumented from source
++while new stage/recovery subpaths resolved built artifacts, so their process-
++local WeakMap custody differed. The harness was corrected to resolve those
++subpaths through the same fresh source realm. A second run found one stale
++creator epoch-1 fixture rejoin missing the mandatory head. After that fixture-
++only correction, the complete product browser gate passed 24/24 in Chromium,
++Firefox, and WebKit with zero skipped, unexpected, or flaky results.
++
++Affected Node, v3-room, and v3-chat builds passed. Exact Node production-source,
++room, chat, and private-fixture typechecks passed, as did exact-owner ESLint,
++Prettier, diff-check, the corrected six-step/key-roster/source-custody audit,
++and frozen root-manifest/lockfile identity checks. A first read-only diagnostic
++incorrectly counted the literal `expectedRoomHead:` syntax rather than the two
++actual hot/cold capture and equality checks; the corrected V2 check passed and
++the regex mistake is not a code failure. No protocol-v3, registry, wire, schema,
++dependency, threshold, workload, campaign, D.110a, or long multi-epoch path
++changed or ran. Protected roots remain present and all 27 current stashes are
++preserved. The first whole-plan Prettier check exhausted Node's default heap on
++this 93,000-line file; the identical read-only check passed with an 8 GiB
++formatter-process heap, without changing a product or test memory contract.
++
++The complete GREEN ledger is
++`.logs/d110c-0b0-green-798489fd/green-ledger.md`, SHA-256
++`fa150846b600f8549a88e9476cba85ae5e469fb8773a61da91b4103c969d4c25`.
++Focused, final retained, final browser, and corrected source-audit SHA-256
++values are
++`3d8f2391d4ba1059bca42eb86a0dfc330b92563fcdede49415935a6c5320386d`,
++`65b6c35141885ecc5e8ab0fe6b7c7dc944325a8249ffdccdc850e422ee7abb8f`,
++`56a53de0ee5c5c051b245f201ee97d031e64cea295189cb57bc7835cd7308b18`,
++and `b338d1b840e0086f2500a3dbf6b48e9f17f1d9d3ce0ca0b0e2c394b7b52c443e`.
++The validated 45-entry self-excluding evidence/source manifest SHA-256 is
++`9746dec91515f81219cc063bbb62dde77b478da91cbca35d390d6447a9a5bc21`;
++the plan is excluded to avoid circular identity.
++
++The latest expressly authorized one-off Fable 5.1/high parallel audit used
++session `a07b9681-5de2-4cb2-a106-ba421f2738c8`, completed normally, spawned no
++subagents, and changed no repository file. It returned no P0 and independently
++confirmed the selected fixed-creator checkpoint, immediate-predecessor rollback
++pair, and external 0b0 freshness floor. Its two P1s are accepted prospectively
++for a/b/0b1 rather than widening 0b0: a/b tests must assert closure membership
++through the inspect/advance predicates instead of freezing exact ref arrays,
++and 0b1 must prove D.109 cannot reclaim the floor member while an active cold
++open still requires it. The predecessor QC remains a fail-closed availability
++trade, not another trust root. Transcript and report SHA-256 values are
++`65aadcf527dfe334aab9dd9de85489ae2b6690d2def010d24b75f8581b96a6e4`
++and `66c8b3a091cd846c11cf46365928322d15832ae007b6347b0cb9fc3250217849`.
++This express authorization is consumed; no further Fable run is authorized.
++
++The implementation/evidence checkpoint is signed and pushed before the one
++governing Grok 4.6/high, standard direct Kimi K3 100-step, and Opus xhigh final
++plan-to-RED-to-GREEN review. That review must inspect the causal RED, 0b0a/0b0b
++prerequisites, complete provider/public boundary, six-step ordering, pending
++recovery, exact negative classifications, retained behavior, and evidence
++custody. Only P0/P1 blocks; any executable correction receives at most the one
++permitted confirmation. D.110c-0b0 is not closed and D.110c-a/b do not begin
++until that blocking union is empty.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The
+91740:| Stable genesis/root authority signs the current checkpoint  | Directly authenticates a current anchor under the creator key committed by a separately pin-verified genesis anchor carrier. Supports evolving ACL/state/history fields while the `creator-trusted-v1` signer remains invariant; does not solve future seal-key rotation. | O(1) existing-v1 current-record bytes, one fixed caller-held genesis invite carrier, and fixed rollback generations, plus the existing RFC 9162 accumulator's absolute safe-integer ceiling of at most 53 peaks; existing Ed25519 plus anchor/QC/history checks. | Browser-feasible with existing primitives, record schema, and no new crypto dependency or wire field. It still requires a new reviewed protocol-v3 checkpoint opener, closure-law contract, durable compatibility transition, and authenticated freshness floor. | Untrusted genesis-carrier/current-record bytes are fully reverified and cross-bound. A caller-held authenticated expected head/floor is required to reject a valid stale checkpoint; a new client with only genesis cannot infer latestness. The bounded immediate-predecessor rollback closure supplies the genuine epoch-N-1 trust needed to verify the retained N-1→N QC. Archive bytes grow separately. Prune only after authentic durable replacement, head installation, snapshot/availability/outbox gates, and two rollback generations. **Selected for creator-only integrity/control compaction, conditional on D.110c-0b0 selecting a real freshness-floor owner.** |
+91813:`CurrentAnchorTrust` minting remains protocol-v3 custody. D.110c-0b0b therefore
+91836:the latest checkpoint after complete hostile rollback. **D.110c-0b0** now owns
+91844:D.110c-0b1 executable RED is deliberately sequenced **after D.110c-0b0,
+91845:D.110c-0a, D.110c-a, and D.110c-b GREEN, after D.110c-0b0b design acceptance,
+91896:order is: current 0b architecture decision; D.110c-0b0 design acceptance;
+91897:D.110c-0a GREEN; D.110c-0b0 RED/GREEN; D.110c-0b0b design acceptance;
+91931:2. **D.110c-0b0 — authenticated freshness-floor authority prerequisite.**
+91979:   authority solution, conditional on D.110c-0b0 supplying the missing floor.
+91980:   D.110c-0b0b freezes the reviewed non-root epoch-N checkpoint opener and
+92438:##### D.110c-0b0 owner-selection design
+92468:| Library-selected external checkpoint service     | Could supply a monotonic authenticated pin and brand-new-client bootstrap.                                                    | Adds a service, availability policy, credential protocol, dependency, and migration chosen by ts-drp.                        | Rejected for D.110c-0b0. Phase 7 may bind the application capability to a separately reviewed service, but ts-drp does not silently choose one here. |
+92474:close/adoption owners. D.110c-0b0 first plumbs the provider and a copied exact
+92600:D.110c-0b0 RED/GREEN is frozen accordingly. RED uses the real first transition
+92665:The D.110c-0b0 executable RED is now frozen without reopening the accepted
+92667:`tests/phase-6b-d110c-0b0-floor-red.test.ts`, initial SHA-256
+92674:`D110C_0B0_FRESHNESS_FLOOR_MISSING`. GREEN is causal only when the same path
+92681:`pnpm exec vitest run tests/phase-6b-d110c-0b0-floor-red.test.ts
+92682:--reporter=json --outputFile=.logs/d110c-0b0-red/vitest.json`; it selects one
+92712:`TypeError: D110C_0B0_FRESHNESS_FLOOR_MISSING`. This is the frozen causal RED:
+92728:The RED gate is closed and the next authorized state is the narrow D.110c-0b0
+92770:##### D.110c-0b0a staged adoption and pending-recovery prerequisite
+92789:weaken crash acceptance or hide provider I/O in Node. **D.110c-0b0a** owns it,
+92842:   and leaves the others unselected. D.110c-0b0/0b1 owns reclamation and
+92855:   product room. D.110c-0b0, not 0b0a, later rewrites the product to the frozen
+92860:5. D.110c-0b0 also retains its already accepted activation gate: hot activation
+92876:`D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`. RED must not alter product source or
+92918:D.110c-0b0a does not implement the freshness provider, rewrite the product,
+92923:The first D.110c-0b0a plan review inspected signed/pushed commit
+92942:The blocking union is accepted and corrected in one batch. D.110c-0b0a is
+92985:authority, workload, or a hard acceptance gate. The D.110c-0b0a plan gate is
+92988:The deterministic D.110c-0b0a RED then ran exactly once from accepted plan HEAD
+92990:`tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts`, opened a genuine
+92994:only with exact token `D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`: one selected,
+93006:The D.110c-0b0a GREEN implementation now closes that exact causal seam. The
+93038:`.logs/d110c-0b0a-green-c1e443fc/green-ledger.md`. No D.110a identity or long
+93079:D.110c-0b0a is closed.
+93081:##### D.110c-0b0b epoch-N checkpoint-opener and bounded-advance contract prerequisite
+93100:implementation. **D.110c-0b0b** is owned by the protocol-v3 creator-checkpoint
+93248:`D110C_0B0B_DESIGN_READY: YES` with two P1 declarations: make the new epoch-N
+93269:The first high-risk D.110c-0b0b review inspected signed/pushed checkpoint
+93312:D.110c-0b0b acceptance. Grok's session did not cancel, so no resume is required.
+93342:D.110c-0b0b is accepted. No production edit or workload is authorized by this
+93344:D.110c-0b0 GREEN before D.110c-a/b.
+93348:`.logs/d110c-0b0-owner-design-review-65912fbc`; prompt SHA-256 is
+93381:`.logs/d110c-0b0-owner-confirmation-49e8dcff`; prompt SHA-256 is
+93400:The D.110c-0b0 GREEN implementation now supplies the reviewed first-transition
+93447:`.logs/d110c-0b0-green-798489fd/green-ledger.md`, SHA-256
+93479:permitted confirmation. D.110c-0b0 is not closed and D.110c-a/b do not begin
+93678:  deterministic negative answer, so D.110c-0b0 owns the new authority decision
+93703:`.logs/d110c-0b0-amendment-review-610d0f9e`; prompt SHA-256 is
+93735:`.logs/d110c-0b0-confirmation-340a6646`; prompt SHA-256 is
+93754:empty and the exact next state is `D110C_0B0_OWNER_SELECTION_READY`.
+##### D.110c-0b0 owner-selection design
+
+The bounded owner audit rejects two superficially attractive shortcuts. The
+existing creator finality key authenticates checkpoint content but has no
+monotonic memory: it can sign two same-epoch forks, and every valid older
+signature remains valid. Storing a signed "latest" value in the room AHE,
+IndexedDB, invite, checkpoint, registration, journal, snapshot store, or another
+database on the same rollbackable storage boundary merely moves the replay
+problem. The current `@ts-drp/keychain` derives signing keys from caller seed
+material and exposes signing, not a platform monotonic counter or independently
+durable per-room state. Neither construction can be the floor.
+
+The selected owner is therefore an **application/account-held monotonic room
+head authority** supplied to the product room as an explicit capability. It is
+not a built-in checkpoint server, global ledger, consensus service, or new
+cryptographic proof. The provider may be backed by an authenticated account
+service or a platform credential store with real anti-rollback semantics, but
+that backing is application policy outside the room's untrusted storage. A
+plain IndexedDB/localStorage implementation on the same origin does not satisfy
+the hostile-storage acceptance. The capability is trusted only for latestness
+and availability; protocol-v3 remains responsible for authenticating genesis,
+creator/profile/signer-set, epoch/anchor lineage, cut/QC, ACL, history,
+archive/state/snapshot/manifest, and recovery bytes.
+
+The compared owner families and dispositions are:
+
+| Floor owner family                               | Freshness/root property                                                                                                       | Browser and operational property                                                                                             | Disposition                                                                                                                                          |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creator signing custody alone                    | Authenticates bytes but remembers no maximum epoch; rollback and same-key forks remain valid.                                 | Existing browser-compatible Ed25519 path, but no monotonic durable cell.                                                     | Rejected as insufficient. The creator key remains the checkpoint signer, never the latestness oracle.                                                |
+| Application/account-held monotonic room-head pin | Caller-authenticated O(1) cell selects one exact current `(objectId, epoch, currentAnchorDigest)` independently of room data. | Async TypeScript capability is browser-feasible; a real account/platform backing is required for hostile-storage resistance. | **Selected.** This is an acknowledged public product/Node contract addition and must pass this high-risk design review before any production edit.   |
+| Library-selected external checkpoint service     | Could supply a monotonic authenticated pin and brand-new-client bootstrap.                                                    | Adds a service, availability policy, credential protocol, dependency, and migration chosen by ts-drp.                        | Rejected for D.110c-0b0. Phase 7 may bind the application capability to a separately reviewed service, but ts-drp does not silently choose one here. |
+| Merkle/recursive proof without an external floor | Authenticates lineage or consistency but cannot establish which valid prefix is latest.                                       | Adds proof machinery without closing rollback freshness.                                                                     | Rejected as a floor. It remains orthogonal to the already selected creator checkpoint design.                                                        |
+
+The new public contract is narrow and explicit. Product ownership begins at
+`CreateV3RoomSessionInput` in `examples/v3-room/src/index.ts`; Node integration
+touches creator adoption commit/reopen/activation and the later generalized
+close/adoption owners. D.110c-0b0 first plumbs the provider and a copied exact
+expected room-head only through the existing first-transition product/Node
+commit, reopen, and activation path. Protocol-v3 receives that value at the new
+bounded checkpoint opener only when D.110c-0b1 implements that later consumer;
+it never receives the provider or its I/O. The 0b0 publishing capability is
+mandatory for the creator-owned room session that can close/adopt. Any
+non-creator session that cold-reopens an advanced room and claims latestness
+must also receive an authenticated current pin through the separately reviewed
+Phase-7 participant/bootstrap contract; absent that input it fails closed and
+cannot treat local advanced state as current. The provider exposes one
+per-room authenticated state:
+
+```text
+scope   = (pinnedGenesisAnchorDigest, objectId)
+stable  = (objectId, epoch, currentAnchorDigest)
+pending = null | {
+  previous: stable,
+  next: (objectId, epoch + 1, nextAnchorDigest)
+}
+```
+
+The previous/next tuples plus immutable provider scope already bind the pending
+transition; no redundant commitment field exists. The capability supports an
+account-side create-scope-if-never-seen operation, one explicitly authorized
+legacy migrate-scope operation, exact read, begin-CAS from
+`{stable, pending:null}` to `{stable, pending}`, and commit-CAS from that exact
+pending value to `{stable:next, pending:null}`. All inputs and results are
+copied, exact-shaped, and fail closed. No method may
+select the greatest stored epoch, accept an absent floor, blindly overwrite a
+conflict, or expose a general arbitrary-value store. At
+most one stable tuple and one pending tuple exist per room, so provider state is
+O(1) with epoch count.
+
+The publication protocol supplies logical atomicity across the independent
+authority and room store without pretending that two physical stores share a
+transaction:
+
+1. Verify the current stable floor equals the genuine active room head and that
+   no pending value exists.
+2. Produce, verify, and durably complete the exact next checkpoint/generation,
+   while leaving the current room head and activation unchanged.
+3. Install the exact pending advance through provider CAS. From this point no
+   old or new room generation may activate until the transition resolves.
+4. CAS the room AHE head from the exact prior head to the already-complete next
+   generation. An ambiguous CAS is resolved by an authenticated reopen and
+   exact equality before step 5; it is never guessed.
+5. Commit the exact pending provider record to the new stable floor. The
+   confirmed step-4 head equality plus this commit retire the old stable tuple.
+6. Reopen both owners, require exact equality at the new tuple, and only then
+   activate/publish the new owner. This is a fresh publication check, not the
+   first evidence for step-5 retirement. Old control proof retirement remains
+   separately subject to adoption, rollback, availability, snapshot, and
+   outbox gates.
+
+After pending installation there is no rollback-to-old abort path. Recovery
+either completes the same exact authenticated transition or remains unavailable
+and fail closed. This makes every crash state deterministic:
+
+| Crash observation                                                                             | Required result                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Old stable floor, no pending, old room head; next generation absent or merely staged/complete | Old head may reopen; unselected next bytes have no authority.                                                                                                                                                 |
+| Old stable floor, exact pending next, old room head                                           | No activation. Reverify the pending-selected complete next generation, then perform the exact head CAS and pending commit.                                                                                    |
+| Old stable floor, exact pending next, next room head                                          | No activation until the provider commits that exact pending value; then exact dual-owner equality is required.                                                                                                |
+| New stable floor, no pending, next room head                                                  | Reverify checkpoint contents and exact floor equality, then activate.                                                                                                                                         |
+| Floor behind an authenticated room head with no matching pending                              | `D110C_FLOOR_HEAD_AHEAD`; do not accept the floor-matching old generation and do not synthesize a pending value.                                                                                              |
+| Floor ahead of room head with no pending                                                      | `D110C_FLOOR_MISMATCH`; never fall back to the largest local epoch or an older matching generation.                                                                                                           |
+| Malformed/foreign pending, missing selected generation, or unavailable provider               | Typed availability/authority failure; never fall back to the largest local epoch or an older matching generation.                                                                                             |
+| Two concurrent next heads or a changed provider value                                         | Exact CAS conflict `D110C_FLOOR_CONFLICT`; the losing publication attempt cannot activate. A later reopen observing the exact winning `pending.next` follows pending recovery rather than retrying begin-CAS. |
+
+The focused contract freezes the complete classification set rather than a
+prefix wildcard:
+
+| Condition                                                                 | Exact code                         |
+| ------------------------------------------------------------------------- | ---------------------------------- |
+| Provider create/migrate/read/begin/commit unavailable or throws           | `D110C_FLOOR_UNAVAILABLE`          |
+| Provider value is malformed, cross-object, cross-genesis, or noncanonical | `D110C_FLOOR_INVALID`              |
+| Stable floor differs from the sole proposed current authenticated head    | `D110C_FLOOR_MISMATCH`             |
+| Proposed next epoch/anchor regresses, skips, or reuses the stable tuple   | `D110C_FLOOR_REGRESSION`           |
+| Exact create/migrate/begin/commit CAS loses or observes another value     | `D110C_FLOOR_CONFLICT`             |
+| Pending previous/next tuple is missing, duplicate, or inconsistent        | `D110C_FLOOR_PENDING_INVALID`      |
+| Authenticated room head is ahead while no exact pending advance exists    | `D110C_FLOOR_HEAD_AHEAD`           |
+| Exact pending-selected complete generation is absent or unavailable       | `D110C_FLOOR_RECOVERY_UNAVAILABLE` |
+| Any ordinary reopen has no independently authenticated provider scope     | `D110C_FLOOR_MIGRATION_REQUIRED`   |
+
+When an exact pending value selects the observed old or next room head, the
+pending-recovery rows dominate ordinary mismatch classification.
+`D110C_FLOOR_MISMATCH` applies when the floor is ahead or otherwise differs
+without an exact pending selector; `D110C_FLOOR_HEAD_AHEAD` is reserved for an
+authenticated room head ahead of the stable floor with no exact pending.
+
+Crash completion reads the next tuple from the independently authenticated
+pending provider record. It may load hostile room bytes only as candidates and
+must fully authenticate the candidate against that tuple and the prior trust;
+it may not derive, repair, or advance the provider value from a local AHE head,
+checkpoint, journal, snapshot, invite, or maximum epoch. A provider outage is
+an availability failure, not permission to weaken freshness. A provider that
+lies, rolls back, or equivocates is outside the selected trust assumption and
+can defeat latestness; this limitation is explicit.
+
+Initialization and compatibility are also exact. Only an explicit account-side
+**new-room creation act** may create a previously unseen provider scope, using
+create-if-never-seen CAS to install
+`(objectId, 0, pinnedGenesisAnchorDigest)`. It runs as part of new room creation,
+not ordinary reopen, and concurrent creators converge only on the identical
+deterministic genesis tuple. The provider must remember that the scope has ever
+existed; erasing the room store or provider value cannot make the scope new
+again. If new-room creation aborts after scope creation, the scope remains
+reserved and reopen fails unavailable until the exact genesis room data is
+restored.
+
+Ordinary reopen with an absent provider scope always returns
+`D110C_FLOOR_MIGRATION_REQUIRED`, even when hostile local bytes present an
+authentic epoch-0 trust root. No local epoch, invite, checkpoint, or signature
+may distinguish a legacy unadvanced room from an advanced room rolled back to
+genesis. A legacy room may continue only through the explicit one-time
+migrate-scope operation using an independently authenticated application/account
+pin; migration never derives the pin from local room storage. A brand-new client
+with only genesis can authenticate a checkpoint but cannot establish freshness;
+Phase 7 must define how its application/account obtains the current pin.
+Step-4 authenticated head equality authorizes the step-5 provider commit that
+retires the old stable tuple; step 6 reconfirms equality before publication. No
+transition history is retained. D.110c does not implement permanent provider
+scope deletion: the account authority must retain the last active pin or an
+O(1) terminal used-scope/tombstone marker. Any erasing deletion policy is a
+separate high-risk Phase-7 decision and may never enable create-scope reuse.
+
+D.110c-0b0 RED/GREEN is frozen accordingly. RED uses the real first transition
+D.110c-0b0 RED/GREEN is frozen accordingly. RED uses the real first transition
+and production reopen path to demonstrate all of the following without a
+tests-only trust record: a valid old generation is accepted when no independent
+floor exists; a creator signature alone cannot distinguish latestness; and the
+current APIs have no provider/pending/CAS seam. GREEN adds only the reviewed
+capability/public-contract boundary and the first-transition orchestration. It
+must prove:
+
+- exact account-side create-if-never-seen genesis initialization, exact
+  current-head equality, and refusal to initialize during ordinary reopen;
+- make-before-publish ordering and no activation during a pending transition;
+- every crash row above in both before/after orderings, including ambiguous
+  room-head CAS recovery;
+- stale, forked, skipped, duplicate, cross-object, cross-genesis, regressed,
+  malformed, missing, unavailable, and concurrent-provider mutants fail with
+  exact `D110C_FLOOR_*` codes before activation or deletion;
+- neither normal nor crash recovery derives the provider value from hostile
+  local data;
+- creator-owned close/adopt sessions require the publishing capability;
+  participant advanced reopen without a separately authenticated Phase-7 pin
+  fails closed and is not silently treated as creator-floor custody;
+- the provider contains exactly one stable and at most one pending fixed-size
+  record, old values retire only after step-4 authenticated head equality plus
+  the exact step-5 commit, step 6 gates publication, and the D.110c-c/d censuses
+  count it;
+- fresh account-side epoch-0 creation succeeds; every ordinary reopen with a
+  missing scope, including local epoch 0, returns
+  `D110C_FLOOR_MIGRATION_REQUIRED`; explicit migration requires an
+  independently authenticated pin; used scopes cannot be re-created; and no
+  silent migration occurs;
+  and
+- the existing wire records, anchor/QC semantics, creator key, thresholds,
+  dependencies, room workload, and storage schemas remain unchanged.
+
+The retained transition is explicit rather than contradictory. Creator-owned
+Phase-6a adoption/reopen cases receive the deterministic model implementation
+of the new account capability and must retain their existing semantic success.
+The established-peer and fresh-late-peer cold-reopen cases in
+`packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`, and
+the cold activation/reopen cases in
+`tests/phase-6a-creator-successor-activation-red.test.ts`, become exact 0b0 RED
+when no independently authenticated pin is supplied: they fail before room
+authority or activation with `D110C_FLOOR_MIGRATION_REQUIRED` or the named
+availability owner. Their original success remains retained only in the paired
+case that supplies a separately authenticated application/account test pin.
+This changes no D.108 evidence retrospectively; it freezes how those same
+golden-path controls are interpreted after the new mandatory freshness owner
+exists.
+
+Focused gates cover a deterministic in-memory hostile room store and a separate
+model provider, real browser room reopen with an injected account-authority
+test implementation, creator trust/close/adoption retained vectors, exact
+public source shape, package builds/typechecks, exact-owner lint/format/diff,
+protected paths/stashes, and signed/pushed evidence. The browser test provider
+is an implementation of the public authority contract, not evidence that
+IndexedDB itself is anti-rollback. If production implementation requires a new
+protocol wire/schema field, cryptographic dependency, built-in external
+service, keychain mutation/counter, changed genesis assumption, or any public
+surface broader than this exact capability and expected-head plumbing, stop
+and reslice before production edits. After reviewed 0b0 GREEN, D.110c-a/b must
+generalize the identical protocol to every genuine transition; 0b1 consumes the
+stable exact floor for bounded cold trust opening; D.110c-c/d prove retirement,
+restart, census, and at least 100 transitions; Phase 7 owns new-client pin
+distribution and archive/cold-join availability.
+
+The D.110c-0b0 executable RED is now frozen without reopening the accepted
+owner-selection design. Its sole new owner is
+`tests/phase-6b-d110c-0b0-floor-red.test.ts`, initial SHA-256
+`d9b41102189c0bf3e703d026ed050e08fc395f1dd815101ec9d6975c49258252`.
+The test creates the genuine D.108 first-transition fixture, durably commits the
+epoch-1 successor, transfers the resulting exact durable carriers to the
+existing fresh-process production cold-reopen child, and supplies no
+independent room-head authority. The current implementation activates that
+advanced room, so the exact expected RED failure token is
+`D110C_0B0_FRESHNESS_FLOOR_MISSING`. GREEN is causal only when the same path
+instead returns `{ ok:false, kind:"D110C_FLOOR_MIGRATION_REQUIRED" }` before
+activation and the exact reviewed public/provider plumbing is present. Partial,
+source-only, fixture-authored, or locally inferred floor evidence cannot satisfy
+the test.
+
+The focused RED command is exactly
+`pnpm exec vitest run tests/phase-6b-d110c-0b0-floor-red.test.ts
+--reporter=json --outputFile=.logs/d110c-0b0-red/vitest.json`; it selects one
+test in one file and may run once from the signed/pushed freeze checkpoint. Its
+fresh evidence root records command/stdout/stderr/status, selected/result/error
+counts, exact terminal token, source and built-import identities, changed paths,
+protected state, and a self-excluding manifest. Before RED, affected workspace
+packages are freshly built so the child cannot consume stale `dist` state.
+RED changes no production source. Starting production SHA-256 values are
+`be0fae5e22476ebfcf2602c34213df60df954b51f1f2e945807c04a3e7fbb612`
+for `examples/v3-room/src/index.ts`,
+`70dba504e7f71fd830b89f28cbfde0d58a9f51584ca256a6058045e693c6cf46`
+for `packages/node/src/creator-adoption-activate.ts`, and
+`a5fd0c18292e63a8c3f16a2517dff474e7f51c99bf122360a65b87f0c7516db9`
+for `packages/node/src/creator-adoption-commit.ts`; lockfile and root-manifest
+SHA-256 values are
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`
+and `1baa6c3967e63f1d8af5f1e70c6b6c62e032a90e770f18dd3d86f5cfc40e1a55`.
+The already accepted Grok/Kimi/Opus owner-selection plan and confirmation are
+the bounded plan review for this executable sub-slice; deterministic RED needs
+no additional model round. No browser campaign or D.110a invocation is
+authorized.
+
+That RED ran exactly once from signed/pushed freeze commit
+`2ba2752ff5dca0d39656f97b429fe6439be7bae9`, tree
+`8f77c0b7b5403d411cf9844a01b0f8df7b47a3f8`, after the complete workspace
+package build exited zero with empty stderr. From `2026-09-02T06:04:47Z`
+through `2026-09-02T06:04:54Z`, the exact command selected one test in one
+test-result file, returned status 1, and reported zero passes, one failure, zero
+skips, and no top-level or child-launch error. The genuine freshly built
+epoch-1 cold reopen activated without any independently authenticated
+room-head authority; the sole failure was exactly
+`TypeError: D110C_0B0_FRESHNESS_FLOOR_MISSING`. This is the frozen causal RED:
+the creator signature and authentic local successor bytes establish content
+authenticity but not freshness.
+
+The accepted RED audit SHA-256 is
+`834e8c20a85a6d1a74cd28a51b4832c1645e6005263c505f9556a763c593306a`.
+It proves local/upstream equality at the freeze commit, exact freshly built
+package import ownership, unchanged production/lockfile identities, zero
+tracked dirt before evidence recording, 26 preserved stashes, all protected
+roots present, no relevant ts-drp process, all four fixed ports clear, and zero
+campaign or D.110a invocation. Vitest JSON/stdout/stderr SHA-256 values are
+`732c82ff6233209326c337cee5f5b3cb50a1b634f0a99609a69a4de931b4e6b5`,
+`a4dd8d50187eb4056245d66dc1ef35874a59aab64806aad3ed48381b4fd8565d`,
+and `702197514be5b0d6cfb028f66fe2a1fe0a7cd881be4dafe4ef8e5db2539a5a3f`.
+The validating self-excluding RED manifest SHA-256 is
+`67f6311573e754a3cbd5d4233bd292aee994d06e7b7fbfc674c23b148b639fe2`.
+The RED gate is closed and the next authorized state is the narrow D.110c-0b0
+GREEN; the RED command may not be rerun.
+
+The expressly authorized one-off Fable 5.1/high parallel audit, session
+`5d9b90ff-5bca-4284-92fa-a9f1018273ff`, independently re-fetched the three
+pinned Hiero heads, inspected the local trust/closure/reopen owners read-only,
+and returned `P0=0/P1=0`. It agrees that WRAPS is unnecessary for the fixed
+creator signer and cannot supply freshness, and that deterministic provider
+tests prove correctness assuming an honest external authority rather than
+browser-only rollback resistance. Therefore D.110c-c/d and Phase 7 may claim
+hostile-storage freshness only when a real application/account provider exists
+outside that storage boundary. Its preferred simpler caller-held-genesis-carrier
+variant and its QC/abort/census observations are P2 design guidance for the
+already required D.110c-0b1 private-opener stop-check; they do not reopen the
+accepted architecture or authorize a new record/API/dependency. The durable
+report SHA-256 is
+`a9ce81a546d04c282276629e927b04583a44d49d8986efca194f8d2a58fe9ba4`;
+the raw local session JSONL SHA-256 is
+`8d4c6cf06f435a814fe1b59cc9d7fec048006811edf37d573590668e1b19219d`.
+No further Fable run is authorized by this result.
+
+A second expressly authorized one-off Fable 5.1/high audit, session
+`924afa1f-908c-4590-95ba-ce5cfc94f8bc`, completed read-only against RED
+evidence HEAD `685611728ecfe37bbdb09369f245f9a909fcf776` and the in-progress uncommitted
+0b0 plumbing. It independently revalidated the same three upstream heads and
+again selects the existing creator-signed bounded checkpoint plus the 0b0
+external freshness floor; WRAPS is disproportionate for a fixed signer and
+does not establish latestness. It returned no P0. Its three P1 design cautions
+are accepted prospectively: D.110c-0b1 must declare the genuinely required
+epoch-N opener/Node-reopen public compatibility boundary before RED; bounded
+cold reopen authenticates the creator-signed current history root/size rather
+than replay-proving every retired historical extension; and retaining the
+immediate predecessor QC is an explicit fail-closed availability trade rather
+than an additional trust root. These cautions do not reopen 0b0, authorize an
+opener change, weaken archive accounting, or claim that a self-authenticating
+checkpoint is fresh. The durable report is
+`.logs/d110c-0b-hiero-fable-924afa1f/report.md`, SHA-256
+`f9342a7337c1769c4c37d17b7d063acf04cd852ef4abae4b6903affb7f166efd`;
+the raw local session JSONL SHA-256 is
+`9db8635826759afa527d1370cdfbd5df0da63a351c92463ad8a21250ff81be94`.
+No further Fable run is authorized by this second result.
+
+##### D.110c-0b0a staged adoption and pending-recovery prerequisite
+##### D.110c-0b0a staged adoption and pending-recovery prerequisite
+
+The first 0b0 GREEN composition audit found a narrower prerequisite that the
+accepted owner design did not make executable. At RED evidence HEAD
+`685611728ecfe37bbdb09369f245f9a909fcf776`, the exported
+`commitCreatorSuccessorAdoption()` consumes its one-use authenticated intent,
+stages/completes the candidate generation, and swaps the AHE head in the same
+call. It cannot expose the required durable-complete-but-not-published state in
+which the application installs the provider pending record. Conversely,
+`reopenCreatorSuccessorAdoption()` authenticates only the already-adopted
+three-generation epoch-1 shape and activates it in the same call. It cannot
+authenticate or finish a provider-selected pending candidate without live
+activation. Therefore expected-head plumbing alone cannot implement the frozen
+six-step protocol or its old-head/new-head crash rows. Reordering the existing
+calls is not a repair: committing the AHE first creates an unrecoverable
+floor-behind/head-ahead window, while installing pending first can leave no
+durably complete selected candidate after a crash.
+
+This is a demonstrated production composition/API seam, not permission to
+weaken crash acceptance or hide provider I/O in Node. **D.110c-0b0a** owns it,
+blocks resumption of 0b0 GREEN, and is due before any focused 0b0 GREEN run,
+D.110c-a production work, or multi-epoch execution. Its source owner is the
+creator adoption lifecycle across
+`packages/node/src/creator-adoption-commit.ts`,
+`packages/node/src/creator-adoption.ts`,
+`packages/node/src/creator-adoption-activate.ts`, two new non-root Node subpaths
+`creator-adoption-stage` and `creator-adoption-recover`, and their private
+opaque-capability registries under `packages/node/src/internal/`. The existing
+`creator-adoption-commit` export roster and the product orchestrator in
+`examples/v3-room/src/index.ts` are retained unchanged by 0b0a. Existing
+exploratory uncommitted 0b0 edits are non-evidence and receive no acceptance; no
+additional production edit or focused GREEN execution may occur until this
+prerequisite's plan gate is accepted.
+
+The selected compatibility direction is additive and phase-separated:
+
+1. New non-root subpath `@ts-drp/node/creator-adoption-stage` exports exactly
+   `stageCreatorSuccessorAdoption` and
+   `publishStagedCreatorSuccessorAdoption`. Stage consumes exact input
+   `{handle,intent}`, writes and authenticates the complete next generation,
+   leaves the exact old AHE head unchanged, and returns exact success keys
+   `{capability,descriptor,lifecycle,ok,recovery}` with
+   `lifecycle:"successor-staged"` and `recovery:"pending-old"`. The capability
+   is a distinct owner-bound, one-use opaque type; it is not accepted by the
+   existing commit or activation owners. Publish consumes exact input
+   `{capability,handle}`, performs the exact old-head-to-next-head CAS, resolves
+   ambiguous storage results only through authenticated reopen/equality, and
+   returns the existing prepared-activation success shape
+   `{capability,descriptor,head,lifecycle,ok,recovery}` with
+   `lifecycle:"successor-prepared"` and `recovery:"active-new"`. Both operations use
+   exact failure keys `{detail,kind,ok}` and perform no provider I/O or live
+   activation.
+2. New non-root subpath `@ts-drp/node/creator-adoption-recover` exports exactly
+   `recoverPendingCreatorSuccessorAdoption`. Its exact input keys are
+   `{authenticationProfile,catalog,detachedSignature,exactCanonicalAnchorPreimageBytes,exactCanonicalParametersCarrierBytes,expectedNextRoomHead,expectedPreviousRoomHead,pinnedGenesisAnchorDigest,snapshotDeclaration,snapshotStore,store}`.
+   The two expected values are copied exact provider anchor tuples
+   `{currentAnchorDigest,epoch,objectId}`, never AHE `PresentHead` locators.
+   Without live activation, the operation authenticates the pending-selected
+   complete candidate from pinned genesis and prior trust. If the AHE is old it
+   completes the exact head CAS; if the AHE is already new it proves that the
+   authenticated successor trust equals `expectedNextRoomHead`; generation ID
+   is irrelevant in this already-new case. Exact success keys are
+   `{head,lifecycle,ok,recovery}` with
+   `lifecycle:"successor-published"` and `recovery:"active-new"`; failure keys
+   remain `{detail,kind,ok}`. AHE generation ID, revision, and closure digest are
+   locators resolved inside Node only after candidate authentication.
+3. Recovery selection explicitly handles retry leftovers. Among fully
+   authenticated Complete candidates whose previous/current trust equals
+   `expectedPreviousRoomHead` and whose successor anchor equals
+   `expectedNextRoomHead`, candidates with one identical authenticated closure
+   digest are equivalent; while AHE is still old, recovery deterministically
+   selects the lexicographically smallest exact encoded generation-ID string
+   and leaves the others unselected. D.110c-0b0/0b1 owns reclamation and
+   durable-census accounting for those inert equivalent leftovers; 0b0a proves
+   only that they cannot affect authentication.
+   An extra Staged/incomplete/unmatched generation has no authority. No matching
+   Complete candidate, malformed/foreign state, or two authenticated matching
+   candidates with different closure digests is a fail-closed missing,
+   invalid, or true-fork result. This covers a stage crash before provider
+   pending followed by a successful retry that leaves two content-identical
+   Complete generations.
+4. The existing `commitCreatorSuccessorAdoption` module, exact export roster,
+   input/result shapes, direct-call semantics, and current product use remain
+   unchanged during 0b0a. Its documentation records that the retained one-call
+   API supplies no freshness publication and must not be used to advance a provider-scoped
+   product room. D.110c-0b0, not 0b0a, later rewrites the product to the frozen
+   stage → provider begin-CAS → Node publish → provider commit-CAS → exact
+   dual-owner reread → activation sequence and updates the two retained
+   source-governance contracts that currently require the one-call product
+   owner.
+5. D.110c-0b0 also retains its already accepted activation gate: hot activation
+   receives the copied exact new stable room-head tuple, Node requires it to
+   equal the published successor trust, and the trusted product obtains/passes
+   it only after provider commit and exact stable reread. The 0b0 negative gate
+   must prove that a still-pending/old provider prevents any activation call or
+   live successor owner. The 0b0a publish capability alone is not freshness
+   authority and 0b0a makes no product-activation claim.
+
+This additive Node lifecycle surface is a high-risk public-contract exception.
+One bounded Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review
+must inspect the exact API/ownership design before RED. Only P0/P1 blocks; one
+confirmation is permitted only if a correction changes executable semantics,
+scope, or the public contract. Deterministic RED then replaces prose inference:
+one genuine first-transition fixture must prove that the current public API has
+no durable-complete/no-head-swap capability and no non-activating pending cold
+recovery owner, failing with exact token
+`D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`. RED must not alter product source or
+run a retained campaign.
+
+GREEN acceptance is exact and Node-only:
+
+- after genuine stage, the candidate is complete and fully authenticated, the
+  AHE head remains the prior exact head, no provider call has occurred, and no
+  successor owner has activated;
+- publish refuses a missing, foreign, replayed, duplicated, already-consumed,
+  cross-handle, wrong-head, or mutated staged capability and preserves exact
+  existing failure custody;
+- publish performs one exact head CAS and resolves an ambiguous result by
+  authenticated equality, never by assuming success;
+- cold pending recovery covers both provider/AHE orderings, candidate absent,
+  candidate incomplete, wrong previous/next provider anchor tuple, equivalent
+  duplicate Complete candidates, different-closure true fork, malformed
+  stores, abandoned pre-pending candidate, and ambiguous CAS, without
+  activation and without deriving either expected tuple from room storage;
+- a tests-only deterministic decision model composes stage, a modeled pending
+  boundary, publish, a modeled stable boundary, and recovery to prove that the
+  Node calls support the frozen six-step order. It does not add the provider
+  public contract, rewrite the product, or claim the complete 0b0 crash matrix;
+- the old one-call API, exact module export roster, and retained product-owner
+  source predicates keep their previously proved semantics; adding the two new
+  non-root subpaths updates only the exact package-export-map snapshots that
+  enumerate every `@ts-drp/node` export;
+- no provider object crosses into Node or protocol-v3, and no wire record,
+  schema, digest, authority, dependency, threshold, rollback generation,
+  availability rule, or public product capability beyond the reviewed Node
+  lifecycle seam changes; and
+- exact-owner source-shape tests, Node builds/typechecks, focused genuine
+  runtime tests, all retained creator adoption/activation/reopen and cleanup
+  tests, lint/format/diff, protected paths, stashes, signed commits, pushed refs,
+  and self-excluding evidence manifests pass. Product/example browser controls
+  remain unchanged and are rerun by 0b0 after its product rewrite.
+
+After signed/pushed GREEN, one formal Grok/Kimi/Opus review covers plan → RED →
+GREEN causality, the additive compatibility boundary, capability custody,
+non-activating recovery, and retained behavior. Only then may 0b0 resume and
+implement provider initialization, product orchestration, expected-head
+activation/reopen gates, classification, the full crash matrix, the authorized
+source-governance updates, and the already frozen focused/retained gates.
+D.110c-0b0a does not implement the freshness provider, rewrite the product,
+change existing creator-adoption-commit contracts, add the bounded checkpoint
+opener, perform repeated rollover or pruning, evolve the archive, or run any
+long campaign.
+
+The first D.110c-0b0a plan review inspected signed/pushed commit
+`7f6d05d366466a7e1c5e0a6e37d5bb1f8cab1e29` in a clean detached checkout.
+Prompt SHA-256 is
+`64a777daf5218d89cc28e13aba6886bac1adb52a831337de1969042170665eb5`.
+Grok 4.6/high completed with `stop_reason=end_turn` after active inspection but
+placed explanatory prose before its terminal JSON, so the runner honestly
+classified it `NO_VERDICT`; its public terminal content was `BLOCKED` with two
+P1 and one P2. Grok event/public/status SHA-256 values are
+`3907660e807de0d48f77d6914546df71d4e5cf40f84f01ae91455e8ffcd4575f`,
+`d2b071cb505bf9d3937a9591af32c1b472536de3db01d8894f6e99aca99d5d8e`, and
+`1b712e1a8bdcc02a943e6d5589b92503e960fb5acdd6c48eac6730f1f8fa9102`.
+Direct Kimi K3 with the exact 100-step control, session
+`session_9e4333d2-a1bb-496c-b489-0b92b51b3dc7`, returned `PASS`, P0=0/P1=0/P2=2;
+its exported-session SHA-256 is
+`63a76d4f0c54a985e138e5f9fcd4831b40c808dd985890bc4444a09e58abc90a`.
+Opus xhigh session `2cfa1f8e-7271-4643-b892-b434a54ca752` returned `BLOCKED`,
+P0=0/P1=3/P2=2; terminal SHA-256 is
+`3e7a818b46b9c65de2c967bc92c0a498f47b63eebcfaae70fe9f6ae941d3c231`.
+
+The blocking union is accepted and corrected in one batch. D.110c-0b0a is
+Node-only and uses new subpaths so the existing commit export and retained
+product-source contracts remain unchanged. It freezes exact operation and
+input/result names, treats same-tuple/same-closure retry leftovers as equivalent
+with deterministic generation selection, treats different-closure matches as a
+true fork, and explicitly leaves product/provider orchestration and hot/cold
+expected-head activation gates to 0b0. The P2 union is dispositioned in the
+same correction: provider tuples are distinguished from AHE locators; the
+compatibility wrapper is documented as non-freshness; and 0b0 owns the
+source-governance rewrite. Because these corrections change executable scope
+and the public Node boundary, the single permitted Grok/Kimi/Opus confirmation
+must inspect the signed correction. No later prose-only round is permitted.
+
+The single confirmation inspected signed/pushed correction
+`4f893654e6456ca94384277054ac51fb2df4413d` from a clean detached checkout.
+Prompt SHA-256 is
+`8ee96fd63c82be173f4b887f5937d0e19b5268d0791e472f84d6d0f9cbfcf96a`.
+Grok 4.6/high completed with `stop_reason=end_turn` and emitted an explicit
+`PASS`, P0=0/P1=0/P2=2 JSON after inspection prose; because the prose preceded
+the terminal object, the strict runner honestly classified the invocation
+`NO_VERDICT`. It did not cancel, time out, or report a blocking finding. Grok
+event/public/status SHA-256 values are
+`d5417ff1c8d47d8a9a69f47c7d70043411f4647c4a241e2a0496bfe17d39d5f0`,
+`c74436f74b5994ef8e00456d840c938005613ea5fe5aea3d29bf7bf1f9e9b259`, and
+`b7edf022d694a0205ec7295679baf171e9f32666747c79036a0f40a5bd304fec`.
+Direct Kimi K3 session `session_8c87a776-6622-428e-a2f9-ad6f15c34263`
+with the exact 100-step control returned `PASS`, P0=0/P1=0/P2=2; its exported
+session SHA-256 is
+`f4330108c8b1c51afce19c1443634ab2f8f50376f3100e92700a9d1947089e73`.
+Opus xhigh session `04a793cc-81de-4586-8047-f8dc9e346b1a` returned `PASS`,
+P0=0/P1=0/P2=3; its recorded terminal SHA-256 is
+`a40143d3800a977e01aaf2fa0b7f0b5fda5218d15bc9df97c3adedf7f6b7625d`.
+
+The blocking confirmation union is empty. The P2 union is dispositioned
+mechanically without another review: the RED freeze states publish's literal
+lifecycle/recovery values and exact encoded generation-ID ordering; an
+already-new AHE is compared by authenticated successor trust rather than
+generation locator; the full package-export-map snapshot is updated for the
+two additive subpaths; equivalent unselected-candidate reclamation is owned by
+0b0/0b1 census work; and the retained one-call API wording no longer implies
+that it wraps the new operations. The approximate count of later product-owner
+contracts remains bookkeeping for 0b0, which must enumerate the actual changed
+predicates when it rewrites the product. No finding changes executable scope,
+authority, workload, or a hard acceptance gate. The D.110c-0b0a plan gate is
+accepted; deterministic RED is next.
+
+The deterministic D.110c-0b0a RED then ran exactly once from accepted plan HEAD
+`c47927f515f1182b6bc6a711e85fb696d3effe1b`. The sole selected test and file,
+`tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts`, opened a genuine
+first-transition fixture, authenticated its successor intent, observed the
+retained one-call commit perform exactly one old-to-new AHE head swap, and
+proved that neither reviewed stage nor recovery subpath exists. It then failed
+only with exact token `D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`: one selected,
+zero passed, one failed, zero pending, zero unexpected errors, and no campaign
+title. The JSON report is authoritative and has `success:false`; Vitest's JSON
+output-file invocation anomalously returned shell status 0, which is recorded
+separately and does not convert the failed report into a pass. Source and
+report SHA-256 values are
+`295515e5fc3dc980c0b40291632ff5c39e7d608acb73fec59cb7fa2152820ce9` and
+`db4dcd8218055f0d1ab323634faa74511bc977ac244de3c9a4265388db4d9ac9`.
+The causal matrix matches the frozen RED exactly; no production file changed,
+no retained or long test ran, and GREEN may now implement only the accepted
+Node seam.
+
+The D.110c-0b0a GREEN implementation now closes that exact causal seam. The
+new non-root `creator-adoption-stage` owner stages and authenticates a complete
+successor without moving the AHE head, then publishes it through one
+owner-bound, one-use opaque capability and one exact head CAS. The separate
+non-activating `creator-adoption-recover` owner authenticates a provider-selected
+pending candidate from pinned genesis and the copied exact previous/next room
+head tuples, deterministically selects equivalent retry leftovers, rejects a
+different authenticated closure as a true fork, and resolves old-head,
+already-new-head, and ambiguous-CAS recovery without deriving freshness from
+room storage or activating a live successor. The retained one-call commit API,
+its public roster and fault semantics, product/provider orchestration, existing
+activation owners, protocol records, dependencies, thresholds, and root exports
+remain unchanged.
+
+The accepted focused command disabled only the repository-wide coverage
+percentage gate and passed 3/3. The separate exact retained seven-file selection passed
+86/86 with zero failures or pending tests. Node build, exact production-source
+typecheck, the affected private compile fixture, exact-owner ESLint and
+Prettier, diff-check, source-shape audit, and built package self-reference
+export probe all exited zero. The broad Node package `typecheck` remains an
+inherited unsuitable aggregate because it includes unrelated worker-host
+`rootDir`, retained WebRTC emit-typing, and compact-history-helper errors; the
+exact affected source and private compile owners pass and this slice does not
+widen to those debts. A first provider grep that matched documentation and a
+first export probe run from the unlinked repository root were corrected as
+diagnostic mistakes, not code failures.
+
+Final focused and retained JSON SHA-256 values are
+`dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349`
+and `65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059`.
+The complete command/result, diagnostic, changed-path, source-hash, stash, and
+protected-path ledger is
+`.logs/d110c-0b0a-green-c1e443fc/green-ledger.md`. No D.110a identity or long
+campaign ran. GREEN is not closed until this signed/pushed implementation and
+evidence receive the one governing Grok/Kimi/Opus plan-to-RED-to-GREEN review;
+only P0/P1 blocks. No Fable result substitutes for that formal review.
+
+That final implementation review inspected signed/pushed GREEN
+`2b3080d6562881ecd2a129dc3d896e9e9a86650d` in a clean detached checkout.
+Prompt SHA-256 is
+`891d559783217819352ed2ac62271e67eba531454550c2d47e1e490642baf669`.
+Grok 4.6/high completed normally after 885.749 seconds with
+`stop_reason=end_turn`, no cancellation or timeout, but placed inspection prose
+before its exact JSON, so the runner honestly classified it `NO_VERDICT`. Its
+public terminal object was `BLOCKED`, P0=0/P1=1/P2=1; event, public, status, and
+extracted-terminal SHA-256 values are
+`99400b41d3de58fc5c4ea292ece98640f5994b19d9537571ef564579a3f211f0`,
+`e2f2d5c91e4faacc891bef5cf0800671d69d8ea3d38a94727af5e60df1767e29`,
+`b0ee8db858485ace1b02e40e34b18683036ac94bfe53f4ddf96a323b6611d261`,
+and `1e3b33cfd71d1ea5780e5f3d9ec9604f2642a8bbe312d074d38658df3037f752`.
+Standard direct Kimi K3 session
+`session_8d50908e-4785-47a2-b68e-a370def74885` with the exact 100-step control
+returned `PASS`, P0=0/P1=0/P2=1; stream and terminal SHA-256 values are
+`466127c30936204bd812e1744277005dbd19c8f46f19d771f69989a4f56c44f7`
+and `ea0e4f06c6da88ab99a0d8c3e8517154f024598cb5f621c04212a8b3de3f45b7`.
+Opus xhigh session `de925e84-c258-4a43-9868-e15be6a5ca05` returned `PASS`,
+P0=0/P1=0/P2=3; stream and terminal SHA-256 values are
+`e30bda798ef91ec333178f66634081abc887a70964f47281c8db566b43ad2b84`
+and `13df504fc996da7f91fa8eb4559937033ba04058d321704cf3dad2cf0c79bdd7`.
+
+The only P1 was Grok's correct evidence inconsistency: retained JSON proves
+seven files/86 tests/14 suites, while the original ledger and plan called it an
+eight-file report. Kimi and Opus independently found the same issue as P2. The
+ledger and plan now state the exact truth: focused JSON separately proves the
+0b0a file's 3/3 and retained JSON proves the seven retained files' 86/86. No
+test, source byte, public contract, scope, or acceptance behavior changed, so
+the governing policy forbids a new confirmation for this documentation-only
+correction. Grok did not cancel, so its cancellation-resume rule does not
+apply. The remaining P2s are assigned to 0b0: its full product/provider crash
+matrix owns the modeled pending/stable six-step composition and missing/wrong/
+foreign rows, and its source-governance update preserves an explicit no-AHE-
+mutation predicate for the original reopen owner while allowing the distinct
+pending-recovery owner to publish. The corrected blocking union is empty and
+D.110c-0b0a is closed.
+
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/packages/node/src/creator-adoption-activate.ts b/packages/node/src/creator-adoption-activate.ts
+index e921897e..2bc46a82 100644
+--- a/packages/node/src/creator-adoption-activate.ts
++++ b/packages/node/src/creator-adoption-activate.ts
+@@ -4,6 +4,7 @@ import {
+ 	consumePreparedCreatorSuccessorAdoption,
+ 	type PreparedCreatorSuccessorAdoptionMaterial,
+ } from "./internal/creator-adoption-intent.js";
++import { captureCreatorExpectedRoomHead, sameCreatorRoomHead } from "./internal/creator-room-head.js";
+ import {
+ 	consumeCreatorSuccessorHandleAlias,
+ 	consumeCreatorSuccessorLive,
+@@ -13,7 +14,14 @@ import {
+ } from "./internal/creator-successor-live.js";
+ import { deriveV3StableTopic } from "./internal/v3-topic.js";
+ 
+-const HOT_KEYS = Object.freeze(["capability", "handle", "messageQueueManager", "networkNode", "onAdmittedVertex"]);
++const HOT_KEYS = Object.freeze([
++	"capability",
++	"expectedRoomHead",
++	"handle",
++	"messageQueueManager",
++	"networkNode",
++	"onAdmittedVertex",
++]);
+ const COLD_KEYS = Object.freeze([
+ 	"authenticationProfile",
+ 	"author",
+@@ -21,6 +29,7 @@ const COLD_KEYS = Object.freeze([
+ 	"detachedSignature",
+ 	"exactCanonicalAnchorPreimageBytes",
+ 	"exactCanonicalParametersCarrierBytes",
++	"expectedRoomHead",
+ 	"issuanceStore",
+ 	"liveJournalStore",
+ 	"messageQueueManager",
+@@ -229,12 +238,17 @@ async function activateMaterial(
+ export async function activateCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
+ 	const captured = capture(input, HOT_KEYS);
+ 	if (captured === undefined) return failure("malformed-input", "creator successor activation input is invalid");
++	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
++	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
+ 	const bindings = runtimeBindings(captured);
+ 	if (bindings === undefined) return failure("malformed-input", "creator successor runtime bindings are invalid");
+ 	const prepared = consumePreparedCreatorSuccessorAdoption(captured.capability, captured.handle) as
+ 		| PreparedCreatorSuccessorAdoptionMaterial
+ 		| undefined;
+ 	if (prepared === undefined) return failure("capability-unavailable", "creator successor capability is unavailable");
++	if (!sameCreatorRoomHead(expectedRoomHead, prepared.activation.successor.trust)) {
++		return failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
++	}
+ 	return activateMaterial(prepared.activation, bindings);
+ }
+ 
+@@ -244,8 +258,21 @@ export async function activateCreatorSuccessorAdoption(input: unknown): Promise<
+  * @returns Active successor custody or a typed fail-closed result.
+  */
+ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
++	if (
++		input !== null &&
++		typeof input === "object" &&
++		Object.getPrototypeOf(input) === Object.prototype &&
++		!("expectedRoomHead" in input)
++	) {
++		return failure(
++			"D110C_FLOOR_MIGRATION_REQUIRED",
++			"creator successor reopen requires an authenticated room-head floor"
++		);
++	}
+ 	const captured = capture(input, COLD_KEYS);
+ 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
++	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
++	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
+ 	if (captured.authenticationProfile !== "creator-only") {
+ 		return failure("malformed-input", "creator successor authentication profile is invalid");
+ 	}
+@@ -256,5 +283,8 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
+ 	if (bindings === undefined) return failure("malformed-input", "creator successor runtime bindings are invalid");
+ 	const reopened = await consumeCreatorSuccessorReopen(captured as never);
+ 	if (!reopened.ok) return failure(reopened.kind, reopened.detail);
++	if (!sameCreatorRoomHead(expectedRoomHead, reopened.material.successor.trust)) {
++		return failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
++	}
+ 	return activateMaterial(reopened.material, bindings);
+ }
+diff --git a/packages/node/src/internal/creator-room-head.ts b/packages/node/src/internal/creator-room-head.ts
+new file mode 100644
+index 00000000..b4546005
+--- /dev/null
++++ b/packages/node/src/internal/creator-room-head.ts
+@@ -0,0 +1,64 @@
++const ROOM_HEAD_KEYS = Object.freeze(["currentAnchorDigest", "epoch", "objectId"]);
++const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
++
++export interface CreatorExpectedRoomHead {
++	readonly currentAnchorDigest: string;
++	readonly epoch: number;
++	readonly objectId: string;
++}
++
++/**
++ * Captures one exact copied room-head expectation.
++ * @param value - Candidate room-head value.
++ * @returns Detached exact head or undefined.
++ */
++export function captureCreatorExpectedRoomHead(value: unknown): CreatorExpectedRoomHead | undefined {
++	try {
++		if (value === null || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) {
++			return undefined;
++		}
++		const keys = Reflect.ownKeys(value);
++		if (keys.length !== ROOM_HEAD_KEYS.length || keys.some((key) => !ROOM_HEAD_KEYS.includes(key as string))) {
++			return undefined;
++		}
++		const record = value as Readonly<Record<string, unknown>>;
++		for (const key of ROOM_HEAD_KEYS) {
++			const descriptor = Object.getOwnPropertyDescriptor(record, key);
++			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
++		}
++		if (
++			typeof record.currentAnchorDigest !== "string" ||
++			!LOWER_HEX_256.test(record.currentAnchorDigest) ||
++			!Number.isSafeInteger(record.epoch) ||
++			(record.epoch as number) < 0 ||
++			typeof record.objectId !== "string" ||
++			record.objectId.length === 0
++		) {
++			return undefined;
++		}
++		return Object.freeze({
++			currentAnchorDigest: record.currentAnchorDigest,
++			epoch: record.epoch as number,
++			objectId: record.objectId,
++		});
++	} catch {
++		return undefined;
++	}
++}
++
++/**
++ * Returns whether an expected room head matches authenticated trust.
++ * @param left - Independently authenticated expected head.
++ * @param right - Authenticated protocol trust.
++ * @returns Whether every identity field matches.
++ */
++export function sameCreatorRoomHead(
++	left: CreatorExpectedRoomHead,
++	right: Readonly<{ readonly currentAnchorDigest: string; readonly currentEpoch: number; readonly objectId: string }>
++): boolean {
++	return (
++		left.currentAnchorDigest === right.currentAnchorDigest &&
++		left.epoch === right.currentEpoch &&
++		left.objectId === right.objectId
++	);
++}
+diff --git a/packages/node/src/internal/creator-successor-live.ts b/packages/node/src/internal/creator-successor-live.ts
+index 25bfe4ad..40037089 100644
+--- a/packages/node/src/internal/creator-successor-live.ts
++++ b/packages/node/src/internal/creator-successor-live.ts
+@@ -11,6 +11,8 @@ import type {
+ } from "@ts-drp/storage/snapshot-transfer";
+ import type { DRPNetworkNode, Message } from "@ts-drp/types";
+ 
++import type { CreatorExpectedRoomHead } from "./creator-room-head.js";
++
+ export interface CreatorSuccessorGenerationMaterial {
+ 	readonly candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];
+ 	readonly detachedAnchorSignature: Uint8Array;
+@@ -87,6 +89,7 @@ export interface CreatorSuccessorReopenInput {
+ 	readonly detachedSignature: Uint8Array;
+ 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+ 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
++	readonly expectedRoomHead: CreatorExpectedRoomHead;
+ 	readonly issuanceStore: DurableIssuanceStore;
+ 	readonly liveJournalStore: DurableLiveJournalStore;
+ 	readonly pinnedGenesisAnchorDigest: string;
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index d0e57e67..39018287 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -8,7 +8,11 @@ import {
+ 	activateCreatorSuccessorAdoption,
+ 	reopenCreatorSuccessorAdoption,
+ } from "@ts-drp/node/creator-adoption-activate";
+-import { commitCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-commit";
++import { recoverPendingCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-recover";
++import {
++	publishStagedCreatorSuccessorAdoption,
++	stageCreatorSuccessorAdoption,
++} from "@ts-drp/node/creator-adoption-stage";
+ import {
+ 	bindCreatorLiveClose,
+ 	type BindCreatorLiveCloseInput,
+@@ -238,6 +242,48 @@ export interface V3RoomSuccessorAuthority {
+ 	readonly profileId: "creator-trusted-v1";
+ }
+ 
++export interface V3RoomHead {
++	readonly currentAnchorDigest: string;
++	readonly epoch: number;
++	readonly objectId: string;
++}
++
++export interface V3RoomHeadScope {
++	readonly objectId: string;
++	readonly pinnedGenesisAnchorDigest: string;
++}
++
++export interface V3RoomHeadState {
++	readonly pending: null | Readonly<{ readonly next: V3RoomHead; readonly previous: V3RoomHead }>;
++	readonly stable: V3RoomHead;
++}
++
++export type V3RoomHeadAuthorityResult =
++	| Readonly<{ readonly ok: false; readonly reason: "conflict" | "unavailable" }>
++	| Readonly<{ readonly ok: true; readonly state: V3RoomHeadState | null }>;
++
++export type V3RoomHeadInitialization =
++	| Readonly<{ readonly kind: "create" }>
++	| Readonly<{ readonly head: V3RoomHead; readonly kind: "migrate" }>
++	| Readonly<{ readonly kind: "reopen" }>;
++
++export interface V3RoomHeadAuthority {
++	readonly initialization: V3RoomHeadInitialization;
++	begin(
++		input: Readonly<{ readonly expected: V3RoomHeadState; readonly next: V3RoomHead; readonly scope: V3RoomHeadScope }>
++	): Promise<V3RoomHeadAuthorityResult>;
++	commit(
++		input: Readonly<{ readonly expected: V3RoomHeadState; readonly scope: V3RoomHeadScope }>
++	): Promise<V3RoomHeadAuthorityResult>;
++	create(
++		input: Readonly<{ readonly scope: V3RoomHeadScope; readonly stable: V3RoomHead }>
++	): Promise<V3RoomHeadAuthorityResult>;
++	migrate(
++		input: Readonly<{ readonly scope: V3RoomHeadScope; readonly stable: V3RoomHead }>
++	): Promise<V3RoomHeadAuthorityResult>;
++	read(input: Readonly<{ readonly scope: V3RoomHeadScope }>): Promise<V3RoomHeadAuthorityResult>;
++}
++
+ export interface V3RoomMigrationProjection {
+ 	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+ 	readonly importOperations: readonly Readonly<Record<string, unknown>>[];
+@@ -339,6 +385,7 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
+ 	onProjection(projection: Projection): void;
+ 	readonly publicKeyBytes: Uint8Array;
+ 	readonly rebaseSourceInvite?: string | V3RoomCreatorInviteMaterial;
++	readonly roomHeadAuthority: V3RoomHeadAuthority;
+ 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+ 	readonly successorSnapshotDeclaration?: SnapshotQuarantineDeclaration;
+ }
+@@ -743,6 +790,199 @@ function exactRecord(value: unknown, expectedKeys: readonly string[]): Readonly<
+ 	return Object.freeze(output);
+ }
+ 
++const ROOM_HEAD_KEYS = Object.freeze(["currentAnchorDigest", "epoch", "objectId"]);
++const ROOM_HEAD_STATE_KEYS = Object.freeze(["pending", "stable"]);
++const ROOM_HEAD_PENDING_KEYS = Object.freeze(["next", "previous"]);
++const ROOM_HEAD_INITIALIZATION_KEYS = Object.freeze(["kind"]);
++const ROOM_HEAD_MIGRATION_KEYS = Object.freeze(["head", "kind"]);
++const ROOM_HEAD_RESULT_FAILURE_KEYS = Object.freeze(["ok", "reason"]);
++const ROOM_HEAD_RESULT_SUCCESS_KEYS = Object.freeze(["ok", "state"]);
++const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
++
++function roomHeadFailure(code: string): never {
++	throw new TypeError(code);
++}
++
++function captureRoomHead(value: unknown): V3RoomHead | undefined {
++	const record = exactRecord(value, ROOM_HEAD_KEYS);
++	return record !== undefined &&
++		typeof record.currentAnchorDigest === "string" &&
++		LOWER_HEX_256.test(record.currentAnchorDigest) &&
++		Number.isSafeInteger(record.epoch) &&
++		(record.epoch as number) >= 0 &&
++		typeof record.objectId === "string" &&
++		record.objectId.length > 0
++		? Object.freeze({
++				currentAnchorDigest: record.currentAnchorDigest,
++				epoch: record.epoch as number,
++				objectId: record.objectId,
++			})
++		: undefined;
++}
++
++function sameRoomHead(left: V3RoomHead, right: V3RoomHead): boolean {
++	return (
++		left.currentAnchorDigest === right.currentAnchorDigest &&
++		left.epoch === right.epoch &&
++		left.objectId === right.objectId
++	);
++}
++
++function captureRoomHeadState(value: unknown, scope: V3RoomHeadScope): V3RoomHeadState | undefined {
++	const record = exactRecord(value, ROOM_HEAD_STATE_KEYS);
++	const stable = captureRoomHead(record?.stable);
++	if (record === undefined || stable === undefined || stable.objectId !== scope.objectId) return undefined;
++	if (record.pending === null) return Object.freeze({ pending: null, stable });
++	const pending = exactRecord(record.pending, ROOM_HEAD_PENDING_KEYS);
++	const previous = captureRoomHead(pending?.previous);
++	const next = captureRoomHead(pending?.next);
++	return pending !== undefined &&
++		previous !== undefined &&
++		next !== undefined &&
++		sameRoomHead(previous, stable) &&
++		next.objectId === scope.objectId &&
++		next.epoch === stable.epoch + 1 &&
++		next.currentAnchorDigest !== stable.currentAnchorDigest
++		? Object.freeze({ pending: Object.freeze({ next, previous }), stable })
++		: undefined;
++}
++
++function sameRoomHeadState(left: V3RoomHeadState, right: V3RoomHeadState): boolean {
++	return (
++		sameRoomHead(left.stable, right.stable) &&
++		(left.pending === null
++			? right.pending === null
++			: right.pending !== null &&
++				sameRoomHead(left.pending.previous, right.pending.previous) &&
++				sameRoomHead(left.pending.next, right.pending.next))
++	);
++}
++
++function captureRoomHeadInitialization(value: unknown): V3RoomHeadInitialization | undefined {
++	const createOrReopen = exactRecord(value, ROOM_HEAD_INITIALIZATION_KEYS);
++	if (createOrReopen?.kind === "create" || createOrReopen?.kind === "reopen") {
++		return Object.freeze({ kind: createOrReopen.kind });
++	}
++	const migration = exactRecord(value, ROOM_HEAD_MIGRATION_KEYS);
++	const head = captureRoomHead(migration?.head);
++	return migration?.kind === "migrate" && head !== undefined
++		? Object.freeze({ head, kind: "migrate" as const })
++		: undefined;
++}
++
++async function callRoomHeadAuthority(
++	operation: () => Promise<V3RoomHeadAuthorityResult>,
++	scope: V3RoomHeadScope
++): Promise<V3RoomHeadState | null> {
++	let result: unknown;
++	try {
++		result = await operation();
++	} catch {
++		return roomHeadFailure("D110C_FLOOR_UNAVAILABLE");
++	}
++	const failure = exactRecord(result, ROOM_HEAD_RESULT_FAILURE_KEYS);
++	if (failure?.ok === false) {
++		if (failure.reason === "conflict") return roomHeadFailure("D110C_FLOOR_CONFLICT");
++		if (failure.reason === "unavailable") return roomHeadFailure("D110C_FLOOR_UNAVAILABLE");
++		return roomHeadFailure("D110C_FLOOR_INVALID");
++	}
++	const success = exactRecord(result, ROOM_HEAD_RESULT_SUCCESS_KEYS);
++	if (success?.ok !== true) return roomHeadFailure("D110C_FLOOR_INVALID");
++	if (success.state === null) return null;
++	return captureRoomHeadState(success.state, scope) ?? roomHeadFailure("D110C_FLOOR_INVALID");
++}
++
++async function initializeRoomHeadAuthority(
++	authority: V3RoomHeadAuthority,
++	scope: V3RoomHeadScope,
++	genesis: V3RoomHead
++): Promise<V3RoomHeadState> {
++	const initialization = captureRoomHeadInitialization(Reflect.get(authority, "initialization"));
++	if (initialization === undefined) return roomHeadFailure("D110C_FLOOR_INVALID");
++	let state: V3RoomHeadState | null;
++	if (initialization.kind === "create") {
++		state = await callRoomHeadAuthority(() => authority.create(Object.freeze({ scope, stable: genesis })), scope);
++	} else if (initialization.kind === "migrate") {
++		if (initialization.head.objectId !== scope.objectId) return roomHeadFailure("D110C_FLOOR_INVALID");
++		state = await callRoomHeadAuthority(
++			() => authority.migrate(Object.freeze({ scope, stable: initialization.head })),
++			scope
++		);
++	} else {
++		state = await callRoomHeadAuthority(() => authority.read(Object.freeze({ scope })), scope);
++	}
++	if (state === null) {
++		return roomHeadFailure(
++			initialization.kind === "reopen" ? "D110C_FLOOR_MIGRATION_REQUIRED" : "D110C_FLOOR_CONFLICT"
++		);
++	}
++	return state;
++}
++
++async function readRoomHeadAuthority(authority: V3RoomHeadAuthority, scope: V3RoomHeadScope): Promise<V3RoomHeadState> {
++	return (
++		(await callRoomHeadAuthority(() => authority.read(Object.freeze({ scope })), scope)) ??
++		roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED")
++	);
++}
++
++async function beginRoomHeadAdvance(
++	authority: V3RoomHeadAuthority,
++	scope: V3RoomHeadScope,
++	current: V3RoomHead,
++	next: V3RoomHead
++): Promise<V3RoomHeadState> {
++	if (
++		current.objectId !== scope.objectId ||
++		next.objectId !== scope.objectId ||
++		next.epoch !== current.epoch + 1 ||
++		next.currentAnchorDigest === current.currentAnchorDigest
++	) {
++		return roomHeadFailure("D110C_FLOOR_REGRESSION");
++	}
++	const observed = await readRoomHeadAuthority(authority, scope);
++	if (observed.pending !== null) {
++		if (sameRoomHead(observed.pending.previous, current) && sameRoomHead(observed.pending.next, next)) return observed;
++		return roomHeadFailure("D110C_FLOOR_PENDING_INVALID");
++	}
++	if (!sameRoomHead(observed.stable, current)) {
++		return roomHeadFailure(observed.stable.epoch > current.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH");
++	}
++	const expected = Object.freeze({ pending: null, stable: current });
++	const selected = await callRoomHeadAuthority(() => authority.begin(Object.freeze({ expected, next, scope })), scope);
++	const pending = Object.freeze({ next, previous: current });
++	const desired = Object.freeze({ pending, stable: current });
++	if (selected === null || !sameRoomHeadState(selected, desired)) return roomHeadFailure("D110C_FLOOR_CONFLICT");
++	return selected;
++}
++
++async function commitRoomHeadAdvance(
++	authority: V3RoomHeadAuthority,
++	scope: V3RoomHeadScope,
++	pending: V3RoomHeadState
++): Promise<V3RoomHeadState> {
++	if (pending.pending === null) return roomHeadFailure("D110C_FLOOR_PENDING_INVALID");
++	const selected = await callRoomHeadAuthority(
++		() => authority.commit(Object.freeze({ expected: pending, scope })),
++		scope
++	);
++	const desired = Object.freeze({ pending: null, stable: pending.pending.next });
++	if (selected === null || !sameRoomHeadState(selected, desired)) return roomHeadFailure("D110C_FLOOR_CONFLICT");
++	const reopened = await readRoomHeadAuthority(authority, scope);
++	if (!sameRoomHeadState(reopened, desired)) return roomHeadFailure("D110C_FLOOR_MISMATCH");
++	return reopened;
++}
++
++function expectedRoomHeadFromDescriptor(descriptor: Readonly<Record<string, unknown>>): V3RoomHead {
++	return (
++		captureRoomHead({
++			currentAnchorDigest: descriptor.anchorDigest,
++			epoch: descriptor.epoch,
++			objectId: descriptor.objectId,
++		}) ?? roomHeadFailure("D110C_FLOOR_INVALID")
++	);
++}
++
+ function exactDenseArray(value: unknown): readonly unknown[] | undefined {
+ 	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
+ 	const keys = Reflect.ownKeys(value);
+@@ -1222,7 +1462,8 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
+ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAuthority>(
+ 	input: CreateV3RoomSessionInput<Projection>,
+ 	requireFreshTrust: boolean,
+-	redirectSource?: RedirectSourceRecovery
++	redirectSource?: RedirectSourceRecovery,
++	skipRoomHeadAuthority = false
+ ): Promise<V3RoomSession<Projection>> {
+ 	if (
+ 		input.successorSnapshotDeclaration !== undefined &&
+@@ -1283,6 +1524,51 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	} = input;
+ 	const objectIdResult = parseStorageObjectId(input.objectId);
+ 	if (!objectIdResult.ok) throw new TypeError("v3 room object id is invalid");
++	const roomHeadScope = Object.freeze({
++		objectId: input.objectId,
++		pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
++	});
++	const genesisRoomHead = Object.freeze({
++		currentAnchorDigest: material.pinnedGenesisAnchorDigest,
++		epoch: 0,
++		objectId: input.objectId,
++	});
++	let roomHeadAuthority: V3RoomHeadAuthority | undefined;
++	let openedRoomHeadState: V3RoomHeadState | undefined;
++	if (redirectSource === undefined && !requireFreshTrust && !skipRoomHeadAuthority) {
++		const candidate = input.roomHeadAuthority;
++		if (
++			candidate === undefined ||
++			candidate === null ||
++			typeof candidate !== "object" ||
++			!["begin", "commit", "create", "migrate", "read"].every(
++				(method) => typeof Reflect.get(candidate, method) === "function"
++			)
++		) {
++			if (input.creatorFinalitySigner !== undefined || input.successorSnapshotDeclaration !== undefined) {
++				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
++			}
++		} else {
++			roomHeadAuthority = candidate;
++			openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
++			if (
++				openedRoomHeadState.pending === null &&
++				input.successorSnapshotDeclaration === undefined &&
++				!sameRoomHead(openedRoomHeadState.stable, genesisRoomHead)
++			) {
++				return roomHeadFailure(
++					openedRoomHeadState.stable.epoch > genesisRoomHead.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
++				);
++			}
++			if (
++				openedRoomHeadState.pending === null &&
++				input.successorSnapshotDeclaration !== undefined &&
++				(openedRoomHeadState.stable.objectId !== input.objectId || openedRoomHeadState.stable.epoch !== 1)
++			) {
++				return roomHeadFailure("D110C_FLOOR_MISMATCH");
++			}
++		}
++	}
+ 	const inviteAuthority = migrationInviteAuthority(material);
+ 	const roomInviteAuthority = input.application.migration === undefined ? undefined : inviteAuthority;
+ 	if (inviteAuthority.objectId !== input.objectId) {
+@@ -1870,10 +2156,40 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
+ 			activeHandle = activated.handle as RoomPlaneHandle;
+ 		} else {
++			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
++				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
++			}
+ 			const snapshotStore = await createBrowserSnapshotQuarantineStore({
+ 				primaryDatabaseName: input.databaseName,
+ 			});
+ 			creatorCloseStoreClosers.push(snapshotStore.close);
++			const selectedPending = openedRoomHeadState.pending;
++			if (selectedPending !== null) {
++				const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
++				const recoveredPending = await recoverPendingCreatorSuccessorAdoption({
++					authenticationProfile: "creator-only",
++					catalog: input.application.catalog,
++					detachedSignature: material.detachedGenesisSignature,
++					exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
++					exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
++					expectedNextRoomHead: selectedPending.next,
++					expectedPreviousRoomHead: selectedPending.previous,
++					pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
++					snapshotDeclaration: input.successorSnapshotDeclaration,
++					snapshotStore,
++					store: aheStores[0],
++				});
++				const recoveredHead = captureRoomHead(recoveredPending.head);
++				if (
++					recoveredPending.ok !== true ||
++					recoveredHead === undefined ||
++					!sameRoomHead(recoveredHead, selectedPending.next)
++				) {
++					return roomHeadFailure("D110C_FLOOR_RECOVERY_UNAVAILABLE");
++				}
++				openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
++			}
++			const expectedRoomHead = openedRoomHeadState.stable;
+ 			const reopened = await reopenCreatorSuccessorAdoption({
+ 				authenticationProfile: "creator-only",
+ 				author: input.author,
+@@ -1881,6 +2197,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 				detachedSignature: material.detachedGenesisSignature,
+ 				exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+ 				exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
++				expectedRoomHead,
+ 				issuanceStore,
+ 				liveJournalStore: journalStore,
+ 				messageQueueManager,
+@@ -2745,12 +3062,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 				onProjection: (): void => undefined,
+ 				openTransport: migrationTransport,
+ 				publicKeyBytes: new Uint8Array(input.publicKeyBytes),
++				roomHeadAuthority: input.roomHeadAuthority,
+ 				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+ 			});
+ 			let target: V3RoomSession<Projection> | undefined;
+ 			let reopenedTarget: V3RoomSession<Projection> | undefined;
+ 			try {
+-				const openedTarget = await createV3RoomSessionOwned(targetInput, true);
++				const openedTarget = await createV3RoomSessionOwned(targetInput, true, undefined, true);
+ 				target = openedTarget;
+ 				const bootstrapAcceptedCount = targetAccepted.length;
+ 				if (bootstrapAcceptedCount < 1) throw new TypeError("v3 room migration target bootstrap was not accepted");
+@@ -2821,7 +3139,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 							}
+ 						},
+ 					}),
+-					false
++					false,
++					undefined,
++					true
+ 				);
+ 				reopenedTarget = reopened;
+ 				const reopenedProjection = reopened.projection();
+@@ -3052,7 +3372,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 					onMigrationTarget: () => undefined,
+ 					onProjection: (): void => undefined,
+ 				}),
+-				false
++				false,
++				undefined,
++				true
+ 			);
+ 			try {
+ 				const recoveredRecord = recoveredRecords[0];
+@@ -3172,15 +3494,36 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			handle: creatorCloseHandle,
+ 		});
+ 		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
++		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
++			return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
++		}
+ 		assertSessionOpen();
+-		const committed = await commitCreatorSuccessorAdoption({
++		const staged = await stageCreatorSuccessorAdoption({
+ 			handle: creatorCloseHandle,
+ 			intent: verified.intent,
+ 		});
+-		if (!committed.ok) throw new TypeError(`v3 room successor commit failed: ${committed.kind}`);
++		if (!staged.ok) throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`);
++		const nextRoomHead = expectedRoomHeadFromDescriptor(staged.descriptor as Readonly<Record<string, unknown>>);
++		const pendingRoomHead = await beginRoomHeadAdvance(
++			roomHeadAuthority,
++			roomHeadScope,
++			openedRoomHeadState.stable,
++			nextRoomHead
++		);
++		);
++		assertSessionOpen();
++		const published = await publishStagedCreatorSuccessorAdoption({
++			capability: staged.capability,
++			handle: creatorCloseHandle,
++		});
++		if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
++		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
++		if (openedRoomHeadState.pending !== null || !sameRoomHead(openedRoomHeadState.stable, nextRoomHead)) {
++			return roomHeadFailure("D110C_FLOOR_MISMATCH");
++		}
+ 		assertSessionOpen();
+ 		const activated = await activateCreatorSuccessorAdoption({
+-			capability: committed.capability,
++			capability: published.capability,
++			expectedRoomHead: openedRoomHeadState.stable,
+ 			handle: creatorCloseHandle,
+ 			messageQueueManager,
+ 			networkNode: transport.networkNode,
+388:	readonly roomHeadAuthority: V3RoomHeadAuthority;
+1459:	return createV3RoomSessionOwned(input, false);
+1462:async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAuthority>(
+1464:	requireFreshTrust: boolean,
+1466:	skipRoomHeadAuthority = false
+1536:	let roomHeadAuthority: V3RoomHeadAuthority | undefined;
+1538:	if (redirectSource === undefined && !requireFreshTrust && !skipRoomHeadAuthority) {
+1539:		const candidate = input.roomHeadAuthority;
+1552:			roomHeadAuthority = candidate;
+1693:			requireFreshTrust,
+1976:		const attempt = createV3RoomSessionOwned(
+2159:			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+2190:				openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
+3065:				roomHeadAuthority: input.roomHeadAuthority,
+3071:				const openedTarget = await createV3RoomSessionOwned(targetInput, true, undefined, true);
+3133:				const reopened = await createV3RoomSessionOwned(
+3360:			const target = await createV3RoomSessionOwned(
+3497:		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+3508:			roomHeadAuthority,
+3519:		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
+3763:	requireFreshTrust = false,
+3833:		let prepared = await prepareMaterial(material, aheStore, requireFreshTrust);
+3855:		if (requireFreshTrust) {
+3880:			if (requireFreshTrust && readiness.ready) {
+			// The migration target is intentionally local-only.
+		},
+		setIngressHandler(): void {
+			// The migration target accepts no remote ingress.
+		},
+		setRetainedPublisher(): void {
+			// The genuine live plane still installs its local publisher.
+		},
+	});
+}
+
+/**
+ * Opens one browser v3 room from application material and a real transport adapter.
+ * @param input - Closed application, identity, durable-store and transport bindings.
+ * @returns The active room session after durable recovery and live activation.
+ */
+export async function createV3RoomSession<Projection extends V3RoomProjectionAuthority>(
+	input: CreateV3RoomSessionInput<Projection>
+): Promise<V3RoomSession<Projection>> {
+	return createV3RoomSessionOwned(input, false);
+}
+
+async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAuthority>(
+	input: CreateV3RoomSessionInput<Projection>,
+	requireFreshTrust: boolean,
+	redirectSource?: RedirectSourceRecovery,
+	skipRoomHeadAuthority = false
+): Promise<V3RoomSession<Projection>> {
+	if (
+		input.successorSnapshotDeclaration !== undefined &&
+		(input.createOperationAdmissionPolicy !== undefined ||
+			input.rebaseSourceInvite !== undefined ||
+			input.creatorFinalitySigner !== undefined)
+	) {
+		throw new TypeError("v3 room successor authority composition is unsupported");
+	}
+	if (
+		input.createOperationAdmissionPolicy !== undefined &&
+		typeof input.createOperationAdmissionPolicy !== "function"
+	) {
+		throw new TypeError("v3 room operation admission factory is invalid");
+	}
+	if (
+		!Array.isArray(input.application.batchableOperationActions) ||
+		!Object.isFrozen(input.application.batchableOperationActions) ||
+		input.application.batchableOperationActions.length === 0 ||
+		input.application.batchableOperationActions.some(
+			(action, index, actions) =>
+				typeof action !== "string" || action.length === 0 || (index > 0 && (actions[index - 1] as string) >= action)
+		)
+	) {
+		throw new TypeError("v3 room batchable operation actions are invalid");
+	}
+	if (input.rebaseSourceInvite !== undefined) validateDisplacementPolicy(input.application);
+	const issuanceDatabaseName =
+		input.issuanceDatabaseName ?? (input.rebaseSourceInvite === undefined ? input.databaseName : undefined);
+	if (typeof issuanceDatabaseName !== "string" || issuanceDatabaseName.length === 0) {
+		throw new TypeError("v3 room issuance database name is invalid");
+	}
+	if (
+		input.migrationDatabaseNamespace !== undefined &&
+		(typeof input.migrationDatabaseNamespace !== "string" || input.migrationDatabaseNamespace.length === 0)
+	) {
+		throw new TypeError("v3 room migration database namespace is invalid");
+	}
+	const migrationScratchDatabaseName = (scratchDigest: string): string =>
+		input.migrationDatabaseNamespace === undefined
+			? `ts-drp-v3-room-migration--${scratchDigest}`
+			: `ts-drp-v3-room-migration--${digest(
+					"ts-drp/v3-room-migration-local-store/v1",
+					encodeCanonical({ localNamespace: input.migrationDatabaseNamespace, scratchDigest })
+				)}`;
+	const invite =
+		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
+	const material = decodeCreatorInvite(invite);
+	const sourceInvite = input.rebaseSourceInvite;
+	const sourceMaterial =
+		sourceInvite === undefined
+			? undefined
+			: decodeCreatorInvite(typeof sourceInvite === "string" ? sourceInvite : encodeCreatorInvite(sourceInvite));
+	const {
+		rebaseSourceInvite: _rebaseSourceInvite,
+		successorSnapshotDeclaration: _successorSnapshotDeclaration,
+		...inputWithoutRebase
+	} = input;
+	const objectIdResult = parseStorageObjectId(input.objectId);
+	if (!objectIdResult.ok) throw new TypeError("v3 room object id is invalid");
+	const roomHeadScope = Object.freeze({
+		objectId: input.objectId,
+		pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+	});
+	const genesisRoomHead = Object.freeze({
+		currentAnchorDigest: material.pinnedGenesisAnchorDigest,
+		epoch: 0,
+		objectId: input.objectId,
+	});
+	let roomHeadAuthority: V3RoomHeadAuthority | undefined;
+	let openedRoomHeadState: V3RoomHeadState | undefined;
+	if (redirectSource === undefined && !requireFreshTrust && !skipRoomHeadAuthority) {
+		const candidate = input.roomHeadAuthority;
+		if (
+			candidate === undefined ||
+			candidate === null ||
+			typeof candidate !== "object" ||
+			!["begin", "commit", "create", "migrate", "read"].every(
+				(method) => typeof Reflect.get(candidate, method) === "function"
+			)
+		) {
+			if (input.creatorFinalitySigner !== undefined || input.successorSnapshotDeclaration !== undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+			}
+		} else {
+			roomHeadAuthority = candidate;
+			openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
+			if (
+				openedRoomHeadState.pending === null &&
+				input.successorSnapshotDeclaration === undefined &&
+				!sameRoomHead(openedRoomHeadState.stable, genesisRoomHead)
+			) {
+				return roomHeadFailure(
+					openedRoomHeadState.stable.epoch > genesisRoomHead.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
+				);
+			}
+			if (
+				openedRoomHeadState.pending === null &&
+				input.successorSnapshotDeclaration !== undefined &&
+				(openedRoomHeadState.stable.objectId !== input.objectId || openedRoomHeadState.stable.epoch !== 1)
+			) {
+				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+			}
+		}
+	}
+	const inviteAuthority = migrationInviteAuthority(material);
+	const roomInviteAuthority = input.application.migration === undefined ? undefined : inviteAuthority;
+	if (inviteAuthority.objectId !== input.objectId) {
+		throw new TypeError("v3 room creator invite object is invalid");
+	}
+	const migrationActivationAuthority =
+		roomInviteAuthority === undefined
+			? undefined
+			: Object.freeze({
+					anchorDigest: material.pinnedGenesisAnchorDigest,
+					blueprintDigest: roomInviteAuthority.blueprintDigest,
+					creatorAuthor: roomInviteAuthority.creatorAuthor,
+					objectId: roomInviteAuthority.objectId,
+					signerSetDigest: roomInviteAuthority.signerSetDigest,
+				});
+	const sourceMigrationActivationAuthority =
+		redirectSource === undefined || sourceMaterial === undefined
+			? undefined
+			: ((): MigrationActivationAuthority => {
+					const authority = migrationInviteAuthority(sourceMaterial);
+					return Object.freeze({
+						anchorDigest: sourceMaterial.pinnedGenesisAnchorDigest,
+						blueprintDigest: authority.blueprintDigest,
+						creatorAuthor: authority.creatorAuthor,
+						objectId: authority.objectId,
+						signerSetDigest: authority.signerSetDigest,
+					});
+				})();
+	if (
+		redirectSource !== undefined &&
+		(migrationActivationAuthority === undefined ||
+			sourceMigrationActivationAuthority === undefined ||
+			redirectSource.activation.decision.sourceObjectId !== sourceMigrationActivationAuthority.objectId ||
+			redirectSource.activation.decision.sourceAnchorDigest !== sourceMigrationActivationAuthority.anchorDigest ||
+			redirectSource.activation.decision.sourceBlueprintDigest !== sourceMigrationActivationAuthority.blueprintDigest ||
+			redirectSource.activation.decision.sourceCreatorAuthor !== sourceMigrationActivationAuthority.creatorAuthor ||
+			redirectSource.activation.decision.targetObjectId !== migrationActivationAuthority.objectId ||
+			redirectSource.activation.decision.targetAnchorDigest !== migrationActivationAuthority.anchorDigest ||
+			redirectSource.activation.decision.targetBlueprintDigest !== migrationActivationAuthority.blueprintDigest ||
+			redirectSource.activation.decision.targetCreatorAuthor !== migrationActivationAuthority.creatorAuthor ||
+			sourceMigrationActivationAuthority.signerSetDigest !== migrationActivationAuthority.signerSetDigest)
+	) {
+		throw new TypeError("v3 room redirect authority is invalid");
+	}
+	const classifyTerminalVertex =
+		migrationActivationAuthority === undefined
+			? undefined
+			: sourceMigrationActivationAuthority === undefined
+				? migrationActivationClassifier(migrationActivationAuthority)
+			session: V3RoomSession<Projection>;
+		}>
+	> => {
+		const rehearsalNonce = activation.decision.rehearsalNonce as Uint8Array;
+		const targetObjectId = activation.decision.targetObjectId as string;
+		const scratchDigest = digest(
+			"ts-drp/v3-room-migration-scratch/v1",
+			encodeCanonical({ rehearsalNonce, sourceObjectId: input.objectId, targetObjectId })
+		);
+		const scratchDatabaseName = migrationScratchDatabaseName(scratchDigest);
+		const acceptedVertices: AdmittedReceivedVertexView[] = [];
+		let callbacksReady = false;
+		let migrationTargetCallbacksReady = false;
+		let pendingProjection: Projection | undefined;
+		let selectedTargetObjectId = targetObjectId;
+		let selectedSession: V3RoomSession<Projection> | undefined;
+		const attempt = createV3RoomSessionOwned(
+			Object.freeze({
+				...inputWithoutRebase,
+				creatorInvite: activation.targetCreatorInvite,
+				databaseName: scratchDatabaseName,
+				issuanceDatabaseName: `${scratchDatabaseName}--issuance`,
+				objectId: targetObjectId,
+				onAcceptedVertex: (vertex: AdmittedReceivedVertexView): void | Promise<void> => {
+					if (callbacksReady) return input.onAcceptedVertex(vertex);
+					acceptedVertices.push(vertex);
+				},
+				onMigrationTarget: (_target: V3RoomSession<Projection>, nestedTargetObjectId: string): void => {
+					selectedTargetObjectId = nestedTargetObjectId;
+					if (migrationTargetCallbacksReady && selectedSession !== undefined) {
+						input.onMigrationTarget?.(selectedSession, nestedTargetObjectId);
+					}
+				},
+				onProjection: (targetProjection: Projection): void => {
+					if (callbacksReady) {
+						input.onProjection(targetProjection);
+						return;
+					}
+					pendingProjection = targetProjection;
+				},
+				rebaseSourceInvite: material,
+			}),
+			false,
+			Object.freeze({
+				activation,
+				cancelled: redirectCancellation,
+				issuanceStore,
+				journalStore,
+				onRetainedBootstrapHold: reportRedirectBootstrapHold,
+			})
+		);
+		return attempt.then((session) => {
+			selectedSession = session;
+			return Object.freeze({
+				activateMigrationTargetCallbacks(): void {
+					migrationTargetCallbacksReady = true;
+				},
+				migrationTargetObjectId(): string {
+					return selectedTargetObjectId;
+				},
+				async releaseCallbacks(): Promise<void> {
+					while (acceptedVertices.length > 0) {
+						const selected = acceptedVertices.splice(0);
+						for (const vertex of selected) await input.onAcceptedVertex(vertex);
+					}
+					callbacksReady = true;
+					const selectedProjection = pendingProjection;
+					pendingProjection = undefined;
+					if (selectedProjection !== undefined) input.onProjection(selectedProjection);
+				},
+				session,
+			});
+		});
+	};
+	const ensureRedirect = (activation: AuthenticatedMigrationActivation): Promise<V3RoomSession<Projection>> => {
+		if (redirectedSession !== undefined) return Promise.resolve(redirectedSession);
+		if (redirectPromise !== undefined) return redirectPromise;
+		const attempt = createRedirectSession(activation);
+		redirectPromise = attempt.then(
+			async ({ activateMigrationTargetCallbacks, migrationTargetObjectId, releaseCallbacks, session }) => {
+				if (closed) {
+					await session.close().catch(() => undefined);
+					throw new TypeError("v3 room session closed during redirect");
+				}
+				redirectPromise = undefined;
+				redirectedSession = session;
+				try {
+					input.onMigrationTarget?.(session, migrationTargetObjectId());
+					activateMigrationTargetCallbacks();
+					await releaseCallbacks();
+				} catch (error) {
+					redirectedSession = undefined;
+					await session.close().catch(() => undefined);
+					throw error;
+				}
+				return session;
+			},
+			(error: unknown) => {
+				redirectPromise = undefined;
+				throw error;
+			}
+		);
+		return redirectPromise;
+	};
+	const retainedPrefixReady = (vertex: V3RoomAcceptedVertex): boolean => {
+		if (!retainedBootstrapHeld || retainedBootstrapReady || redirectSource === undefined) return false;
+		const operation = detachedRoomOperation(vertex.operation);
+		if (operation === undefined || Reflect.get(operation, "action") !== "migrationRecord") return false;
+		const record = exactRecord(Reflect.get(operation, "record"), MIGRATION_RECORD_KEYS);
+		if (record === undefined) return false;
+		const activation = redirectSource.activation;
+		const decision = activation.decision;
+		const recordBytes = encodeCanonical(record);
+		const imports = acceptedOperationSnapshot().filter((row) => {
+			const action = Reflect.get(row.operation, "action");
+			return typeof action === "string" && input.application.batchableOperationActions.includes(action);
+		});
+		const migration = input.application.migration;
+		if (
+			migration === undefined ||
+			hex(vertex.digest) !== decision.migrationRecordVertexDigest ||
+			digest("ts-drp/v3-room-migration-record/v1", recordBytes) !== decision.migrationRecordDigest ||
+			imports.length !== decision.targetImportOperationCount ||
+			digest("ts-drp/v3-room-migration-import/v1", encodeCanonical(imports.map(({ operation: value }) => value))) !==
+				decision.targetImportOperationsDigest ||
+			!MIGRATION_RECORD_KEYS.every((key) => {
+				if (
+					key === "archivePolicy" ||
+					key === "authorityKind" ||
+					key === "exactCanonicalApplicationStateBytes" ||
+					key === "kind" ||
+					key === "version"
+				)
+					return true;
+				return sameBytes(encodeCanonical(record[key]), encodeCanonical(decision[key]));
+			})
+		) {
+			throw new TypeError("v3 room retained migration prefix differs");
+		}
+		const exactState = normalizeApplicationStateBytes(
+			Reflect.apply(migration.canonicalStateBytes, migration, [projection]) as Uint8Array,
+			"migration"
+		);
+		const recordState = normalizeApplicationStateBytes(record.exactCanonicalApplicationStateBytes, "migration");
+		if (
+			!sameBytes(exactState, recordState) ||
+			digest("ts-drp/v3-room-migration-state/v1", exactState) !== decision.applicationStateDigest
+		) {
+			throw new TypeError("v3 room retained migration state differs");
+		}
+		retainedBootstrapReady = true;
+		resolveRetainedBootstrap?.();
+		return true;
+	};
+	const admittedSink = async ({
+		vertex,
+	}: Parameters<V3AdmittedVertexSink>[0]): Promise<
+		Readonly<{
+			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+		}>
+	> => {
+		try {
+			await commit([vertex]);
+			if (retainedPrefixReady(vertex)) return Object.freeze({ kind: "retained-bootstrap-ready" as const });
+			const operation = detachedRoomOperation(vertex.operation);
+			if (operation !== undefined && Reflect.get(operation, "action") === "migrationActivation") {
+				const activation =
+					migrationActivationAuthority === undefined
+						? undefined
+						: migrationActivationOperation(operation, vertex.author, migrationActivationAuthority);
+				if (activation !== undefined) {
+					await ensureRedirect(authenticatedMigrationActivation(activation, hex(vertex.digest)));
+				}
+				return Object.freeze({
+					kind: activation === undefined ? ("terminal-rejected" as const) : ("terminal-accepted" as const),
+				});
+			}
+			return Object.freeze({ kind: "continue" as const });
+		} catch (error) {
+			terminalFailure = error;
+			rejectRetainedBootstrap?.(error);
+			await shutdown().catch(() => undefined);
+			throw error;
+		}
+	};
+	try {
+		const openedTransport = input.openTransport(input.objectId);
+		transport = openedTransport;
+		if (input.successorSnapshotDeclaration === undefined) {
+			if (recovered === undefined) throw new TypeError("v3 room recovered genesis custody is unavailable");
+			const activated = activateV3LivePlane({
+				capability: recovered.capability,
+				messageQueueManager,
+				networkNode: openedTransport.networkNode,
+				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+			});
+			if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
+			activeHandle = activated.handle as RoomPlaneHandle;
+		} else {
+			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+			}
+			const snapshotStore = await createBrowserSnapshotQuarantineStore({
+				primaryDatabaseName: input.databaseName,
+			});
+			creatorCloseStoreClosers.push(snapshotStore.close);
+			const selectedPending = openedRoomHeadState.pending;
+			if (selectedPending !== null) {
+				const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
+				const recoveredPending = await recoverPendingCreatorSuccessorAdoption({
+					authenticationProfile: "creator-only",
+					catalog: input.application.catalog,
+					detachedSignature: material.detachedGenesisSignature,
+					exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+					exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+					expectedNextRoomHead: selectedPending.next,
+					expectedPreviousRoomHead: selectedPending.previous,
+					pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+					snapshotDeclaration: input.successorSnapshotDeclaration,
+					snapshotStore,
+					store: aheStores[0],
+				});
+				const recoveredHead = captureRoomHead(recoveredPending.head);
+				if (
+					recoveredPending.ok !== true ||
+					recoveredHead === undefined ||
+					!sameRoomHead(recoveredHead, selectedPending.next)
+				) {
+					return roomHeadFailure("D110C_FLOOR_RECOVERY_UNAVAILABLE");
+				}
+				openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
+			}
+			const expectedRoomHead = openedRoomHeadState.stable;
+			const reopened = await reopenCreatorSuccessorAdoption({
+				authenticationProfile: "creator-only",
+				author: input.author,
+				catalog: input.application.catalog,
+				detachedSignature: material.detachedGenesisSignature,
+				exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+				exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+				expectedRoomHead,
+				issuanceStore,
+				liveJournalStore: journalStore,
+				messageQueueManager,
+				networkNode: openedTransport.networkNode,
+				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+				pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+				snapshotDeclaration: input.successorSnapshotDeclaration,
+				snapshotStore,
+				store: aheStores[0],
+			});
+			if (reopened.ok !== true) {
+				throw new TypeError(`v3 room successor reopen failed: ${String(reopened.kind)}: ${String(reopened.detail)}`);
+			}
+			activeHandle = reopened.handle as RoomPlaneHandle;
+			successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
+		}
+		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+			if (input.application.migration === undefined) {
+				throw new TypeError("v3 room creator close initial state is unavailable");
+			}
+			const initialProjection = input.application.projectAcceptedOperations(Object.freeze([]));
+			const exactCanonicalInitialStateBytes = normalizeApplicationStateBytes(
+				Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
+					initialProjection,
+				]) as Uint8Array,
+				"genesis"
+			);
+			const blueprint = bindV3BlueprintLivePlane({ exactCanonicalInitialStateBytes, plane: activeHandle });
+			if (!blueprint.ok) throw new TypeError(`v3 room creator-close blueprint binding failed: ${blueprint.kind}`);
+		}
+		openedTransport.setIngressHandler(
+			activeHandle.topic,
+			(message) => {
+				routeV3Ingress(openedTransport.networkNode, message);
+			},
+			(message) => {
+				if (activeHandle !== undefined) routeV3RetainedIngress(activeHandle, message);
+			}
+		);
+		openedTransport.setRetainedPublisher(async (targetPeerId) => {
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+			const result =
+				targetPeerId === undefined
+					? await activeHandle.republishRetained()
+					: await republishV3RetainedTo(activeHandle, targetPeerId);
+			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
+		});
+		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
+			creatorCloseStoreClosers.push(voteStore.close);
+			const evidenceStore = await openBrowserSealEvidenceStore({ databaseName: input.databaseName });
+			creatorCloseStoreClosers.push(evidenceStore.close);
+			const snapshotStore = await createBrowserSnapshotQuarantineStore({
+				primaryDatabaseName: input.databaseName,
+			});
+			creatorCloseStoreClosers.push(snapshotStore.close);
+			if (voteStore.observation.incarnation !== evidenceStore.observation.incarnation) {
+				throw new TypeError("v3 room creator-close storage incarnation differs");
+				transition.capability.resume();
+			} else {
+				terminalFailure = failure;
+			}
+			throw failure;
+		}
+		await publishAccepted();
+		await ensureRedirect(authenticatedMigrationActivation(capturedActivation, published.digest));
+		return Object.freeze({
+			activated: true as const,
+			activationDecisionDigest: capturedActivation.decisionDigest,
+			activationVertexDigest: published.digest,
+			targetAnchorDigest: targetCreatorInvite.pinnedGenesisAnchorDigest,
+		});
+	};
+	const activateMigration = async (
+		activationInput: V3RoomMigrationActivationInput
+	): Promise<V3RoomMigrationActivationReceipt> => {
+		const capturedInput = snapshotMigrationActivationInput(activationInput);
+		const selected = await enqueueLifetimeTransition(async () => {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) {
+				return Object.freeze({
+					result: redirectedSession.activateMigration(capturedInput),
+				});
+			}
+			return Object.freeze({
+				result: await performMigrationActivation(capturedInput),
+			});
+		});
+		return selected.result;
+	};
+	if (redirectSource !== undefined) {
+		try {
+			await waitForRetainedBootstrap();
+			await rebasePromise;
+			if (terminalFailure !== undefined) throw terminalFailure;
+		} catch (error) {
+			await shutdown().catch(() => undefined);
+			throw error;
+		}
+	}
+	const assertSessionOpen = (): void => {
+		if (closed) throw new TypeError("v3 room session is closed");
+	};
+	const performCreatorSuccessorAdoption = async (): Promise<void> => {
+		if (terminalFailure !== undefined) throw terminalFailure;
+		if (successorProjectionAuthority !== null) return;
+		if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+		if (activeHandle === undefined || transport === undefined) {
+			throw new TypeError("v3 room live plane is unavailable");
+		}
+		const verified = await verifyCreatorSuccessorAdoption({
+			catalog: input.application.catalog,
+			handle: creatorCloseHandle,
+		});
+		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+			return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+		}
+		assertSessionOpen();
+		const staged = await stageCreatorSuccessorAdoption({
+			handle: creatorCloseHandle,
+			intent: verified.intent,
+		});
+		if (!staged.ok) throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`);
+		const nextRoomHead = expectedRoomHeadFromDescriptor(staged.descriptor as Readonly<Record<string, unknown>>);
+		const pendingRoomHead = await beginRoomHeadAdvance(
+			roomHeadAuthority,
+			roomHeadScope,
+			openedRoomHeadState.stable,
+			nextRoomHead
+		);
+		assertSessionOpen();
+		const published = await publishStagedCreatorSuccessorAdoption({
+			capability: staged.capability,
+			handle: creatorCloseHandle,
+		});
+		if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
+		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
+		if (openedRoomHeadState.pending !== null || !sameRoomHead(openedRoomHeadState.stable, nextRoomHead)) {
+			return roomHeadFailure("D110C_FLOOR_MISMATCH");
+		}
+		assertSessionOpen();
+		const activated = await activateCreatorSuccessorAdoption({
+			capability: published.capability,
+			expectedRoomHead: openedRoomHeadState.stable,
+			handle: creatorCloseHandle,
+			messageQueueManager,
+			networkNode: transport.networkNode,
+			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+		});
+		if (activated.ok !== true) {
+			throw new TypeError(`v3 room successor activation failed: ${String(activated.kind)}`);
+		}
+		const replacement = activated.handle as RoomPlaneHandle;
+		let replacementOwned = true;
+		const releaseReplacement = async (): Promise<void> => {
+			if (!replacementOwned) return;
+			await Promise.resolve(replacement.deactivate());
+			replacementOwned = false;
+		};
+		const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
+			try {
+				await releaseReplacement();
+			} catch (cleanup) {
+				throw combineFailures(primary, cleanup);
+			}
+			throw primary;
+		};
+		if (closed) {
+			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+		}
+		let authority: V3RoomSuccessorAuthority;
+		try {
+			authority = successorAuthority(activated.trust, replacement);
+		} catch (error) {
+			return throwAfterReplacementCleanup(error);
+		}
+		const predecessor = activeHandle;
+		try {
+			await Promise.resolve(predecessor.deactivate());
+		} catch (error) {
+			return throwAfterReplacementCleanup(error);
+		}
+		if (closed) {
+			activeHandle = undefined;
+			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+		}
+		activeHandle = replacement;
+		replacementOwned = false;
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/tests/phase-6b-d110c-0b0-floor-red.test.ts b/tests/phase-6b-d110c-0b0-floor-red.test.ts
+index d6547284..e9f5ee08 100644
+--- a/tests/phase-6b-d110c-0b0-floor-red.test.ts
++++ b/tests/phase-6b-d110c-0b0-floor-red.test.ts
+@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
+ import { openGenuineCreatorAdoptionFixture } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
+ import {
+ 	createD108d1PackedDurableMaterial,
++	type D108d1ChildMessage,
+ 	REPOSITORY_ROOT,
+ 	runD108d1ActivationChild,
+ } from "./fixtures/phase-6a-v3/creator-successor-activation-contract.js";
+@@ -18,33 +19,44 @@ describe("D.110c-0b0 authenticated room-head floor causal RED", () => {
+ 			configurable: true,
+ 			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+ 		});
+-		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d110c-0b0-red-"));
+-		const fixture = await openGenuineCreatorAdoptionFixture();
+-		try {
+-			const material = await createD108d1PackedDurableMaterial(fixture, directory);
+-			const result = await runD108d1ActivationChild("cold", material);
+-			const proof = result.proof as
+-				| Readonly<{
+-						readonly activation?: Readonly<{ readonly ok?: unknown }>;
+-						readonly failure?: Readonly<{ readonly kind?: unknown; readonly ok?: unknown }>;
+-				  }>
+-				| undefined;
+-			if (proof?.failure?.kind !== "D110C_FLOOR_MIGRATION_REQUIRED" || proof.failure.ok !== false) {
+-				throw new TypeError("D110C_0B0_FRESHNESS_FLOOR_MISSING");
++		const run = async (mode: "cold" | "d110c-no-floor" | "d110c-wrong-floor"): Promise<D108d1ChildMessage> => {
++			const directory = mkdtempSync(join(tmpdir(), "ts-drp-d110c-0b0-red-"));
++			const fixture = await openGenuineCreatorAdoptionFixture();
++			try {
++				const material = await createD108d1PackedDurableMaterial(fixture, directory);
++				return await runD108d1ActivationChild(mode, material);
++			} finally {
++				await fixture.close();
++				rmSync(directory, { force: true, recursive: true });
+ 			}
+-			expect(proof.activation).toBeUndefined();
+-
+-			const roomSource = readFileSync(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"), "utf8");
+-			const activationSource = readFileSync(
+-				resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts"),
+-				"utf8"
+-			);
+-			expect(roomSource).toContain("export interface V3RoomHeadAuthority");
+-			expect(roomSource).toContain("readonly roomHeadAuthority: V3RoomHeadAuthority");
+-			expect(activationSource).toContain('"expectedRoomHead"');
+-		} finally {
+-			await fixture.close();
+-			rmSync(directory, { force: true, recursive: true });
++		};
++		const result = await run("d110c-no-floor");
++		const proof = result.proof as
++			| Readonly<{
++					readonly activation?: Readonly<{ readonly ok?: unknown }>;
++					readonly failure?: Readonly<{ readonly kind?: unknown; readonly ok?: unknown }>;
++			  }>
++			| undefined;
++		if (proof?.failure?.kind !== "D110C_FLOOR_MIGRATION_REQUIRED" || proof.failure.ok !== false) {
++			throw new TypeError("D110C_0B0_FRESHNESS_FLOOR_MISSING");
+ 		}
++		expect(proof.activation).toBeUndefined();
++		const wrong = (await run("d110c-wrong-floor")).proof as
++			| Readonly<{ readonly failure?: Readonly<{ readonly kind?: unknown; readonly ok?: unknown }> }>
++			| undefined;
++		expect(wrong?.failure).toMatchObject({ kind: "D110C_FLOOR_MISMATCH", ok: false });
++		const correct = (await run("cold")).proof as
++			| Readonly<{ readonly activation?: Readonly<{ readonly epoch?: unknown; readonly ok?: unknown }> }>
++			| undefined;
++		expect(correct?.activation).toMatchObject({ epoch: 1, ok: true });
++
++		const roomSource = readFileSync(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"), "utf8");
++		const activationSource = readFileSync(
++			resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts"),
++			"utf8"
++		);
++		expect(roomSource).toContain("export interface V3RoomHeadAuthority");
++		expect(roomSource).toContain("readonly roomHeadAuthority: V3RoomHeadAuthority");
++		expect(activationSource).toContain('"expectedRoomHead"');
+ 	});
+ });
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts b/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts
+index 73cd30c8..073f9fe2 100644
+--- a/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts
+@@ -61,6 +61,7 @@ export const CREATOR_SUCCESSOR_ACTIVATION_EXPORTS = Object.freeze([
+ ] as const);
+ export const CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS = Object.freeze([
+ 	"capability",
++	"expectedRoomHead",
+ 	"handle",
+ 	"messageQueueManager",
+ 	"networkNode",
+@@ -72,6 +73,7 @@ export const CREATOR_SUCCESSOR_REOPEN_INPUT_KEYS = Object.freeze([
+ 	"detachedSignature",
+ 	"exactCanonicalAnchorPreimageBytes",
+ 	"exactCanonicalParametersCarrierBytes",
++	"expectedRoomHead",
+ 	"issuanceStore",
+ 	"liveJournalStore",
+ 	"messageQueueManager",
+@@ -89,6 +91,7 @@ export const CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS = Object.freeze([
+ 	"detachedSignature",
+ 	"exactCanonicalAnchorPreimageBytes",
+ 	"exactCanonicalParametersCarrierBytes",
++	"expectedRoomHead",
+ 	"issuanceStore",
+ 	"liveJournalStore",
+ 	"messageQueueManager",
+@@ -108,6 +111,9 @@ export const CREATOR_SUCCESSOR_ACTIVATION_SUCCESS_KEYS = Object.freeze([
+ 	"trust",
+ ] as const);
+ export const CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS = Object.freeze([
++	"D110C_FLOOR_INVALID",
++	"D110C_FLOOR_MIGRATION_REQUIRED",
++	"D110C_FLOOR_MISMATCH",
+ 	"malformed-input",
+ 	"capability-unavailable",
+ 	"source-unavailable",
+@@ -152,6 +158,8 @@ export interface D108d1CandidateModule {
+ 
+ export type D108d1ChildMode =
+ 	| "cold"
++	| "d110c-no-floor"
++	| "d110c-wrong-floor"
+ 	| "declaration-loop-mutant"
+ 	| "divergent-genesis"
+ 	| "extra-epoch"
+ .../production-hardening-tdd-plan-v2.md            |  82 +++++
+ examples/v3-chat/src/index.ts                      |  53 +++
+ examples/v3-room/src/index.ts                      | 359 ++++++++++++++++++++-
+ packages/node/src/creator-adoption-activate.ts     |  32 +-
+ packages/node/src/internal/creator-room-head.ts    |  64 ++++
+ .../node/src/internal/creator-successor-live.ts    |   3 +
+ .../phase-6a-creator-successor-activation-entry.ts |   5 +
+ .../phase-6a-creator-successor-product-entry.ts    |  49 +++
+ .../tests/phase-6a-creator-successor-product.pw.ts |  34 ++
+ ...phase-6a-creator-successor-activation-child.mjs |  10 +
+ ...ase-6a-creator-successor-local-author-child.mjs |  15 +
+ .../creator-adoption-commit-contract.ts            |  14 +-
+ .../creator-successor-activation-contract.ts       |   8 +
+ .../creator-successor-product-contract.ts          |  13 +-
+ .../phase-6b/runtime-reclamation-contract.ts       |   5 +
+ tests/phase-3a1b-d9346-room-semantics-red.test.ts  |   2 +
+ tests/phase-3h-v3-room-rehearsal-red.test.ts       |   1 +
+ tests/phase-6a-creator-adoption-commit-red.test.ts |   3 +-
+ ...ase-6a-creator-successor-activation-red.test.ts |  48 ++-
+ ...a-creator-successor-handle-identity-red.test.ts |   5 +
+ .../phase-6a-creator-successor-product-red.test.ts |   2 +-
+ tests/phase-6b-d110c-0b0-floor-red.test.ts         |  64 ++--
+ .../phase-6b-d110c-0b0a-staged-handoff-red.test.ts |   5 +
+ 23 files changed, 827 insertions(+), 49 deletions(-)
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+examples/v3-chat/src/index.ts
+examples/v3-room/src/index.ts
+packages/node/src/creator-adoption-activate.ts
+packages/node/src/internal/creator-room-head.ts
+packages/node/src/internal/creator-successor-live.ts
+packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs
+packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
+tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts
+tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+tests/phase-3a1b-d9346-room-semantics-red.test.ts
+tests/phase-3h-v3-room-rehearsal-red.test.ts
+tests/phase-6a-creator-adoption-commit-red.test.ts
+tests/phase-6a-creator-successor-activation-red.test.ts
+tests/phase-6a-creator-successor-handle-identity-red.test.ts
+tests/phase-6a-creator-successor-product-red.test.ts
+tests/phase-6b-d110c-0b0-floor-red.test.ts
+tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts b/packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts
+index e253e274..4bc99c76 100644
+--- a/packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts
++++ b/packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts
+@@ -442,6 +442,11 @@ export async function openContender(
+ 					? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
+ 					: "",
+ 				catalog: trustedCatalog(material),
++				expectedRoomHead: {
++					currentAnchorDigest: String((material.oracle as PlainRecord).anchorDigest),
++					epoch: Number((material.oracle as PlainRecord).epoch),
++					objectId: String((material.oracle as PlainRecord).objectId),
++				},
+ 				issuanceStore: stores.issuanceStore,
+ 				liveJournalStore: stores.liveJournalStore,
+ 				messageQueueManager: new BrowserTestMessageQueueManager(),
+diff --git a/packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs b/packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs
+index 2f721a7e..d4caf5e4 100644
+--- a/packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs
++++ b/packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs
+@@ -437,6 +437,16 @@ async function cold(material, selectedMode) {
+ 				...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
+ 				...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
+ 				catalog,
++				...(selectedMode === "d110c-no-floor"
++					? {}
++					: {
++							expectedRoomHead: {
++								currentAnchorDigest:
++									selectedMode === "d110c-wrong-floor" ? "f".repeat(64) : material.oracle.anchorDigest,
++								epoch: material.oracle.epoch,
++								objectId: material.oracle.objectId,
++							},
++						}),
+ 				issuanceStore: stores.issuanceStore,
+ 				liveJournalStore: stores.liveJournal.store,
+ 				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+diff --git a/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs b/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
+index 1bdaa1b3..244bad95 100644
+--- a/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
++++ b/packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
+@@ -925,6 +925,11 @@ async function runCase(material, index, input) {
+ 				...material.creatorGenesis,
+ 				author: input.authority.author,
+ 				catalog: trustedCatalog(material),
++				expectedRoomHead: {
++					currentAnchorDigest: material.oracle.anchorDigest,
++					epoch: material.oracle.epoch,
++					objectId: material.oracle.objectId,
++				},
+ 				issuanceStore: issuance.store,
+ 				liveJournalStore: liveJournal.store,
+ 				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+@@ -1077,6 +1082,11 @@ async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthori
+ 			...material.creatorGenesis,
+ 			author: selectedAuthority.author,
+ 			catalog: trustedCatalog(material),
++			expectedRoomHead: {
++				currentAnchorDigest: material.oracle.anchorDigest,
++				epoch: material.oracle.epoch,
++				objectId: material.oracle.objectId,
++			},
+ 			issuanceStore,
+ 			liveJournalStore: context.liveJournal.store,
+ 			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+@@ -1165,6 +1175,11 @@ async function issueGenuineFuture(material, raw, selectedAuthority) {
+ 			...material.creatorGenesis,
+ 			author: selectedAuthority.author,
+ 			catalog: trustedCatalog(material),
++			expectedRoomHead: {
++				currentAnchorDigest: material.oracle.anchorDigest,
++				epoch: material.oracle.epoch,
++				objectId: material.oracle.objectId,
++			},
+ 			issuanceStore: raw,
+ 			liveJournalStore: context.liveJournal.store,
+ 			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts b/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+index 69d389f9..cefbc01e 100644
+--- a/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
++++ b/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+@@ -803,6 +803,54 @@ function directDependencies(): DirectRoomDependencies {
+ 	return selected as DirectRoomDependencies;
+ }
+ 
++function directRoomHeadAuthority(): PlainRecord {
++	let state: PlainRecord | null = null;
++	const same = (left: unknown, right: unknown): boolean => {
++		const leftBytes = encodeCanonical(left);
++		const rightBytes = encodeCanonical(right);
++		return (
++			leftBytes.byteLength === rightBytes.byteLength && leftBytes.every((byte, index) => byte === rightBytes[index])
++		);
++	};
++	const success = (): PlainRecord => Object.freeze({ ok: true, state });
++	return Object.freeze({
++		initialization: Object.freeze({ kind: "create" }),
++		begin: (input: PlainRecord): Promise<PlainRecord> => {
++			if (state === null || !same(state, input.expected)) {
++				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
++			}
++			const expected = input.expected as PlainRecord;
++			state = Object.freeze({
++				pending: Object.freeze({ next: input.next, previous: expected.stable }),
++				stable: expected.stable,
++			});
++			return Promise.resolve(success());
++		},
++		commit: (input: PlainRecord): Promise<PlainRecord> => {
++			if (state === null || state.pending === null || !same(state, input.expected)) {
++				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
++			}
++			state = Object.freeze({ pending: null, stable: (state.pending as PlainRecord).next });
++			return Promise.resolve(success());
++		},
++		create: (input: PlainRecord): Promise<PlainRecord> => {
++			const desired = Object.freeze({ pending: null, stable: input.stable });
++			if (state === null) state = desired;
++			else if (!same(state, desired)) return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
++			return Promise.resolve(success());
++		},
++		migrate: (input: PlainRecord): Promise<PlainRecord> => {
++			const desired = Object.freeze({ pending: null, stable: input.stable });
++			if (state !== null && !same(state, desired)) {
++				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
++			}
++			state = desired;
++			return Promise.resolve(success());
++		},
++		read: (): Promise<PlainRecord> => Promise.resolve(success()),
++	});
++}
++
+ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
+ 	if (name.length === 0 || directRooms.has(name)) throw new TypeError("D.108e3 direct room identity is invalid");
+ 	const databaseName = `d108e3-direct-${name}`;
+@@ -880,6 +928,7 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
+ 		onProjection: () => undefined,
+ 		openTransport: () => directTransport(authorKeychain.localAuthorId),
+ 		publicKeyBytes: bytesFromHex(authorKeychain.localAuthorId),
++		roomHeadAuthority: directRoomHeadAuthority(),
+ 		signRegisteredVertexDigest: (registeredDigest: Uint8Array) => authorKeychain.signWithLocalAuthor(registeredDigest),
+ 	});
+ }
+diff --git a/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts b/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+index a5a8477a..b65d20cc 100644
+--- a/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
++++ b/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+@@ -46,6 +46,8 @@ function lifetimeInstrumentationPlugin(): Plugin {
+ 	const creatorClose = resolve(REPOSITORY_ROOT, "packages/node/src/creator-close.ts");
+ 	const creatorAdoption = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts");
+ 	const creatorAdoptionCommit = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-commit.ts");
++	const creatorAdoptionStage = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-stage.ts");
++	const creatorAdoptionRecover = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-recover.ts");
+ 	const creatorAdoptionActivate = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts");
+ 	const shared = `
+ const stateSymbol = Symbol.for("ts-drp/d108e2b/lifetime-state");
+@@ -412,6 +414,21 @@ export const commitCreatorSuccessorAdoption = async (input) => {
+   if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
+   return actual.commitCreatorSuccessorAdoption(input);
+ };`,
++				],
++				[
++					"@ts-drp/node/creator-adoption-stage",
++					`${shared}
++import * as actual from ${JSON.stringify(creatorAdoptionStage)};
++export const stageCreatorSuccessorAdoption = async (input) => {
++  if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
++  return actual.stageCreatorSuccessorAdoption(input);
++};
++export const publishStagedCreatorSuccessorAdoption = actual.publishStagedCreatorSuccessorAdoption;`,
++				],
++				[
++					"@ts-drp/node/creator-adoption-recover",
++					`import * as actual from ${JSON.stringify(creatorAdoptionRecover)};
++export const recoverPendingCreatorSuccessorAdoption = actual.recoverPendingCreatorSuccessorAdoption;`,
+ 				],
+ 				[
+ 					"@ts-drp/node/creator-adoption-activate",
+@@ -500,6 +517,8 @@ async function startProductBrowserServer(entryPoint: string): Promise<ProductBro
+ 						"@ts-drp/node/creator-adoption",
+ 						"@ts-drp/node/creator-adoption-activate",
+ 						"@ts-drp/node/creator-adoption-commit",
++						"@ts-drp/node/creator-adoption-recover",
++						"@ts-drp/node/creator-adoption-stage",
+ 						"@ts-drp/node/creator-close",
+ 						"@ts-drp/node/v3-live",
+ 					]).has(specifier)
+@@ -716,6 +735,11 @@ test(D108D2_BROWSER_BEHAVIORS[1], async () => {
+ 		clientId: "bob",
+ 		databaseName: DATABASES.established,
+ 		invite,
++		roomHead: {
++			currentAnchorDigest: carrier.authority.anchorDigest,
++			epoch: carrier.authority.epoch,
++			objectId: carrier.authority.objectId,
++		},
+ 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
+ 	});
+ 	const reopened = await snapshot(established);
+@@ -753,6 +777,11 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
+ 		clientId: "carol",
+ 		databaseName: DATABASES.late,
+ 		invite,
++		roomHead: {
++			currentAnchorDigest: carrier.authority.anchorDigest,
++			epoch: carrier.authority.epoch,
++			objectId: carrier.authority.objectId,
++		},
+ 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
+ 	});
+ 	await waitForText(late, "successor-live");
+@@ -766,6 +795,11 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
+ 		clientId: "alice",
+ 		databaseName: DATABASES.creator,
+ 		invite,
++		roomHead: {
++			currentAnchorDigest: carrier.authority.anchorDigest,
++			epoch: carrier.authority.epoch,
++			objectId: carrier.authority.objectId,
++		},
+ 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
+ 	});
+ 	expect((await snapshot(creator)).authority).toEqual(carrier.authority);
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/examples/v3-chat/src/index.ts b/examples/v3-chat/src/index.ts
+index 29874803..5740a0db 100644
+--- a/examples/v3-chat/src/index.ts
++++ b/examples/v3-chat/src/index.ts
+@@ -6,6 +6,10 @@ import {
+ 	type V3RoomAcceptedOperation,
+ 	type V3RoomApplication,
+ 	type V3RoomCreatorInviteMaterial,
++	type V3RoomHead,
++	type V3RoomHeadAuthority,
++	type V3RoomHeadAuthorityResult,
++	type V3RoomHeadState,
+ 	type V3RoomMigrationActivationReceipt,
+ 	type V3RoomMigrationProjection,
+ 	type V3RoomMigrationRehearsalReceipt,
+@@ -50,6 +54,7 @@ interface JoinInput {
+ 	readonly clientId: ClientId;
+ 	readonly databaseName: string;
+ 	readonly invite: string;
++	readonly roomHead?: V3RoomHead;
+ 	readonly successorSnapshotDeclaration?: SuccessorSnapshotDeclaration;
+ }
+ 
+@@ -732,6 +737,52 @@ function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjec
+ 	});
+ }
+ 
++function chatRoomHeadAuthority(migrationHead?: V3RoomHead): V3RoomHeadAuthority {
++	let state: V3RoomHeadState | null = null;
++	const same = (left: unknown, right: unknown): boolean => sameBytes(encodeCanonical(left), encodeCanonical(right));
++	const success = (): V3RoomHeadAuthorityResult => Object.freeze({ ok: true as const, state });
++	return Object.freeze({
++		initialization:
++			migrationHead === undefined
++				? Object.freeze({ kind: "create" as const })
++				: Object.freeze({ head: migrationHead, kind: "migrate" as const }),
++		begin: (input: Parameters<V3RoomHeadAuthority["begin"]>[0]) => {
++			if (state === null || !same(state, input.expected)) {
++				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
++			}
++			state = Object.freeze({
++				pending: Object.freeze({ next: input.next, previous: input.expected.stable }),
++				stable: input.expected.stable,
++			});
++			return Promise.resolve(success());
++		},
++		commit: (input: Parameters<V3RoomHeadAuthority["commit"]>[0]) => {
++			if (state === null || state.pending === null || !same(state, input.expected)) {
++				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
++			}
++			state = Object.freeze({ pending: null, stable: state.pending.next });
++			return Promise.resolve(success());
++		},
++		create: (input: Parameters<V3RoomHeadAuthority["create"]>[0]) => {
++			const desired = Object.freeze({ pending: null, stable: input.stable });
++			if (state === null) state = desired;
++			else if (!same(state, desired)) {
++				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
++			}
++			return Promise.resolve(success());
++		},
++		migrate: (input: Parameters<V3RoomHeadAuthority["migrate"]>[0]) => {
++			const desired = Object.freeze({ pending: null, stable: input.stable });
++			if (state !== null && !same(state, desired)) {
++				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
++			}
++			state = desired;
++			return Promise.resolve(success());
++		},
++		read: () => Promise.resolve(success()),
++	});
++}
++
+ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
+ 	const application = createV3ChatApplication(input.clientId);
+ 	const selected = CLIENTS[input.clientId];
+@@ -774,6 +825,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
+ 			}
+ 		},
+ 		publicKeyBytes: bytes(author),
++		roomHeadAuthority: chatRoomHeadAuthority(input.roomHead),
+ 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
+ 		...(input.successorSnapshotDeclaration === undefined
+ 			? {}
+@@ -817,6 +869,7 @@ const api = Object.freeze({
+ 			clientId: input.clientId,
+ 			creatorInvite: input.invite,
+ 			databaseName: input.databaseName,
++			...(input.roomHead === undefined ? {} : { roomHead: input.roomHead }),
+ 			...(input.successorSnapshotDeclaration === undefined
+ 				? {}
+ 				: { successorSnapshotDeclaration: input.successorSnapshotDeclaration }),
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/tests/phase-3a1b-d9346-room-semantics-red.test.ts b/tests/phase-3a1b-d9346-room-semantics-red.test.ts
+index e99ca5a6..c1a52ce7 100644
+--- a/tests/phase-3a1b-d9346-room-semantics-red.test.ts
++++ b/tests/phase-3a1b-d9346-room-semantics-red.test.ts
+@@ -52,6 +52,7 @@ interface ExpectedInput {
+ 	onProjection(projection: Projection): void;
+ 	openTransport(): Readonly<Record<string, unknown>>;
+ 	readonly publicKeyBytes: Uint8Array;
++	readonly roomHeadAuthority: never;
+ 	signRegisteredVertexDigest(): Promise<Uint8Array>;
+ }
+ 
+@@ -354,6 +355,7 @@ function input(application: ExpectedApplication, onProjection: (projection: Proj
+ 			setRetainedPublisher: () => undefined,
+ 		}),
+ 		publicKeyBytes: Uint8Array.of(1),
++		roomHeadAuthority: undefined as never,
+ 		signRegisteredVertexDigest: () => Promise.resolve(new Uint8Array(64)),
+ 	};
+ }
+diff --git a/tests/phase-3h-v3-room-rehearsal-red.test.ts b/tests/phase-3h-v3-room-rehearsal-red.test.ts
+index 987d9320..6db61c96 100644
+--- a/tests/phase-3h-v3-room-rehearsal-red.test.ts
++++ b/tests/phase-3h-v3-room-rehearsal-red.test.ts
+@@ -453,6 +453,7 @@ async function openRoom(
+ 			return inertTransport(input.databaseName, openedObjectId);
+ 		},
+ 		publicKeyBytes: bytes(author),
++		roomHeadAuthority: undefined as never,
+ 		signRegisteredVertexDigest:
+ 			input.signer ?? ((registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, input.material.seed))),
+ 	})) as MigrationSession;
+diff --git a/tests/phase-6a-creator-adoption-commit-red.test.ts b/tests/phase-6a-creator-adoption-commit-red.test.ts
+index eb941579..a6d777b6 100644
+--- a/tests/phase-6a-creator-adoption-commit-red.test.ts
++++ b/tests/phase-6a-creator-adoption-commit-red.test.ts
+@@ -205,7 +205,8 @@ describe("D.108c one-CAS creator adoption RED", () => {
+ 			noDirectChatCommitConsumer: true,
+ 			noRootExport: true,
+ 			privateCapabilityConsumer: readiness.ready,
+-			roomOwnsCommitWhenProductExists: true,
++			retainedCommitHasNoProductConsumer: true,
++			roomOwnsStagedPublicationWhenProductExists: true,
+ 		});
+ 		expect(D108C_GREEN_PATHS).not.toContain("packages/node/src/index.ts");
+ 		expect(D108C_GREEN_PATHS.every((path) => !/(?:transport|issuance|v3-live|examples)/u.test(path))).toBe(true);
+diff --git a/tests/phase-6a-creator-successor-activation-red.test.ts b/tests/phase-6a-creator-successor-activation-red.test.ts
+index dd589439..ef435f49 100644
+--- a/tests/phase-6a-creator-successor-activation-red.test.ts
++++ b/tests/phase-6a-creator-successor-activation-red.test.ts
+@@ -62,6 +62,15 @@ async function candidate(): Promise<D108d1CandidateModule> {
+ 	return import(pathToFileURL(resolve(REPOSITORY_ROOT, D108D1_GREEN_PATHS[0])).href) as Promise<D108d1CandidateModule>;
+ }
+ 
++function preparedRoomHead(prepared: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
++	const descriptor = prepared.descriptor as Readonly<Record<string, unknown>>;
++	return Object.freeze({
++		currentAnchorDigest: descriptor.anchorDigest,
++		epoch: descriptor.epoch,
++		objectId: descriptor.objectId,
++	});
++}
++
+ function runtimeBindings(peerId: string): Readonly<Record<string, unknown>> {
+ 	return Object.freeze({
+ 		messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
+@@ -180,6 +189,11 @@ describe("D.108d1 creator successor activation RED", () => {
+ 				detachedSignature: new Uint8Array(),
+ 				exactCanonicalAnchorPreimageBytes: new Uint8Array(),
+ 				exactCanonicalParametersCarrierBytes: new Uint8Array(),
++				expectedRoomHead: Object.freeze({
++					currentAnchorDigest: "0".repeat(64),
++					epoch: 1,
++					objectId: "creator:00000000000000000000000000000000",
++				}),
+ 				issuanceStore: downstream,
+ 				liveJournalStore: downstream,
+ 				messageQueueManager: downstream,
+@@ -240,6 +254,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 		]);
+ 		expect(CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS).toEqual([
+ 			"capability",
++			"expectedRoomHead",
+ 			"handle",
+ 			"messageQueueManager",
+ 			"networkNode",
+@@ -252,6 +267,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			"detachedSignature",
+ 			"exactCanonicalAnchorPreimageBytes",
+ 			"exactCanonicalParametersCarrierBytes",
++			"expectedRoomHead",
+ 			"issuanceStore",
+ 			"liveJournalStore",
+ 			"messageQueueManager",
+@@ -269,6 +285,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			"detachedSignature",
+ 			"exactCanonicalAnchorPreimageBytes",
+ 			"exactCanonicalParametersCarrierBytes",
++			"expectedRoomHead",
+ 			"issuanceStore",
+ 			"liveJournalStore",
+ 			"messageQueueManager",
+@@ -281,6 +298,9 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			"store",
+ 		]);
+ 		expect(CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS).toEqual([
++			"D110C_FLOOR_INVALID",
++			"D110C_FLOOR_MIGRATION_REQUIRED",
++			"D110C_FLOOR_MISMATCH",
+ 			"malformed-input",
+ 			"capability-unavailable",
+ 			"source-unavailable",
+@@ -370,6 +390,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
+ 			result = await activate({
+ 				capability: prepared.capability,
++				expectedRoomHead: preparedRoomHead(prepared),
+ 				handle: fixture.handle,
+ 				...fixture.runtimeBindings,
+ 			});
+@@ -400,6 +421,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			}
+ 			const malformedHot = Object.freeze({
+ 				capability: prepared.capability,
++				expectedRoomHead: preparedRoomHead(prepared),
+ 				epoch: 1,
+ 				handle: fixture.handle,
+ 				...runtimeBindings(`d108d1-forged-hot-${crypto.randomUUID()}`),
+@@ -476,7 +498,12 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			const recording = recordingRuntimeBindings(`d108d1-displaced-${crypto.randomUUID()}`);
+ 			const activate = (await candidate()).activateCreatorSuccessorAdoption;
+ 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
+-			result = await activate({ capability: prepared.capability, handle: fixture.handle, ...recording.input });
++			result = await activate({
++				capability: prepared.capability,
++				expectedRoomHead: preparedRoomHead(prepared),
++				handle: fixture.handle,
++				...recording.input,
++			});
+ 			expect(result.ok).toBe(true);
+ 			const handle = result.handle as Readonly<{
+ 				publishPending(): Promise<Readonly<Record<string, unknown>>>;
+@@ -507,6 +534,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
+ 			const input = {
+ 				capability: prepared.capability,
++				expectedRoomHead: preparedRoomHead(prepared),
+ 				handle: fixture.handle,
+ 				...runtimeBindings(`d108d1-terminal-${crypto.randomUUID()}`),
+ 			};
+@@ -537,8 +565,18 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
+ 			const firstPrepared = await committed(fixture);
+ 			const secondPrepared = await committed(fixture);
+-			first = await activate({ capability: firstPrepared.capability, handle: fixture.handle, ...bindings });
+-			const second = await activate({ capability: secondPrepared.capability, handle: fixture.handle, ...bindings });
++			first = await activate({
++				capability: firstPrepared.capability,
++				expectedRoomHead: preparedRoomHead(firstPrepared),
++				handle: fixture.handle,
++				...bindings,
++			});
++			const second = await activate({
++				capability: secondPrepared.capability,
++				expectedRoomHead: preparedRoomHead(secondPrepared),
++				handle: fixture.handle,
++				...bindings,
++			});
+ 			expect(first).toMatchObject({ ok: true });
+ 			expect(second).toMatchObject({ ok: true });
+ 			expect(second.handle).toBe(first.handle);
+@@ -558,6 +596,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			const secondPrepared = await committed(fixture);
+ 			first = await activate({
+ 				capability: firstPrepared.capability,
++				expectedRoomHead: preparedRoomHead(firstPrepared),
+ 				handle: fixture.handle,
+ 				...runtimeBindings(`d108d1-binding-a-${crypto.randomUUID()}`),
+ 			});
+@@ -565,6 +604,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			expect(
+ 				await activate({
+ 					capability: secondPrepared.capability,
++					expectedRoomHead: preparedRoomHead(secondPrepared),
+ 					handle: fixture.handle,
+ 					...runtimeBindings(`d108d1-binding-b-${crypto.randomUUID()}`),
+ 				})
+@@ -590,6 +630,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			expect(
+ 				await activate({
+ 					capability: failedPrepared.capability,
++					expectedRoomHead: preparedRoomHead(failedPrepared),
+ 					handle: fixture.handle,
+ 					messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
+ 					networkNode: broken,
+@@ -600,6 +641,7 @@ describe("D.108d1 creator successor activation RED", () => {
+ 			expect(replay).toMatchObject({ ok: true, recovery: "active-new" });
+ 			recovered = await activate({
+ 				capability: replay.capability,
++				expectedRoomHead: preparedRoomHead(replay),
+ 				handle: fixture.handle,
+ 				...runtimeBindings(`d108d1-retry-${crypto.randomUUID()}`),
+ 			});
+diff --git a/tests/phase-6a-creator-successor-handle-identity-red.test.ts b/tests/phase-6a-creator-successor-handle-identity-red.test.ts
+index 6d68b3d1..9a575f32 100644
+--- a/tests/phase-6a-creator-successor-handle-identity-red.test.ts
++++ b/tests/phase-6a-creator-successor-handle-identity-red.test.ts
+@@ -112,6 +112,11 @@ describe("D.108d1a successor handle registration identity RED", () => {
+ 			}
+ 			active = await candidate.activateCreatorSuccessorAdoption({
+ 				capability: prepared.capability,
++				expectedRoomHead: Object.freeze({
++					currentAnchorDigest: (prepared.descriptor as Readonly<Record<string, unknown>>).anchorDigest,
++					epoch: (prepared.descriptor as Readonly<Record<string, unknown>>).epoch,
++					objectId: (prepared.descriptor as Readonly<Record<string, unknown>>).objectId,
++				}),
+ 				handle: fixture.handle,
+ 				messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
+ 				networkNode,
+diff --git a/tests/phase-6a-creator-successor-product-red.test.ts b/tests/phase-6a-creator-successor-product-red.test.ts
+index 30232eae..6dc1c05c 100644
+--- a/tests/phase-6a-creator-successor-product-red.test.ts
++++ b/tests/phase-6a-creator-successor-product-red.test.ts
+@@ -84,8 +84,8 @@ describe("D.108e2b creator successor room lifetime RED", () => {
+ 
+ 	it("keeps node-root and chat authority closed while assigning the room as sole node consumer", () => {
+ 		expect(d108d2SourceGovernance()).toEqual({
+-			chatByteIdentical: true,
+ 			chatHasNoDirectNodeAdoptionConsumer: true,
++			chatOwnsOnlyReviewedRoomHeadCapability: true,
+ 			chatInputAllowsOnlyDeclarationWhenProductExists: true,
+ 			noForbiddenProductReturn: true,
+ 			noNodeRootWidening: true,
+diff --git a/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts b/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+index b0c44260..d85f1d5f 100644
+--- a/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
++++ b/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+@@ -195,6 +195,11 @@ describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
+ 			expect(
+ 				await activateCreatorSuccessorAdoption({
+ 					capability: staged.capability,
++					expectedRoomHead: Object.freeze({
++						currentAnchorDigest: (staged.descriptor as Readonly<Record<string, unknown>>).anchorDigest,
++						epoch: (staged.descriptor as Readonly<Record<string, unknown>>).epoch,
++						objectId: (staged.descriptor as Readonly<Record<string, unknown>>).objectId,
++					}),
+ 					handle: fixture.handle,
+ 					...fixture.runtimeBindings,
+ 				})
+commit 213850dbba5e4b3fca350592a3d1193c6d50e7b0
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 06:23:42 2026 -0400
+
+    feat: add authenticated room head floor
+
+diff --git a/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts b/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts
+index 0c182822..f0707122 100644
+--- a/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts
+@@ -186,7 +186,8 @@ export function d108cSourceGovernance(): Readonly<{
+ 	readonly noDirectChatCommitConsumer: boolean;
+ 	readonly noRootExport: boolean;
+ 	readonly privateCapabilityConsumer: boolean;
+-	readonly roomOwnsCommitWhenProductExists: boolean;
++	readonly retainedCommitHasNoProductConsumer: boolean;
++	readonly roomOwnsStagedPublicationWhenProductExists: boolean;
+ }> {
+ 	const read = (path: string): string => {
+ 		const absolute = resolve(REPOSITORY_ROOT, path);
+@@ -198,8 +199,10 @@ export function d108cSourceGovernance(): Readonly<{
+ 	const room = read("examples/v3-room/src/index.ts");
+ 	const chat = read("examples/v3-chat/src/index.ts");
+ 	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
+-	const roomConsumesCommit =
+-		/@ts-drp\/node\/creator-adoption-commit/u.test(room) && /commitCreatorSuccessorAdoption/u.test(room);
++	const roomConsumesStagedPublication =
++		/@ts-drp\/node\/creator-adoption-stage/u.test(room) &&
++		/stageCreatorSuccessorAdoption/u.test(room) &&
++		/publishStagedCreatorSuccessorAdoption/u.test(room);
+ 	const manifest = JSON.parse(read("packages/node/package.json")) as {
+ 		readonly exports?: Readonly<Record<string, unknown>>;
+ 	};
+@@ -213,6 +216,9 @@ export function d108cSourceGovernance(): Readonly<{
+ 		noDirectChatCommitConsumer: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(chat),
+ 		noRootExport: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(root),
+ 		privateCapabilityConsumer: /function\s+consumePreparedCreatorSuccessorAdoption\s*\(/u.test(internal),
+-		roomOwnsCommitWhenProductExists: !productExists || roomConsumesCommit,
++		retainedCommitHasNoProductConsumer: !/commitCreatorSuccessorAdoption|@ts-drp\/node\/creator-adoption-commit/u.test(
++			room
++		),
++		roomOwnsStagedPublicationWhenProductExists: !productExists || roomConsumesStagedPublication,
+ 	});
+ }
+diff --git a/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts b/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+index cbe98291..151edd22 100644
+--- a/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+@@ -1,4 +1,3 @@
+-import { createHash } from "node:crypto";
+ import { existsSync, readdirSync, readFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ import ts from "typescript";
+@@ -14,7 +13,6 @@ export const D108E2B_RED_PATHS = Object.freeze([
+ ] as const);
+ 
+ export const D108E2B_GREEN_PATHS = Object.freeze(["examples/v3-room/src/index.ts"] as const);
+-const D108E2B_CHAT_SHA256 = "af384cb45ad8cffb2e56e648bdb22ea92fb8b8a053376ec2a47c34284b95fd0f";
+ 
+ export const D108D2_AUTHORITY_KEYS = Object.freeze([
+ 	"aclDigest",
+@@ -92,6 +90,7 @@ const D108D2_ROOM_INPUT_KEYS = Object.freeze([
+ 	"openTransport",
+ 	"publicKeyBytes",
+ 	"rebaseSourceInvite",
++	"roomHeadAuthority",
+ 	"signRegisteredVertexDigest",
+ 	"successorSnapshotDeclaration",
+ ] as const);
+@@ -100,11 +99,12 @@ const D108D2_CHAT_JOIN_INPUT_KEYS = Object.freeze([
+ 	"clientId",
+ 	"databaseName",
+ 	"invite",
++	"roomHead",
+ 	"successorSnapshotDeclaration",
+ ] as const);
+ 
+ const ADOPTION_MARKER =
+-	/verifyCreatorSuccessorAdoption|commitCreatorSuccessorAdoption|activateCreatorSuccessorAdoption|reopenCreatorSuccessorAdoption/u;
++	/verifyCreatorSuccessorAdoption|stageCreatorSuccessorAdoption|publishStagedCreatorSuccessorAdoption|recoverPendingCreatorSuccessorAdoption|activateCreatorSuccessorAdoption|reopenCreatorSuccessorAdoption/u;
+ 
+ function read(path: string): string {
+ 	const absolute = resolve(REPOSITORY_ROOT, path);
+@@ -344,13 +344,16 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
+ 	const consumers = exampleSources("examples").filter(({ source }) => ADOPTION_MARKER.test(source));
+ 	const roomConsumesAll = [
+ 		"verifyCreatorSuccessorAdoption",
+-		"commitCreatorSuccessorAdoption",
++		"stageCreatorSuccessorAdoption",
++		"publishStagedCreatorSuccessorAdoption",
++		"recoverPendingCreatorSuccessorAdoption",
+ 		"activateCreatorSuccessorAdoption",
+ 		"reopenCreatorSuccessorAdoption",
+ 	].every((marker) => room.includes(marker));
+ 	return Object.freeze({
+-		chatByteIdentical: createHash("sha256").update(chat).digest("hex") === D108E2B_CHAT_SHA256,
+ 		chatHasNoDirectNodeAdoptionConsumer: !ADOPTION_MARKER.test(chat),
++		chatOwnsOnlyReviewedRoomHeadCapability:
++			/V3RoomHeadAuthority/u.test(chat) && /roomHeadAuthority:\s*chatRoomHeadAuthority/u.test(chat),
+ 		chatInputAllowsOnlyDeclarationWhenProductExists:
+ 			!productExists || sameStrings(interfaceKeys(chat, "JoinInput"), [...D108D2_CHAT_JOIN_INPUT_KEYS].sort()),
+ 		noForbiddenProductReturn:
+diff --git a/tests/fixtures/phase-6b/runtime-reclamation-contract.ts b/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+index 6ddbb01b..04d7d55d 100644
+--- a/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
++++ b/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+@@ -234,6 +234,11 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions
+ 		});
+ 		const activated = await base.modules.activateCreatorSuccessorAdoption({
+ 			capability: prepared.capability,
++			expectedRoomHead: Object.freeze({
++				currentAnchorDigest: (prepared.descriptor as Readonly<Record<string, unknown>>).anchorDigest,
++				epoch: (prepared.descriptor as Readonly<Record<string, unknown>>).epoch,
++				objectId: (prepared.descriptor as Readonly<Record<string, unknown>>).objectId,
++			}),
+ 			handle: base.handle,
+ 			...runtimeBindings,
+ 		});
+total 14520
+drwxr-xr-x    27 aristotle  staff      864 Sep  2 06:20 .
+drwxr-xr-x  7821 aristotle  staff   250272 Sep  2 06:24 ..
+-rw-r--r--     1 aristotle  staff     5439 Sep  2 06:22 SHA256SUMS
+-rw-r--r--     1 aristotle  staff    43768 Sep  2 06:10 browser-product-final.json
+-rw-r--r--     1 aristotle  staff        2 Sep  2 06:10 browser-product-final.status
+-rw-r--r--     1 aristotle  staff        0 Sep  2 06:10 browser-product-final.stderr
+-rw-r--r--     1 aristotle  staff    32922 Sep  2 06:12 browser-product-green.json
+-rw-r--r--     1 aristotle  staff        2 Sep  2 06:12 browser-product-green.status
+-rw-r--r--     1 aristotle  staff        0 Sep  2 06:11 browser-product-green.stderr
+-rw-r--r--     1 aristotle  staff    44091 Sep  2 06:07 browser-product.json
+-rw-r--r--     1 aristotle  staff        0 Sep  2 06:07 browser-product.stderr
+-rw-r--r--     1 aristotle  staff  7118071 Sep  2 05:59 focused.json
+-rw-r--r--     1 aristotle  staff        2 Sep  2 05:59 focused.status
+-rw-r--r--     1 aristotle  staff      241 Sep  2 05:59 focused.stderr
+-rw-r--r--     1 aristotle  staff    35779 Sep  2 05:59 focused.stdout
+-rw-r--r--     1 aristotle  staff     5685 Sep  2 06:22 green-ledger.md
+-rw-r--r--     1 aristotle  staff     2649 Sep  2 06:22 manifest-validation.txt
+-rw-r--r--     1 aristotle  staff    37936 Sep  2 06:05 retained-final.json
+-rw-r--r--     1 aristotle  staff        2 Sep  2 06:05 retained-final.status
+-rw-r--r--     1 aristotle  staff     1352 Sep  2 06:05 retained-final.stderr
+-rw-r--r--     1 aristotle  staff      119 Sep  2 06:05 retained-final.stdout
+-rw-r--r--     1 aristotle  staff    40837 Sep  2 06:01 retained.json
+-rw-r--r--     1 aristotle  staff        2 Sep  2 06:01 retained.status
+-rw-r--r--     1 aristotle  staff     1352 Sep  2 06:01 retained.stderr
+-rw-r--r--     1 aristotle  staff      113 Sep  2 06:01 retained.stdout
+-rw-r--r--     1 aristotle  staff      460 Sep  2 06:16 source-audit-v2.txt
+-rw-r--r--     1 aristotle  staff      230 Sep  2 06:15 source-audit.txt
+---
+040000 tree 17ff8c10aa92cac5a59da931272590e0490735ed	.logs/d110c-0a-final-review-93fe946a
+040000 tree 84194599f7098274be850d1062ed3f0a19e5b42b	.logs/d110c-0a-green-0b7a1cf6
+040000 tree f802df7c51830e202200d6358a2d282ed85c1d48	.logs/d110c-0b-hiero-fable-51-high-93fe946a
+040000 tree 3002dafac82fcde4821c1f1792c35303040aa813	.logs/d110c-0b-hiero-fable-924afa1f
+040000 tree ad7102bceb88b0d0e0a4644abbaac2de5f59e879	.logs/d110c-0b-hiero-fable51-parallel-20260902
+040000 tree 5c8ece4cb01a82bb29a1a05a14b6e92996bc676b	.logs/d110c-0b0-red
+040000 tree a900070e1bcbf75983d47bc0f1543232d1b958be	.logs/d110c-0b0a-final-review-2b3080d6
+040000 tree a0d50d182ceb6f8841c22182ce4ad15bd3ed4e3f	.logs/d110c-0b0a-green-c1e443fc
+040000 tree e7ff550a2ae123e031a1240053bc11a9af192c94	.logs/d110c-0b0a-plan-confirmation-4f893654
+040000 tree c52583c6bfde3b15c45b1c1d765ec9eecd82a5bf	.logs/d110c-0b0a-red-c47927f5
+.logs/d110c-0a-final-review-93fe946a/grok-reemit-prompt.txt
+.logs/d110c-0a-final-review-93fe946a/grok-reemit.json
+.logs/d110c-0a-final-review-93fe946a/grok/command.json
+.logs/d110c-0a-final-review-93fe946a/grok/events.jsonl
+.logs/d110c-0a-final-review-93fe946a/grok/input-packet.md
+.logs/d110c-0a-final-review-93fe946a/grok/public.txt
+.logs/d110c-0a-final-review-93fe946a/grok/review.diff
+.logs/d110c-0a-final-review-93fe946a/grok/status.json
+.logs/d110c-0a-final-review-93fe946a/grok/stderr.log
+.logs/d110c-0a-final-review-93fe946a/kimi.stderr
+.logs/d110c-0a-final-review-93fe946a/kimi.stream.jsonl
+.logs/d110c-0a-final-review-93fe946a/manifest.sha256
+.logs/d110c-0a-final-review-93fe946a/opus.raw.json
+.logs/d110c-0a-final-review-93fe946a/opus.stderr
+.logs/d110c-0a-final-review-93fe946a/review-prompt.md
+.logs/d110c-0a-final-review-93fe946a/review-summary.json
+.logs/d110c-0a-green-0b7a1cf6/batch1-corrected-vitest.json
+.logs/d110c-0a-green-0b7a1cf6/batch1-vitest.json
+.logs/d110c-0a-green-0b7a1cf6/batch2-corrected-vitest.json
+.logs/d110c-0a-green-0b7a1cf6/batch2-genuine-actor-corrected-vitest.json
+2e868495c9ed3e1512dc8b3bdcde29ab09c6d78d092686568f81bda50903cdc0  .logs/d110c-0b0-green-798489fd/browser-product-final.json
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  .logs/d110c-0b0-green-798489fd/browser-product-final.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0b0-green-798489fd/browser-product-final.stderr
+56a53de0ee5c5c051b245f201ee97d031e64cea295189cb57bc7835cd7308b18  .logs/d110c-0b0-green-798489fd/browser-product-green.json
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0b0-green-798489fd/browser-product-green.status
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0b0-green-798489fd/browser-product-green.stderr
+9f301c7deb41e88c9b14ef600c0c9cebadaa198185af41d13f4e9c5bf51f1d70  .logs/d110c-0b0-green-798489fd/browser-product.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0b0-green-798489fd/browser-product.stderr
+3d8f2391d4ba1059bca42eb86a0dfc330b92563fcdede49415935a6c5320386d  .logs/d110c-0b0-green-798489fd/focused.json
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  .logs/d110c-0b0-green-798489fd/focused.status
+5500b0501b19aecd09b81e2e3197aea8343f273e0bbfc07a67edbfedaea71503  .logs/d110c-0b0-green-798489fd/focused.stderr
+0393f550e442df3f03555eccb60bd72561fc93337bd65a2a30a28e76be7ca7cf  .logs/d110c-0b0-green-798489fd/focused.stdout
+fa150846b600f8549a88e9476cba85ae5e469fb8773a61da91b4103c969d4c25  .logs/d110c-0b0-green-798489fd/green-ledger.md
+65b6c35141885ecc5e8ab0fe6b7c7dc944325a8249ffdccdc850e422ee7abb8f  .logs/d110c-0b0-green-798489fd/retained-final.json
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0b0-green-798489fd/retained-final.status
+00320dce28dc26a99c58cabfd542723acbd5a349fe16cce193c16f3ee33e432b  .logs/d110c-0b0-green-798489fd/retained-final.stderr
+e73b2e7465706c928a14f2070fdedda3dea6675d54a9b80edcac94ee3613b430  .logs/d110c-0b0-green-798489fd/retained-final.stdout
+4fc71562d38b89534818137ada268f06318da41974a1231d83c7362607f80ff4  .logs/d110c-0b0-green-798489fd/retained.json
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  .logs/d110c-0b0-green-798489fd/retained.status
+ef741e7c1654632cf926befc3975fb1937b2470b775984059e0694d1213d75db  .logs/d110c-0b0-green-798489fd/retained.stderr
+b9272e5d7536d671ac37595424e6b93579c61450387e77558289879acb3db66b  .logs/d110c-0b0-green-798489fd/retained.stdout
+b338d1b840e0086f2500a3dbf6b48e9f17f1d9d3ce0ca0b0e2c394b7b52c443e  .logs/d110c-0b0-green-798489fd/source-audit-v2.txt
+7ec689b8b4f657cebdd974892a18bedf85d68dddabe62a77262fe681ba6420dc  .logs/d110c-0b0-green-798489fd/source-audit.txt
+ede864e4b7c10ebd578f7ddec47868ffe864e37991f4f07c4cb28e9795c17b67  examples/v3-chat/src/index.ts
+3a6057ef8e11c7b5ce00c74180b3f2740cc79ec4dbc262fd67f8555239956d73  examples/v3-room/src/index.ts
+a0de90e3d74177ac505da9e5f5c94985642cb585eecfa9e6d336f0745a0bfffe  packages/node/src/creator-adoption-activate.ts
+f9cd1ab69e9f7deba0872894e4df4b8bfd5687bd7096e3ace8c217cf7ac9b9fc  packages/node/src/internal/creator-room-head.ts
+41df016f2dbb5b2681657930b3cf5341b253ff961ae6871cc892eb4c2f6023fd  packages/node/src/internal/creator-successor-live.ts
+6f9fd31745c580ce8122571a8bb67d9fdb637869f9d22eb95dd235ccf8dc5bad  packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts
+f0f08d06cc76b238e8a9ba84a3a4ae4ab8c136e49ffd216524e15e521ae6cbed  packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+52cfb4f0378d616c11b2aa46ced177d073b691b3120b3c6876363143405b25fe  packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+75b54e5b1046ba91371df81df7194a65bd00b666d5c11a3c4c0d9aa11207e6ed  packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs
+754606d13a3f9961680172b4be38cab96f366860fe8f9fcd8974871a58d7d8b5  packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs
+d9dcdd53efd6371cceeea6dbaf73ea98c34d2909583effd94363f7b40a436012  tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts
+ef73921c4fd59be8bf2f1ddb89bfaa489b32c4152672f26e8109a418e1ffea81  tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts
+4c16a0e23cc207c5f2c32e920af06a7414f681cf42f8ff281a95553e6ea56987  tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+ae39431ecc81d677bf0ad1745ac48d675734cdc27423330e3982babb506c3b2e  tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+559ad6a44fd2d7082ab55443892b09134b6a026c7f72066dd7794ff495a2320b  tests/phase-3a1b-d9346-room-semantics-red.test.ts
+8281a209de407caa4812ba319e9052c75eb4a733578d93d2a2826760263c58c1  tests/phase-3h-v3-room-rehearsal-red.test.ts
+fb46aeacb16c468d7295d246dc3e397c665635b7309ce43ba75568286c531164  tests/phase-6a-creator-adoption-commit-red.test.ts
+d5d1e91f130e1e9dff2c1bf1fc8b1631df2d1713ec00fa7cbc814af9d6e982b9  tests/phase-6a-creator-successor-activation-red.test.ts
+45a46ab2a15a45f7a5b00a10b7ada89a1752e3d3aa7972549e454e2647fbe462  tests/phase-6a-creator-successor-handle-identity-red.test.ts
+894cdfb7092adeb4f4349f75d2d5c768e3a0adc13bc698a7bc5e9ca73416cad9  tests/phase-6a-creator-successor-product-red.test.ts
+5f65a4d51e1d37284d349a29316fd9cc33b0ab3553e7c7c9e1202efa208442e1  tests/phase-6b-d110c-0b0-floor-red.test.ts
+c0ba21bd814ec48b0d1bbc59d69b79dccb0cddfa3a8ac0820da004c4e04b6e6f  tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+D110C_0B0_SOURCE_AUDIT_V1
+mandatory-room-head-authority=pass
+exact-provider-operation-roster=pass
+missing-and-wrong-floor-codes=pass
+retained-one-call-commit-has-no-product-consumer=pass
+six-step-order=438,836,1173,1336,1586,1869
+D110C_0B0_SOURCE_AUDIT_V2
+mandatory-room-head-authority=pass
+exact-provider-operation-roster=pass
+missing-and-wrong-floor-codes=pass
+retained-one-call-commit-has-no-product-consumer=pass
+six-step-order=438,836,1173,1336,1586,1869
+node-room-head-keys=currentAnchorDigest,epoch,objectId
+node-hot-and-cold-exact-head-checks=pass
+wire-schema-dependency-paths=unchanged
+frozen-root-identities=pass
+stash-count=27
+.agents=present
+.claude=present
+.pnpm-store=present
+.logs/d110c-0b0-green-798489fd/browser-product-final.json: OK
+.logs/d110c-0b0-green-798489fd/browser-product-final.status: OK
+.logs/d110c-0b0-green-798489fd/browser-product-final.stderr: OK
+.logs/d110c-0b0-green-798489fd/browser-product-green.json: OK
+.logs/d110c-0b0-green-798489fd/browser-product-green.status: OK
+.logs/d110c-0b0-green-798489fd/browser-product-green.stderr: OK
+.logs/d110c-0b0-green-798489fd/browser-product.json: OK
+.logs/d110c-0b0-green-798489fd/browser-product.stderr: OK
+.logs/d110c-0b0-green-798489fd/focused.json: OK
+.logs/d110c-0b0-green-798489fd/focused.status: OK
+.logs/d110c-0b0-green-798489fd/focused.stderr: OK
+.logs/d110c-0b0-green-798489fd/focused.stdout: OK
+.logs/d110c-0b0-green-798489fd/green-ledger.md: OK
+.logs/d110c-0b0-green-798489fd/retained-final.json: OK
+.logs/d110c-0b0-green-798489fd/retained-final.status: OK
+.logs/d110c-0b0-green-798489fd/retained-final.stderr: OK
+.logs/d110c-0b0-green-798489fd/retained-final.stdout: OK
+.logs/d110c-0b0-green-798489fd/retained.json: OK
+.logs/d110c-0b0-green-798489fd/retained.status: OK
+.logs/d110c-0b0-green-798489fd/retained.stderr: OK
+.logs/d110c-0b0-green-798489fd/retained.stdout: OK
+.logs/d110c-0b0-green-798489fd/source-audit-v2.txt: OK
+.logs/d110c-0b0-green-798489fd/source-audit.txt: OK
+examples/v3-chat/src/index.ts: OK
+examples/v3-room/src/index.ts: OK
+packages/node/src/creator-adoption-activate.ts: OK
+packages/node/src/internal/creator-room-head.ts: OK
+packages/node/src/internal/creator-successor-live.ts: OK
+packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts: OK
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts: OK
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts: OK
+packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs: OK
+packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs: OK
+tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts: OK
+tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts: OK
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts: OK
+tests/fixtures/phase-6b/runtime-reclamation-contract.ts: OK
+tests/phase-3a1b-d9346-room-semantics-red.test.ts: OK
+tests/phase-3h-v3-room-rehearsal-red.test.ts: OK
+tests/phase-6a-creator-adoption-commit-red.test.ts: OK
+tests/phase-6a-creator-successor-activation-red.test.ts: OK
+tests/phase-6a-creator-successor-handle-identity-red.test.ts: OK
+tests/phase-6a-creator-successor-product-red.test.ts: OK
+tests/phase-6b-d110c-0b0-floor-red.test.ts: OK
+tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts: OK
+shasum: .logs/d110c-0b0-green-798489fd/browser-product-final.json: No such file or directory
+.logs/d110c-0b0-green-798489fd/browser-product-final.json: FAILED open or read
+shasum: .logs/d110c-0b0-green-798489fd/browser-product-final.status: No such file or directory
+.logs/d110c-0b0-green-798489fd/browser-product-final.status: FAILED open or read
+shasum: .logs/d110c-0b0-green-798489fd/browser-product-final.stderr: No such file or directory
+.logs/d110c-0b0-green-798489fd/browser-product-final.stderr: FAILED open or read
+shasum: .logs/d110c-0b0-green-798489fd/browser-product-green.json: No such file or directory
+.logs/d110c-0b0-green-798489fd/browser-product-green.json: FAILED open or read
+shasum: .logs/d110c-0b0-green-798489fd/browser-product-green.status: No such file or directory
+.logs/d110c-0b0-green-798489fd/browser-product-green.status: FAILED open or read
+SUMS-CHECK-EXIT:0
+focused.json success=true tests: {"total":1,"passed":1,"failed":0,"pending":0}
+retained-final.json success=true tests: {"total":97,"passed":97,"failed":0,"pending":0}
+browser-product-green.json success=undefined tests: {"stats":{"startTime":"2026-09-02T10:11:49.887Z","duration":52061.58500000001,"expected":24,"skipped":0,"unexpected":0,"flaky":0}}
+browser-product-final.json success=undefined tests: {"stats":{"startTime":"2026-09-02T10:10:09.750Z","duration":10396.035,"expected":9,"skipped":12,"unexpected":3,"flaky":0}}
+browser-product.json success=undefined tests: {"stats":{"startTime":"2026-09-02T10:07:44.303Z","duration":12311.405999999999,"expected":3,"skipped":18,"unexpected":3,"flaky":0}}
+---
+focused.status: 1
+retained-final.status: 0
+browser-product-green.status: 0
+browser-product-final.status: 1
+---
+(node:20902) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ERROR: Coverage for lines (16.36%) does not meet global threshold (70%)
+(node:24727) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24873) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24944) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24969) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:25049) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:25051) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:25076) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:25126) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+0
+exit=1
+pins the exact successor product browser inventory
+hot creator adoption exposes oracle authority and issues through the replacement handle
+established peer cold reopen accepts the genuine epoch-one live operation
+fresh late peer cold reopen accepts the targeted retained epoch-one operation
+concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping
+close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup
+cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown
+redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding
+pins the exact successor product browser inventory
+hot creator adoption exposes oracle authority and issues through the replacement handle
+established peer cold reopen accepts the genuine epoch-one live operation
+fresh late peer cold reopen accepts the targeted retained epoch-one operation
+concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping
+close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup
+cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown
+redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding
+pins the exact successor product browser inventory
+hot creator adoption exposes oracle authority and issues through the replacement handle
+established peer cold reopen accepts the genuine epoch-one live operation
+fresh late peer cold reopen accepts the targeted retained epoch-one operation
+concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping
+close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup
+cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown
+redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding
+file: /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b0-floor-red.test.ts
+ - passed refuses a genuine advanced cold reopen when no independent room-head authority is supplied
+retained-first-run: 97 95 2
+retained-final files: 9
+tests/phase-3a1b-p3-live-transport-red.test.ts 24
+tests/phase-3h-v3-room-rehearsal-red.test.ts 9
+tests/phase-6a-creator-adoption-commit-red.test.ts 9
+tests/phase-6a-creator-adoption-red.test.ts 13
+tests/phase-6a-creator-successor-activation-red.test.ts 17
+tests/phase-6a-creator-successor-handle-identity-red.test.ts 3
+tests/phase-6a-creator-successor-product-red.test.ts 8
+tests/phase-6b-cleanup-eligibility-red.test.ts 11
+tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts 3
+161:describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
+162:	it("stages without a head swap and publishes through one owner-bound CAS", async () => {
+246:	it("recovers equivalent Complete retries deterministically across both AHE orderings", async () => {
+291:	it("fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates", async () => {
+browser-product.json [
+  'Error: page.evaluate: TypeError: v3 room successor stage failed: intent-unavailable',
+  'Error: page.evaluate: v3 room successor stage failed: intent-unavailable',
+  'Error: page.evaluate: TypeError: v3 room successor stage failed: intent-unavailable'
+]
+browser-product-final.json [
+  'Error: page.evaluate: TypeError: D110C_FLOOR_MISMATCH',
+  'Error: page.evaluate: D110C_FLOOR_MISMATCH',
+  'Error: page.evaluate: TypeError: D110C_FLOOR_MISMATCH'
+]
+build.status
+build.stderr
+build.stdout
+command.txt
+manifest.sha256
+red-audit.json
+test.finished-at
+test.started-at
+vitest.json
+vitest.status
+vitest.stderr
+vitest.stdout
+red success: false total: 1 failed: 1
+failed TypeError: D110C_0B0_FRESHNESS_FLOOR_MISSING
+835:	if (record.pending === null) return Object.freeze({ pending: null, stable });
+853:		(left.pending === null
+854:			? right.pending === null
+855:			: right.pending !== null &&
+944:	if (observed.pending !== null) {
+949:		return roomHeadFailure(observed.stable.epoch > current.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH");
+964:	if (pending.pending === null) return roomHeadFailure("D110C_FLOOR_PENDING_INVALID");
+972:	if (!sameRoomHeadState(reopened, desired)) return roomHeadFailure("D110C_FLOOR_MISMATCH");
+1555:				openedRoomHeadState.pending === null &&
+1556:				input.successorSnapshotDeclaration === undefined &&
+1560:					openedRoomHeadState.stable.epoch > genesisRoomHead.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
+1564:				openedRoomHeadState.pending === null &&
+1568:				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+1687:	if (input.successorSnapshotDeclaration === undefined) {
+2148:		if (input.successorSnapshotDeclaration === undefined) {
+2218:		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+2250:		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+3520:		if (openedRoomHeadState.pending !== null || !sameRoomHead(openedRoomHeadState.stable, nextRoomHead)) {
+3521:			return roomHeadFailure("D110C_FLOOR_MISMATCH");
+		const openedTransport = input.openTransport(input.objectId);
+		transport = openedTransport;
+		if (input.successorSnapshotDeclaration === undefined) {
+			if (recovered === undefined) throw new TypeError("v3 room recovered genesis custody is unavailable");
+			const activated = activateV3LivePlane({
+				capability: recovered.capability,
+				messageQueueManager,
+				networkNode: openedTransport.networkNode,
+				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+			});
+			if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
+			activeHandle = activated.handle as RoomPlaneHandle;
+		} else {
+			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+----
+			)
+		) {
+			if (input.creatorFinalitySigner !== undefined || input.successorSnapshotDeclaration !== undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+			}
+		} else {
+			roomHeadAuthority = candidate;
+			openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
+			if (
+				openedRoomHeadState.pending === null &&
+				input.successorSnapshotDeclaration === undefined &&
+				!sameRoomHead(openedRoomHeadState.stable, genesisRoomHead)
+			) {
+				return roomHeadFailure(
+					openedRoomHeadState.stable.epoch > genesisRoomHead.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
+				);
+			}
+			if (
+				openedRoomHeadState.pending === null &&
+				input.successorSnapshotDeclaration !== undefined &&
+				(openedRoomHeadState.stable.objectId !== input.objectId || openedRoomHeadState.stable.epoch !== 1)
+			) {
+				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+			}
+		}
+	}
+	const inviteAuthority = migrationInviteAuthority(material);
+packages/node/src/creator-adoption-activate.ts:19:	"expectedRoomHead",
+packages/node/src/creator-adoption-activate.ts:32:	"expectedRoomHead",
+packages/node/src/creator-adoption-activate.ts:241:	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
+packages/node/src/creator-adoption-activate.ts:242:	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
+packages/node/src/creator-adoption-activate.ts:249:	if (!sameCreatorRoomHead(expectedRoomHead, prepared.activation.successor.trust)) {
+packages/node/src/creator-adoption-activate.ts:265:		!("expectedRoomHead" in input)
+packages/node/src/creator-adoption-activate.ts:274:	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
+packages/node/src/creator-adoption-activate.ts:275:	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
+packages/node/src/creator-adoption-activate.ts:286:	if (!sameCreatorRoomHead(expectedRoomHead, reopened.material.successor.trust)) {
+---
+0

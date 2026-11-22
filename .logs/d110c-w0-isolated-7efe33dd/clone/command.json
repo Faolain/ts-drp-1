@@ -1,0 +1,19 @@
+{
+  "label": "clone",
+  "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL",
+  "budgetMs": 120000,
+  "command": [
+    "git",
+    "clone",
+    "--shared",
+    "--no-checkout",
+    "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "/private/tmp/d110c-w0-isolated-qA7HqL/checkout"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "testsExecuted": 0
+}

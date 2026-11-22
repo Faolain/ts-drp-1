@@ -1,0 +1,50 @@
+{
+	"schemaVersion": 1,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "message-register.v1",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "type",
+	"operations": [
+		{
+			"name": "clear-message",
+			"reducerBinding": "clearMessageReducer",
+			"argumentSchema": { "kind": "closed-record", "fields": [] }
+		},
+		{
+			"name": "set-message",
+			"reducerBinding": "setMessageReducer",
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{ "name": "message", "required": true, "type": "string" },
+					{ "name": "sequence", "required": true, "type": "safe-integer" }
+				]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "track-p2-e-message-register-v1",
+		"seed": "track-p2-e-independent-seed-2026-08-13",
+		"initialState": { "message": "", "sequence": 0 },
+		"prCases": [
+			{
+				"id": "pr-set-negative-zero",
+				"action": "set-message",
+				"arguments": { "message": "hello", "sequence": -0 }
+			},
+			{
+				"id": "pr-set-repeated",
+				"action": "set-message",
+				"arguments": { "message": "world", "sequence": 2 }
+			},
+			{ "id": "pr-clear", "action": "clear-message", "arguments": {} }
+		],
+		"nightlyAdditionalCases": [
+			{
+				"id": "nightly-set-unicode",
+				"action": "set-message",
+				"arguments": { "message": "nightly-λ", "sequence": 3 }
+			}
+		]
+	}
+}

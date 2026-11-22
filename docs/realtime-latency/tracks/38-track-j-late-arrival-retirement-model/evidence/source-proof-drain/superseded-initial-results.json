@@ -1,0 +1,1510 @@
+{
+  "reason": "The initial cold property could fail on later progress after an earlier valid reopen. Final observations snapshot actual proof availability at the new reopen, preserving the same source/prefix domain.",
+  "modelSha256": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+  "originalRuns": {
+    "test": {
+      "sourceHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+        "packages/protocol-v3/formal/check-source-proof-drain.mjs": "3a756439f7274ef18aff9d4cfee7f5ac1e7973a01262b277d621ea70b67acd38"
+      },
+      "unchanged": true,
+      "mode": "test",
+      "caseFilter": null,
+      "declaredCases": [
+        {
+          "name": "model-typecheck",
+          "command": "typecheck",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt"
+          ],
+          "expected": "typecheck"
+        },
+        {
+          "name": "sourceProofDrain-tests",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain"
+          ],
+          "expected": "tests",
+          "count": 13
+        },
+        {
+          "name": "sourceProofTargetCurrency-tests",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency"
+          ],
+          "expected": "tests",
+          "count": 4
+        }
+      ],
+      "results": [
+        {
+          "name": "model-typecheck",
+          "command": "typecheck",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt"
+          ],
+          "expected": "typecheck",
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "typecheck",
+          "seconds": 2,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/model-typecheck.log"
+        },
+        {
+          "name": "sourceProofDrain-tests",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain"
+          ],
+          "expected": "tests",
+          "count": 13,
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "tests",
+          "seconds": 2,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/sourceProofDrain-tests.log"
+        },
+        {
+          "name": "sourceProofTargetCurrency-tests",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency"
+          ],
+          "expected": "tests",
+          "count": 4,
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "tests",
+          "seconds": 1,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/sourceProofTargetCurrency-tests.log"
+        }
+      ]
+    },
+    "verify": {
+      "sourceHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+        "packages/protocol-v3/formal/check-source-proof-drain.mjs": "3a756439f7274ef18aff9d4cfee7f5ac1e7973a01262b277d621ea70b67acd38"
+      },
+      "unchanged": true,
+      "mode": "verify",
+      "caseFilter": null,
+      "declaredCases": [
+        {
+          "name": "custody-safe",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "cold-safe",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "coldCustody",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "partial-nonvacuity",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "neverPartial",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "release-nonvacuity",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "neverReleased",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "premature-cold-loss",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "prematureStep",
+            "--init",
+            "init",
+            "--invariants",
+            "coldCustody",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "stale-before-plan",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "inverseStep",
+            "--init",
+            "init",
+            "--invariants",
+            "inverseSafety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "shared-context-loss",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "contextStep",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "pending-pair-loss",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "pendingStep",
+            "--init",
+            "init",
+            "--invariants",
+            "pendingRetained",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "target-safe",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        },
+        {
+          "name": "target-stale-read",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "unsafeStep",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ]
+        }
+      ],
+      "results": [
+        {
+          "name": "custody-safe",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "ok",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/custody-safe.log"
+        },
+        {
+          "name": "cold-safe",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "coldCustody",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "ok",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/cold-safe.log"
+        },
+        {
+          "name": "partial-nonvacuity",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "neverPartial",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/partial-nonvacuity.log"
+        },
+        {
+          "name": "release-nonvacuity",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "neverReleased",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/release-nonvacuity.log"
+        },
+        {
+          "name": "premature-cold-loss",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "prematureStep",
+            "--init",
+            "init",
+            "--invariants",
+            "coldCustody",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/premature-cold-loss.log"
+        },
+        {
+          "name": "stale-before-plan",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "inverseStep",
+            "--init",
+            "init",
+            "--invariants",
+            "inverseSafety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/stale-before-plan.log"
+        },
+        {
+          "name": "shared-context-loss",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "contextStep",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/shared-context-loss.log"
+        },
+        {
+          "name": "pending-pair-loss",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofDrain",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "pendingStep",
+            "--init",
+            "init",
+            "--invariants",
+            "pendingRetained",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/pending-pair-loss.log"
+        },
+        {
+          "name": "target-safe",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "ok",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-safe.log"
+        },
+        {
+          "name": "target-stale-read",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "unsafeStep",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-stale-read.log"
+        }
+      ]
+    },
+    "induction": {
+      "sourceHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+        "packages/protocol-v3/formal/check-source-proof-drain.mjs": "3a756439f7274ef18aff9d4cfee7f5ac1e7973a01262b277d621ea70b67acd38"
+      },
+      "unchanged": true,
+      "mode": "induction",
+      "caseFilter": null,
+      "declaredCases": [
+        {
+          "name": "target-base",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+            "--max-steps=0"
+          ]
+        },
+        {
+          "name": "target-step",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "indInit",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+            "--max-steps=1"
+          ]
+        },
+        {
+          "name": "target-mutation",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "unsafeStep",
+            "--init",
+            "indInit",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+            "--max-steps=1"
+          ]
+        }
+      ],
+      "results": [
+        {
+          "name": "target-base",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+            "--max-steps=0"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "ok",
+          "seconds": 7,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-base.log"
+        },
+        {
+          "name": "target-step",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "step",
+            "--init",
+            "indInit",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+            "--max-steps=1"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 0,
+          "got": "ok",
+          "seconds": 11,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-step.log"
+        },
+        {
+          "name": "target-mutation",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/source-proof-drain.qnt",
+            "--main",
+            "sourceProofTargetCurrency",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8931",
+            "--step",
+            "unsafeStep",
+            "--init",
+            "indInit",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+            "--max-steps=1"
+          ],
+          "inputHashes": {
+            "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+            "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+          },
+          "code": 1,
+          "got": "violation",
+          "seconds": 7,
+          "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-mutation.log"
+        }
+      ]
+    }
+  },
+  "results": [
+    {
+      "name": "model-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt"
+      ],
+      "expected": "typecheck",
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 2,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/model-typecheck.log",
+      "archivedLog": {
+        "path": "logs/initial-model-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "sourceProofDrain-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain"
+      ],
+      "expected": "tests",
+      "count": 13,
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "tests",
+      "seconds": 2,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/sourceProofDrain-tests.log",
+      "archivedLog": {
+        "path": "logs/initial-sourceProofDrain-tests.log.gz",
+        "sha256": "d83a409cc3f5b7c05ce0db657a5fd97c96406a96fc8f33be2c6236fa28adb900",
+        "uncompressedSha256": "96f697c702221f5e0b936c2b286756f32d5df5f0026ac0c61f3a2b4419df3b61"
+      }
+    },
+    {
+      "name": "sourceProofTargetCurrency-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofTargetCurrency"
+      ],
+      "expected": "tests",
+      "count": 4,
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "tests",
+      "seconds": 1,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/sourceProofTargetCurrency-tests.log",
+      "archivedLog": {
+        "path": "logs/initial-sourceProofTargetCurrency-tests.log.gz",
+        "sha256": "bf3dd8078baa70d3bf978dcb187b48420730b004c83b14dcd57c265523c5e6b1",
+        "uncompressedSha256": "6de4b0d34b4c204ce241cc2aae2d4c9ec9449ea1e85d8a42683df2c09197eb61"
+      }
+    },
+    {
+      "name": "custody-safe",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/custody-safe.log",
+      "archivedLog": {
+        "path": "logs/initial-custody-safe.log.gz",
+        "sha256": "f9bcd7217b2e2d5d2c63082ea1fd2cab23eb163ba038d4efc2afd1d429d659d6",
+        "uncompressedSha256": "883474d7c4dafc25002103372d8b3c46d0ce45af35b206e9272540a25c230de4"
+      },
+      "graph": {
+        "generated": 1638,
+        "distinct": 528,
+        "queued": 0
+      }
+    },
+    {
+      "name": "cold-safe",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "coldCustody",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/cold-safe.log",
+      "archivedLog": {
+        "path": "logs/initial-cold-safe.log.gz",
+        "sha256": "ace1b7701e7d640d8ddf10d448368f369e8b7f11c53fe25f02aff4f806a7acaf",
+        "uncompressedSha256": "0249170532ff2609019fbad8569e26155892108cf5af6818a9a4e6a66914e78c"
+      },
+      "graph": {
+        "generated": 1638,
+        "distinct": 528,
+        "queued": 0
+      }
+    },
+    {
+      "name": "partial-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverPartial",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/partial-nonvacuity.log",
+      "archivedLog": {
+        "path": "logs/initial-partial-nonvacuity.log.gz",
+        "sha256": "daa5caf707acfb90b90e885077a6e282eecabd826d6afc6f3664c53010adb559",
+        "uncompressedSha256": "26710b468d751bad595a4cabdaf0740b0d11c152d4ce40c9c02a13b4c33e868a"
+      },
+      "graph": {
+        "generated": 180,
+        "distinct": 94,
+        "queued": 54
+      }
+    },
+    {
+      "name": "release-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverReleased",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/release-nonvacuity.log",
+      "archivedLog": {
+        "path": "logs/initial-release-nonvacuity.log.gz",
+        "sha256": "cac0525acdf9ea79079e39bb0c9d98d2f5c13b4451c82a9fa30a75f2b206e412",
+        "uncompressedSha256": "bf2cd6d11309e49b60cc1b5dd7789629f0321c69787686a314dae3beedbded30"
+      },
+      "graph": {
+        "generated": 709,
+        "distinct": 264,
+        "queued": 85
+      }
+    },
+    {
+      "name": "premature-cold-loss",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "prematureStep",
+        "--init",
+        "init",
+        "--invariants",
+        "coldCustody",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/premature-cold-loss.log",
+      "archivedLog": {
+        "path": "logs/initial-premature-cold-loss.log.gz",
+        "sha256": "0ca04d92230c8b4f5cad5db1d3571c9a32b7b48351325f8493b9a79cab7c51b7",
+        "uncompressedSha256": "02446b5f451deea5f09fdd37f95921ef35cad78ba4828aa6d14ae94ff0decb64"
+      },
+      "graph": {
+        "generated": 747,
+        "distinct": 376,
+        "queued": 199
+      }
+    },
+    {
+      "name": "stale-before-plan",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "inverseStep",
+        "--init",
+        "init",
+        "--invariants",
+        "inverseSafety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/stale-before-plan.log",
+      "archivedLog": {
+        "path": "logs/initial-stale-before-plan.log.gz",
+        "sha256": "7ce8b4ea845a30a5b2afb8156cb51c431f5d6e34e1e6e94bae0a46463b25c6c5",
+        "uncompressedSha256": "5186231a7d30af74638afeedf3e6ecbccb274d015875304e7963484ef32098c7"
+      },
+      "graph": {
+        "generated": 380,
+        "distinct": 205,
+        "queued": 124
+      }
+    },
+    {
+      "name": "shared-context-loss",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "contextStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/shared-context-loss.log",
+      "archivedLog": {
+        "path": "logs/initial-shared-context-loss.log.gz",
+        "sha256": "70dfcdad332a0ed28da7c4895b6a47bfb19b2b8271d05d25b4e03d621c9b06a1",
+        "uncompressedSha256": "a9a2daadc8c0f8198fb419ea920876cc30d12054e336c70ba648dade878d7613"
+      },
+      "graph": {
+        "generated": 397,
+        "distinct": 177,
+        "queued": 82
+      }
+    },
+    {
+      "name": "pending-pair-loss",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofDrain",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "pendingStep",
+        "--init",
+        "init",
+        "--invariants",
+        "pendingRetained",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/pending-pair-loss.log",
+      "archivedLog": {
+        "path": "logs/initial-pending-pair-loss.log.gz",
+        "sha256": "aa7be64436afbd33b77deef932305475d7f933d08b65402fc4067b65ae1684c1",
+        "uncompressedSha256": "d8cc03e5f939f2e9708de58c7f1381757deb6fac5d7fba2ae38066931ac22efe"
+      },
+      "graph": {
+        "generated": 9,
+        "distinct": 9,
+        "queued": 7
+      }
+    },
+    {
+      "name": "target-safe",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofTargetCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-safe.log",
+      "archivedLog": {
+        "path": "logs/initial-target-safe.log.gz",
+        "sha256": "9f6f0b0aa572ee28d3e86bdff56ecb8f3f2d14650fa396a1f893fdcd705a4ed8",
+        "uncompressedSha256": "16ec7d4dee872d000ed2c39181999af26438850fa55d584e9595920a6265e38c"
+      },
+      "graph": {
+        "generated": 8,
+        "distinct": 5,
+        "queued": 0
+      }
+    },
+    {
+      "name": "target-stale-read",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofTargetCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/tlc.json"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-stale-read.log",
+      "archivedLog": {
+        "path": "logs/initial-target-stale-read.log.gz",
+        "sha256": "f80b200e73de72c80d132e83f022ff5fa5081ab036eff3d03e3dbcd212943cc0",
+        "uncompressedSha256": "3197e3c6026183e18b4abc3e0d19d2dde48bb95b599f5c19e03df4017bb0f1c2"
+      },
+      "graph": {
+        "generated": 5,
+        "distinct": 5,
+        "queued": 2
+      }
+    },
+    {
+      "name": "target-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofTargetCurrency",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+        "--max-steps=0"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-base.log",
+      "archivedLog": {
+        "path": "logs/initial-target-base.log.gz",
+        "sha256": "d44b6a7e74c8380405f3b01fdb60372934e08b382006e666c7ccbe2c56b06867",
+        "uncompressedSha256": "b3c12ba6259ba7dc9cb67070e9da2aa74f09cbde030d88ebffa5b39fb25179f4"
+      }
+    },
+    {
+      "name": "target-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofTargetCurrency",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+        "--max-steps=1"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 0,
+      "got": "ok",
+      "seconds": 11,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-step.log",
+      "archivedLog": {
+        "path": "logs/initial-target-step.log.gz",
+        "sha256": "4d1905dea49885476004a2171f3baeef0f94e2bdb4cb354492dccd7178d8858e",
+        "uncompressedSha256": "66ec7453f72a108816ab6a4aa6672650dd38e36121f7a43a586584ecf0f9b1e1"
+      }
+    },
+    {
+      "name": "target-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-proof-drain.qnt",
+        "--main",
+        "sourceProofTargetCurrency",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8931",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-source-proof-drain-v1/apalache.json",
+        "--max-steps=1"
+      ],
+      "inputHashes": {
+        "packages/protocol-v3/formal/source-proof-drain.qnt": "5701a4d1f360e48034b69f14e9a2e7e3f23df80e21d93b105a4b07556893eba3",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "/private/tmp/ts-drp-source-proof-drain-v1/target-mutation.log",
+      "archivedLog": {
+        "path": "logs/initial-target-mutation.log.gz",
+        "sha256": "f16d05865ad71f4f41a9e2fa309ed8a3a4b95df36ed7b4abcb71feb91edc7236",
+        "uncompressedSha256": "d22d46e4add3ab6a8df40f2b985744a0e8ad2b61958153b28c8df5624066d600"
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": { "composite": false, "noEmit": true, "rootDir": "../../..", "target": "ES2023" },
+	"files": ["probe.ts", "child.ts", "runner.ts", "gates.ts"],
+	"include": []
+}

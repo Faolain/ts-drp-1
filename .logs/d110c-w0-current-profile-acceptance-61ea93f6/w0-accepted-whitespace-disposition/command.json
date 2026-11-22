@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import fs from\"node:fs\";import assert from\"node:assert/strict\";const s=fs.readFileSync(\".logs/d110c-w0-current-profile-acceptance-61ea93f6/w0-accepted-staged-whitespace/stdout\",\"utf8\"),paths=[...new Set(s.split(\"\\n\").map(l=>l.match(/^(\\.logs\\/[^:]+):\\d+:/)?.[1]).filter(Boolean))];assert.deepEqual(paths,[\".logs/d110c-w0-final-review-7efe33dd/public/w0-green.patch\"]);console.log(JSON.stringify({exactRawWhitespacePaths:paths,rawBytesPreserved:true}));"
+  ],
+  "start": "2026-09-06T12:39:24.601Z"
+}

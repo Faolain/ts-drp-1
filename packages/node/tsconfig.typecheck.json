@@ -1,0 +1,12 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"rootDir": "../..",
+		"paths": {
+			"@ts-drp/node": ["./src/index.ts"],
+			"@ts-drp/node/*": ["./src/*.ts"],
+			"@ts-drp/*": ["../*"]
+		}
+	}
+}

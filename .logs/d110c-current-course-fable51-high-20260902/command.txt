@@ -1,0 +1,1 @@
+CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude -p --model fable --effort high --permission-mode dontAsk --safe-mode --allowedTools Read,Grep,Glob,Bash --disallowedTools Edit,Write,NotebookEdit,Task --output-format json < .logs/d110c-current-course-fable51-high-20260902/prompt.md

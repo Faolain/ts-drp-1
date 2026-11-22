@@ -1,0 +1,294 @@
+[
+  {
+    "file": "compiler-green/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T05:52:23.826Z",
+    "finish": "2026-09-06T05:52:30.266Z",
+    "pid": 10841
+  },
+  {
+    "file": "custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:58:16.609Z",
+    "finish": "2026-09-06T05:58:23.073Z",
+    "pid": 18445
+  },
+  {
+    "file": "custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:52:04.879Z",
+    "finish": "2026-09-06T05:52:11.013Z",
+    "pid": 10330
+  },
+  {
+    "file": "custody-final/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:07:35.671Z",
+    "finish": "2026-09-06T06:07:49.518Z",
+    "pid": 34805
+  },
+  {
+    "file": "diff/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:53:11.646Z",
+    "finish": "2026-09-06T05:53:11.706Z",
+    "pid": 11615
+  },
+  {
+    "file": "equivalence-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:52:47.999Z",
+    "finish": "2026-09-06T05:52:48.420Z",
+    "pid": 11254
+  },
+  {
+    "file": "equivalence/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T05:52:23.325Z",
+    "finish": "2026-09-06T05:52:23.743Z",
+    "pid": 10802
+  },
+  {
+    "file": "format/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:53:09.796Z",
+    "finish": "2026-09-06T05:53:10.343Z",
+    "pid": 11503
+  },
+  {
+    "file": "freeze-runtime-ready/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:53:36.634Z",
+    "finish": "2026-09-06T05:53:37.839Z",
+    "pid": 12129
+  },
+  {
+    "file": "freeze-runtime/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T05:53:24.572Z",
+    "finish": "2026-09-06T05:53:25.158Z",
+    "pid": 11838
+  },
+  {
+    "file": "isolated/build/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:01:46.882Z",
+    "finish": "2026-09-06T06:02:23.135Z",
+    "pid": 24559
+  },
+  {
+    "file": "isolated/checkout/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:00:44.422Z",
+    "finish": "2026-09-06T06:00:45.223Z",
+    "pid": 21703
+  },
+  {
+    "file": "isolated/clone/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:00:29.168Z",
+    "finish": "2026-09-06T06:00:29.241Z",
+    "pid": 21493
+  },
+  {
+    "file": "isolated/compiler-green/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T06:02:50.537Z",
+    "finish": "2026-09-06T06:03:05.870Z",
+    "pid": 29019
+  },
+  {
+    "file": "isolated/custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:07:32.752Z",
+    "finish": "2026-09-06T06:07:36.285Z",
+    "pid": 33186
+  },
+  {
+    "file": "isolated/custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:02:44.988Z",
+    "finish": "2026-09-06T06:02:47.450Z",
+    "pid": 26867
+  },
+  {
+    "file": "isolated/custody-prepared/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:01:14.209Z",
+    "finish": "2026-09-06T06:01:16.716Z",
+    "pid": 22197
+  },
+  {
+    "file": "isolated/diff/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:02:56.606Z",
+    "finish": "2026-09-06T06:02:56.637Z",
+    "pid": 29133
+  },
+  {
+    "file": "isolated/equivalence/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:02:56.698Z",
+    "finish": "2026-09-06T06:02:57.386Z",
+    "pid": 29147
+  },
+  {
+    "file": "isolated/format/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:02:56.604Z",
+    "finish": "2026-09-06T06:02:58.200Z",
+    "pid": 29112
+  },
+  {
+    "file": "isolated/freeze-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:03:24.480Z",
+    "finish": "2026-09-06T06:03:25.415Z",
+    "pid": 29687
+  },
+  {
+    "file": "isolated/graph-comparison/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:03:24.226Z",
+    "finish": "2026-09-06T06:03:24.387Z",
+    "pid": 29649
+  },
+  {
+    "file": "isolated/install/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:00:45.714Z",
+    "finish": "2026-09-06T06:00:55.024Z",
+    "pid": 21850
+  },
+  {
+    "file": "isolated/lint/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:02:56.388Z",
+    "finish": "2026-09-06T06:03:11.437Z",
+    "pid": 29098
+  },
+  {
+    "file": "isolated/matrix-validator/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:03:23.990Z",
+    "finish": "2026-09-06T06:03:24.126Z",
+    "pid": 29611
+  },
+  {
+    "file": "isolated/native-addon-import/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:01:45.196Z",
+    "finish": "2026-09-06T06:01:46.822Z",
+    "pid": 24500
+  },
+  {
+    "file": "isolated/native-prebuild/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:01:26.332Z",
+    "finish": "2026-09-06T06:01:28.822Z",
+    "pid": 24308
+  },
+  {
+    "file": "isolated/native-preparation/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:01:19.360Z",
+    "finish": "2026-09-06T06:01:28.851Z",
+    "pid": 24301
+  },
+  {
+    "file": "isolated/node-root-import/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:02:43.855Z",
+    "finish": "2026-09-06T06:02:44.937Z",
+    "pid": 26811
+  },
+  {
+    "file": "isolated/patch-apply/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:00:45.554Z",
+    "finish": "2026-09-06T06:00:45.590Z",
+    "pid": 21812
+  },
+  {
+    "file": "isolated/patch-check/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:00:45.370Z",
+    "finish": "2026-09-06T06:00:45.404Z",
+    "pid": 21750
+  },
+  {
+    "file": "isolated/runtime-49/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T06:07:23.290Z"
+  },
+  {
+    "file": "isolated/sparse/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:00:44.163Z",
+    "finish": "2026-09-06T06:00:44.203Z",
+    "pid": 21658
+  },
+  {
+    "file": "lint/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:53:10.424Z",
+    "finish": "2026-09-06T05:53:25.600Z",
+    "pid": 11547
+  },
+  {
+    "file": "main-49/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T05:58:07.931Z"
+  },
+  {
+    "file": "main-handoff/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:58:33.948Z",
+    "finish": "2026-09-06T05:58:34.143Z",
+    "pid": 18821
+  },
+  {
+    "file": "matrix-validator/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T05:53:09.558Z",
+    "finish": "2026-09-06T05:53:09.701Z",
+    "pid": 11465
+  }
+]

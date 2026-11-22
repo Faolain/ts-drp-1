@@ -1,0 +1,209 @@
+import type {
+	CreateV3RoomSessionInput,
+	V3RoomAcceptedOperation,
+	V3RoomApplication,
+	V3RoomAuthenticatedProjectionBase,
+	V3RoomMigrationActivationInput,
+	V3RoomMigrationActivationReceipt,
+	V3RoomMigrationCapability,
+	V3RoomMigrationProjection,
+	V3RoomMigrationRehearsalInput,
+	V3RoomMigrationRehearsalReceipt,
+	V3RoomProjectionAuthority,
+	V3RoomProjectionInput,
+	V3RoomSession,
+	V3RoomTransport,
+} from "../../../examples/v3-room/src/index.js";
+import type { EphemeralChannel, EphemeralChannelOptions } from "../../../packages/ephemeral/src/index.js";
+
+type Equal<Left, Right> =
+	(<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false;
+type Assert<Value extends true> = Value;
+
+type ExpectedOperationAdmissionReservation =
+	| Readonly<{ readonly kind: "fresh"; commit(): "committed"; release(): void }>
+	| Readonly<{ readonly kind: "duplicate" | "conflict" | "rejected" }>;
+
+interface ExpectedOperationAdmissionPolicy {
+	reserve(operation: Readonly<Record<string, unknown>>): ExpectedOperationAdmissionReservation;
+}
+
+type PropertyIfPresent<Value, Key extends PropertyKey> = Key extends keyof Value ? Value[Key] : undefined;
+
+interface ExpectedRosterEntry {
+	readonly author: string;
+	readonly peerId: string;
+}
+
+interface ExpectedProjection extends V3RoomProjectionAuthority {
+	readonly acceptedDigests: readonly string[];
+}
+
+interface ExpectedAcceptedOperation {
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operationCount: number;
+	readonly operationIndex: number;
+	readonly vertexDigest: string;
+}
+
+interface ExpectedMigrationProjection {
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly importOperations: readonly Readonly<Record<string, unknown>>[];
+}
+
+interface ExpectedMigrationCapability {
+	canonicalStateBytes(projection: ExpectedProjection): Uint8Array;
+	prepare(accepted: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection;
+}
+
+interface ExpectedMigrationInput {
+	readonly rehearsalNonce: Uint8Array;
+	readonly targetCreatorInvite: CreateV3RoomSessionInput<ExpectedProjection>["creatorInvite"];
+}
+
+interface ExpectedMigrationReceipt {
+	readonly activated: false;
+	readonly applicationStateDigest: string;
+	readonly exactCanonicalRecordBytes: Uint8Array;
+	readonly importedOperationCount: number;
+	readonly recordDigest: string;
+	readonly recordVertexDigest: string;
+	readonly targetAnchorDigest: string;
+}
+
+interface ExpectedMigrationActivationReceipt {
+	readonly activated: true;
+	readonly activationDecisionDigest: string;
+	readonly activationVertexDigest: string;
+	readonly targetAnchorDigest: string;
+}
+
+interface ExpectedMigrationActivationInput {
+	readonly exactCanonicalRecordBytes: Uint8Array;
+	readonly recordVertexDigest: string;
+	readonly targetCreatorInvite: CreateV3RoomSessionInput<ExpectedProjection>["creatorInvite"];
+}
+
+interface ExpectedAuthenticatedProjectionBase {
+	readonly blueprintDigest: string;
+	readonly epoch: number;
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly objectId: string;
+	readonly stateDigest: string;
+}
+
+interface ExpectedProjectionInput {
+	readonly authenticatedBase: ExpectedAuthenticatedProjectionBase | undefined;
+	readonly currentEpochOperations: readonly V3RoomAcceptedOperation[];
+}
+
+type ExpectedProjector = (input: ExpectedProjectionInput) => ExpectedProjection;
+
+type _AcceptedOperation = Assert<Equal<V3RoomAcceptedOperation, ExpectedAcceptedOperation>>;
+type _AuthenticatedProjectionBase = Assert<
+	Equal<V3RoomAuthenticatedProjectionBase, ExpectedAuthenticatedProjectionBase>
+>;
+type _ApplicationKeys = Assert<
+	Equal<
+		keyof V3RoomApplication<ExpectedProjection>,
+		| "batchableOperationActions"
+		| "bootstrapOperation"
+		| "canonicalBlueprintPackageBytes"
+		| "catalog"
+		| "displacedOperationIdentity"
+		| "displacementPolicies"
+		| "migration"
+		| "projectAcceptedOperations"
+		| "transformDisplacedOperation"
+	>
+>;
+type _MigrationProjection = Assert<Equal<V3RoomMigrationProjection, ExpectedMigrationProjection>>;
+type _MigrationCapability = Assert<Equal<V3RoomMigrationCapability<ExpectedProjection>, ExpectedMigrationCapability>>;
+type _MigrationApplication = Assert<
+	Equal<V3RoomApplication<ExpectedProjection>["migration"], V3RoomMigrationCapability<ExpectedProjection> | undefined>
+>;
+type _MigrationInput = Assert<Equal<V3RoomMigrationRehearsalInput, ExpectedMigrationInput>>;
+type _MigrationReceipt = Assert<Equal<V3RoomMigrationRehearsalReceipt, ExpectedMigrationReceipt>>;
+type _MigrationActivationInput = Assert<Equal<V3RoomMigrationActivationInput, ExpectedMigrationActivationInput>>;
+type _MigrationActivationReceipt = Assert<Equal<V3RoomMigrationActivationReceipt, ExpectedMigrationActivationReceipt>>;
+type _BatchableActions = Assert<
+	Equal<V3RoomApplication<ExpectedProjection>["batchableOperationActions"], readonly string[]>
+>;
+type _DisplacedOperationIdentity = Assert<
+	Equal<
+		V3RoomApplication<ExpectedProjection>["displacedOperationIdentity"],
+		(operation: Readonly<Record<string, unknown>>) => string
+	>
+>;
+type _DisplacementPolicies = Assert<
+	Equal<
+		V3RoomApplication<ExpectedProjection>["displacementPolicies"],
+		Readonly<Record<string, "expire" | "manual-review" | "rebase" | "transform">>
+	>
+>;
+type _Projector = Assert<Equal<V3RoomApplication<ExpectedProjection>["projectAcceptedOperations"], ExpectedProjector>>;
+type _ProjectionInput = Assert<Equal<V3RoomProjectionInput, ExpectedProjectionInput>>;
+type _TransformDisplacedOperation = Assert<
+	Equal<
+		V3RoomApplication<ExpectedProjection>["transformDisplacedOperation"],
+		((operation: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>) | undefined
+	>
+>;
+type _IssuanceDatabaseName = Assert<
+	Equal<CreateV3RoomSessionInput<ExpectedProjection>["issuanceDatabaseName"], string>
+>;
+type _RebaseSourceInvite = Assert<
+	Equal<
+		CreateV3RoomSessionInput<ExpectedProjection>["rebaseSourceInvite"],
+		CreateV3RoomSessionInput<ExpectedProjection>["creatorInvite"] | undefined
+	>
+>;
+type _Roster = Assert<Equal<V3RoomProjectionAuthority["transportPeerAuthors"], readonly ExpectedRosterEntry[]>>;
+type _Writers = Assert<Equal<V3RoomProjectionAuthority["writerAuthors"], readonly string[]>>;
+type _ProjectionSink = Assert<
+	Equal<CreateV3RoomSessionInput<ExpectedProjection>["onProjection"], (projection: ExpectedProjection) => void>
+>;
+type _OperationAdmissionFactory = Assert<
+	Equal<
+		PropertyIfPresent<CreateV3RoomSessionInput<ExpectedProjection>, "createOperationAdmissionPolicy">,
+		"createOperationAdmissionPolicy" extends keyof CreateV3RoomSessionInput<ExpectedProjection>
+			?
+					| ((
+							context: Readonly<{
+								readonly aclDigest: string;
+								readonly anchorDigest: string;
+								readonly epoch: number;
+								readonly objectId: string;
+							}>
+					  ) => ExpectedOperationAdmissionPolicy)
+					| undefined
+			: undefined
+	>
+>;
+type _TransportFactory = Assert<
+	Equal<CreateV3RoomSessionInput<ExpectedProjection>["openTransport"], (objectId: string) => V3RoomTransport>
+>;
+type _SessionActivation = Assert<
+	Equal<
+		V3RoomSession<ExpectedProjection>["activateMigration"],
+		(input: ExpectedMigrationActivationInput) => Promise<ExpectedMigrationActivationReceipt>
+	>
+>;
+
+declare const session: V3RoomSession<ExpectedProjection>;
+declare const options: EphemeralChannelOptions;
+const channel: EphemeralChannel = session.openEphemeral(options);
+const projection: ExpectedProjection = session.projection();
+const rehearsal: Promise<ExpectedMigrationReceipt> = session.rehearseMigration({
+	rehearsalNonce: new Uint8Array(32),
+	targetCreatorInvite: "00",
+});
+declare const activationInput: ExpectedMigrationActivationInput;
+const activation: Promise<ExpectedMigrationActivationReceipt> = session.activateMigration(activationInput);
+void channel;
+void projection;
+void rehearsal;
+void activation;

@@ -1,0 +1,294 @@
+[
+  {
+    "file": "capture-stopped/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:39:25.684Z",
+    "finish": "2026-09-06T04:39:25.844Z",
+    "pid": 18051
+  },
+  {
+    "file": "compiler-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:41:47.230Z",
+    "finish": "2026-09-06T04:41:55.961Z",
+    "pid": 20488
+  },
+  {
+    "file": "compiler-green/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:36:58.175Z",
+    "finish": "2026-09-06T04:37:03.377Z",
+    "pid": 16357
+  },
+  {
+    "file": "custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:46:57.452Z",
+    "finish": "2026-09-06T04:46:59.745Z",
+    "pid": 26046
+  },
+  {
+    "file": "custody-before-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:35:38.238Z",
+    "finish": "2026-09-06T04:35:41.844Z",
+    "pid": 15018
+  },
+  {
+    "file": "custody-before/status.json",
+    "code": -2,
+    "signal": null,
+    "spawnError": "Error: spawn .logs/d110c-0c1f5b-green-transport-static-41686d6f/custody.mjs ENOENT",
+    "start": "2026-09-06T04:35:23.623Z",
+    "finish": "2026-09-06T04:35:23.627Z"
+  },
+  {
+    "file": "custody-final/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:55:44.114Z",
+    "finish": "2026-09-06T04:55:57.957Z",
+    "pid": 42561
+  },
+  {
+    "file": "diff-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:41:30.834Z",
+    "finish": "2026-09-06T04:41:30.903Z",
+    "pid": 20067
+  },
+  {
+    "file": "diff/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:36:27.948Z",
+    "finish": "2026-09-06T04:36:27.981Z",
+    "pid": 15923
+  },
+  {
+    "file": "equivalence/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:43:59.782Z",
+    "finish": "2026-09-06T04:44:00.823Z",
+    "pid": 22849
+  },
+  {
+    "file": "format-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:41:28.820Z",
+    "finish": "2026-09-06T04:41:29.514Z",
+    "pid": 19937
+  },
+  {
+    "file": "format/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:36:25.681Z",
+    "finish": "2026-09-06T04:36:26.625Z",
+    "pid": 15783
+  },
+  {
+    "file": "freeze-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:46:00.498Z",
+    "finish": "2026-09-06T04:46:00.873Z",
+    "pid": 25031
+  },
+  {
+    "file": "isolated/build/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:52:52.277Z",
+    "finish": "2026-09-06T04:53:22.810Z",
+    "pid": 33843
+  },
+  {
+    "file": "isolated/checkout/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:50:10.947Z",
+    "finish": "2026-09-06T04:50:11.612Z",
+    "pid": 29408
+  },
+  {
+    "file": "isolated/clone/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:49:56.234Z",
+    "finish": "2026-09-06T04:49:56.322Z",
+    "pid": 29065
+  },
+  {
+    "file": "isolated/compiler-green/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:54:02.799Z",
+    "finish": "2026-09-06T04:54:09.926Z",
+    "pid": 37109
+  },
+  {
+    "file": "isolated/custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:55:37.743Z",
+    "finish": "2026-09-06T04:55:40.243Z",
+    "pid": 40506
+  },
+  {
+    "file": "isolated/custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:54:04.012Z",
+    "finish": "2026-09-06T04:54:07.132Z",
+    "pid": 37148
+  },
+  {
+    "file": "isolated/custody-prepared/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:50:49.886Z",
+    "finish": "2026-09-06T04:50:54.120Z",
+    "pid": 30466
+  },
+  {
+    "file": "isolated/freeze-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:54:31.297Z",
+    "finish": "2026-09-06T04:54:31.496Z",
+    "pid": 39443
+  },
+  {
+    "file": "isolated/graph-comparison/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:54:31.026Z",
+    "finish": "2026-09-06T04:54:31.196Z",
+    "pid": 39405
+  },
+  {
+    "file": "isolated/install/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:50:12.114Z",
+    "finish": "2026-09-06T04:50:23.472Z",
+    "pid": 29561
+  },
+  {
+    "file": "isolated/native-addon-import/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:52:51.474Z",
+    "finish": "2026-09-06T04:52:52.180Z",
+    "pid": 33785
+  },
+  {
+    "file": "isolated/native-prebuild/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:52:33.303Z",
+    "finish": "2026-09-06T04:52:34.928Z",
+    "pid": 33607
+  },
+  {
+    "file": "isolated/native-preparation-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:52:33.101Z",
+    "finish": "2026-09-06T04:52:34.952Z",
+    "pid": 33605
+  },
+  {
+    "file": "isolated/native-preparation/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T04:50:53.225Z",
+    "finish": "2026-09-06T04:51:01.039Z",
+    "pid": 32315
+  },
+  {
+    "file": "isolated/node-root-import/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:54:01.632Z",
+    "finish": "2026-09-06T04:54:02.707Z",
+    "pid": 37054
+  },
+  {
+    "file": "isolated/patch-apply/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:50:11.921Z",
+    "finish": "2026-09-06T04:50:11.971Z",
+    "pid": 29523
+  },
+  {
+    "file": "isolated/patch-check/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:50:11.736Z",
+    "finish": "2026-09-06T04:50:11.767Z",
+    "pid": 29478
+  },
+  {
+    "file": "isolated/sparse/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:50:10.767Z",
+    "finish": "2026-09-06T04:50:10.799Z",
+    "pid": 29362
+  },
+  {
+    "file": "isolated/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T04:55:00.005Z"
+  },
+  {
+    "file": "lint-corrected/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:41:29.602Z",
+    "finish": "2026-09-06T04:42:08.034Z",
+    "pid": 19985
+  },
+  {
+    "file": "lint/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T04:36:26.725Z",
+    "finish": "2026-09-06T04:36:58.064Z",
+    "pid": 15852
+  },
+  {
+    "file": "main-24/status.json",
+    "status": 0,
+    "signal": null,
+    "endedAt": "2026-09-06T04:46:35.345Z"
+  },
+  {
+    "file": "main-handoff/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:48:18.679Z",
+    "finish": "2026-09-06T04:48:18.899Z",
+    "pid": 27186
+  },
+  {
+    "file": "query-transform/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T04:44:56.079Z",
+    "finish": "2026-09-06T04:44:56.855Z",
+    "pid": 23750
+  }
+]

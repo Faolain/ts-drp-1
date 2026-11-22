@@ -1,0 +1,196 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "--testNamePattern=D.110c-0c1f5b parent genuine settlement composition|parent f5b P2",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-89f147cc/focused-01/result.json"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "expectedTotal": 45,
+  "expectedActive": 28,
+  "expectedPass": 28,
+  "expectedFail": 0,
+  "expectedFiltered": 17,
+  "entries": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition retains checkpoint-terminal open progress through cold recovery across three transitions",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 12 scans the largest valid fence without burning another author space",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 12 ignores a stale fence at or below the authenticated terminal boundary",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 23 freezes only the equivocating author below a fence",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve unpublished-fence custody",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-replacement custody",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-fence custody",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 17 closes an authenticated null-boundary member without a fence or slot zero",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition cases 19-21 retain displaced control and sole plan completion ownership",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 24a rejects a stale local head without regressing the authenticated floor",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=false",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=true",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=false",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=true",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 13 prunes only beyond the fully retained authenticated rollback window",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition case 17 retains the exact legacy v1 reentry guard source custody",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "name": "D.110c-0c1f5b parent genuine settlement composition keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for issue",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for rehearse",
+      "expectedStatus": "passed",
+      "token": null
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "name": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for activate",
+      "expectedStatus": "passed",
+      "token": null
+    }
+  ],
+  "fileHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c"
+  }
+}

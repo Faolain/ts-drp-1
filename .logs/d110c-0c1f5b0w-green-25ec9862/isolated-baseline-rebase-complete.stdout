@@ -1,0 +1,48 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-f5b0w-green-m7UvLk/checkout
+
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once 1033ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis 4ms
+   → expected [Function] to throw error including 'issuance-rejected' but got 'truncated canonical value'
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > rejects wrong readiness scope and snapshot scope before bootstrap or recovery 1ms
+   → expected [Function] to throw error including 'readiness' but got 'truncated canonical value'
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase 4ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > orders exact rebase and transform inputs while expire and held review perform no issue 3ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > closes one source exactly once after every child has a terminal outcome 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > preserves published source work and completes pending work only after target acceptance 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > batches sixteen compatible rebases behind one target signature 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > splits seventeen compatible rebases into sixteen plus one 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > refuses a foreign-author displaced intent before signing or issuing 0ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > sorts displaced pages before assigning fresh target logical times 0ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > suppresses an accepted exact identity before issue and rejects changed bytes 0ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps the source pending and terminally exposes target issue or publication failure 0ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a failed source completion pending and retries it on reopen 0ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > fails unknown policy and unstable transform identity before target issuance 1ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a transformed source pending when the product projection rejects its replacement 0ms
+   → truncated canonical value
+ × tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a recovered projection-rejected replacement and its source pending without reissue 0ms
+   → truncated canonical value
+ ✓ tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > rejects partial, extra and accessor-backed policy evidence before consuming a source row 1ms
+ ✓ tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps the reserved terminal activation outside the real chat and zone displacement policies 123ms
+
+ Test Files  1 failed (1)
+      Tests  18 failed | 2 passed (20)
+   Start at  10:13:15
+   Duration  1.48s (transform 786ms, setup 0ms, collect 95ms, tests 1.18s, environment 0ms, prepare 41ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0w-green-25ec9862/isolated-baseline-rebase-complete.json

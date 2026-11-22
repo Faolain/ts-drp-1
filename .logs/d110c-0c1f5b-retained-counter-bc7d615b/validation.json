@@ -1,0 +1,97 @@
+{
+  "tests": "bc7d615b40c5125ed5b48ff90d0be64dcdca4b15",
+  "signature": "G",
+  "pushed": true,
+  "classification": "ACCEPTED_RETAINED_COUNTER_BASELINE",
+  "executionCount": 1,
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "allOtherAssertionsUnchanged": true,
+  "parentTestsUnchanged": true,
+  "productionPreserved": true,
+  "isolatedSourceRuntimePreserved": true,
+  "targetDiagnostics": 0,
+  "externalDiagnostics": 0,
+  "packageWideTypecheckClaimedGreen": false,
+  "protectedPaths": 86522,
+  "stashCount": 27,
+  "protectedFunctions": [
+    {
+      "name": "temporaryPrimary",
+      "sha256": "a3721656515e2787201a5fd92fbb33a34d4939ccfb4540368f4a01e7712b7cf8"
+    },
+    {
+      "name": "openMemory",
+      "sha256": "d3e6f226c644ec4d85658d388c6cef384529b88aa580fa5af00abd7057187fd4"
+    },
+    {
+      "name": "openBrowser",
+      "sha256": "e5a0fc1bfbf182541e492a08331b6fdcdb97b038d947cb3b3079443c3156085b"
+    },
+    {
+      "name": "openNode",
+      "sha256": "3c304ff43e38ac519d710884f4c2bfcca83615db000836f74943380e88234abd"
+    },
+    {
+      "name": "openAdapter",
+      "sha256": "c40e2433855167d37b3cb513be45d2205d339830e167e27a9da79eefbbb3f923"
+    },
+    {
+      "name": "withAdapter",
+      "sha256": "ed827c922b385ab87707179fec4668c3f613afcc863ea56a949c637ae669b194"
+    },
+    {
+      "name": "authenticatedSettledPrune",
+      "sha256": "518898e73aaa062f15bc6794c96540a8975545b440112f575774867f4cc145fb"
+    },
+    {
+      "name": "issueRows",
+      "sha256": "41099089f29572d7dcc6c290a928d5dbe08937b17dac82c91c4ed1554611a000"
+    },
+    {
+      "name": "writePlan",
+      "sha256": "e7f6653b402566fe9af5b7645fa74023f7609802dfdfd6c238f8217eec299353"
+    },
+    {
+      "name": "assertRowsRemain",
+      "sha256": "97eca5febfc64ef05ac2aa331bf003da63e50d30ab280c3081b9f54ff1f5acd9"
+    }
+  ],
+  "retainedHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c",
+    "tests/fixtures/phase-6b-d110c-0c1f5b0s/settlement-plan-contract.ts": "8866e93e6b6fa306a1fc2bfbda601d75585816121e8b8fc0305cbab523288952"
+  },
+  "immutable": [
+    {
+      "name": "d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "manifestSha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "name": "d110c-0c1f5b-green-89f147cc",
+      "entries": 137,
+      "manifestSha256": "9ee19175cda3b5a1db33319c16478b3c01f3ea5c30db08a1d0a99566c3c4ef4c"
+    },
+    {
+      "name": "d110c-0c1f5b-red-checkpoint-link-f83764c5",
+      "entries": 71,
+      "manifestSha256": "606860edd135b91fbd1eb71b3ebed39caaa80860485024bff1564a7d65797a39"
+    },
+    {
+      "name": "d110c-0c1f5b-red-scalar-6353eb61",
+      "entries": 75,
+      "manifestSha256": "4590049f6472fd0eb5699ed795289803ad3ca7197545356b5049ccf4ba77d0f0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-observer-78e068a8",
+      "entries": 63,
+      "manifestSha256": "fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148"
+    }
+  ],
+  "notNewCausalRed": true,
+  "pendingGreenGateStillRequired": true
+}

@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "files": ["api-contract.ts"], "include": [] }

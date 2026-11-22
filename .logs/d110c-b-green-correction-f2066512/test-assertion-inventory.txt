@@ -1,0 +1,12 @@
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:735:test("pins the exact successor product browser inventory", () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:753:test(D108D2_BROWSER_BEHAVIORS[0], async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:786:test(D108D2_BROWSER_BEHAVIORS[1], async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:814:test(D108D2_BROWSER_BEHAVIORS[2], async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:903:test("D.110c-0b0 provider crash and classification matrix fails closed", async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1009:test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1155:test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1297:test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2008:test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2143:test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody", async ({
+tests/phase-6b-d110c-b-hot-adoption.test.ts:11:describe("D.110c-b general hot adoption GREEN", () => {
+tests/phase-6b-d110c-b-hot-adoption.test.ts:12:	it("advances the genuine epoch-one close to one exact epoch-two active owner", async () => {

@@ -1,0 +1,43 @@
+{
+  "full": {
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--check",
+      "--",
+      ".logs/d110c-0c1f5b0z-green-b2594cc7"
+    ],
+    "status": 2,
+    "stdout": ".logs/d110c-0c1f5b0z-green-b2594cc7/baseline-typecheck-storage/stdout:4: new blank line at EOF.\n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:516: trailing whitespace.\n+37127 37084       00:01 node (vitest)      \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:519: trailing whitespace.\n+37156 37127       00:00 node (vitest 1)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:520: trailing whitespace.\n+37157 37127       00:00 node (vitest 2)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:521: trailing whitespace.\n+37158 37127       00:00 node (vitest 3)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:522: trailing whitespace.\n+37159 37127       00:00 node (vitest 4)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:523: trailing whitespace.\n+37160 37127       00:00 node (vitest 5)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:524: trailing whitespace.\n+37162 37127       00:00 node (vitest 6)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:525: trailing whitespace.\n+37163 37127       00:00 node (vitest 7)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:526: trailing whitespace.\n+37164 37127       00:00 node (vitest 8)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:527: trailing whitespace.\n+37165 37127       00:00 node (vitest 9)     \n.logs/d110c-0c1f5b0z-green-b2594cc7/initial-typecheck-storage/stdout:4: new blank line at EOF.\n.logs/d110c-0c1f5b0z-green-b2594cc7/main-eslint/stdout:7: new blank line at EOF.\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:6: space before tab in indent.\n+ \ttype AheReclamationPromotion,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:7: space before tab in indent.\n+ \ttype AheReclamationReceipt,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:8: space before tab in indent.\n+ \ttype AheReclamationSnapshot,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:10: space before tab in indent.\n+ \tcaptureAheReclamationInput,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:11: space before tab in indent.\n+ \tclassifyAheReclamation,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:12: space before tab in indent.\n+ \tcreateAheReclamationError,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:14: space before tab in indent.\n+ \tlifecycle: BrowserAheReclamationLifecycle,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:15: space before tab in indent.\n+ \tdatabaseName: string\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:24: trailing whitespace.\n+ \n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:31: space before tab in indent.\n+ \ttype AheReclamationPromotion,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:32: space before tab in indent.\n+ \ttype AheReclamationReceipt,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:33: space before tab in indent.\n+ \ttype AheReclamationSnapshot,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:35: space before tab in indent.\n+ \tcaptureAheReclamationInput,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:36: space before tab in indent.\n+ \tclassifyAheReclamation,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:37: space before tab in indent.\n+ \tcreateAheReclamationError,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:39: space before tab in indent.\n+ \tconnection: DatabaseSync,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:40: space before tab in indent.\n+ \tlifecycle: Lifecycle\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:49: trailing whitespace.\n+ \n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:56: space before tab in indent.\n+ \tisStorageObjectId,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:60: space before tab in indent.\n+ \tBlobDigest,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:61: space before tab in indent.\n+ \tExpectedHead,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:62: space before tab in indent.\n+ \tGenerationId,\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:64: space before tab in indent.\n+ \treclaimClosedEpoch(input: unknown): Promise<AheReclamationReceipt>;\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:66: trailing whitespace.\n+ \n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:152: space before tab in indent.\n+ \tdigest: BlobDigest;\n.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:153: space before tab in indent.\n+ \tgenerationId: GenerationId;\n.logs/d110c-0c1f5b0z-green-b2594cc7/signed-typecheck-storage/stdout:4: new blank line at EOF.\n",
+    "stderr": ""
+  },
+  "scoped": {
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--check",
+      "--",
+      ".logs/d110c-0c1f5b0z-green-b2594cc7",
+      ":(exclude).logs/d110c-0c1f5b0z-green-b2594cc7/baseline-typecheck-storage/stdout",
+      ":(exclude).logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout",
+      ":(exclude).logs/d110c-0c1f5b0z-green-b2594cc7/initial-typecheck-storage/stdout",
+      ":(exclude).logs/d110c-0c1f5b0z-green-b2594cc7/main-eslint/stdout",
+      ":(exclude).logs/d110c-0c1f5b0z-green-b2594cc7/production.patch",
+      ":(exclude).logs/d110c-0c1f5b0z-green-b2594cc7/signed-typecheck-storage/stdout"
+    ],
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "rawExceptions": [
+    "baseline-typecheck-storage/stdout",
+    "browser-process-preflight/stdout",
+    "initial-typecheck-storage/stdout",
+    "main-eslint/stdout",
+    "production.patch",
+    "signed-typecheck-storage/stdout"
+  ],
+  "disposition": "Only exact captured output and patch whitespace are exempt. Production owners, docs, scripts and all other evidence must pass; published process output has separately recorded credential redaction."
+}

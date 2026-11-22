@@ -1,0 +1,27 @@
+{
+  "verdict": "PASS",
+  "findings": [],
+  "checked_requirements": [
+    "Read the frozen plan from “W0 current-profile fixture reconciliation freeze” through the combined acceptance checkpoint, stopping before historical cleanup.",
+    "Verified the explicit nine-file source scope and hashes. The three W0 owners match w0-green.patch; the six retained-consumer owners match their signed repair evidence. The eight pending production owners were treated only as protected inputs.",
+    "Confirmed the optional creatorTrustProfileId seam reaches genuine preparation, defaults to creator-trusted-v1 when omitted, and selects ACL version 3 only for creator-trusted-settlement-v1.",
+    "Confirmed genuine capacity behavior and independent accounting: legacy retains its workload and rejects the fence; settlement journals the signed fence, charges sequences 0–1491 to the offender’s 1,492 share, rejects sequence 1,492, permits another writer, includes the anchor in occupancy, and genuinely closes. Persisted bytes, digests, signatures, close charges, and application totals are independently bound.",
+    "Reviewed the failed application-waiter implementation and its causal correction. The accepted correction uses the sequence-one dependency as the admission barrier without changing workload, thresholds, or production code.",
+    "Confirmed the retained Node facade preserves the ordered eight-method public surface, retains six intentional overrides, preserves both settlement method identities, and keeps the original heavy-child controls.",
+    "Confirmed full aggregate-bearing closures are authenticated before exact digest-and-length projection into the bounded trust predicate; durable aggregate evidence and independently derived hostile bindings remain present.",
+    "Confirmed both cold-input construction sites receive detached bytes from one journal-derived, canonical, digest-checked epoch-zero bootstrap; no recovery-row substitution, hardcoding, or shared API was introduced.",
+    "Preserved evidence identity: the historical consumed mismatch remains a failed six-test reporter; observation-only RED added no runtime; consumer RED remains four passes and three causal failures; no historical failure was relabeled as a success.",
+    "Confirmed consumer GREEN represents 7 checkpoint executions plus 51 consumer executions covering 51 unique controls—not 58 independent cases—and includes the heavy child once.",
+    "Confirmed main acceptance contains 232 unique identities: the original W0 seven, all historical retained 220 plus two closure controls, and three separately categorized bootstrap controls. All passed once without retry, skip, timeout, or cleanup residue.",
+    "Confirmed browser acceptance covers all 24 existing identities across Chromium, Firefox, and WebKit, once each, with no flaky, skipped, or retried cases.",
+    "Confirmed isolated acceptance used a detached baseline plus the exact 11-owner overlay, an independent offline install, independently prepared native artifact, and a fresh source build without borrowing main node_modules, dist, or native output. Its W0 7, retained 222, and bootstrap 3 gates passed once.",
+    "Reviewed both fresh 40-root program inventories and graph comparison. Common source hashes and normalized import edges match; the actual 381-file difference consists only of derived ancestor declarations. Both programs have the identical 92-diagnostic inventory, including three targeted diagnostics and zero additions or removals.",
+    "Confirmed root result/identity verification and exact self-excluding seals: RED 67 entries, W0 GREEN 290, consumer RED 174, consumer GREEN 135, regression 51, browser 26, and isolation 164.",
+    "Confirmed custody records preserve pending production owners, built identities, stashes, protected paths, sealed evidence, and quiescence. No production/API repair, parent acceptance, or long campaign is claimed."
+  ],
+  "limitations": [
+    "This was the required read-only review; tests, builds, compilers, installers, and profilers were not rerun. The verdict relies on inspected immutable reporters, assertions, hashes, manifests, and independent verification records.",
+    "The widened typecheck is not clean: 92 inherited diagnostics remain, three in targeted fixture owners. PASS means the isolated inventory is baseline-equivalent with zero new diagnostics, not that type debt is resolved.",
+    "The unfinished parent production repair, registry governance, grid authority composition, and eventual 64-writer/100-transition campaign remain explicitly outside this acceptance verdict."
+  ]
+}

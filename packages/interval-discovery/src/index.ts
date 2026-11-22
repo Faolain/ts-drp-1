@@ -246,19 +246,15 @@ export class DRPIntervalDiscovery implements IDRPIntervalDiscovery {
 		subscribers: Record<string, SubscriberInfo>,
 		objectId: string
 	): Promise<void> {
-		try {
-			const response = DRPDiscoveryResponse.create({ subscribers });
-			const message = Message.create({
-				sender: recipient,
-				type: MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE,
-				data: DRPDiscoveryResponse.encode(response).finish(),
-				objectId,
-			});
-
-			await networkNode.sendMessage(recipient, message);
-		} catch (_) {
-			// TODO: need to add a global logger for this
-		}
+		const response = DRPDiscoveryResponse.create({ subscribers });
+		const message = Message.create({
+			sender: recipient,
+			type: MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE,
+			data: DRPDiscoveryResponse.encode(response).finish(),
+			objectId,
+		});
+		// A failed send rejects (typed) and reaches handleDiscoveryRequest's error report.
+		await networkNode.sendMessage(recipient, message);
 	}
 }
 

@@ -1,0 +1,5 @@
+# Gate32 retained finality export roster
+
+The complete raw reporter and validation record 12 total /11 passed /1 failed, exact intended file and title multiset, zero skips or suite errors. The failure is `keeps the actor, evidence, and finality subpaths closed` at tests/phase-5e-creator-actor-red.test.ts:275. Earlier exact actor/evidence assertions in that case pass; the finality assertion compares the existing four-export module to EXPECTED_EXPORTS.finality's three names. The same file's contract assertion at255–258 also explicitly pins that old three-name list.
+
+This is the same existing signed keychain export addition documented completely in retained-31-attribution.json: d77ee315a7688cffb5fd55870c38231403ecc41f added signCreatorIssuanceRetirementRequest. No new parent API is involved. The runtime failure occurs on the exact module-surface assertion, not a signature check. All eleven other actor cases pass. No fixture expectation was edited and no runtime/module rerun was performed; execution stopped before33 for root disposition.

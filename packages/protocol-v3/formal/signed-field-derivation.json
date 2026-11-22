@@ -1,0 +1,41 @@
+{
+	"algorithm": "signed-vertex-type-auth-action-usage-v1",
+	"derivedSignedFields": [
+		"anchor",
+		"author",
+		"authorSequence",
+		"dependencies",
+		"epoch",
+		"kind",
+		"logicalTime",
+		"objectId",
+		"operation",
+		"protocolMajor"
+	],
+	"inputs": {
+		"authenticatedActions": ["issueLocalSuccess", "admitRemote"],
+		"authenticationPredicate": "authenticateSignedVertex",
+		"model": {
+			"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+		},
+		"registry": [],
+		"signedVertexType": {
+			"fields": [
+				"anchor",
+				"author",
+				"authorSequence",
+				"dependencies",
+				"epoch",
+				"kind",
+				"logicalTime",
+				"objectId",
+				"operation",
+				"protocolMajor"
+			],
+			"name": "SignedVertex"
+		}
+	},
+	"protocolMajor": 3,
+	"schemaVersion": "phase-n1prime-a-signed-field-derivation-v2"
+}

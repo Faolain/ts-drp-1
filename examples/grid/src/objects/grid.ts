@@ -25,34 +25,6 @@ export class Grid implements IDRP {
 	}
 
 	/**
-	 * Move a user in the grid
-	 * @param userId - The user id
-	 * @param direction - The direction to move the user
-	 */
-	moveUser(userId: string, direction: string): void {
-		const userColorString = [...this.positions.keys()].find((u) => u.startsWith(`${userId}:`));
-		if (userColorString) {
-			const position = this.positions.get(userColorString);
-			if (position) {
-				switch (direction) {
-					case "U":
-						position.y += 1;
-						break;
-					case "D":
-						position.y -= 1;
-						break;
-					case "L":
-						position.x -= 1;
-						break;
-					case "R":
-						position.x += 1;
-						break;
-				}
-			}
-		}
-	}
-
-	/**
 	 * Query the users in the grid
 	 * @returns The users in the grid
 	 */

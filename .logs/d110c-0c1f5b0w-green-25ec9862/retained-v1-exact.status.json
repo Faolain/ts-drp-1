@@ -1,0 +1,22 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "--testNamePattern=keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+    "--no-file-parallelism",
+    "--maxWorkers=1",
+    "--minWorkers=1",
+    "--coverage.enabled=false",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile.json=.logs/d110c-0c1f5b0w-green-25ec9862/retained-v1-exact.json"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:12:16.491Z",
+  "finished": "2026-09-05T14:12:20.118Z",
+  "status": 0,
+  "signal": null
+}

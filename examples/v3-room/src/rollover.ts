@@ -1,0 +1,1355 @@
+import { decodeCanonical } from "@ts-drp/canonical";
+import {
+	isV3RoomClosePendingRefusal,
+	V3RoomAwaitingAuthorFence,
+	V3RoomHandBackRefused,
+	V3RoomLocalBacklogFull,
+} from "@ts-drp/node/v3-room";
+import type {
+	V3RoomAcceptedVertex,
+	V3RoomHandBack,
+	V3RoomSession,
+	V3RoomSettlementStatus,
+	V3RoomSuccessorAuthority,
+} from "@ts-drp/node/v3-room";
+
+import { createV3RoomWriterCapacity, type V3RoomWriterCapacity, type V3RoomWriterCapacityReading } from "./writer-capacity.js";
+
+/** The adopted successor's offer (the four exact canonical byte strings a member installs). */
+export type V3RoomSuccessorOffer = Awaited<ReturnType<V3RoomSession["exportCreatorSuccessor"]>>;
+
+/**
+ * When a room's creator rolls the epoch over. Each application chooses its own values (in its own
+ * `rollover.ts`) under the ceiling it measured; only the scheduling is shared.
+ *
+ * A move counts against the epoch it was admitted in, per author: the native ceilings are per
+ * author (the creator's own issuance image; each Writer's own rows), and so is Chat's allowance.
+ */
+export interface V3RoomRolloverBudget {
+	/** The creator seals once one author has this many admitted moves in the current epoch. */
+	readonly movesPerAuthor: number;
+	/**
+	 * Optional application weight of one admitted move (Chat: its canonical message bytes), and the
+	 * per-author total in one epoch at which the creator seals.
+	 */
+	readonly weight?: Readonly<{ perAuthor: number; of(vertex: V3RoomAcceptedVertex): number }>;
+	/** The creator seals after this long without an admission, once the epoch holds a move. */
+	readonly idleMs: number;
+}
+
+/** What the policy did, for the page's status line and for measurement. Observation only. */
+export type V3RoomRolloverEvent = Readonly<{
+	epoch: number;
+	successorEpoch: number;
+	/**
+	 * `capacity`: a settlement Writer's forecast admission (writer-capacity.ts) is about to end, so the
+	 * creator rolls before the Writer's own store refuses its next move. `silence`: a Writer past half
+	 * of its forecast admission stopped issuing (its refused move is waiting), so the creator does not
+	 * wait for the idle period. Both are capacity triggers: a test's budget override does not replace
+	 * them, as it does not replace the native refusal trigger, and each fires at most once per epoch,
+	 * only from admitted rows.
+	 */
+	trigger: "budget" | "idle" | "refusal" | "capacity" | "silence";
+	/** The most moves (and weight) any one author had admitted in the closed epoch. */
+	moves: number;
+	weight: number;
+	ms: number;
+}>;
+
+export interface V3RoomRolloverHooks {
+	/**
+	 * Creator: hands the adopted successor's offer to the room's other members, who install it with
+	 * `installCreatorSuccessor`. Members cannot follow the room without it. A failure is reported
+	 * through `onError`; the creator keeps the offer and the next rollover publishes its own.
+	 */
+	publishSuccessor?(offer: V3RoomSuccessorOffer, successorEpoch: number): void | Promise<void>;
+	onRollover?(event: V3RoomRolloverEvent): void;
+	onError?(error: unknown): void;
+	/**
+	 * Member: a move waits for the room's next epoch (refused at a capacity only a rollover
+	 * clears). The page's successor delivery asks the creator for its latest offer.
+	 */
+	requestSuccessor?(): void;
+	/** Every change of `status()`, for the page's status line. */
+	onStatus?(status: V3RoomRolloverStatus): void;
+	/**
+	 * Member: whether the creator is reachable now (the successor delivery's `creatorReachable`).
+	 * While it is not, the member is read-only: a move is kept (V3RoomReadOnly), not issued, and
+	 * offered again once the creator is back and the room has installed a later epoch.
+	 */
+	creatorReachable?(): boolean;
+	/**
+	 * Member: a move the room gave back was offered again and refused for a lasting reason (the room's
+	 * application state limit, or its admission policy): the policy declined it (the room drops its
+	 * record, so it holds no backlog slot and is never offered again). The page tells the user the move
+	 * did not happen. Called once per declined move.
+	 */
+	onDeclined?(declined: V3RoomMoveDeclined): void;
+	/**
+	 * An application refusal that a rollover clears (Chat: its allowance is per checkpoint).
+	 * Native capacity refusals are recognised without it.
+	 */
+	clearedByRollover?(error: unknown): boolean;
+}
+
+/**
+ * The policy's state for the page. "waiting": a member's move waits for the next epoch.
+ * "successor-unavailable": no successor arrived within the member's bound; the kept moves are
+ * offered again, in order, once the room installs a later epoch.
+ * "not-reaching-host": a member's own moves have not reached the creator for `unsettledEpochs`
+ * epochs (from V3_ROOM_NOT_REACHING_HOST_EPOCHS on), or the room refused a new move because its
+ * undelivered moves fill the room's backlog (V3RoomNotReachingHost). The member still writes until
+ * then; at `window` unsettled epochs the room stops re-offering a move and gives it back, and the
+ * policy keeps it (`kept`) until the member's moves reach the creator again.
+ * "read-only": the creator is unreachable (hooks.creatorReachable); moves are kept, not issued.
+ * "awaiting-fence": the room refused a move because this epoch's author fence is awaited
+ * (V3RoomAwaitingFence): the member's retained work waits for the creator's frontier of a later
+ * install. Moves are kept and offered again, in order, once the room installs a later epoch.
+ */
+export type V3RoomRolloverStatus = Readonly<{
+	state: "ready" | "waiting" | "successor-unavailable" | "not-reaching-host" | "awaiting-fence" | "read-only";
+	epoch: number;
+	kept: readonly Readonly<Record<string, unknown>>[];
+	/** A member's own settlement lag (V3RoomSettlementStatus); 0 for a creator or an unknown room. */
+	unsettledEpochs: number;
+	/** The room's settlement window in epochs; 0 when the room reports none. */
+	window: number;
+}>;
+
+/**
+ * A member's move refused at a capacity only a rollover clears, when no later epoch arrived within
+ * the member's bound. The move is not lost: the policy keeps it and offers it again once the room
+ * installs a later epoch (`status().kept`).
+ */
+export class V3RoomSuccessorUnavailable extends Error {
+	/**
+	 * @param operation - The move kept for the next installed epoch.
+	 * @param epoch - The epoch the member waited in.
+	 * @param waitedMs - How long it waited.
+	 * @param options - The refusal that only a rollover clears, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly waitedMs: number,
+		options?: ErrorOptions
+	) {
+		super(`no successor epoch arrived within ${Math.round(waitedMs)} ms; the move is kept`, options);
+		this.name = "V3RoomSuccessorUnavailable";
+	}
+}
+
+/**
+ * A member's move refused because the creator is unreachable (hooks.creatorReachable). The move is
+ * not lost: the policy keeps it and offers it again once the creator is back and the room has
+ * installed a later epoch (`status().kept`).
+ */
+export class V3RoomReadOnly extends Error {
+	/**
+	 * @param operation - The move kept until the creator is reachable.
+	 * @param epoch - The epoch the member was in.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number
+	) {
+		super("the room's creator is unreachable; this member is read-only and the move is kept");
+		this.name = "V3RoomReadOnly";
+	}
+}
+
+/**
+ * A move the room kept refusing as transient (its input queue full: "retry after admitted work
+ * joins") for the whole retry bound, as during a long install or adoption. The move is not lost: the
+ * policy keeps it and offers it again once the room takes work (`status().kept`).
+ */
+export class V3RoomBusy extends Error {
+	/**
+	 * @param operation - The move kept until the room takes work again.
+	 * @param epoch - The epoch the move was offered in.
+	 * @param waitedMs - How long the policy retried.
+	 * @param options - The transient refusal, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly waitedMs: number,
+		options?: ErrorOptions
+	) {
+		super(`the room stayed busy for ${Math.round(waitedMs)} ms; the move is kept and sent once it takes work`, options);
+		this.name = "V3RoomBusy";
+	}
+}
+
+/**
+ * Reported through `onError` (never thrown to the caller): a kept move's re-offer was refused with an
+ * error outside the kinds the policy keeps a move for. The move is not dropped: it stays kept
+ * (`status().kept`) and is offered again in a later epoch, once per epoch, as a given-back move the room
+ * still lists is.
+ */
+export class V3RoomKeptMoveRefused extends Error {
+	/**
+	 * @param operation - The kept move.
+	 * @param epoch - The epoch the re-offer was refused in.
+	 * @param options - The refusal, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		options?: ErrorOptions
+	) {
+		super("a kept move's re-offer was refused; the move is kept and offered again in a later epoch", options);
+		this.name = "V3RoomKeptMoveRefused";
+	}
+}
+
+/**
+ * Reported through `onError` (never thrown to the caller): a kept or given-back move was superseded by
+ * a newer accepted move of the same author and identity (the policy's `identity`, as a later placement
+ * of the same block). Offered again as a new move, the older move would land after the newer one and
+ * replace it in every replica, so the newer move stands as the author's final state for that identity:
+ * a superseded kept move is not offered again; a superseded given-back move is offered again with its
+ * record (only its own row consumes the record) and `supersededBy` is offered again right after it, so
+ * it lands last. Either way the older move is accounted for here, never silently dropped.
+ */
+export class V3RoomKeptMoveSuperseded extends Error {
+	/**
+	 * @param operation - The older kept or given-back move.
+	 * @param supersededBy - The newer accepted move of the same identity that stands in its place.
+	 * @param epoch - The epoch the policy found it superseded in.
+	 * @param givenBack - Whether the older move was a given-back move (offered again with its record).
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly supersededBy: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly givenBack: boolean
+	) {
+		super(
+			givenBack
+				? "a given-back move was superseded by a newer accepted move of the same identity; the newer move is sent again after it"
+				: "a kept move was superseded by a newer accepted move of the same identity; the newer move stands in its place"
+		);
+		this.name = "V3RoomKeptMoveSuperseded";
+	}
+}
+
+/**
+ * A member's new move refused because its undelivered moves fill the room's backlog
+ * (V3RoomLocalBacklogFull): they are not reaching the host. The move was never accepted, so it is not
+ * lost: the policy keeps it and offers it again once the member's moves reach the creator
+ * (`status().kept`, state "not-reaching-host").
+ */
+export class V3RoomNotReachingHost extends Error {
+	/**
+	 * @param operation - The move kept until the member's moves reach the creator.
+	 * @param epoch - The epoch the member was in.
+	 * @param options - The room's backlog refusal, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		options?: ErrorOptions
+	) {
+		super("this member's moves are not reaching the host; the move is kept and sent once they do", options);
+		this.name = "V3RoomNotReachingHost";
+	}
+}
+
+/**
+ * The early signal: a member whose own moves have not reached the creator for this many epochs is
+ * told so (status "not-reaching-host"). It is two epochs before the room's settlement window, at
+ * which the room stops re-offering a move and gives it back.
+ */
+export const V3_ROOM_NOT_REACHING_HOST_MARGIN = 2;
+
+/**
+ * How long a member waits for the room's next epoch after a capacity refusal before it tells the
+ * page and keeps the move. A rollover (seal, adopt, export) measured 1-3 s natively; delivery and
+ * install add a few seconds more. Thirty seconds is ten times that and still short for a person.
+ */
+export const V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS = 30_000;
+/** How often a member with kept moves looks for a later epoch. */
+const KEPT_POLL_MS = 1_000;
+
+/**
+ * A member's new move the room refused because this epoch's author fence is awaited
+ * (V3RoomAwaitingAuthorFence, the `cause`): its retained work waits for the creator's frontier of a
+ * later install, and a move signed now could never be proven never admitted. The room did not accept
+ * the move; this policy keeps it (`status().kept`, state "awaiting-fence") and offers it again, in
+ * order, once the room has installed a later epoch. The app shows it as pending, not lost.
+ */
+export class V3RoomAwaitingFence extends Error {
+	/**
+	 * @param operation - The move kept until a later epoch.
+	 * @param epoch - The epoch whose author fence is awaited.
+	 * @param options - The room's refusal as `cause`.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		options?: ErrorOptions
+	) {
+		super(
+			"the room refused this move: this epoch's author fence is awaited; the policy keeps the move and sends it after the next install",
+			options
+		);
+		this.name = "V3RoomAwaitingFence";
+	}
+}
+
+/**
+ * A move the room gave back (settlementStatus().undelivered) that this policy offered again and the
+ * room refused for a lasting reason (`reason`: "application-state-limit" or "admission-rejected"; the
+ * room's V3RoomHandBackRefused is the `cause`). Offering it again would be refused again, so the policy
+ * declined it (V3RoomSession.declineHandBack): it is not kept and never sent. The page tells the user
+ * (hooks.onDeclined).
+ */
+export class V3RoomMoveDeclined extends Error {
+	/**
+	 * @param operation - The given-back move that was declined.
+	 * @param epoch - The epoch it was refused in.
+	 * @param reason - Why the room refused it.
+	 * @param options - The room's refusal as `cause`.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly reason: "application-state-limit" | "admission-rejected",
+		options?: ErrorOptions
+	) {
+		super(
+			reason === "application-state-limit"
+				? "the room's state limit refused this given-back move; it was declined and is not sent"
+				: "the room's admission policy refused this given-back move; it was declined and is not sent",
+			options
+		);
+		this.name = "V3RoomMoveDeclined";
+	}
+}
+
+/**
+ * The room's refusal of a given-back move offered with its record, with its lasting reason, if any.
+ * @param error - The refusal.
+ * @returns The refusal, when it is one.
+ */
+function handBackRefusal(error: unknown): V3RoomHandBackRefused | undefined {
+	if (error instanceof V3RoomHandBackRefused) return error;
+	if (error instanceof Error && error.name === "V3RoomHandBackRefused" && typeof Reflect.get(error, "handBack") === "object")
+		return error as V3RoomHandBackRefused;
+	return undefined;
+}
+
+type RolloverRoom = Pick<
+	V3RoomSession,
+	"adoptCreatorSuccessor" | "authority" | "exportCreatorSuccessor" | "issue" | "sealEpoch"
+> &
+	Partial<Pick<V3RoomSession, "settlementStatus" | "onAdopted" | "declineHandBack">>;
+
+export interface V3RoomRolloverPolicy {
+	/** "creator" seals; a "member" (Writer) never seals and only re-offers refused moves. */
+	readonly role: "creator" | "member";
+	/** Binds the opened room. Moves observed before it count from then on. */
+	bind(room: RolloverRoom): void;
+	/** Every accepted vertex, own and remote (the session's `onAcceptedVertex`). */
+	observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void;
+	/**
+	 * Creator: the room refused a received move at a capacity a rollover clears (the session's
+	 * `onIngressCapacityRefusal`). The creator seals at once, as for its own refused move, so a hot
+	 * Writer's held move lands in the successor (its Writer offers it again) instead of waiting for
+	 * the budget or idle trigger. A member ignores it.
+	 */
+	refused(reason: string): void;
+	/**
+	 * Issues one move. A move refused at a capacity that a rollover clears is never dropped: the
+	 * creator rolls over at once and offers the same move again; a member offers it again once
+	 * its room has installed a later epoch. A move refused because the epoch is closing (sealed
+	 * and not yet adopted or installed) is offered again once the room is past it. After
+	 * `MAX_OFFERS` capacity refusals, or a closing longer than CLOSING_LIMIT_MS, the last refusal is
+	 * thrown, so the page can show it and keep the move.
+	 */
+	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	/** Moves waiting to be offered again, for the page's status line. */
+	waiting(): number;
+	/** The state the page shows, with the moves a member kept (see V3RoomSuccessorUnavailable). */
+	status(): V3RoomRolloverStatus;
+	/**
+	 * Creator: publishes the successor its room adopted when this policy published none for it, and
+	 * nothing otherwise. The room adopts outside the policy when its own retry of an interrupted
+	 * close seals and adopts (the policy's failed seal handed the close to that retry), and a creator
+	 * reopened from storage starts at an epoch no offer of this page announced. The policy calls it as
+	 * soon as its room reports such an adoption (the session's `onAdopted`), and the page calls it when
+	 * a member pulls from behind the room's epoch with no offer for it (the successor delivery's
+	 * `onMemberBehind`, the backstop for an adoption no event reported, such as one at reopen). It exports the room's successor (which also opens its material serving) and
+	 * hands it to `publishSuccessor`. A rollover in flight publishes its own successor, so this joins
+	 * it; one export at a time, serialized with rollovers. A member ignores it.
+	 */
+	publishCurrent(): Promise<void>;
+	/** Joins an in-flight rollover (tests and orderly shutdown). */
+	settled(): Promise<void>;
+	stats(): Readonly<{ epoch: number; rollovers: number; moves: number; weight: number }>;
+	close(): void;
+}
+
+/**
+ * Native refusals that end with the epoch: the creator's issuance image and proof capacities, and
+ * ISSUANCE_CAPACITY_FORECAST_EXCEEDED (a creator's or Writer's admission refused before signing
+ * because the issuance maintenance forecast would exceed its bound; a rollover clears it).
+ */
+const ROLLOVER_REFUSAL =
+	/ISSUANCE_CAPACITY_FORECAST_EXCEEDED|MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
+/** Refusals that clear once admitted work joins, without a rollover. */
+const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
+/**
+ * The local plane stopped accepting new operations because its epoch is closing (the creator
+ * sealed it and has not adopted the successor yet, or a member received the close and has not
+ * installed the successor yet, or its live plane is being replaced by that install). The move is
+ * offered again once the room is in a later epoch. "creator recovery dependency hold
+ * unavailable:replay" is the creator's issue finding its live plane replaced (by its own adoption)
+ * while it captured its recovery dependencies; a refusal at any other stage of that capture is not
+ * a closing.
+ */
+const CLOSING_REFUSAL =
+	/: not-active\b|live plane is unavailable|creator recovery dependency hold unavailable:replay\b/u;
+/**
+ * An interrupted creator close that the room retries by itself (fix/creator-close-crash): new
+ * operations are refused with "v3 room new operation is not authorized: not-active: close-pending:
+ * ..." until the retried close lands (isV3RoomClosePendingRefusal). The move waits for the room's
+ * epoch to advance (within the closing bound) and is offered again; the policy never seals for it
+ * and never counts it as a capacity offer. A rollover the policy starts meanwhile is that same
+ * close: the room's sealEpoch joins its in-flight retry or runs it in place of the pending one.
+ */
+const SESSION_CLOSED = /v3 room session is closed/u;
+/**
+ * Capacity refusals of one move before the last is thrown. The creator's issuance image spans the
+ * current epoch and up to three before it (measured: a full epoch makes the next two refuse their
+ * first move too), so a move may need a rollover per spanned epoch before one admits it.
+ */
+const MAX_OFFERS = 6;
+/**
+ * A transient refusal ("retry after admitted work joins") is retried with doubling backoff from
+ * TRANSIENT_RETRY_MS up to TRANSIENT_RETRY_MAX_MS, for as long as a closing may last (closingLimitMs):
+ * the room's input queue can stay full through a whole install or adoption. Past that the move is
+ * kept (V3RoomBusy), never dropped. Transient offers do not count against MAX_OFFERS.
+ */
+const TRANSIENT_RETRY_MS = 50;
+const TRANSIENT_RETRY_MAX_MS = 1_000;
+const MEMBER_EPOCH_POLL_MS = 250;
+/**
+ * A move refused while the epoch closes is offered again when the room reaches a later epoch or
+ * after this pause, whichever is first (the refusal can come from an install that already
+ * reports the new epoch), until the closing has lasted CLOSING_LIMIT_MS.
+ */
+const CLOSING_RETRY_MS = 250;
+const CLOSING_LIMIT_MS = 120_000;
+const RETRY_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
+
+/**
+ * The same move: equal plain-data operations, key order aside.
+ * @param left - One operation (or a value inside one).
+ * @param right - The other.
+ * @returns Whether both hold the same data.
+ */
+function sameMove(left: unknown, right: unknown): boolean {
+	if (left === right) return true;
+	if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+	if (Array.isArray(left) !== Array.isArray(right)) return false;
+	const leftKeys = Object.keys(left).sort();
+	const rightKeys = Object.keys(right).sort();
+	return (
+		leftKeys.length === rightKeys.length &&
+		leftKeys.every(
+			(key, index) =>
+				key === rightKeys[index] &&
+				sameMove((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key])
+		)
+	);
+}
+
+function message(error: unknown): string {
+	if (error instanceof Error) return `${error.message} ${message(error.cause)}`;
+	return error === undefined ? "" : String(error);
+}
+
+/**
+ * The epoch an exported offer installs: its successor trust record's `currentEpoch`.
+ * @param offer - An offer the creator's room exported.
+ * @returns The successor epoch, or undefined when the record carries none.
+ */
+function offerSuccessorEpoch(offer: V3RoomSuccessorOffer): number | undefined {
+	let record: unknown;
+	try {
+		record = decodeCanonical(offer.exactCanonicalTrustStateRecordBytes);
+	} catch {
+		return undefined;
+	}
+	const epoch = record !== null && typeof record === "object" ? Reflect.get(record, "currentEpoch") : undefined;
+	return Number.isSafeInteger(epoch) && Number(epoch) >= 1 ? Number(epoch) : undefined;
+}
+
+/**
+ * Runs `work` in a later host task, at idle priority where the host has one: the rollover is
+ * background work and never runs inside the turn that admitted a move. The room's seal already
+ * yields between its native phases and defers to registered foreground issues.
+ * @param work - The rollover.
+ */
+/**
+ * Own moves a Writer must have in the epoch before its forecast can roll the room (capacity or silence): the
+ * shipped per-author budget (Grid, Canvas, v3-chat: 7), so neither trigger is cheaper than the budget.
+ */
+const CAPACITY_MIN_EPOCH_MOVES = 7;
+/** The capacity trigger's margin floor, in moves. */
+const CAPACITY_MARGIN_MIN_MOVES = 4;
+/** The rollover length the margin assumes before the first rollover is measured. */
+const CAPACITY_DEFAULT_ROLL_MS = 2_000;
+/** The shortest silence of a Writer past half its admission that rolls the room. */
+const SILENCE_MIN_MS = 2_000;
+
+function later(work: () => void): void {
+	const idle = Reflect.get(globalThis, "requestIdleCallback") as
+		| ((callback: () => void, options: Readonly<{ timeout: number }>) => unknown)
+		| undefined;
+	if (typeof idle === "function") idle(work, { timeout: 1_000 });
+	else setTimeout(work, 0);
+}
+
+/**
+ * The shared scheduling of every application's rollover policy. The creator counts each author's
+ * admitted moves in the current epoch and seals, adopts and exports the successor once one author
+ * reaches the application's budget, after an idle period, or at once when its own move is refused
+ * at a capacity a rollover clears. One rollover runs at a time; a failed one is reported and
+ * retried after a backoff. Members never seal.
+ * @param input - The local role, the application's budget and hooks.
+ * @returns The policy; bind it to the room once the room is open.
+ */
+export function createV3RoomRolloverPolicy(
+	input: Readonly<{
+		role: "creator" | "member";
+		budget: V3RoomRolloverBudget;
+		hooks?: V3RoomRolloverHooks;
+		/** A member's bound on waiting for the next epoch (default V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS). */
+		memberWaitMs?: number;
+		/** How long a move waits through a closing or a close-pending retry (default 120 s). */
+		closingLimitMs?: number;
+		/**
+		 * The identity under which a later move supersedes an earlier one (the application's
+		 * displacedOperationIdentity for its "rebase" actions), or undefined for a move nothing
+		 * supersedes. With it, a kept or given-back move never lands after a newer accepted move of the
+		 * same identity (author order); without it, kept moves are offered again as they are.
+		 */
+		identity?(operation: Readonly<Record<string, unknown>>): string | undefined;
+		/**
+		 * Creator: the room parameters' dependency bound and the profile its genesis signed, which turn on
+		 * the forecast of each Writer's own admission (the capacity and silence triggers) for the settlement
+		 * profile. The genesis profile is needed because the room's authority is unknown until its first
+		 * successor (a hot Writer can reach its admission in epoch 0); once known, the authority's profile
+		 * decides. Without it only budget, idle and refusal roll the room.
+		 */
+		writerCapacity?: Readonly<{ maxDependencies: number; profileId: V3RoomSuccessorAuthority["profileId"] }>;
+	}>
+): V3RoomRolloverPolicy {
+	const { role, budget } = input;
+	const hooks = input.hooks ?? {};
+	const memberWaitMs = input.memberWaitMs ?? V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS;
+	if (!Number.isFinite(memberWaitMs) || memberWaitMs <= 0) throw new TypeError("v3 room member wait is invalid");
+	const closingLimitMs = input.closingLimitMs ?? CLOSING_LIMIT_MS;
+	if (!Number.isFinite(closingLimitMs) || closingLimitMs <= 0) throw new TypeError("v3 room closing limit is invalid");
+	if (!Number.isSafeInteger(budget.movesPerAuthor) || budget.movesPerAuthor < 1)
+		throw new TypeError("v3 room rollover budget is invalid");
+	if (!Number.isFinite(budget.idleMs) || budget.idleMs <= 0) throw new TypeError("v3 room rollover idle is invalid");
+	let room: RolloverRoom | undefined;
+	let closed = false;
+	let epoch = 0;
+	let rollovers = 0;
+	const moves = new Map<string, number>();
+	const weights = new Map<string, number>();
+	let idleTimer: ReturnType<typeof setTimeout> | undefined;
+	let rolling: Promise<void> | undefined;
+	// The cut of the rollover in flight: its seal and adoption. A move waits for this, not for the
+	// export and publish that follow (they serve the adopted successor; a move then is in its epoch).
+	// Resolves true once adopted, false if the seal or adoption failed.
+	let cutting: Promise<boolean> | undefined;
+	let scheduled = false;
+	let retryAt = 0;
+	let failures = 0;
+	// Creator: the highest successor epoch handed to publishSuccessor.
+	let published = 0;
+	// Writer capacity (creator, settlement profile): the forecast, the epoch each of its triggers last
+	// fired in (once per epoch each), the silence watch on the hottest Writer, and the last rollover's
+	// length (the trigger's margin covers the Writer's moves during the next one).
+	let writerCapacity: V3RoomWriterCapacity | null | undefined;
+	let capacityFired = -1;
+	let silenceFired = -1;
+	let silenceTimer: ReturnType<typeof setTimeout> | undefined;
+	let silenceWatch: (V3RoomWriterCapacityReading & { epoch: number }) | undefined;
+	let lastRollMs = CAPACITY_DEFAULT_ROLL_MS;
+	let waiting = 0;
+	let successorWaits = 0;
+	const kept: Readonly<Record<string, unknown>>[] = [];
+	// The epoch kept new moves wait to be past, and the epoch each given-back move waits to be past.
+	let keptEpoch = 0;
+	const givenBackWait = new WeakMap<object, number>();
+	// The epoch in which a given-back move's re-offer was refused for good, by its hand-back record: the
+	// next listing of that record waits to be past it (one offer per record per epoch).
+	const refusedGivenBack = new Map<string, number>();
+	let keptTimer: ReturnType<typeof setTimeout> | undefined;
+	// The kept moves' re-offer runs one batch at a time, each move after the previous one's answer.
+	let reoffering = false;
+	// The batch moves not yet answered: still kept for the page (status().kept) while they are offered
+	// again, until the room admits, supersedes or declines one, or it is kept again.
+	let reofferPending: Readonly<Record<string, unknown>>[] = [];
+	const listedKept = (): Readonly<Record<string, unknown>>[] => [...reofferPending, ...kept];
+	// This session's own moves accepted in the current epoch (the page may not observe them yet).
+	let acceptedThisEpoch = 0;
+	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
+	// has already kept this session (by their durable hand-back record). A kept given-back operation
+	// is offered again with its record, whose consumption is part of the new row's own issuance
+	// transaction: after a crash the room lists it again only if that row was never issued.
+	let settlement: V3RoomSettlementStatus | undefined;
+	const takenBack = new Set<string>();
+	const handBackOf = new WeakMap<object, V3RoomHandBack>();
+	// The room's durable author order for a given-back move (its listing's supersededBy): the author's
+	// newer move of the same identity, recomputed by the room from its plan and issued rows, so it
+	// survives a reload that empties this policy's history.
+	const supersededByOf = new WeakMap<object, Readonly<Record<string, unknown>>>();
+	const handBackKey = (handBack: V3RoomHandBack): string => `${handBack.sourceSequence}:${handBack.intent}`;
+	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
+	// Author order (input.identity): each new move's place in the order the page asked for moves, and the
+	// last accepted move of each identity with that place. A given-back move is an earlier accepted move
+	// (place 0, older than every move asked for in this session).
+	let requests = 0;
+	const requestOrder = new WeakMap<object, number>();
+	const latest = new Map<string, Readonly<{ operation: Readonly<Record<string, unknown>>; order: number }>>();
+	const identityOf = (operation: Readonly<Record<string, unknown>>): string | undefined => {
+		try {
+			return input.identity?.(operation);
+		} catch {
+			return undefined;
+		}
+	};
+	let lastStatus = "";
+	const epochWaiters = new Set<() => void>();
+	let stopAdoptions: (() => void) | undefined;
+	function close(): void {
+		closed = true;
+		stopAdoptions?.();
+		stopAdoptions = undefined;
+		if (idleTimer !== undefined) clearTimeout(idleTimer);
+		if (keptTimer !== undefined) clearTimeout(keptTimer);
+		if (settlementTimer !== undefined) clearTimeout(settlementTimer);
+		if (silenceTimer !== undefined) clearTimeout(silenceTimer);
+		for (const wake of [...epochWaiters]) wake();
+	}
+	// Member only: the creator is unreachable now (read-only), or its moves are not reaching it.
+	const readOnly = (): boolean => role === "member" && hooks.creatorReachable?.() === false;
+	// The epoch in which the room last refused a new move at its backlog bound: until the room installs a
+	// later epoch (or a new move is accepted) the member's moves are not reaching the host.
+	let backlogFullEpoch: number | undefined;
+	const notReachingHost = (): boolean =>
+		role === "member" &&
+		((backlogFullEpoch !== undefined && currentEpoch() <= backlogFullEpoch) ||
+			(settlement !== undefined &&
+				settlement.window > 0 &&
+				settlement.unsettledEpochs >= Math.max(1, settlement.window - V3_ROOM_NOT_REACHING_HOST_MARGIN)));
+	// The epoch in which the room last refused a new move because its author fence was awaited.
+	let awaitingFenceEpoch: number | undefined;
+	const awaitingFence = (): boolean =>
+		role === "member" && awaitingFenceEpoch !== undefined && currentEpoch() <= awaitingFenceEpoch;
+	const status = (): V3RoomRolloverStatus => {
+		const listed = listedKept();
+		return Object.freeze({
+			state: readOnly()
+				? "read-only"
+				: notReachingHost()
+					? "not-reaching-host"
+					: awaitingFence()
+						? "awaiting-fence"
+						: listed.length > 0
+							? "successor-unavailable"
+							: successorWaits > 0
+								? "waiting"
+								: "ready",
+			epoch: currentEpoch(),
+			kept: Object.freeze(listed),
+			unsettledEpochs: role === "member" ? (settlement?.unsettledEpochs ?? 0) : 0,
+			window: settlement?.window ?? 0,
+		});
+	};
+	const reportStatus = (): void => {
+		const next = status();
+		const key = `${next.state}:${next.kept.length}:${next.unsettledEpochs}`;
+		if (key === lastStatus) return;
+		lastStatus = key;
+		try {
+			hooks.onStatus?.(next);
+		} catch (error) {
+			hooks.onError?.(error);
+		}
+	};
+
+	const most = (values: ReadonlyMap<string, number>): number => Math.max(0, ...values.values());
+	const currentEpoch = (): number => Math.max(epoch, room?.authority()?.epoch ?? 0);
+	const advance = (next: number): void => {
+		if (next <= epoch) return;
+		epoch = next;
+		moves.clear();
+		weights.clear();
+		acceptedThisEpoch = 0;
+		if (silenceTimer !== undefined) clearTimeout(silenceTimer);
+		silenceTimer = undefined;
+		silenceWatch = undefined;
+		for (const wake of [...epochWaiters]) wake();
+	};
+	// The room can advance without this policy (a host's own seal, a member's install); its
+	// authority is read before every decision so counts of a closed epoch never trigger one.
+	const overBudget = (): boolean => {
+		advance(currentEpoch());
+		return (
+			most(moves) >= budget.movesPerAuthor || (budget.weight !== undefined && most(weights) >= budget.weight.perAuthor)
+		);
+	};
+
+	const roll = (trigger: V3RoomRolloverEvent["trigger"]): Promise<void> => {
+		if (rolling !== undefined) return rolling;
+		const selected = room;
+		if (selected === undefined || closed || role !== "creator") return Promise.resolve();
+		const started = performance.now();
+		const closing = { epoch: currentEpoch(), moves: most(moves), weight: most(weights) };
+		const cut = (async () => {
+			const sealed = await selected.sealEpoch();
+			await selected.adoptCreatorSuccessor();
+			return sealed;
+		})();
+		const cutDone = cut.then(
+			() => true,
+			() => false
+		);
+		cutting = cutDone;
+		void cutDone.then(() => {
+			if (cutting === cutDone) cutting = undefined;
+		});
+		const task = (async (): Promise<void> => {
+			const sealed = await cut;
+			const offer = await selected.exportCreatorSuccessor();
+			rollovers++;
+			failures = 0;
+			retryAt = 0;
+			published = Math.max(published, sealed.successorEpoch);
+			lastRollMs = performance.now() - started;
+			advance(sealed.successorEpoch);
+			hooks.onRollover?.(
+				Object.freeze({
+					...closing,
+					epoch: sealed.epoch,
+					successorEpoch: sealed.successorEpoch,
+					trigger,
+					ms: performance.now() - started,
+				})
+			);
+			try {
+				await hooks.publishSuccessor?.(offer, sealed.successorEpoch);
+			} catch (error) {
+				hooks.onError?.(error);
+			}
+		})();
+		rolling = task
+			.then(
+				() => undefined,
+				(error: unknown) => {
+					// A closed session ends its policy; nothing is retried on it.
+					if (SESSION_CLOSED.test(message(error))) {
+						close();
+						return;
+					}
+					failures++;
+					retryAt = Date.now() + (RETRY_BACKOFF_MS[Math.min(failures, RETRY_BACKOFF_MS.length) - 1] ?? 30_000);
+					hooks.onError?.(error);
+				}
+			)
+			.finally(() => {
+				rolling = undefined;
+				// Work admitted while the rollover ran counts in the successor epoch.
+				if (overBudget()) schedule("budget");
+			});
+		return rolling;
+	};
+	const publishCurrent = (): Promise<void> => {
+		const selected = room;
+		if (selected === undefined || closed || role !== "creator") return Promise.resolve();
+		// A rollover in flight (or this catch-up) publishes the successor it adopts.
+		if (rolling !== undefined) return rolling;
+		const current = currentEpoch();
+		if (current < 1 || current <= published) return Promise.resolve();
+		const task = (async (): Promise<void> => {
+			// Named apart from the rollover's own export (tests/fixtures/realtime-probe brackets that one).
+			const adopted = await selected.exportCreatorSuccessor();
+			const successorEpoch = offerSuccessorEpoch(adopted);
+			// The room moved on during the export: a later pull publishes the newer successor.
+			if (closed || currentEpoch() !== current) return;
+			if (successorEpoch !== current)
+				throw new TypeError(`v3 room successor export is for epoch ${String(successorEpoch)}, the room is at ${current}`);
+			published = Math.max(published, current);
+			advance(current);
+			await hooks.publishSuccessor?.(adopted, current);
+		})();
+		rolling = task
+			.then(
+				() => undefined,
+				(error: unknown) => {
+					if (SESSION_CLOSED.test(message(error))) {
+						close();
+						return;
+					}
+					hooks.onError?.(error);
+				}
+			)
+			.finally(() => {
+				rolling = undefined;
+				if (overBudget()) schedule("budget");
+			});
+		return rolling;
+	};
+	const schedule = (trigger: "budget" | "idle" | "capacity" | "silence"): void => {
+		if (scheduled || rolling !== undefined || closed || role !== "creator") return;
+		if (Date.now() < retryAt) {
+			// After a failed rollover, try again once the backoff ends.
+			scheduled = true;
+			setTimeout(() => {
+				scheduled = false;
+				schedule(trigger);
+			}, retryAt - Date.now());
+			return;
+		}
+		scheduled = true;
+		const scheduledIn = currentEpoch();
+		later(() => {
+			scheduled = false;
+			// A rollover that ran meanwhile (a refused move's) may have cleared the trigger.
+			const due =
+				trigger === "budget"
+					? overBudget()
+					: trigger === "idle"
+						? (advance(currentEpoch()), most(moves) > 0)
+						: currentEpoch() === scheduledIn &&
+							(trigger === "capacity" ? capacityFired : silenceFired) !== scheduledIn;
+			if (!due) return;
+			if (trigger === "capacity") capacityFired = scheduledIn;
+			if (trigger === "silence") silenceFired = scheduledIn;
+			void roll(trigger);
+		});
+	};
+	// The forecast exists once the room is bound and only for a settlement-profile creator given its
+	// dependency bound. The room's authority is null until its first successor, so the genesis epoch is
+	// decided by the profile the application signed into genesis, and the object by the admitted row's.
+	const capacityOf = (objectId: string | undefined): V3RoomWriterCapacity | undefined => {
+		if (writerCapacity !== undefined) return writerCapacity ?? undefined;
+		if (role !== "creator" || input.writerCapacity === undefined) {
+			writerCapacity = null;
+			return undefined;
+		}
+		if (room === undefined) return undefined;
+		const authority = room.authority();
+		const object = authority?.objectId ?? objectId;
+		if (object === undefined) return undefined;
+		writerCapacity =
+			(authority?.profileId ?? input.writerCapacity.profileId) === "creator-trusted-settlement-v1"
+				? createV3RoomWriterCapacity({ objectId: object, maxDependencies: input.writerCapacity.maxDependencies })
+				: null;
+		return writerCapacity ?? undefined;
+	};
+	// One admitted row of the current epoch: roll before the Writer's admission ends (capacity), or watch
+	// a Writer past half of it for silence. Margin: the Writer's moves during a rollover and its install
+	// (twice the last rollover), at its recent rate, and never less than CAPACITY_MARGIN_MIN_MOVES.
+	const watchCapacity = (vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void => {
+		if (role !== "creator" || vertex.authorSequence === undefined) return;
+		const reading = capacityOf(vertex.objectId)?.observe(
+			vertex as Pick<V3RoomAcceptedVertex, "author" | "epoch" | "authorSequence"> & Partial<V3RoomAcceptedVertex>,
+			epoch
+		);
+		// No cheaper than the per-author budget: a Writer moves the room only after this many own moves in the epoch.
+		if (reading === undefined || reading.epochRows < CAPACITY_MIN_EPOCH_MOVES) return;
+		const rate = Number.isFinite(reading.gapMs) && reading.gapMs > 0 ? 1_000 / reading.gapMs : 0;
+		const margin = Math.max(CAPACITY_MARGIN_MIN_MOVES, Math.ceil((2 * lastRollMs * rate) / 1_000));
+		if (reading.moves <= margin && capacityFired !== epoch) {
+			schedule("capacity");
+			return;
+		}
+		if (reading.used < 0.5 || silenceFired === epoch) return;
+		// One watch: the Writer furthest into its admission, renewed by its own next row.
+		if (silenceWatch !== undefined && silenceWatch.author !== reading.author && silenceWatch.used > reading.used) return;
+		silenceWatch = { ...reading, epoch };
+		if (silenceTimer !== undefined) clearTimeout(silenceTimer);
+		const quiet = Math.max(SILENCE_MIN_MS, Number.isFinite(reading.gapMs) ? 4 * reading.gapMs : SILENCE_MIN_MS);
+		silenceTimer = setTimeout(() => {
+			silenceTimer = undefined;
+			const watched = silenceWatch;
+			silenceWatch = undefined;
+			if (closed || watched === undefined || currentEpoch() !== watched.epoch || silenceFired === watched.epoch) return;
+			schedule("silence");
+		}, quiet);
+	};
+	const armIdle = (): void => {
+		if (role !== "creator" || closed) return;
+		if (idleTimer !== undefined) clearTimeout(idleTimer);
+		idleTimer = setTimeout(() => {
+			idleTimer = undefined;
+			advance(currentEpoch());
+			if (most(moves) > 0) schedule("idle");
+		}, budget.idleMs);
+	};
+	const clearedByRollover = (error: unknown): boolean =>
+		ROLLOVER_REFUSAL.test(message(error)) || hooks.clearedByRollover?.(error) === true;
+	// A member's room advances when the host installs the successor; it polls its own authority.
+	const nextEpoch = (after: number, within = Number.POSITIVE_INFINITY): Promise<void> =>
+		new Promise<void>((resolve, reject) => {
+			const deadline = performance.now() + within;
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const done = (): void => {
+				epochWaiters.delete(done);
+				if (timer !== undefined) clearTimeout(timer);
+				if (closed) reject(new TypeError("v3 room rollover policy is closed"));
+				else resolve();
+			};
+			const poll = (): void => {
+				if (closed || currentEpoch() > after || performance.now() >= deadline) {
+					advance(currentEpoch());
+					done();
+					return;
+				}
+				timer = setTimeout(poll, MEMBER_EPOCH_POLL_MS);
+			};
+			epochWaiters.add(done);
+			poll();
+		});
+
+	// A member's kept moves take only what the epoch's budget leaves: the creator seals once any author's
+	// accepted moves reach it, so a kept move offered past that point targets an epoch being closed and is
+	// displaced, then replaced at the next install. The forecast follows the epoch's fill as observed
+	// (every author's moves and this session's own accepted ones). Only kept re-offers are paced: new
+	// moves, the creator and other members never are.
+	const keptRoomLeft = (): boolean => {
+		if (role !== "member") return true;
+		advance(currentEpoch());
+		if (budget.weight !== undefined && most(weights) >= budget.weight.perAuthor) return false;
+		return Math.max(acceptedThisEpoch, most(moves)) < budget.movesPerAuthor;
+	};
+	// Kept moves are offered again, in order, once the room is past the epoch that kept them. A move
+	// the room gave back carries its hand-back record: the room never refuses it at the undelivered-move
+	// bound and the record bound limits how many recirculate, so it is offered whatever
+	// notReachingHost() says (waiting on the member's lag only makes it older). It goes first in its
+	// batch. A new move also waits for this member's moves to reach the creator again, and the first
+	// new move refused at the bound keeps the batch's other new moves without offering them.
+	const watchKept = (): void => {
+		if (keptTimer !== undefined || closed || kept.length === 0) return;
+		keptTimer = setTimeout(() => {
+			keptTimer = undefined;
+			if (closed || kept.length === 0) return;
+			if (reoffering) {
+				watchKept();
+				return;
+			}
+			const now = currentEpoch();
+			const givenBack =
+				!readOnly()
+					? kept.filter((operation) => handBackOf.has(operation) && now > (givenBackWait.get(operation) ?? 0))
+					: [];
+			const fresh =
+				now > keptEpoch && !readOnly() && !notReachingHost()
+					? kept.filter((operation) => !handBackOf.has(operation))
+					: [];
+			if (givenBack.length + fresh.length === 0) {
+				watchKept();
+				return;
+			}
+			advance(now);
+			const offered = new Set<object>([...givenBack, ...fresh]);
+			const waiting = kept.filter((operation) => !offered.has(operation));
+			kept.splice(0, kept.length, ...waiting);
+			const batch = [...givenBack, ...fresh];
+			reofferPending = [...batch];
+			reportStatus();
+			watchKept();
+			reoffering = true;
+			void (async (): Promise<void> => {
+				try {
+					for (const [index, operation] of batch.entries()) {
+						if (!keptRoomLeft()) {
+							// The epoch's budget is spent: the rest of the batch waits for a later epoch, in order.
+							for (const unoffered of batch.slice(index)) keep(unoffered, currentEpoch());
+							break;
+						}
+						const answer = await offerKept(operation);
+						// Answered: admitted, superseded or declined (no longer kept), or kept again by keep().
+						answered(operation);
+						reportStatus();
+						if (answer === "next" || (answer === "stop-new" && index < givenBack.length)) continue;
+						// Refused at the bound (new moves) or busy (every move), and kept by issue(): the rest of
+						// the batch stays kept, unoffered.
+						const rest = batch
+							.slice(index + 1)
+							.filter((unoffered) => answer === "stop-all" || !handBackOf.has(unoffered));
+						for (const unoffered of rest)
+							keep(unoffered, answer === "stop-all" ? currentEpoch() - 1 : (backlogFullEpoch ?? currentEpoch()));
+						break;
+					}
+				} finally {
+					reoffering = false;
+					reofferPending = [];
+					reportStatus();
+					// A batch move kept again goes back ahead of the moves kept since, in its order.
+					const again = batch.filter((operation) => kept.includes(operation));
+					if (again.length > 0)
+						kept.splice(0, kept.length, ...again, ...kept.filter((operation) => !again.includes(operation)));
+				}
+			})();
+		}, KEPT_POLL_MS);
+	};
+	// One kept move offered again. "stop-new": the room refused it at the undelivered-move bound (the
+	// batch's other new moves are not offered); "stop-all": the room stayed busy (no move is offered).
+	//
+	// Author order: a kept move is older than any accepted move of its identity the page asked for after
+	// it, and a given-back move is older than every accepted move of its identity. Offered again as a
+	// new move it would land after that newer move and replace it in every replica. So a kept new move
+	// such a move supersedes is not offered again (the newer accepted move stands in its place). A
+	// superseded given-back move is still offered again with its record (only its own row may consume
+	// the record), and the newest accepted move of its identity is offered right after it, so the newer
+	// move lands last. Either is reported (V3RoomKeptMoveSuperseded), never silently dropped. The newer
+	// move offered again is a kept re-offer like any other: it takes what the epoch's budget leaves, and
+	// with none left (or while it is kept already) it waits, kept, for a later epoch, still after the
+	// older move.
+	//
+	// The newer move is this session's last accepted move of the identity when there is one (every move
+	// accepted in this session is newer than any row issued before it, and at least as new as the room's
+	// answer), else, for a given-back move, the room's durable supersededBy (author order by origin, from
+	// the plan and the issued rows): after a reload this policy has no history, and the room's answer
+	// still keeps the older move from landing last.
+	const offerKept = async (operation: Readonly<Record<string, unknown>>): Promise<"next" | "stop-new" | "stop-all"> => {
+		const identity = identityOf(operation);
+		const newest = identity === undefined ? undefined : latest.get(identity);
+		const givenBack = handBackOf.has(operation);
+		const newer = newest?.operation ?? (givenBack ? supersededByOf.get(operation) : undefined);
+		const superseded =
+			newer !== undefined &&
+			!sameMove(newer, operation) &&
+			(givenBack || (requestOrder.get(operation) ?? 0) < (newest?.order ?? 0));
+		if (superseded && !givenBack) {
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newer, currentEpoch(), false));
+			return "next";
+		}
+		const answer = await offerOne(operation);
+		if (answer !== "issued") return answer;
+		if (superseded) {
+			hooks.onError?.(new V3RoomKeptMoveSuperseded(operation, newer, currentEpoch(), true));
+			// The room's answer is a copy of the operation, so "kept already" compares the move itself.
+			if (kept.some((candidate) => sameMove(candidate, newer))) return "next";
+			if (!keptRoomLeft()) {
+				keep(newer, currentEpoch());
+				return "next";
+			}
+			const again = await offerOne(newer);
+			return again === "issued" ? "next" : again;
+		}
+		return "next";
+	};
+	const offerOne = async (
+		operation: Readonly<Record<string, unknown>>
+	): Promise<"issued" | "next" | "stop-new" | "stop-all"> => {
+		try {
+			await issue(operation);
+			return "issued";
+		} catch (error) {
+			if (error instanceof V3RoomNotReachingHost) return "stop-new";
+			if (error instanceof V3RoomBusy) return "stop-all";
+			// A given-back move refused for a lasting reason was declined and told to the page (onDeclined).
+			if (error instanceof V3RoomMoveDeclined) return "next";
+			// A move refused again for want of a successor (or while read-only) is kept again by issue().
+			if (error instanceof V3RoomSuccessorUnavailable) return "next";
+			if (error instanceof V3RoomReadOnly) {
+				hooks.onError?.(error);
+				return "next";
+			}
+			// Refused for good, never dropped: a given-back move stays listed by the room until a row
+			// offering it again consumes its record, so the next settlement poll keeps it again; a new move
+			// is kept here. Either is offered again in a later epoch (one offer per epoch), and the refusal
+			// reaches onError with the move.
+			const refusedIn = currentEpoch();
+			const handBack = handBackOf.get(operation);
+			if (handBack !== undefined) {
+				handBackOf.delete(operation);
+				takenBack.delete(handBackKey(handBack));
+				refusedGivenBack.set(handBackKey(handBack), refusedIn);
+			} else keep(operation, refusedIn);
+			hooks.onError?.(new V3RoomKeptMoveRefused(operation, refusedIn, { cause: error }));
+		}
+		return "next";
+	};
+	// A batch move the re-offer answered leaves the moves listed as pending.
+	const answered = (operation: Readonly<Record<string, unknown>>): void => {
+		if (reofferPending.includes(operation)) reofferPending = reofferPending.filter((pending) => pending !== operation);
+	};
+	// A kept move waits for the room to be past `waitPast` (the epoch that refused it; one before it for
+	// a move that may be offered again in the same epoch).
+	const keep = (operation: Readonly<Record<string, unknown>>, waitPast: number): void => {
+		answered(operation);
+		kept.push(operation);
+		if (handBackOf.has(operation)) givenBackWait.set(operation, waitPast);
+		else keptEpoch = Math.max(keptEpoch, waitPast);
+		reportStatus();
+		watchKept();
+	};
+
+	// The last accepted move of each identity (author order). A move accepted at an earlier place never
+	// replaces a later one: a given-back move (place 0) is recorded only when nothing of its identity is.
+	const noteAccepted = (operation: Readonly<Record<string, unknown>>, order: number): void => {
+		const identity = identityOf(operation);
+		if (identity === undefined) return;
+		const prior = latest.get(identity);
+		if (prior === undefined || (order > 0 && order >= prior.order))
+			latest.set(identity, Object.freeze({ operation, order }));
+	};
+
+	// A member follows its own settlement: the moves the room's settlement window gave back are kept
+	// (in order) and offered again by watchKept, and the status follows the room's lag and the
+	// creator's reachability.
+	const watchSettlement = (): void => {
+		if (closed || role !== "member" || settlementTimer !== undefined) return;
+		settlementTimer = setTimeout(() => {
+			settlementTimer = undefined;
+			if (closed) return;
+			try {
+				const next = room?.settlementStatus?.();
+				if (next !== undefined) {
+					settlement = next;
+					const listed = new Set<string>();
+					for (const given of next.undelivered) {
+						const key = handBackKey(given.handBack);
+						listed.add(key);
+						if (takenBack.has(key)) continue;
+						takenBack.add(key);
+						// A given-back move may be offered again in the epoch it is listed in. Its record exists only
+						// for a frontier-displaced row the window expired: that row's epoch is closed and the
+						// creator's signed cut excludes it, ingress admits only the current anchor, and no live
+						// replacement carries the move (the drain never replaces an "expire" entry), so the
+						// creator can never settle the original. Only the row offering it again, whose issuance
+						// consumes the record, carries the move. Waiting for a later epoch kept the move forever
+						// once the creator went idle in the member's epoch. A record whose re-offer was refused for
+						// good waits to be past that epoch.
+						for (const operation of given.operations) {
+							handBackOf.set(operation, given.handBack);
+							if (given.supersededBy !== undefined) supersededByOf.set(operation, given.supersededBy.operation);
+							keep(operation, refusedGivenBack.get(key) ?? next.epoch - 1);
+						}
+					}
+					// The room lists a given-back move until the row offering it again consumes its record.
+					for (const key of [...takenBack]) if (!listed.has(key)) takenBack.delete(key);
+					for (const key of [...refusedGivenBack.keys()]) if (!listed.has(key)) refusedGivenBack.delete(key);
+				}
+			} catch (error) {
+				hooks.onError?.(error);
+			}
+			reportStatus();
+			watchSettlement();
+		}, KEPT_POLL_MS);
+	};
+
+	async function issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
+		const selected = room;
+		if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
+		if (!handBackOf.has(operation) && !requestOrder.has(operation)) requestOrder.set(operation, ++requests);
+		if (readOnly()) {
+			// The creator is unreachable: a move issued now could only wait out the settlement window.
+			keep(operation, currentEpoch());
+			throw new V3RoomReadOnly(operation, currentEpoch());
+		}
+		let closingSince: number | undefined;
+		let busySince: number | undefined;
+		let busyRetries = 0;
+		for (let offer = 1; ; offer++) {
+			// A move never enters the creator's own rollover between its seal and its adoption. A failed
+			// cut also waits for the roll's own failure handling (backoff, close) before the offer.
+			const cut = cutting;
+			if (cut !== undefined && !(await cut) && rolling !== undefined) await rolling;
+			const attempted = currentEpoch();
+			try {
+				const handBack = handBackOf.get(operation);
+				await selected.issue(operation, handBack === undefined ? undefined : { handBack });
+				handBackOf.delete(operation);
+				advance(currentEpoch());
+				if (currentEpoch() === attempted) acceptedThisEpoch++;
+				noteAccepted(operation, handBack === undefined ? (requestOrder.get(operation) ?? 0) : 0);
+				// A given-back move's reissue never counted against the bound; only a new move reopens it.
+				// Any move, a reissue too, still waits for the author fence (the node refuses it until then).
+				if ((handBack === undefined && backlogFullEpoch !== undefined) || awaitingFenceEpoch !== undefined) {
+					backlogFullEpoch = undefined;
+					awaitingFenceEpoch = undefined;
+					reportStatus();
+				}
+				return;
+			} catch (error) {
+				if (closed) throw error;
+				const refused = handBackRefusal(error);
+				if (refused?.reason !== undefined) {
+					// A given-back move refused for a lasting reason: offering it again would be refused again,
+					// and its record would hold a backlog slot for good. Decline it and tell the page.
+					handBackOf.delete(operation);
+					try {
+						await selected.declineHandBack?.(refused.handBack);
+					} catch (declineError) {
+						hooks.onError?.(declineError);
+					}
+					const declined = new V3RoomMoveDeclined(operation, attempted, refused.reason, { cause: error });
+					try {
+						hooks.onDeclined?.(declined);
+					} catch (hookError) {
+						hooks.onError?.(hookError);
+					}
+					throw declined;
+				}
+				if (
+					error instanceof V3RoomLocalBacklogFull ||
+					(error instanceof Error && error.name === "V3RoomLocalBacklogFull")
+				) {
+					// Refused before acceptance: the member's moves are not reaching the host. Keep the move.
+					backlogFullEpoch = attempted;
+					keep(operation, attempted);
+					throw new V3RoomNotReachingHost(operation, attempted, { cause: error });
+				}
+				if (
+					error instanceof V3RoomAwaitingAuthorFence ||
+					(error instanceof Error && error.name === "V3RoomAwaitingAuthorFence")
+				) {
+					// Refused before acceptance: this epoch's author fence is awaited. Keep it for a later epoch.
+					awaitingFenceEpoch = attempted;
+					keep(operation, attempted);
+					throw new V3RoomAwaitingFence(operation, attempted, { cause: error });
+				}
+				if (isV3RoomClosePendingRefusal(error)) {
+					// Not an offer of the move, and no seal: the room retries its interrupted close by itself.
+					// Wait for that retry (the epoch advancing), within the closing bound, then offer again.
+					closingSince ??= performance.now();
+					const remaining = closingLimitMs - (performance.now() - closingSince);
+					if (remaining <= 0) throw error;
+					offer--;
+					waiting++;
+					try {
+						await nextEpoch(attempted, remaining);
+					} finally {
+						waiting--;
+					}
+					if (currentEpoch() <= attempted) throw error;
+					continue;
+				}
+				if (CLOSING_REFUSAL.test(message(error))) {
+					// Not an offer of the move: the room was between epochs. Bounded by the closing's length.
+					closingSince ??= performance.now();
+					if (performance.now() - closingSince >= closingLimitMs) throw error;
+					offer--;
+					waiting++;
+					try {
+						await (rolling ?? Promise.resolve());
+						await nextEpoch(attempted, CLOSING_RETRY_MS);
+					} finally {
+						waiting--;
+					}
+					continue;
+				}
+				closingSince = undefined;
+				if (TRANSIENT_REFUSAL.test(message(error))) {
+					// Not an offer of the move: the room's input queue is full until admitted work joins.
+					busySince ??= performance.now();
+					const waited = performance.now() - busySince;
+					if (waited >= closingLimitMs) {
+						keep(operation, attempted - 1);
+						throw new V3RoomBusy(operation, attempted, waited, { cause: error });
+					}
+					offer--;
+					const pause = Math.min(TRANSIENT_RETRY_MAX_MS, TRANSIENT_RETRY_MS * 2 ** busyRetries++);
+					await new Promise((resolve) => setTimeout(resolve, Math.min(pause, closingLimitMs - waited)));
+					continue;
+				}
+				if (offer >= MAX_OFFERS) throw error;
+				if (!clearedByRollover(error)) throw error;
+				// The refused move was not admitted (its issue transaction or admission refused it);
+				// the same move is offered again in a later epoch.
+				waiting++;
+				try {
+					if (role === "creator") {
+						if (currentEpoch() === attempted) await roll("refusal");
+						if (currentEpoch() === attempted) throw error;
+					} else {
+						// A member's successor comes from the creator through the page's delivery. Ask for it,
+						// and wait a bounded time: with no successor, the page is told and the move kept.
+						successorWaits++;
+						reportStatus();
+						const started = performance.now();
+						try {
+							hooks.requestSuccessor?.();
+						} catch (requestError) {
+							hooks.onError?.(requestError);
+						}
+						try {
+							await nextEpoch(attempted, memberWaitMs);
+						} finally {
+							successorWaits--;
+						}
+						if (currentEpoch() <= attempted) {
+							keep(operation, attempted);
+							throw new V3RoomSuccessorUnavailable(operation, attempted, performance.now() - started, {
+								cause: error,
+							});
+						}
+						reportStatus();
+					}
+				} finally {
+					waiting--;
+				}
+			}
+		}
+	}
+
+	return Object.freeze({
+		role,
+		bind(selected: RolloverRoom): void {
+			if (room !== undefined) throw new TypeError("v3 room rollover policy is already bound");
+			// The room's epoch is read at the policy's first decision, not here.
+			room = selected;
+			// A successor the room adopted by itself (its interrupted-close retry) is published at once.
+			if (role === "creator") stopAdoptions = selected.onAdopted?.(() => void publishCurrent());
+			watchSettlement();
+		},
+		observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void {
+			if (closed) return;
+			advance(Math.max(vertex.epoch, currentEpoch()));
+			if (vertex.epoch < epoch) return;
+			moves.set(vertex.author, (moves.get(vertex.author) ?? 0) + 1);
+			if (budget.weight !== undefined)
+				weights.set(
+					vertex.author,
+					(weights.get(vertex.author) ?? 0) + budget.weight.of(vertex as V3RoomAcceptedVertex)
+				);
+			armIdle();
+			if (overBudget()) schedule("budget");
+			watchCapacity(vertex);
+		},
+		refused(reason: string): void {
+			if (closed || role !== "creator" || !clearedByRollover(new Error(reason))) return;
+			// A rollover under way (or backing off after a failure) already ends this epoch.
+			if (rolling !== undefined || Date.now() < retryAt) return;
+			const refusedIn = currentEpoch();
+			later(() => {
+				if (!closed && currentEpoch() === refusedIn) void roll("refusal");
+			});
+		},
+		issue,
+		publishCurrent,
+		waiting: (): number => waiting,
+		status,
+		settled: async (): Promise<void> => {
+			while (rolling !== undefined || scheduled) {
+				await (rolling ?? new Promise((resolve) => setTimeout(resolve, 10)));
+			}
+		},
+		stats: () => Object.freeze({ epoch: currentEpoch(), rollovers, moves: most(moves), weight: most(weights) }),
+		close,
+	});
+}

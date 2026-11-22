@@ -1,0 +1,26 @@
+{
+  "verdict": "PASS",
+  "summary": "RED is causal (one file, 9 tests, 8 orchestration-seam failures, 1 legacy control pass, fixture diagnostics cleanly separated). GREEN in examples/v3-room/src/index.ts durably CAS-writes the merged plan before issue, holds manual-review, issues the fence via the Node-owned atomic fence planEffect before replacements, links replacements atomically, reads back ambiguous outcomes without retry, handles displaced fences/sources, published sources, ACL surfacing and reserved empty-intent rows, keeps completeRebaseSource and the whole settlement path gated off creator-trusted-v1, and widens no API/wire/crypto/dependency/threshold/lineage surface. Restart/idempotence and merge laws hold; plan failure latches terminalFailure so the startup/public-issue barrier cannot be bypassed or double-applied. Evidence gates (9/9, 87/87, 26/26, isolated 9/9 + 87/87, static) verify, and the inherited 34 fixture failures reproduce identically at pre-GREEN 9f55370c.",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 2,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Accepted focused reporters count two test suites for one selected file",
+      "evidence": ".logs/d110c-0c1f5b0c-red-d062c5f6/focused-vitest.json and .logs/d110c-0c1f5b0c-green-3b6a66a9/focused.json both record numTotalTestSuites:2 while testResults holds exactly one file entry and numTotalTests is 9; the workspace vitest.workspace.ts project graph explains the artifact and it is identical in both colors, so the one-file/nine-test claim remains accurate.",
+      "required_action": "No code or evidence change required; optionally annotate the packet READMEs that the suite count is a workspace reporter artifact.",
+      "owner": "f5b0c"
+    },
+    {
+      "severity": "P2",
+      "title": "RED case 25 fence leg covered only via the shared path",
+      "evidence": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:627-658 exercises the ambiguous atomic link readback only for a replacement; the fence leg runs through the same issueSettlement/readSettlementEffect code (examples/v3-room/src/index.ts:2900-2926) and its restart behavior is partially covered by the displaced-fence test at :569-587, but no test drives an unknown fence-issue outcome directly.",
+      "required_action": "Accept the shared-path coverage for this slice or add a fence-leg case in the f5b integration restart/close suite; does not block f5b0c GREEN.",
+      "owner": "f5b0c"
+    }
+  ],
+  "causal_red_confirmed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true
+}

@@ -1,0 +1,605 @@
+{
+  "sourceHead": "329b08ccb2354bfea9dfd68a6ca95ff339d1ed3a",
+  "sourceDiffSha256": "e93b8e0beaef9e233bae7ecd783eb3c7df60f8ce25c1971bda323547e9afc0f9",
+  "initialLoad": [
+    8.30322265625,
+    8.79736328125,
+    9.12255859375
+  ],
+  "cpu": "Apple M1 Max",
+  "cores": 10,
+  "traceWork": false,
+  "cpuProfiles": false,
+  "completedEpochs": 4,
+  "acceptedIssues": 57,
+  "counters": {
+    "timerCallbacks": 4809,
+    "offered": [
+      4809,
+      4809
+    ],
+    "busy": [
+      0,
+      0
+    ],
+    "unavailable": [
+      14,
+      14
+    ],
+    "published": [
+      4795,
+      4792
+    ],
+    "rejected": [
+      0,
+      0
+    ],
+    "received": [
+      4731,
+      4731
+    ],
+    "remote": [
+      43,
+      22
+    ]
+  },
+  "timerGapsMs": {
+    "count": 4809,
+    "p50": 11.58350000000064,
+    "p95": 15.248083000002225,
+    "p99": 62.023166999999376,
+    "max": 146.05049999999756
+  },
+  "receiveGapsByPeerMs": [
+    {
+      "count": 4731,
+      "p50": 11.550916000000143,
+      "p95": 13.035415999998804,
+      "p99": 61.58795800000371,
+      "max": 875.3618330000027
+    },
+    {
+      "count": 4731,
+      "p50": 11.550917000000481,
+      "p95": 13.033125000001746,
+      "p99": 61.58900000000722,
+      "max": 875.3577500000029
+    }
+  ],
+  "phaseQuanta": [
+    {
+      "phase": "warm-population",
+      "durationMs": 1400.9924579999997,
+      "timers": 24,
+      "maxTimerDelimitedWallMs": 140.75633299999936,
+      "matchingProcessCpuMs": 154.257,
+      "ephemeralReceivedByPeer": [
+        21,
+        21
+      ],
+      "remoteAcceptedByPeer": [
+        16,
+        12
+      ]
+    },
+    {
+      "phase": "warm-convergence",
+      "durationMs": 115.82687499999975,
+      "timers": 6,
+      "maxTimerDelimitedWallMs": 44.02733400000034,
+      "matchingProcessCpuMs": 58.132,
+      "ephemeralReceivedByPeer": [
+        6,
+        6
+      ],
+      "remoteAcceptedByPeer": [
+        1,
+        5
+      ]
+    },
+    {
+      "phase": "startup-repair-settle",
+      "durationMs": 16001.680166999999,
+      "timers": 1385,
+      "maxTimerDelimitedWallMs": 21.49866699999984,
+      "matchingProcessCpuMs": 9.541,
+      "ephemeralReceivedByPeer": [
+        1385,
+        1385
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-start",
+      "durationMs": 2002.1705829999992,
+      "timers": 175,
+      "maxTimerDelimitedWallMs": 18.76983399999881,
+      "matchingProcessCpuMs": 6.686,
+      "ephemeralReceivedByPeer": [
+        175,
+        175
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-before-1",
+      "durationMs": 1000.7779579999988,
+      "timers": 87,
+      "maxTimerDelimitedWallMs": 17.941124999997555,
+      "matchingProcessCpuMs": 6.828,
+      "ephemeralReceivedByPeer": [
+        87,
+        87
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "seal-1",
+      "durationMs": 132.79875000000175,
+      "timers": 2,
+      "maxTimerDelimitedWallMs": 78.7290420000063,
+      "matchingProcessCpuMs": 145.276,
+      "ephemeralReceivedByPeer": [
+        2,
+        2
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "adopt-1",
+      "durationMs": 295.40654099999665,
+      "timers": 9,
+      "maxTimerDelimitedWallMs": 94.27850000000035,
+      "matchingProcessCpuMs": 114.302,
+      "ephemeralReceivedByPeer": [
+        5,
+        5
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "export-1",
+      "durationMs": 8.177833000001556,
+      "timers": 0,
+      "maxTimerDelimitedWallMs": 8.177833000001556,
+      "matchingProcessCpuMs": 9.159,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "install-1",
+      "durationMs": 597.8756250000006,
+      "timers": 21,
+      "maxTimerDelimitedWallMs": 64.83479100000113,
+      "matchingProcessCpuMs": 90.108,
+      "ephemeralReceivedByPeer": [
+        13,
+        13
+      ],
+      "remoteAcceptedByPeer": [
+        2,
+        0
+      ]
+    },
+    {
+      "phase": "maintenance-1",
+      "durationMs": 60.90099999999802,
+      "timers": 0,
+      "maxTimerDelimitedWallMs": 60.90099999999802,
+      "matchingProcessCpuMs": 67.05199999999999,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-after-1",
+      "durationMs": 1000.9676669999972,
+      "timers": 87,
+      "maxTimerDelimitedWallMs": 15.446250000000873,
+      "matchingProcessCpuMs": 0.253,
+      "ephemeralReceivedByPeer": [
+        87,
+        87
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-before-2",
+      "durationMs": 1002.6622500000012,
+      "timers": 85,
+      "maxTimerDelimitedWallMs": 12.472750000000815,
+      "matchingProcessCpuMs": 0.451,
+      "ephemeralReceivedByPeer": [
+        85,
+        85
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "seal-2",
+      "durationMs": 95.38675000000512,
+      "timers": 2,
+      "maxTimerDelimitedWallMs": 73.15495899999951,
+      "matchingProcessCpuMs": 77.483,
+      "ephemeralReceivedByPeer": [
+        2,
+        2
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "adopt-2",
+      "durationMs": 273.29370899999776,
+      "timers": 11,
+      "maxTimerDelimitedWallMs": 59.11066600000049,
+      "matchingProcessCpuMs": 67.061,
+      "ephemeralReceivedByPeer": [
+        3,
+        3
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "export-2",
+      "durationMs": 6.466667000000598,
+      "timers": 0,
+      "maxTimerDelimitedWallMs": 6.466667000000598,
+      "matchingProcessCpuMs": 8.57,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "install-2",
+      "durationMs": 718.8163749999949,
+      "timers": 33,
+      "maxTimerDelimitedWallMs": 103.24245800000062,
+      "matchingProcessCpuMs": 113.303,
+      "ephemeralReceivedByPeer": [
+        28,
+        28
+      ],
+      "remoteAcceptedByPeer": [
+        1,
+        0
+      ]
+    },
+    {
+      "phase": "maintenance-2",
+      "durationMs": 63.471583999998984,
+      "timers": 0,
+      "maxTimerDelimitedWallMs": 63.471583999998984,
+      "matchingProcessCpuMs": 67.535,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-after-2",
+      "durationMs": 1000.1633749999964,
+      "timers": 86,
+      "maxTimerDelimitedWallMs": 14.359624999997322,
+      "matchingProcessCpuMs": 0.275,
+      "ephemeralReceivedByPeer": [
+        86,
+        86
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-reopened-2",
+      "durationMs": 1000.3285830000023,
+      "timers": 86,
+      "maxTimerDelimitedWallMs": 19.7699999999968,
+      "matchingProcessCpuMs": 20.904000000000003,
+      "ephemeralReceivedByPeer": [
+        86,
+        86
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "reopen-startup-settle-2",
+      "durationMs": 16000.403459000001,
+      "timers": 1375,
+      "maxTimerDelimitedWallMs": 18.859375,
+      "matchingProcessCpuMs": 16.338,
+      "ephemeralReceivedByPeer": [
+        1375,
+        1375
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-before-3",
+      "durationMs": 1001.0453330000018,
+      "timers": 87,
+      "maxTimerDelimitedWallMs": 12.693709000006493,
+      "matchingProcessCpuMs": 0.681,
+      "ephemeralReceivedByPeer": [
+        87,
+        87
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "seal-3",
+      "durationMs": 134.98212500000227,
+      "timers": 1,
+      "maxTimerDelimitedWallMs": 92.07945800000016,
+      "matchingProcessCpuMs": 108.861,
+      "ephemeralReceivedByPeer": [
+        1,
+        1
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "adopt-3",
+      "durationMs": 286.48704200000066,
+      "timers": 8,
+      "maxTimerDelimitedWallMs": 62.023166999999376,
+      "matchingProcessCpuMs": 74.516,
+      "ephemeralReceivedByPeer": [
+        3,
+        3
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "export-3",
+      "durationMs": 7.527666000001773,
+      "timers": 0,
+      "maxTimerDelimitedWallMs": 7.527666000001773,
+      "matchingProcessCpuMs": 13.255999999999998,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "install-3",
+      "durationMs": 931.7972080000036,
+      "timers": 57,
+      "maxTimerDelimitedWallMs": 119.27570800000103,
+      "matchingProcessCpuMs": 142.694,
+      "ephemeralReceivedByPeer": [
+        52,
+        52
+      ],
+      "remoteAcceptedByPeer": [
+        1,
+        0
+      ]
+    },
+    {
+      "phase": "maintenance-3",
+      "durationMs": 585.012834000001,
+      "timers": 13,
+      "maxTimerDelimitedWallMs": 129.1621660000019,
+      "matchingProcessCpuMs": 151.582,
+      "ephemeralReceivedByPeer": [
+        13,
+        13
+      ],
+      "remoteAcceptedByPeer": [
+        1,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-after-3",
+      "durationMs": 1002.1335830000025,
+      "timers": 85,
+      "maxTimerDelimitedWallMs": 14.848040999997465,
+      "matchingProcessCpuMs": 4.832000000000001,
+      "ephemeralReceivedByPeer": [
+        85,
+        85
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "baseline-before-4",
+      "durationMs": 1001.4110000000001,
+      "timers": 87,
+      "maxTimerDelimitedWallMs": 13.012332999998762,
+      "matchingProcessCpuMs": 7.4399999999999995,
+      "ephemeralReceivedByPeer": [
+        87,
+        87
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "seal-4",
+      "durationMs": 203.78429199999664,
+      "timers": 2,
+      "maxTimerDelimitedWallMs": 116.6061669999981,
+      "matchingProcessCpuMs": 135.66400000000002,
+      "ephemeralReceivedByPeer": [
+        2,
+        2
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "durationMs": 331.8139579999988,
+      "timers": 8,
+      "maxTimerDelimitedWallMs": 68.76466699999582,
+      "matchingProcessCpuMs": 72.867,
+      "ephemeralReceivedByPeer": [
+        2,
+        2
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "export-4",
+      "durationMs": 7.799250000003667,
+      "timers": 0,
+      "maxTimerDelimitedWallMs": 7.799250000003667,
+      "matchingProcessCpuMs": 7.799,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "install-4",
+      "durationMs": 1766.7044160000005,
+      "timers": 82,
+      "maxTimerDelimitedWallMs": 114.81645800000115,
+      "matchingProcessCpuMs": 117.589,
+      "ephemeralReceivedByPeer": [
+        62,
+        62
+      ],
+      "remoteAcceptedByPeer": [
+        2,
+        0
+      ]
+    },
+    {
+      "phase": "maintenance-4",
+      "durationMs": 2215.4611250000016,
+      "timers": 47,
+      "maxTimerDelimitedWallMs": 140.99862500000745,
+      "matchingProcessCpuMs": 148.90200000000002,
+      "ephemeralReceivedByPeer": [
+        47,
+        47
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        1
+      ]
+    },
+    {
+      "phase": "baseline-after-4",
+      "durationMs": 1001.2403340000019,
+      "timers": 85,
+      "maxTimerDelimitedWallMs": 14.023125000006985,
+      "matchingProcessCpuMs": 5.595,
+      "ephemeralReceivedByPeer": [
+        85,
+        85
+      ],
+      "remoteAcceptedByPeer": [
+        0,
+        0
+      ]
+    }
+  ],
+  "limits": [
+    "One quiet candidate run. Other assigned native/test/review jobs were stopped before start; external shared host load was not controlled.",
+    "Compare with pair12 descriptively only: candidate15 includes composed rejoin source and recovery checkpoints, and actual issue/transition interleaving differs. No equal-work CPU speedup claim.",
+    "Timer-delimited wall/process CPU quanta include concurrent ingress and background runtime work; they are not exact individual synchronous call costs.",
+    "Controlled raw ephemeral delivery is not browser WebRTC, paint, input, or FPS evidence.",
+    "Original candidate harness; later endurance starvation gate changes are not included in this measurement.",
+    "Raw per-receiver gaps include authority-mismatch and reopen intervals; withinBaselineStep excludes intervals beginning before the current baseline step. This is separate from the later final endurance matched-authority window gate."
+  ],
+  "withinBaselineStepReceiveGapsByPeerMs": [
+    {
+      "count": 940,
+      "p50": 11.681334000000788,
+      "p95": 12.405708000005689,
+      "p99": 13.218209000006027,
+      "max": 19.770583999998053
+    },
+    {
+      "count": 940,
+      "p50": 11.68025000000489,
+      "p95": 12.400333000005048,
+      "p99": 13.210875000004307,
+      "max": 19.767459000002418
+    }
+  ]
+}

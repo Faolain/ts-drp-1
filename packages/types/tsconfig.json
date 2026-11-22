@@ -3,6 +3,11 @@
     "compilerOptions": {
         "outDir": "dist"
     },
+    "exclude": [
+        "tests/observer-mode-1i.types.test-d.ts",
+        "tests/compact-history-observer-1i-b.types.test-d.ts",
+        "tests/finality-add-signature-return.types.test-d.ts"
+    ],
     "include": [
         "src/**/*.ts",
         "src/**/*.js",

@@ -1,0 +1,47 @@
+{
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "file": "packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs",
+      "line": 95,
+      "title": "Author-authorization cannot adopt the required base-checker route within the proposed GREEN scope",
+      "evidence": "The active author workflow directly executes the candidate root checker without an explicit base at `.github/workflows/protocol-v3-author-authorization.yml:30`, contrary to the proposal's merge-base-checker/no-candidate-fallback rule. Changing that workflow also changes bytes which this active supplement checker requires to match its policy hash at lines 95–96. The proposal calls the workflow already routed at `red-proposal.md:59` but does not include the author-authorization policy/checker in the GREEN disposition. Left as written, either this consumer remains self-blessable or its supplement check fails. Add the workflow and author-authorization policy to the exact amendment roster; route through the unique merge-base root checker with an explicit base and bound root, repin the workflow in the supplement policy, and extend its routing analyzer/mutations accordingly while retaining the author checker and v2 command.",
+      "violated_requirement": "Full active consumer coverage; base-governed authority with no candidate fallback; preserved subsystem custody and commands."
+    },
+    {
+      "severity": "P1",
+      "file": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+      "line": 1195,
+      "title": "The supersession map omits active root-conformance tests that still bind historical hashes to live files",
+      "evidence": "This test hashes every `acceptedInputs` path against its historical digest; its contract pins the live registry and schema to the obsolete hashes at `tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json:26–32`. It remains an accepted current test at `tests/fixtures/phase-n1prime-e4/root-test-lifecycle-contract.json:49`. The same live-file conflation occurs in regenerated-reference tests at `tests/protocol-v3-regenerated-reference-n1prime-d.test.ts:571–574` and `tests/protocol-v3-regenerated-reference-remediation-n1prime-d2.test.ts:602–604`, also selected at lifecycle lines 51–52. The proposal explicitly maps e/e2/e3/e4 and successor tests but not these consumers. Freeze an exact disposition for c2/d/d2: preserve historical statements and semantic controls, stop asserting their old registry/schema hashes against current paths, retitle superseded predicates, and assign current schema/present-field identity solely to the new current contract without skipping these suites.",
+      "violated_requirement": "Full active consumer coverage and honest historical-test supersession without relabeling old evidence."
+    },
+    {
+      "severity": "P2",
+      "file": ".logs/d110c-registry-current-contract-preparation-8d81c8f4/current-contract-design.md",
+      "line": 136,
+      "title": "The source-bearing semantic-validation seam is not freeze-complete",
+      "evidence": "The retained snapshot envelope has a hash-only `files` map and only one `workflow` source, matching `makeSnapshot` at `packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs:923–970`. The new contract nevertheless requires semantic schema mutations and routing validation across the schema, oracle, and all active workflows. Lines 142–143 and 156–158 defer any new content-bearing field/export, manifest roster, consumer mapping, and command selection. Without freezing that boundary, RED can accidentally demonstrate only stale-hash refusal or fail on an invented export. Specify before RED either a hash-bound source map for every semantically parsed artifact or an exact CLI/source-reader plus directly callable validator API, including how each source is tied to `files`; then freeze the complete manifest and mutation harness.",
+      "violated_requirement": "Implementable exact RED seam, semantic-validator adequacy, workflow-routing mutation evidence, and mutation-baseline independence."
+    }
+  ],
+  "checked_requirements": [
+    "Prospective-baseline trust reset: the proposed trust model is sound in principle. It removes bootstrap authority, rejects old/missing/malformed bases, requires exactly one merge base, runs the merge-base checker with an explicitly bound root, and forbids candidate fallback. Base policy and inventory govern candidate bytes, preserving anti-self-blessing.",
+    "The signed reviewed baseline is honestly described as an out-of-band prospective trust-anchor amendment, not an old-policy-approved PR. Current/current integrity is explicitly disclaimed as transition evidence. Host branch protection is neither changed nor claimed verified. This is not itself a hidden security contradiction, but installation on a protected branch remains external operational work.",
+    "One-current-contract constraint: no dual registry, historical-tree projection, accept-either hash, recursive custody chain, or relabeling of historical sign-offs is proposed.",
+    "Registry/runtime scope: registry bytes remain unchanged; the optional multiplier remains optional; schema boundaries 1 through 1,000,000 do not widen Node's supported profile digests or alter live-journal's separate boundary.",
+    "Schema direction is correct: add the optional property with integer bounds and matching native metadata, retain the seven required fields and closed-object behavior, and do not inject a default.",
+    "Independent oracle design is adequate in direction: it is bounded to the actual ASCII/nonnegative-integer parameter corpus, independently implements canonical key ordering/varuint/zigzag/framing, uses Node SHA-256 rather than production helpers, and requires reviewed literal absent/present-four bytes and digests plus domain/drop/default mutants.",
+    "True causal RED is available through the existing exported `evaluateProtocolV3Freeze({ base, current })` seam at `packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs:842`; its stale immutable registry/schema closure provides a real contract failure rather than a missing export or unsupported flag.",
+    "Mutation-baseline independence is explicitly required: each mutation family starts from the same known-good current baseline and coordinated artifact/policy/checker edits are evaluated by independent base authority.",
+    "Seal, pacemaker, successor-routed workflows, journal, anchor, blueprint, gossip, CODEOWNERS, ordinary-test lifecycle, v2 separation, and historical governance suites were inspected for the cited custody and supersession obligations.",
+    "Existing historical references, locks, vectors, formal sign-offs, and successor evidence can remain preserved while their obsolete live-routing/current-byte assertions are superseded; their safety obligations need replacement, not continued ownership."
+  ],
+  "limitations": [
+    "No tests, checkers, project code, builds, compilers, formatters, network access, Git mutations, writes, or other models were run, as required.",
+    "The eight dirty production owners were treated as inherited, preserved, and out of review.",
+    "The proposal is not eligible for implementation release until the three findings are resolved and the exact protected manifest, source-validation interface, consumer replacement table, command roster, and absent/present-four oracle literals are frozen and independently reviewed.",
+    "Repository evidence cannot establish branch-protection configuration or prove how the signed replacement baseline will be installed on a protected host branch."
+  ]
+}

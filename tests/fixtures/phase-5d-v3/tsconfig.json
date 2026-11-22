@@ -1,0 +1,16 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"baseUrl": "../../..",
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+			"@ts-drp/*": ["packages/*"]
+		}
+	},
+	"include": ["pacemaker-fixture.ts", "pacemaker-trace-runner.ts", "pacemaker-types.ts"]
+}

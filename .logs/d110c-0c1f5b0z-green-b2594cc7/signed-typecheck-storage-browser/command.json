@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout",
+  "command": "pnpm",
+  "args": [
+    "--filter",
+    "@ts-drp/storage-browser",
+    "typecheck"
+  ],
+  "start": "2026-09-05T20:04:37.573Z"
+}

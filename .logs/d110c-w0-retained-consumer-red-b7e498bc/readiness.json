@@ -1,0 +1,34 @@
+{
+  "baseline": "b7e498bcb4a4cd4ec7a7215cd151237e6ce005ec",
+  "sourceAndBuildHashesExact": true,
+  "compilerInputsExact": true,
+  "inheritedProfilingAbsent": true,
+  "nodeV8CoverageAbsent": true,
+  "noCompetingTaskProcesses": true,
+  "numericOnlyProcessInspection": true,
+  "processes": [],
+  "ports": [
+    {
+      "port": 4174,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 4175,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 51000,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 51002,
+      "pids": [],
+      "noTcpListener": true
+    }
+  ],
+  "runtimeNotReleased": true,
+  "requiresImmediatePreExecutionRecheck": true
+}

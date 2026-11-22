@@ -1,0 +1,15 @@
+The native model fails typechecking, blocking all its new tests and verification cases. The repair model's tests and configured verification cases passed.
+
+Review comment:
+
+- [P1] Make the floor monotonicity property typecheck — /private/tmp/ts-drp-track-j-finish/packages/protocol-v3/formal/native-retirement-custody.qnt:41-41
+  With the pinned Quint 0.32.0, `next(s.floor)` has a temporal effect, whereas `orKeep` expects an updating action. This produces a QNT000 effect-unification error and prevents the entire native model from typechecking. Both `check-native-custody.mjs test` and `verify` fail every native case, including checks unrelated to monotonicity. Express this property using a compatible action predicate or temporal formula.
+The native model fails typechecking, blocking all its new tests and verification cases. The repair model's tests and configured verification cases passed.
+
+Review comment:
+
+- [P1] Make the floor monotonicity property typecheck — /private/tmp/ts-drp-track-j-finish/packages/protocol-v3/formal/native-retirement-custody.qnt:41-41
+  With the pinned Quint 0.32.0, `next(s.floor)` has a temporal effect, whereas `orKeep` expects an updating action. This produces a QNT000 effect-unification error and prevents the entire native model from typechecking. Both `check-native-custody.mjs test` and `verify` fail every native case, including checks unrelated to monotonicity. Express this property using a compatible action predicate or temporal formula.
+
+
+Resolution: confirmed P1; replaced the unsupported temporal expression with explicit floorBefore history in the state invariant. Final native/repair runner checks all pass.

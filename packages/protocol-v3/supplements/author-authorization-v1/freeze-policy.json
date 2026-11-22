@@ -1,0 +1,23 @@
+{
+	"schemaVersion": "ts-drp-author-authorization-freeze-v1",
+	"profile": "creator-author-authorization-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-author-authorization.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/author-authorization-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/author-authorization-v1/profile.json",
+		"packages/protocol-v3/supplements/author-authorization-v1/schema.json",
+		"packages/protocol-v3/supplements/author-authorization-v1/spec.md",
+		"packages/protocol-v3/supplements/author-authorization-v1/vectors.json",
+		".github/workflows/protocol-v3-author-authorization.yml"
+	],
+	"checkerSha256": "3c68aca24bf5076fd148f6f783c176780cd0a0e6384ff7a612fc7eddbec31683",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/author-authorization-v1/profile.json": "70fe330d9ae61e3e90d8d6500f61503ac502ee66efbf049e793dd3625b548362",
+		"packages/protocol-v3/supplements/author-authorization-v1/schema.json": "1abb2e8dced225024fcfaff446685ffe99d578d34b22f12c012c5a7198ac72a5",
+		"packages/protocol-v3/supplements/author-authorization-v1/spec.md": "a1d11a41c7d55eaaafa19e27abad533817fb52b48f5eee9168bf3e3dee790c2d",
+		"packages/protocol-v3/supplements/author-authorization-v1/vectors.json": "f97da5ee18998e808da1133223f442302e71c40f0dee95948e1b30f9ba24972b",
+		".github/workflows/protocol-v3-author-authorization.yml": "a8cf8477a1088bdaa5fc66c7d587d2dc3888a60d1ca9be8def0b68d448150e18"
+	}
+}

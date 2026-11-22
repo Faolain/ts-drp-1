@@ -1,0 +1,9 @@
+STASH_COUNT=27
+.agents=present
+.claude=present
+.pnpm-store=present
+TS_DRP_REVIEWER_TEST_PROFILER_PROCESSES=none
+PORT_4174=clear
+PORT_4175=clear
+PORT_51000=clear
+PORT_51002=clear

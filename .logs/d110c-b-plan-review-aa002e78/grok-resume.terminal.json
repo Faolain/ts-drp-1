@@ -1,0 +1,29 @@
+{
+  "verdict": "APPROVED",
+  "blocking_union_empty": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "title": "Post-consume alias/cleanup cannot retain a live predecessor owner",
+      "evidence": "consumeCreatorSuccessorLive already transfers the stable topic before alias: v3-live.ts:7260-7266 sets existing.active=false on transport reuse, 7383-7386 terminalizes the close source after activateV3LivePlane, and 7049-7052/3465-3483 make a later raw deactivate either a no-op or an unsubscribe. creator-adoption-activate.ts:203-228 aliases and map-sets only after that transfer; alias failure currently deactivates the new plane and releases the lock.",
+      "disposition": "Keep retain-old-owner only for refusals that return before activateV3LivePlane. Recast failed alias/cleanup as fail-closed post-custody: do not map-swap, do not release the predecessor lock token, deactivate the unaliased raw successor once, and do not claim the predecessor remains the live topic owner. No v3-live restore owner in this slice."
+    },
+    {
+      "title": "Node GREEN cannot observe a browser lock",
+      "evidence": "creator-adoption-activate.ts:132-168 acquireBrowserLock returns undefined outside browserLockRealm(); Node Vitest has no navigator.locks. The Batch 1 gate still requires 'one browser lock'.",
+      "disposition": "Node focused GREEN asserts exactly one activeOwners topic entry and wrapper identity. Lock uniqueness stays a Chromium/product assertion."
+    },
+    {
+      "title": "New Chromium test can clobber the serial Phase-6a room",
+      "evidence": "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts uses fullyParallel:false and workers:1 on one shared creator page; phase-6a-creator-successor-product.pw.ts plus product-entry.ts expose a singleton create() over DATABASES.creator and the D108d2 invite/carrier chain.",
+      "disposition": "Append the D.110c-b title after the retained serial chain and give it distinct databaseName/channelName so create() cannot replace D108d2 state."
+    },
+    {
+      "title": "Close-rebind must not regress D108E2B replacement cleanup",
+      "evidence": "examples/v3-room/src/index.ts:3539-3586 activates, then predecessor.deactivate() at 3574-3578; failure still throwAfterReplacementCleanup. Retained D108E2B requires that 0->1 cleanup. Floor is already committed at 3534.",
+      "disposition": "Bind the fresh close handle only after predecessor.deactivate() succeeds. Keep D108E2B replacement cleanup on that injected failure. Close-rebind failure uses D110C_B_CLOSE_REBIND_FAILED / stalled unavailable and must not call throwAfterReplacementCleanup."
+    }
+  ],
+  "summary": "RED is genuinely causal: D.110c-a already produces a pending epoch-2 close that dies at the generation-1 predecessor filter with chain-invalid, and post-0->1 sealEpoch fails through the successor-adopted terminal close handle without minted epoch-2 control state. Deriving projection kind/epoch from authenticated current/successor trust plus exact-next safe-integer checks is sufficient and 0->1 byte-identical. Same-lock replacement is safe on the consume-then-alias-then-token-swap path; product vote/evidence/snapshot reuse and stalled close-rebind are implementable without a new store/API; widening only V3RoomSuccessorAuthority.epoch to number is the smallest compatible public change. GREEN 0->1->2 issue/publish plus genuine 2->3 close stays inside the hot loop. Recast post-consume alias retention rather than adding a v3-live restore owner."
+}

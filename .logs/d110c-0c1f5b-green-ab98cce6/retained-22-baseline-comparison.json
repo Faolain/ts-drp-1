@@ -1,0 +1,187 @@
+{
+  "baseline": ".logs/d110c-0c1f5b0u-green-ea02487e/commands/retained-22-corrected/result.json",
+  "baselineReporterSha256": "dae1c62e499badeb5f4be36f52ced31435da0460c95232ad2e5897949b42a6b6",
+  "commit": "60548549219378b30548c3c638da178561c17875",
+  "currentReporterSha256": "3bcf97b0b1c1be8ac982e9719fa532de9cbae6b0115448e3ae1aa15f7696edcd",
+  "comparisons": [
+    {
+      "baseline": {
+        "name": "D.108d2 public return AST oracle > accepts private computations and primitive comparisons without confusing operand names with returned authority",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108d2 public return AST oracle > accepts private computations and primitive comparisons without confusing operand names with returned authority",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108d2 public return AST oracle > rejects exact sensitive properties and values on exported returned shapes",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108d2 public return AST oracle > rejects exact sensitive properties and values on exported returned shapes",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108d2 public return AST oracle > follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108d2 public return AST oracle > follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e2b creator successor room lifetime RED > freezes exactly five RED owners, one GREEN owner and seven browser behaviors",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e2b creator successor room lifetime RED > freezes exactly five RED owners, one GREEN owner and seven browser behaviors",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e2b creator successor room lifetime RED > pins the exact seven-key successor authority and rejects pre-successor or widened values",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e2b creator successor room lifetime RED > pins the exact seven-key successor authority and rejects pre-successor or widened values",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e2b creator successor room lifetime RED > keeps node-root and chat authority closed while assigning the room as sole node consumer",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e2b creator successor room lifetime RED > keeps node-root and chat authority closed while assigning the room as sole node consumer",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e2b creator successor room lifetime RED > runs all product behaviors without a source-pattern readiness gate",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e2b creator successor room lifetime RED > runs all product behaviors without a source-pattern readiness gate",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e2b creator successor room lifetime RED > rejects only unsupported cold successor compositions before reading room authorities",
+        "status": "failed",
+        "failureMessages": [
+          "AssertionError: expected [ { …(3) }, { …(3) }, { …(3) } ] to deeply equal [ { …(3) }, { …(3) }, { …(3) } ]\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-product-red.test.ts:192:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ]
+      },
+      "current": {
+        "name": "D.108e2b creator successor room lifetime RED > rejects only unsupported cold successor compositions before reading room authorities",
+        "status": "failed",
+        "failureMessages": [
+          "AssertionError: expected [ { …(3) }, { …(3) }, { …(3) } ] to deeply equal [ { …(3) }, { …(3) }, { …(3) } ]\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-product-red.test.ts:212:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ]
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e3 room lifetime transition RED > freezes four test owners, one room GREEN owner and twelve causal browser behaviors",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e3 room lifetime transition RED > freezes four test owners, one room GREEN owner and twelve causal browser behaviors",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e5 bounded redirected lifetime RED > bounds migration activation bytes before constructing the call-time owner",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e5 bounded redirected lifetime RED > bounds migration activation bytes before constructing the call-time owner",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    },
+    {
+      "baseline": {
+        "name": "D.108e5 bounded redirected lifetime RED > bounds every migration invite encode before copying caller-controlled bodies",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "current": {
+        "name": "D.108e5 bounded redirected lifetime RED > bounds every migration invite encode before copying caller-controlled bodies",
+        "status": "passed",
+        "failureMessages": []
+      },
+      "sameStatus": true,
+      "sameFirstErrorLines": true
+    }
+  ],
+  "allElevenPreviousOutcomesMatch": true,
+  "addedCases": [
+    {
+      "name": "D.108d2 public return AST oracle > tracks the returned operands of assignment, comma and logical assignment expressions",
+      "status": "passed",
+      "failureMessages": []
+    }
+  ],
+  "test": {
+    "file": "tests/phase-6a-creator-successor-product-red.test.ts",
+    "sha256": "446ac50e8f84d9ae8940fd670eab92930f9179fb26dafc7807d245113d578333",
+    "failedCaseByteIdentical": true,
+    "failedCase": "\tit(\"rejects only unsupported cold successor compositions before reading room authorities\", async () => {\n\t\tconst exercise = async (\n\t\t\textra: Readonly<Record<string, unknown>>,\n\t\t\tincludeDeclaration: boolean\n\t\t): Promise<Readonly<Record<string, unknown>>> => {\n\t\t\tconst reads = { application: 0, signer: 0, store: 0, transport: 0 };\n\t\t\tconst input = {\n\t\t\t\t...extra,\n\t\t\t\tget application(): never {\n\t\t\t\t\treads.application += 1;\n\t\t\t\t\tthrow new TypeError(\"D.108e2b application authority was read\");\n\t\t\t\t},\n\t\t\t\tget databaseName(): never {\n\t\t\t\t\treads.store += 1;\n\t\t\t\t\tthrow new TypeError(\"D.108e2b store authority was read\");\n\t\t\t\t},\n\t\t\t\tget openTransport(): never {\n\t\t\t\t\treads.transport += 1;\n\t\t\t\t\tthrow new TypeError(\"D.108e2b transport authority was read\");\n\t\t\t\t},\n\t\t\t\tget signRegisteredVertexDigest(): never {\n\t\t\t\t\treads.signer += 1;\n\t\t\t\t\tthrow new TypeError(\"D.108e2b signer authority was read\");\n\t\t\t\t},\n\t\t\t\t...(includeDeclaration ? { successorSnapshotDeclaration: Object.freeze({}) } : {}),\n\t\t\t};\n\t\t\tlet detail = \"fulfilled\";\n\t\t\ttry {\n\t\t\t\tawait createV3RoomSession(input as never);\n\t\t\t} catch (error) {\n\t\t\t\tdetail = error instanceof Error ? error.message : String(error);\n\t\t\t}\n\t\t\treturn Object.freeze({ detail, reads: Object.freeze({ ...reads }) });\n\t\t};\n\n\t\tconst unsupported = [];\n\t\tfor (const [key, value] of [\n\t\t\t[\"createOperationAdmissionPolicy\", (): Readonly<Record<string, never>> => Object.freeze({})],\n\t\t\t[\"creatorFinalitySigner\", Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) })],\n\t\t\t[\"rebaseSourceInvite\", \"d108e2b-source-invite\"],\n\t\t] as const) {\n\t\t\tunsupported.push(Object.freeze({ ...(await exercise({ [key]: value }, true)), key }));\n\t\t}\n\t\texpect(unsupported).toEqual(\n\t\t\t[\"createOperationAdmissionPolicy\", \"creatorFinalitySigner\", \"rebaseSourceInvite\"].map((key) => ({\n\t\t\t\tdetail: \"v3 room successor authority composition is unsupported\",\n\t\t\t\tkey,\n\t\t\t\treads: { application: 0, signer: 0, store: 0, transport: 0 },\n\t\t\t}))\n\t\t);\n\n\t\tconst supported = await Promise.all([\n\t\t\texercise({ createOperationAdmissionPolicy: (): Readonly<Record<string, never>> => Object.freeze({}) }, false),\n\t\t\texercise({ creatorFinalitySigner: Object.freeze({}) }, false),\n\t\t\texercise({ rebaseSourceInvite: \"d108e2b-source-invite\" }, false),\n\t\t\texercise({}, true),\n\t\t]);\n\t\texpect(supported).toEqual(\n\t\t\tArray.from({ length: 4 }, () => ({\n\t\t\t\tdetail: \"D.108e2b application authority was read\",\n\t\t\t\treads: { application: 1, signer: 0, store: 0, transport: 0 },\n\t\t\t}))\n\t\t);\n\t});\n});\n\ndescribe(\"D.108e3 room lifetime transition RED\", () => {"
+  },
+  "causalPrelude": {
+    "room": "examples/v3-room/src/index.ts",
+    "current": "const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(\n\t\tinput.application.bootstrapOperation,\n\t\tAPPLICATION_BATCH_LIMITS\n\t);\n\tdecodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);",
+    "signed": "const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(\n\t\tinput.application.bootstrapOperation,\n\t\tAPPLICATION_BATCH_LIMITS\n\t);\n\tdecodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);",
+    "byteIdentical": true
+  },
+  "attribution": "The test supplies an application getter that throws. Existing unconditional pinned-bootstrap canonicalization reads application before the unsupported-composition guard in both signed baseline and current source. All three synthetic inputs fail before the expected guard. The later settlement-only creator restart permission change is not reached by these inputs. This is the single corrected-baseline failure, not the previously fixed AST failure; the additional AST case now passes. Not a pass or waiver."
+}

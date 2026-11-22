@@ -1,0 +1,33 @@
+{
+  "diagnosticFocused": {
+    "reporterSuccess": true,
+    "selectedFiles": 1,
+    "passedTests": 1,
+    "failedTests": 0,
+    "shellStatus": 1,
+    "classification": "coverage-threshold-wrapper-mistake"
+  },
+  "finalFocused": {
+    "reporterSuccess": true,
+    "selectedFiles": 1,
+    "passedTests": 1,
+    "failedTests": 0,
+    "shellStatus": 0
+  },
+  "retained": {
+    "reporterSuccess": true,
+    "selectedFiles": 16,
+    "passedTests": 128,
+    "failedTests": 0,
+    "shellStatus": 0
+  },
+  "static": {
+    "fixtureTypeScript": 0,
+    "exactOwnerEslint": 0,
+    "prettier": 0,
+    "diffCheck": 0,
+    "productionSourceChanges": 0,
+    "protectedPathChanges": 0,
+    "stashCount": 27
+  }
+}

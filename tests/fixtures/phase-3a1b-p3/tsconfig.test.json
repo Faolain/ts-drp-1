@@ -1,0 +1,23 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/blueprint-catalog": ["packages/blueprint-catalog/src/index.ts"],
+			"@ts-drp/issuance-store": ["packages/issuance-store/src/index.ts"],
+			"@ts-drp/message-queue": ["packages/message-queue/src/index.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+			"@ts-drp/protocol-v3/registry/registry-v1.json": ["packages/protocol-v3/registry/registry-v1.json"],
+			"@ts-drp/storage": ["packages/storage/src/index.ts"],
+			"@ts-drp/storage/maintenance": ["packages/storage/src/maintenance.ts"],
+			"@ts-drp/storage/snapshot-transfer": ["packages/storage/src/snapshot-transfer.ts"],
+			"@ts-drp/types": ["packages/types/src/index.ts"]
+		},
+		"rootDir": "../../.."
+	},
+	"files": ["../phase-3a1-a-v3/private-surface.ts", "seam3-types.ts"]
+}

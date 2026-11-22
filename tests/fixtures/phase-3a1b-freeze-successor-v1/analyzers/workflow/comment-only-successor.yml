@@ -1,0 +1,21 @@
+name: Protocol v3 blueprint operation budget freeze
+"on": { pull_request: { types: [opened, synchronize, reopened, edited, ready_for_review] } }
+permissions: { contents: read }
+jobs:
+  protocol-v3-blueprint-operation-budget:
+    name: Require immutable protocol-v3 operation budget enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, ref: "${{ github.sha }}" }
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          mapfile -t MERGE_BASES < <(git merge-base --all "$UPSTREAM_SHA" HEAD)
+          if [ "${#MERGE_BASES[@]}" -ne 1 ]; then exit 1; fi
+          MERGE_BASE="${MERGE_BASES[0]}"
+          git cat-file -e "$MERGE_BASE:unrelated-checker.mjs"
+          git show "$MERGE_BASE:unrelated-checker.mjs" > "$RUNNER_TEMP/unrelated.mjs"
+          # node packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs "$UPSTREAM_SHA"
+          node "$RUNNER_TEMP/unrelated.mjs" "$UPSTREAM_SHA"
+          node packages/protocol-v3/conformance/freeze-successor-v1/check-freezeXmjs "$UPSTREAM_SHA"

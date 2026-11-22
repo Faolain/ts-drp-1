@@ -1,0 +1,252 @@
+{"type":"available_commands","tools":["run_terminal_command","read_file","search_replace","list_dir","grep","kill_command_or_subagent","todo_write","get_command_or_subagent_output","spawn_subagent","scheduler_create","scheduler_delete","scheduler_list","monitor","search_tool","use_tool","workflow","enter_plan_mode","exit_plan_mode","ask_user_question","web_search","web_fetch","image_gen","image_edit","image_to_video","reference_to_video","write"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","deep-research","workflow","goal","loop","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"available_commands","tools":["run_terminal_command","read_file","search_replace","list_dir","grep","kill_command_or_subagent","todo_write","get_command_or_subagent_output","spawn_subagent","scheduler_create","scheduler_delete","scheduler_list","monitor","search_tool","use_tool","workflow","enter_plan_mode","exit_plan_mode","ask_user_question","web_search","web_fetch","image_gen","image_edit","image_to_video","reference_to_video","write"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","deep-research","workflow","goal","loop","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"thought","data":"The"}
+{"type":"thought","data":" user"}
+{"type":"thought","data":" wants"}
+{"type":"thought","data":" me"}
+{"type":"thought","data":" to"}
+{"type":"thought","data":" return"}
+{"type":"thought","data":" exactly"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" same"}
+{"type":"thought","data":" JSON"}
+{"type":"thought","data":" object"}
+{"type":"thought","data":" as"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" entire"}
+{"type":"thought","data":" response"}
+{"type":"thought","data":","}
+{"type":"thought","data":" with"}
+{"type":"thought","data":" no"}
+{"type":"thought","data":" preamble"}
+{"type":"thought","data":","}
+{"type":"thought","data":" markdown"}
+{"type":"thought","data":" fence"}
+{"type":"thought","data":","}
+{"type":"thought","data":" commentary"}
+{"type":"thought","data":","}
+{"type":"thought","data":" or"}
+{"type":"thought","data":" trailing"}
+{"type":"thought","data":" prose"}
+{"type":"thought","data":"."}
+{"type":"thought","data":" I"}
+{"type":"thought","data":" should"}
+{"type":"thought","data":" not"}
+{"type":"thought","data":" re"}
+{"type":"thought","data":"-"}
+{"type":"thought","data":"run"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" review"}
+{"type":"thought","data":" or"}
+{"type":"thought","data":" use"}
+{"type":"thought","data":" tools"}
+{"type":"thought","data":"."}
+{"type":"text","data":"{\""}
+{"type":"text","data":"ver"}
+{"type":"text","data":"dict"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"APPRO"}
+{"type":"text","data":"VED"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"summary"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Signed"}
+{"type":"text","data":" correction"}
+{"type":"text","data":" "}
+{"type":"text","data":"627"}
+{"type":"text","data":"f"}
+{"type":"text","data":"98"}
+{"type":"text","data":"d"}
+{"type":"text","data":"1"}
+{"type":"text","data":" closes"}
+{"type":"text","data":" the"}
+{"type":"text","data":" first"}
+{"type":"text","data":"-"}
+{"type":"text","data":"review"}
+{"type":"text","data":" material"}
+{"type":"text","data":" union"}
+{"type":"text","data":" against"}
+{"type":"text","data":" current"}
+{"type":"text","data":" owners"}
+{"type":"text","data":":"}
+{"type":"text","data":" every"}
+{"type":"text","data":" N"}
+{"type":"text","data":"≥"}
+{"type":"text","data":"1"}
+{"type":"text","data":" close"}
+{"type":"text","data":"/"}
+{"type":"text","data":"hot"}
+{"type":"text","data":"-"}
+{"type":"text","data":"verify"}
+{"type":"text","data":"/"}
+{"type":"text","data":"commit"}
+{"type":"text","data":"/"}
+{"type":"text","data":"active"}
+{"type":"text","data":"-"}
+{"type":"text","data":"cold"}
+{"type":"text","data":" staged"}
+{"type":"text","data":" pair"}
+{"type":"text","data":" is"}
+{"type":"text","data":" routed"}
+{"type":"text","data":" through"}
+{"type":"text","data":" Node"}
+{"type":"text","data":"-"}
+{"type":"text","data":"private"}
+{"type":"text","data":" inspect"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Transition"}
+{"type":"text","data":"Advance"}
+{"type":"text","data":";"}
+{"type":"text","data":" inspect"}
+{"type":"text","data":"Bounded"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":"Advance"}
+{"type":"text","data":" now"}
+{"type":"text","data":" reti"}
+{"type":"text","data":"res"}
+{"type":"text","data":" the"}
+{"type":"text","data":" unique"}
+{"type":"text","data":" current"}
+{"type":"text","data":"Epoch"}
+{"type":"text","data":"-"}
+{"type":"text","data":"1"}
+{"type":"text","data":" predecessor"}
+{"type":"text","data":" ACL"}
+{"type":"text","data":" with"}
+{"type":"text","data":" the"}
+{"type":"text","data":" stale"}
+{"type":"text","data":" Cut"}
+{"type":"text","data":"/"}
+{"type":"text","data":"QC"}
+{"type":"text","data":" pair"}
+{"type":"text","data":" and"}
+{"type":"text","data":" keeps"}
+{"type":"text","data":" the"}
+{"type":"text","data":" post"}
+{"type":"text","data":"-"}
+{"type":"text","data":"adoption"}
+{"type":"text","data":" five"}
+{"type":"text","data":"-"}
+{"type":"text","data":"kind"}
+{"type":"text","data":" census"}
+{"type":"text","data":" constant"}
+{"type":"text","data":";"}
+{"type":"text","data":" open"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Checkpoint"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":" returns"}
+{"type":"text","data":" exactly"}
+{"type":"text","data":" {"}
+{"type":"text","data":"current"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":","}
+{"type":"text","data":"ok"}
+{"type":"text","data":","}
+{"type":"text","data":"predecessor"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":"}"}
+{"type":"text","data":" via"}
+{"type":"text","data":" sole"}
+{"type":"text","data":"-"}
+{"type":"text","data":"caller"}
+{"type":"text","data":" mint"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Anchor"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":"Checkpoint"}
+{"type":"text","data":"Predecessor"}
+{"type":"text","data":" after"}
+{"type":"text","data":" a"}
+{"type":"text","data":" direct"}
+{"type":"text","data":" anchor"}
+{"type":"text","data":"-"}
+{"type":"text","data":"trust"}
+{"type":"text","data":"-"}
+{"type":"text","data":"singleton"}
+{"type":"text","data":".js"}
+{"type":"text","data":" import"}
+{"type":"text","data":"."}
+{"type":"text","data":" Epoch"}
+{"type":"text","data":"≥"}
+{"type":"text","data":"2"}
+{"type":"text","data":" pending"}
+{"type":"text","data":" recovery"}
+{"type":"text","data":" is"}
+{"type":"text","data":" explicitly"}
+{"type":"text","data":" left"}
+{"type":"text","data":" to"}
+{"type":"text","data":" D"}
+{"type":"text","data":"."}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":","}
+{"type":"text","data":" RED"}
+{"type":"text","data":" stays"}
+{"type":"text","data":" a"}
+{"type":"text","data":" three"}
+{"type":"text","data":"-"}
+{"type":"text","data":"token"}
+{"type":"text","data":" behavioral"}
+{"type":"text","data":" matrix"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" byte"}
+{"type":"text","data":"/"}
+{"type":"text","data":"kind"}
+{"type":"text","data":" gates"}
+{"type":"text","data":" are"}
+{"type":"text","data":" now"}
+{"type":"text","data":" closed"}
+{"type":"text","data":"."}
+{"type":"text","data":" No"}
+{"type":"text","data":" new"}
+{"type":"text","data":" P"}
+{"type":"text","data":"0"}
+{"type":"text","data":"/"}
+{"type":"text","data":"P"}
+{"type":"text","data":"1"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"find"}
+{"type":"text","data":"ings"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"[],"}
+{"type":"text","data":"\""}
+{"type":"text","data":"material"}
+{"type":"text","data":"_"}
+{"type":"text","data":"union"}
+{"type":"text","data":"_"}
+{"type":"text","data":"closed"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"scope"}
+{"type":"text","data":"_"}
+{"type":"text","data":"preserved"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"red"}
+{"type":"text","data":"_"}
+{"type":"text","data":"ready"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"blocking"}
+{"type":"text","data":"_"}
+{"type":"text","data":"union"}
+{"type":"text","data":"_"}
+{"type":"text","data":"closed"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":"}"}
+{"type":"available_commands","tools":["run_terminal_command","read_file","search_replace","list_dir","grep","kill_command_or_subagent","todo_write","get_command_or_subagent_output","spawn_subagent","scheduler_create","scheduler_delete","scheduler_list","monitor","search_tool","use_tool","workflow","enter_plan_mode","exit_plan_mode","ask_user_question","web_search","web_fetch","image_gen","image_edit","image_to_video","reference_to_video","write","railway__add_reference_variable","railway__connect_service_source","railway__create_bucket","railway__create_environment","railway__create_project","railway__create_service","railway__create_tcp_proxy","railway__create_volume","railway__delete_domain","railway__deploy","railway__deploy_template","railway__disconnect_service_source","railway__docs_fetch","railway__docs_search","railway__domain_status","railway__environment_status","railway__generate_domain","railway__get_logs","railway__get_service_config","railway__get_tcp_proxy","railway__http_error_rate","railway__http_requests","railway__http_response_time","railway__link_environment","railway__link_service","railway__list_deployments","railway__list_domains","railway__list_projects","railway__list_services","railway__list_tcp_proxies","railway__list_variables","railway__list_workspaces","railway__private_network_status","railway__private_network_update","railway__remove_bucket","railway__remove_service","railway__remove_tcp_proxy","railway__remove_volume","railway__retry_domain_certificate","railway__scale_service","railway__search_templates","railway__service_metrics","railway__set_variables","railway__update_domain","railway__update_service","railway__update_volume","railway__whoami","codex__codex","codex__codex-reply","react-grab-mcp__get_element_context"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","deep-research","workflow","goal","loop","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"usage","usage":{"input_tokens":187726,"output_tokens":254,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"reasoning_tokens":44},"signature":"FYZC/7fny7WDmyw43Ij0PAIYy7A9wZAW2clzMg13MoaMDwwBbhC0LZTIasCXp0V1waeQYaandQRkiqC7VtWCxFUzbXMYhO7qg7AjQYfe/WEp0nMTp739YJ1Yi3ArSQTMLj8qzQ1rSeyXsChNfzWhADTJwmAFjZD8g3i15xC+qSrvWQWtisRIEkWjNfVWCo7+eZBDLq/tAghIMhQqBY3GPdw2DCwvuZpTkfdJZsdbE6jB8RouvhR2wv4ZcFrwYkSHReX6UujdDl0L2pEme5zfyjvRXtEkbeHrZBg"}
+{"type":"end","stopReason":"end_turn","sessionId":"01a063aa-e998-72d2-a25f-ecc46110cc89","requestId":"77c27d19-9f7f-435b-be10-1e4c5d21ca7a","usage":{"input_tokens":187726,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":254,"reasoning_tokens":44,"total_tokens":187980},"num_turns":1,"total_cost_usd":0.06408592,"total_cost_usd_ticks":640859200,"modelUsage":{"grok-4.6-build":{"inputTokens":187726,"outputTokens":254,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"modelCalls":1,"costUSD":0.06408592}}}

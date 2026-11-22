@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync, lstatSync, readlinkSync } from "node:fs";
+import { join } from "node:path";
+const root = import.meta.dirname, repo = "/Users/aristotle/Documents/Projects/ts-drp-1";
+const git = args => execFileSync("git", ["-C", repo, ...args]).toString();
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const before = JSON.parse(readFileSync(join(root, "main-before.json"), "utf8"));
+const commit = git(["rev-parse", "HEAD"]).trim();
+assert.ok(commit.startsWith("e8e7b027"));
+assert.equal(git(["show", "-s", "--format=%G?", commit]).trim(), "G");
+assert.equal(git(["rev-parse", "origin/codex/phase3a1b-p6-golden-path"]).trim(), commit);
+assert.equal(git(["status", "--porcelain=v1", "--untracked-files=no"]), "");
+const owner = "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts";
+assert.equal(git(["diff-tree", "--no-commit-id", "--name-only", "-r", commit]).trim(), owner);
+const records = [];
+function run(name, bin, args, expectedStatus = 0) {
+  const startedAt = new Date().toISOString();
+  console.log("START " + name);
+  const result = spawnSync(bin, args, { cwd: repo, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  for (const stream of ["stdout", "stderr"]) writeFileSync(join(root, `${name}.${stream}`), result[stream] ?? "", { flag: "wx" });
+  records.push({ name, bin, args, cwd: repo, status: result.status, signal: result.signal, expectedStatus, startedAt, finishedAt: new Date().toISOString() });
+  writeFileSync(join(root, "commands.json"), JSON.stringify(records, null, 2) + "\n");
+  console.log("END " + name + ": " + result.status);
+  assert.equal(result.status, expectedStatus);
+}
+run("format", "pnpm", ["exec", "prettier", "--check", owner]);
+run("lint", "pnpm", ["exec", "eslint", owner]);
+run("diff", "git", ["-C", repo, "diff", `${commit}^`, commit, "--check", "--", owner]);
+const selection = "documents both existing callback surfaces without changing their type shapes";
+run("list", "pnpm", ["exec", "vitest", "list", owner, "-t", selection]);
+run("red", "pnpm", ["exec", "vitest", "run", owner, "-t", selection, "--no-file-parallelism", "--coverage.enabled=false", "--reporter=json", "--outputFile=" + join(root, "reporter.json")], 1);
+const protectedEntries = Object.fromEntries(Object.keys(before.protectedEntries).map(path => {
+  const full = join(repo, path), stat = lstatSync(full);
+  return [path, stat.isSymbolicLink() ? { kind: "symlink", target: readlinkSync(full) } : stat.isDirectory() ? { kind: "directory" } : { kind: "file", sha256: hash(readFileSync(full)) }];
+}));
+assert.deepEqual(protectedEntries, before.protectedEntries);
+const stashHash = hash(git(["stash", "list", "--format=%H"]));
+assert.equal(stashHash, before.stashHash);
+assert.equal(git(["status", "--porcelain=v1", "--untracked-files=no"]), "");
+writeFileSync(join(root, "main-after.json"), JSON.stringify({ commit, signature: "G", pushedRef: commit, trackedStatus: "", stashHash, stashCount: before.stashCount, protectedEntries, ownerHash: hash(readFileSync(join(repo, owner))) }, null, 2) + "\n", { flag: "wx" });

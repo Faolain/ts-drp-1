@@ -1,0 +1,1 @@
+tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts > D.110c-0c1f5 foreign-author close liveness > keeps foreign frontier anomalies author-local while creator corruption stays fail closed

@@ -1,0 +1,57 @@
+{
+	"scope": "One confirmed growing harness retaining owner and the diagnostic terminal phase correction; no product cleanup",
+	"reviews": {
+		"sol": { "directory": "assertion-review-sol", "verdict": "PASS", "exitCode": 0, "sourceCustodyExact": true },
+		"grok": {
+			"directory": "assertion-review-grok",
+			"verdict": "PASS",
+			"classification": "TERMINAL_RESPONSE",
+			"exitCode": 0,
+			"maxTurns": 100
+		},
+		"fable": { "directory": "assertion-review-fable", "verdict": "PASS", "exitCode": 0, "sourceCustodyExact": true },
+		"phaseConfirmation": {
+			"directory": "phase-final-review-sol",
+			"verdict": "PASS",
+			"exitCode": 0,
+			"sourceCustodyExact": true,
+			"scope": "Final phase-aware preservation of all general runtime guards, implementing Fable recommendation; not a fresh full Grok/Fable review"
+		}
+	},
+	"dispositions": [
+		{
+			"finding": "Fable P1: skipping entire terminal prepare also skips valid general runtime assertions",
+			"resolution": "Implemented required scalar terminalAccounting phase parameter. Preparation always joins startup and validates creator/plane/current runtime/pending state. Only post-reopen fence cardinality is conditional. Separate RED author used genuine17-writer frontier plus ordinary creator issue to obtain18controls; old helper failed terminal, phase-aware helper passes and still rejects missing creator/plane catalogs.",
+			"evidence": ["terminal-readiness-red-join", "terminal-readiness-green", "phase-final-review-sol"]
+		},
+		{
+			"finding": "Fable P1: byte slope alone cannot establish retaining-owner elimination",
+			"resolution": "Accepted. GREEN capture must show zero Vitest onFinished callbacks and no growing historical-room path through them. Expected bounded original fixture inputs remain. Compare actual graph/owner counts before interpreting slopes; do not assign the whole residual to this owner."
+		},
+		{
+			"finding": "Grok P2: worker-local sourceHashes omits new assertion helper",
+			"resolution": "External run command.json explicitly hashes tests/fixtures/grid-expected-publication-failure.ts and its test, with complete before/after source custody. Entire run directories, not detached telemetry, are the evidence unit."
+		},
+		{
+			"finding": "Fixed63 peer-input roots plus one other path; strong BFS is not exclusive ownership",
+			"resolution": "Accepted. The remaining direct creator-input path is included in preserved strong-owners evidence; fixed total64 is bounded harness baseline. Independent BFS proves strong reachability only. Do not sum old-room retained sizes or infer exclusive cost from onFinished dominator size."
+		},
+		{
+			"finding": "Seven initial assertion tests failed for missing module; terminal fixture initial mismatch preconditions failed",
+			"resolution": "Preserved all failures. Positive installed-Vitest control independently proves callback growth; unchanged GREEN tests prove no callback growth and rejection semantics. Initial2/17-writer terminal attempts did not produce joins and are setup failures, not causal RED. A final ordinary creator issue produces real18-vs17 causal RED before phase-aware GREEN."
+		},
+		{
+			"finding": "Full corrected capture and final unprofiled100 remain unverified; residual graph growth not fully attributed",
+			"resolution": "At review time this was correctly pending. Subsequently capture30-assertion-released completed all snapshots, terminal accounting and final cold reopen, with zero onFinished callbacks and flat128 rooms/registrations. grid100-assertion-released then exited naturally0 with exact source custody, all correctness/recovery assertions and matching101 epoch samples. Owned-byte slope1852126.8980938417 remains11.21x reference; residual1750708 non-database graph bytes remain unattributed. See summary.md and grid100-assertion-released/comparison.json."
+		}
+	],
+	"verification": [
+		"async-assertion-green",
+		"terminal-readiness-green",
+		"phase-final-types",
+		"phase-final-lint",
+		"phase-final-format"
+	],
+	"preservedCapture": "capture30-startup-settled: snapshots10/20/30 complete, later terminal FAIL, no final cold-reopen proof",
+	"nextAction": "Attribute remaining non-database graph-growth delta from preserved paired snapshots before another cleanup or run"
+}

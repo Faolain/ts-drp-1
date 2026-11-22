@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const before=JSON.parse(fs.readFileSync(path.join(out,'custody-before.json'))),after=JSON.parse(fs.readFileSync(path.join(out,'custody-after.json'))),validation=JSON.parse(fs.readFileSync(path.join(out,'validation.json')));
+if(!validation.valid||validation.total!==10||validation.passed!==10)throw Error('Result not green');
+if(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!==after.head)throw Error('HEAD drift');
+for(const field of ['ownerHashes','testHashes','builtOwners','finality'])if(JSON.stringify(before[field])!==JSON.stringify(after[field]))throw Error('Custody drift '+field);
+for(const [f,h]of Object.entries(after.ownerHashes))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Owner drift '+f);
+for(const [f,h]of Object.entries(after.testHashes))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Test drift '+f);
+for(const [f,r]of Object.entries(after.builtOwners))if(hash(fs.readFileSync(path.join(root,f)))!==r.sha256)throw Error('Runtime drift '+f);
+if(hash(fs.readFileSync(path.join(root,after.finality.file)))!==after.finality.sha256)throw Error('Finality drift');
+fs.writeFileSync(path.join(out,'seal-summary.json'),JSON.stringify({head:after.head,patchSha256:after.patchSha256,total:10,passed:10,failed:0,skipped:0,exactTitles:true,executions:1,sourceChanged:false,runtimeChanged:false,rebuilt:false,protectedPaths:after.protectedPaths,stashCount:after.stashCount,reporterSha256:validation.reporterSha256,stdoutBytes:fs.statSync(path.join(out,'stdout.log')).size,stderrBytes:fs.statSync(path.join(out,'stderr.log')).size,committed:false,parentClosed:false},null,2)+'\n',{flag:'wx'});
+const collect=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?collect(path.join(dir,e.name)):[path.join(dir,e.name)]);
+const files=collect(out).filter(f=>path.basename(f)!=='manifest.sha256').sort();
+fs.writeFileSync(path.join(out,'manifest.sha256'),files.map(f=>hash(fs.readFileSync(f))+'  '+path.relative(out,f)).join('\n')+'\n',{flag:'wx'});
+console.log(JSON.stringify({entries:files.length,manifestSha256:hash(fs.readFileSync(path.join(out,'manifest.sha256'))),passed:10,failed:0,skipped:0}));

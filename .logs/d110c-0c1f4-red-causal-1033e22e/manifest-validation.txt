@@ -1,0 +1,14 @@
+docs/production-hardening/production-hardening-tdd-plan-v2.md is intentionally outside the self-excluding evidence manifest.
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts: OK
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts: OK
+.logs/d110c-0c1f4-red-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-corrected-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-final-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/ledger.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/commands.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/listing.txt: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/reporter-validation.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/source-shape.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/static-gates.md: OK
+SHA256SUMS: e029304a2ad63bfdebb3fdbdc2cbf9a482fc8a2f940394e66ebfcd6a5880bd3f

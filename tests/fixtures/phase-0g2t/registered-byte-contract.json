@@ -1,0 +1,70 @@
+{
+	"implementationModule": "../../../packages/protocol-v3/src/index.ts",
+	"registryPath": "../../../packages/protocol-v3/registry/registry-v1.json",
+	"domains": {
+		"v2": "ts-drp/vertex/v2",
+		"v3": "ts-drp/vertex/v3"
+	},
+	"suites": {
+		"v2": "ed25519-sha256-v1",
+		"v3": "ed25519-sha256-v3"
+	},
+	"privateKeySeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+	"vertex": {
+		"kind": "drp-vertex",
+		"protocolMajor": 3,
+		"objectId": "object:phase-0g2t-registered-byte",
+		"epoch": 17,
+		"anchor": "abababababababababababababababababababababababababababababababab",
+		"author": "alice",
+		"authorSequence": 41,
+		"logicalTime": 23,
+		"dependencies": [
+			"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+			"1212121212121212121212121212121212121212121212121212121212121212"
+		],
+		"operation": {
+			"action": "set",
+			"key": "message",
+			"value": "registered-byte-contract"
+		}
+	},
+	"changedAuthorSequence": 42,
+	"wrongExpectedAnchor": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+	"malformedExpectedAnchor": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+	"validAuthorSequenceBoundaries": [0, 9007199254740991],
+	"malformedAuthorSequences": [
+		{
+			"id": "missing",
+			"representation": "missing"
+		},
+		{
+			"id": "negative",
+			"representation": "literal",
+			"value": -1
+		},
+		{
+			"id": "fractional",
+			"representation": "literal",
+			"value": 1.5
+		},
+		{
+			"id": "string",
+			"representation": "literal",
+			"value": "41"
+		},
+		{
+			"id": "unsafe",
+			"representation": "decimal-number",
+			"value": "9007199254740992"
+		},
+		{
+			"id": "nan",
+			"representation": "nan"
+		},
+		{
+			"id": "positive-infinity",
+			"representation": "positive-infinity"
+		}
+	]
+}

@@ -1,0 +1,878 @@
+[
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > treats a compatible pre-sign race as durable truth without reusing the unclassified handle",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > rejects stale message progress before the missing fence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > rejects stale transform-me progress before the missing fence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > does not interpret an absent legacy entry as a durable replacement link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses wrong-sequence ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses unchanged-revision ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses surplus-revision ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses skipped-range ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses duplicate-range ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses incompatible-prefix ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u room reconciliation boundaries > refuses wrong-final-scalar ambiguous progress readback",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] rebases a published displaced source without requiring in-memory target-map presence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] surfaces an ACL source into a durable manual-review entry before any fence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0c room settlement orchestration RED > keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > pins the exact contract owners and case inventory without importing future exports",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory exposes the two plan methods at runtime",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser exposes the two plan methods at runtime",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node exposes the two plan methods at runtime",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory applies revision CAS and returns detached durable plans",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser applies revision CAS and returns detached durable plans",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node applies revision CAS and returns detached durable plans",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory links a fence atomically with issuance",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser links a fence atomically with issuance",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node links a fence atomically with issuance",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory links one replacement atomically and makes the source entry the restart idempotence key",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser links one replacement atomically and makes the source entry the restart idempotence key",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node links one replacement atomically and makes the source entry the restart idempotence key",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a fence when the durable plan is absent",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a fence when the durable plan is absent",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses a fence when the durable plan is absent",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a fence when fenceSequence is already set",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a fence when fenceSequence is already set",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses a fence when fenceSequence is already set",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a fence while manual review is unresolved",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a fence while manual review is unresolved",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses a fence while manual review is unresolved",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a replacement for an absent entry",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a replacement for an absent entry",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses a replacement for an absent entry",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses an already-linked replacement",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses an already-linked replacement",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses an already-linked replacement",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a replacement for a manual-review entry",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a replacement for a manual-review entry",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses a replacement for a manual-review entry",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses corrupt plan shapes without creating state",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses corrupt plan shapes without creating state",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses corrupt plan shapes without creating state",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > memory refuses pruning a published source while an unlinked plan entry references it",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser refuses pruning a published source while an unlinked plan entry references it",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node refuses pruning a published source while an unlinked plan entry references it",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > browser fresh schema is version 2 with exactly the fourth settlementPlans object store",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0s settlement-plan contract RED > node migrates the exact v2 authority to a v3 settlement_plans table in place",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress codec RED > keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress codec RED > accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress codec RED > pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress codec RED > rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress codec RED > accepts only the exact five-key progress effect and copies its digest",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress codec RED > validates a progress effect as a closed commit instead of failing on a future export",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > browser reopens before/after partial and final chunks without losing exact progress",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t settlement progress store RED > node reopens before/after partial and final chunks without losing exact progress",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > refuses malformed and stale progress before signing, while a valid exact prefix issues",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > pins the progress owners without confusing a source-shape diagnostic with runtime proof",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > refuses held issue promptly after the real durable plan write without an issuance effect",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > creator-held seal reaches the existing close owner and exact successor-codec terminus",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > no-hold creator close retains the exact existing thrown codec terminus",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses rehearsal without target import or terminal effect",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses activation without target import or terminal effect",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > changed retained held policy remains terminal source-diff refusal rather than redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > transforms 2 actual source intents and persists exact real Node batch times",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > transforms 16 actual source intents and persists exact real Node batch times",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed before-commit failure onto a fresh active owner",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed final-unknown failure onto a fresh active owner",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > keeps a store-close cleanup failure terminal after signed recovery",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > pins a real Node-assembled sixteen-entry progress chunk to its final child logical time",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > ordinary entries fields do not impersonate an application batch",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > ordinary batch.entries fields do not impersonate an application batch",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > genuine nested applicationBatch derives the final child rather than outer time",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects negative child time without publishing a durable chunk",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects non-integer child time without publishing a durable chunk",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects duplicate child time without publishing a durable chunk",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects regressed child time without publishing a durable chunk",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u exact store logical-time owner > refuses a structurally batch-shaped carrier beyond the canonical operation ceiling",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u zero-chunk origination ownership > memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u zero-chunk origination ownership > browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u zero-chunk origination ownership > node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine successor recovered-delivery RED > replays exact above-snapshot evidence once after authority/base validation and before resumed issue",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine successor recovered-delivery RED > replays authenticated notifications after callback two rejects without duplicating canonical state or issuance",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine successor recovered-delivery RED > fails closed and releases successor custody when recovered sink fails",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine successor recovered-delivery RED > fails closed and releases successor custody when recovered commit fails",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0v replayable callback contract > documents both existing callback surfaces without changing their type shapes",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0v replayable callback contract > pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > refuses final expire to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > refuses final rebase to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > refuses final transform to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact digest",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact disposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed progress cannot be removed while retaining its source and link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > retains undefined to exact empty progress initialization control",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w memory retained settlement entries > store removal control permits an owner re-derived plan without claiming store authentication",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > refuses final expire to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > refuses final rebase to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > refuses final transform to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact digest",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact disposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed progress cannot be removed while retaining its source and link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > retains undefined to exact empty progress initialization control",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w browser retained settlement entries > store removal control permits an owner re-derived plan without claiming store authentication",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > unlinked refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > unlinked refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > unlinked refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > unlinked refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > in-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > in-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > in-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > in-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses source-digest direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses disposition direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses link direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses progress direct CAS",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > refuses final expire to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > refuses final rebase to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > refuses final transform to manual-review redisposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact digest",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact disposition",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed progress cannot be removed while retaining its source and link",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > retains undefined to exact empty progress initialization control",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w node retained settlement entries > store removal control permits an owner re-derived plan without claiming store authentication",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts"
+  }
+]

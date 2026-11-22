@@ -1,0 +1,119 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 9,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics uses the actual full launcher's frozen root, worker path, and seven-hour deadline",
+      "status": "passed",
+      "title": "uses the actual full launcher's frozen root, worker path, and seven-hour deadline",
+      "duration": 1.6666250000000105,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics durably completes a normal miniature child and exactly reconciles its journal",
+      "status": "passed",
+      "title": "durably completes a normal miniature child and exactly reconciles its journal",
+      "duration": 318.67437500000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics retains completed progress and partial lifecycle evidence after controlled failure",
+      "status": "passed",
+      "title": "retains completed progress and partial lifecycle evidence after controlled failure",
+      "duration": 204.20954200000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics records an explicit watchdog firing and preserves pre-kill output",
+      "status": "passed",
+      "title": "records an explicit watchdog firing and preserves pre-kill output",
+      "duration": 1116.923084,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics fails closed for an explicit child error with a durable terminal record",
+      "status": "passed",
+      "title": "fails closed for an explicit child error with a durable terminal record",
+      "duration": 126.11037499999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics flushes partial stdout and stderr without requiring newline termination",
+      "status": "passed",
+      "title": "flushes partial stdout and stderr without requiring newline termination",
+      "duration": 131.80845899999986,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics drains a large final stderr burst before classifying child failure",
+      "status": "passed",
+      "title": "drains a large final stderr burst before classifying child failure",
+      "duration": 559.0145000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics rejects missing, duplicate, malformed, and out-of-order journal records",
+      "status": "passed",
+      "title": "rejects missing, duplicate, malformed, and out-of-order journal records",
+      "duration": 236.58495799999992,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics rejects terminal-proof and completed-sample memory disagreement",
+      "status": "passed",
+      "title": "rejects terminal-proof and completed-sample memory disagreement",
+      "duration": 243.40412500000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

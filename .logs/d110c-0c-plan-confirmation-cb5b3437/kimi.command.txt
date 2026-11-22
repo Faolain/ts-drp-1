@@ -1,0 +1,1 @@
+KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi --model kimi-code/k3 --prompt <prompt.md> --output-format stream-json

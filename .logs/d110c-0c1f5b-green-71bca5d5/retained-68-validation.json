@@ -1,0 +1,120 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-68/result.json",
+  "baselineSha256": "a3876c9c7efbf3ab90a07c76bf3dfd74c6e5cef46642486558c47aecb97462a1",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED has one causal readiness failure for the absent snapshot activation and export surfaces",
+      "status": "passed",
+      "title": "has one causal readiness failure for the absent snapshot activation and export surfaces",
+      "duration": 0.6787919999999303,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED keeps package roots free of runtime/machine/snapshot authority and the v3-live roster unchanged",
+      "status": "passed",
+      "title": "keeps package roots free of runtime/machine/snapshot authority and the v3-live roster unchanged",
+      "duration": 110.58033300000011,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition exports the adopted epoch, matches independent D.99 reconstruction, and activates a third replica",
+      "status": "passed",
+      "title": "exports the adopted epoch, matches independent D.99 reconstruction, and activates a third replica",
+      "duration": 80.59383400000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition rejects live export before adoption, after deactivation, and from author-list authority while invalid next-ACL operations fail before retention",
+      "status": "passed",
+      "title": "rejects live export before adoption, after deactivation, and from author-list authority while invalid next-ACL operations fail before retention",
+      "duration": 97.11966600000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects",
+      "status": "passed",
+      "title": "fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects",
+      "duration": 352.302958,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition consumes the recovered capability once after snapshot success or failure",
+      "status": "passed",
+      "title": "consumes the recovered capability once after snapshot success or failure",
+      "duration": 61.11462500000016,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "ancestorTitles": [
+        "Phase 4b-b live snapshot replacement composition tests-only RED",
+        "Phase 4b-b GREEN live snapshot composition"
+      ],
+      "fullName": "Phase 4b-b live snapshot replacement composition tests-only RED Phase 4b-b GREEN live snapshot composition installs an already folded snapshot handle that rejects every effect-bearing method",
+      "status": "passed",
+      "title": "installs an already folded snapshot handle that rejects every effect-bearing method",
+      "duration": 59.27879200000007,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "4be3e3760d8f27f5f8959f9db42a095aec8cbfb2abe50531cbd52cd9e903f997",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

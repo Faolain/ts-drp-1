@@ -1,0 +1,19 @@
+node:internal/modules/esm/resolve:314
+  return new ERR_PACKAGE_PATH_NOT_EXPORTED(
+         ^
+
+Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: No "exports" main defined in /private/tmp/d110c-f5b0w-green-m7UvLk/checkout/packages/storage-browser/node_modules/@ts-drp/issuance-store/package.json
+    at exportsNotFound (node:internal/modules/esm/resolve:314:10)
+    at packageExportsResolve (node:internal/modules/esm/resolve:604:13)
+    at resolveExports (node:internal/modules/cjs/loader:657:36)
+    at Function._findPath (node:internal/modules/cjs/loader:749:31)
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1387:27)
+    at Function.resolve (node:internal/modules/helpers:145:19)
+    at file:///private/tmp/d110c-f5b0w-green-m7UvLk/checkout/[eval1]:1:290
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:268:26)
+    at async ModuleLoader.executeModuleJob (node:internal/modules/esm/loader:264:20) {
+  code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+}
+
+Node.js v22.15.0

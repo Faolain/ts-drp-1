@@ -1,0 +1,20 @@
+{
+  "head": "f83764c5a141972f13870168eb5b9a758cd92e1c",
+  "remote": "f83764c5a141972f13870168eb5b9a758cd92e1c",
+  "signature": "G",
+  "matrixSha256": "c8b787080d810e33ee4e1fecc4fbd7b660bd6ef69f0bcc8f77475833de05e33c",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "-t",
+    "D.110c-0c1f5b parent genuine settlement composition|parent f5b P2",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-checkpoint-link-f83764c5/focused.json"
+  ],
+  "executionCount": 1,
+  "startedAt": "2026-09-05T22:09:19.706Z"
+}

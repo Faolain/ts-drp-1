@@ -1,0 +1,35 @@
+{
+	"implementationModule": "../packages/protocol-v3/src/index.ts",
+	"controlledModule": "./fixtures/phase-0o-b1a-v3/controlled-equivocation-projection.ts",
+	"publicEntryModule": "../packages/protocol-v3/src/public.ts",
+	"publicReexportMutantModule": "./fixtures/phase-0o-b1a-v3/public-reexport-mutant.ts",
+	"supplementDirectory": "../packages/protocol-v3/supplements/equivocation-evidence-projection-v1",
+	"profileId": "equivocation-evidence-projection-v1",
+	"baseProfileId": "equivocation-digest-identity-v1",
+	"proofDomain": "ts-drp/equivocation-proof/v1",
+	"domain": "ts-drp/vertex/v3",
+	"suiteId": "ed25519-sha256-v3",
+	"privateKeySeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+	"author": "alice",
+	"objectId": "object:phase-0o-b1a-projection",
+	"anchor": "abababababababababababababababababababababababababababababababab",
+	"authorSequence": 23,
+	"epoch": 4,
+	"logicalTime": 91,
+	"dependencies": ["1212121212121212121212121212121212121212121212121212121212121212"],
+	"alternateDependencies": ["cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"],
+	"operation": {
+		"action": "append",
+		"value": "projection-reconstruction"
+	},
+	"baseArtifactSha256": {
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs": "99077789ba33c3ab074d860332a71d67cacefc1ffd2c3e86f852176c15e81a57",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/equivocation-digest-identity.qnt": "653d5f4c459a3380744ee155b21985dfa005144a09e43fafec425ca0a99cee2d",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/freeze-policy.json": "14310e7a599cc0cf7bdcb7568de0935a691f927d8c543b1a965ded7f9e33a181",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/profile.json": "542a28c5d858d346a61d08da0b89ecc1ce3526ecf923f237b3e2e53ac9877fb6",
+		"packages/protocol-v3/supplements/equivocation-digest-identity-v1/spec.md": "44ea9cb169db2e9c0628fda1bd7b25c6519c0e7fdcca9c6436fe14d482026abb",
+		".github/workflows/protocol-v3-equivocation-digest-identity.yml": "e4ea99b91077baa0d4578fbea15107cd0103d989a283fb01c4dc95acefdf2c0a",
+		"tests/protocol-v3-equivocation-0o.test.ts": "5a3066fe2dce562c547a66834435dab162a91c42414b4c1c4a099cb8f6c73198",
+		"tests/fixtures/phase-0o-v3/equivocation-contract.json": "d4063a6c008dba96c1b8428779b91c1fb838d8e8d40ba3cce2b23db89615d642"
+	}
+}

@@ -1,0 +1,32 @@
+{
+  "lint": {
+    "originalResult": "lint/stdout",
+    "failure": "Two newly added TypeScript helpers omitted explicit return types.",
+    "correction": "Use existing InspectCreatorTransitionAdvanceInput and its proposed member type; no behavioral change."
+  },
+  "equivalence": {
+    "originalResult": "equivalence/status.json",
+    "failure": "The recorder recognized aggregate assertion text inside the enclosing describe expression and removed the enclosing suite.",
+    "oldCondition": "basename matches checkpoint test && text contains bootstrap.original, bootstrap.inputs, or aggregate kind",
+    "correctedCondition": "Same condition additionally requires expression text.startsWith('expect(') or text.startsWith('expect.soft(').",
+    "sourceCorrection": false,
+    "originalNormalizedAndBaselinePreserved": true
+  },
+  "equivalenceFormatting": {
+    "originalResult": "equivalence-final/status.json",
+    "failure": "The TypeScript printer retained source-layout line breaks after unwrapping the identical cold input and removing the observer availability guard.",
+    "correction": "Canonical-format both printed ASTs before exact text comparison; original before/after mismatches are preserved.",
+    "sourceCorrection": false,
+    "failedRecorderVersions": ["equivalence-initial-failed.mjs", "equivalence-correction-one-failed.mjs"]
+  },
+  "lintImportOrder": {
+    "originalResult": "lint-final/stdout",
+    "correction": "Order existing verifier value import before its input type, as required by sort-imports; no behavioral change."
+  },
+  "lexicalDiagnostic": {
+    "originalResult": "whitespace-diagnostic/status.json",
+    "correction": "Use parser-directed lexical token leaves so template literals are rescanned in context; compare every token kind and text exactly.",
+    "sourceCorrection": false
+  },
+  "testExecutions": 0
+}

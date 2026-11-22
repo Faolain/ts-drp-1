@@ -73,6 +73,17 @@ export class MessageQueueManager<T> implements IMessageQueueManager<T> {
 	}
 
 	/**
+	 * Retain custody through handler join, or reject an unentered discard.
+	 * @param queueId - Existing queue identity.
+	 * @param message - Message retained by the caller's admission owner.
+	 * @returns Lifetime completion, not application acceptance.
+	 */
+	enqueueJoined(queueId: string, message: T): Promise<void> {
+		const queue = this.queues.get(queueId === "" ? GENERAL_QUEUE_ID : queueId);
+		return queue === undefined ? Promise.reject(new Error(`Queue ${queueId} not found`)) : queue.enqueueJoined(message);
+	}
+
+	/**
 	 * Subscribe to a specific queue
 	 * @param queueId - The id of the queue to subscribe to
 	 * @param handler - The handler to apply to each message received

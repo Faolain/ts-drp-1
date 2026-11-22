@@ -1,0 +1,33 @@
+{
+  "head": "f83764c5a141972f13870168eb5b9a758cd92e1c",
+  "anchor": "b926a60658b7ce244f4ef159d634077e0cba3b49",
+  "anchorSignature": "G",
+  "scopeFiles": [
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts"
+  ],
+  "sweep": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "line": 1597,
+      "text": "\t\t\t\thex(hashDomain(\"ts-drp-storage/blob/v1\", priorCheckpoint.bytes))"
+    }
+  ],
+  "closedPredicate": "openedProposed.identity.priorCheckpointDigest === current.ref.digest",
+  "closedExcerpt": "758: \t);\n759: \treturn openedCurrent !== undefined &&\n760: \t\topenedProposed.identity.priorCheckpointKind === \"settled-v1\" &&\n761: \t\topenedProposed.identity.priorCheckpointDigest === current.ref.digest\n762: \t\t? Object.freeze({ current, proposed })\n763: \t\t: undefined;\n764: }",
+  "currentExcerpt": "945: \t);\n946: \treturn openedCurrent !== undefined &&\n947: \t\topenedProposed.identity.priorCheckpointKind === \"settled-v1\" &&\n948: \t\topenedProposed.identity.priorCheckpointDigest === current.ref.digest &&\n949: \t\tadvance({\n950: \t\t\tcandidateDigest: current.ref.digest,\n951: \t\t\tclosedEpoch: openedCurrent.identity.closedEpoch,",
+  "storageExcerpt": "85: \tif (!(bytes instanceof Uint8Array)) return invalid();\n86: \tif (hasSharedBacking(bytes)) return { ok: false, reason: \"SHARED_BUFFER_INPUT\" };\n87: \tconst copied = new Uint8Array(bytes);\n88: \treturn ok(hex(hashDomain(\"ts-drp-storage/blob/v1\", copied)) as BlobDigest);\n89: }\n90: \n91: /**",
+  "codecExcerpt": "815: \t\t) {\n816: \t\t\treturn failure(\"IDENTITY_INVALID\");\n817: \t\t}\n818: \t\tconst { detachedAuthoritySignature: signature, ...preimage } = decoded;\n819: \t\tconst digest = hashDomain(SETTLEMENT_DOMAIN, encodeCanonical(preimage));\n820: \t\tif (signature.byteLength !== 64 || !ed25519.verify(signature, digest, floor.publicKey, { zip215: false })) {\n821: \t\t\treturn failure(\"SIGNATURE_INVALID\");",
+  "sourceHashes": {
+    "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+    "packages/protocol-v3/src/creator-author-issuance-frontiers.ts": "15dbca08e4a1397ede20ac6db406ca5d17921c5f73ef12902a0cc7fb21178f28",
+    "packages/storage/src/values.ts": "864415bf19da84d0bdda7b3a4fb022b80acad805aa8927d3d5e9168407bdeb43"
+  },
+  "independentSignedPredecessorBytes": true,
+  "noProductionDigestChange": true,
+  "noDesignCodeContradiction": true,
+  "preCodecRedReachesAdjacency": false,
+  "fullGreenStillRequired": true
+}

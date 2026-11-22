@@ -1,0 +1,38 @@
+{
+  "testsCommit": "8fcbc0394d398120baaf2131ef5eebbe99ba74d8",
+  "base": "bc6ec1b12ce13baa408e0e4d7343f7730f7bcfed",
+  "files": [
+    {
+      "path": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "sha256": "e21e71f344232d1ae10bf7172a5dac544bb286e227c69049144d75c9dd013bb7"
+    },
+    {
+      "path": "packages/node/src/creator-adoption-activate.ts",
+      "sha256": "145caf12e72af3567e30e740f09cb162392a0120734fbd5d5843ca1b920c9fd7"
+    },
+    {
+      "path": "packages/node/src/internal/creator-successor-live.ts",
+      "sha256": "a6b202ccef2b14a53c2db096590ee47d0f53ee078354134bcd026c3ae57cfaa3"
+    },
+    {
+      "path": "packages/node/src/internal/creator-adoption-intent.ts",
+      "sha256": "daedadf8236793dcdb5472b336bb9230bc480b806879113527785d2193019f82"
+    },
+    {
+      "path": "packages/storage-browser/src/internal/browser-issuance-store.ts",
+      "sha256": "7ad0a58ea2de2ae33481187a257c3ec69c2c1013445b36ac3ad180538d79c862"
+    },
+    {
+      "path": "packages/issuance-store/src/types.ts",
+      "sha256": "2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d"
+    },
+    {
+      "path": ".logs/d110c-0c1f5b0r-design-3a156aca/manifest.sha256",
+      "sha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "path": ".logs/d110c-0c1f5b-red-1dcff170/manifest.sha256",
+      "sha256": "aad47c54ff7a9cb1837374ef59b205d7327510ccff8f75085366d68fde1c8fc0"
+    }
+  ]
+}

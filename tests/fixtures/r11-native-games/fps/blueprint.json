@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "kind": "ts-drp-blueprint-authoring-source",
+  "artifactId": "r11-native-fps-arena.v1",
+  "runtimeProfile": "ecmascript-2024-sync-v1",
+  "operationDiscriminator": "action",
+  "workBudgetProfile": "blueprint-work-budget-v1",
+  "operations": [
+    { "name": "causalJoin", "reducerBinding": "causalJoinReducer", "maxCanonicalOperationBytes": 192,
+      "argumentSchema": { "kind": "closed-record", "fields": [] } },
+    { "name": "fpsMove", "reducerBinding": "fpsMoveReducer", "maxCanonicalOperationBytes": 256,
+      "argumentSchema": { "kind": "closed-record", "fields": [
+        { "name": "forward", "required": true, "type": "safe-integer" },
+        { "name": "step", "required": true, "type": "safe-integer" },
+        { "name": "turn", "required": true, "type": "safe-integer" }
+      ] } },
+    { "name": "fpsShot", "reducerBinding": "fpsShotReducer", "maxCanonicalOperationBytes": 192,
+      "argumentSchema": { "kind": "closed-record", "fields": [
+        { "name": "step", "required": true, "type": "safe-integer" }
+      ] } }
+  ],
+  "conformance": {
+    "corpusVersion": "r11-native-fps-arena.v1",
+    "seed": "r11-native-fps-arena-2026-10-12",
+    "initialState": { "version": 1, "kind": "fps", "controller": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "step": 0,
+      "status": "playing", "player": { "x": 1, "y": 2, "heading": 0, "health": 3, "ammo": 3 }, "bot": { "x": 6, "y": 2, "health": 2 }, "history": [] },
+    "prCases": [
+      { "id": "bootstrap", "action": "causalJoin", "arguments": {} },
+      { "id": "move-forward", "action": "fpsMove", "arguments": { "step": -0, "forward": 1, "turn": 0 }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+      { "id": "first-hit", "action": "fpsShot", "arguments": { "step": 1 }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+      { "id": "winning-hit", "action": "fpsShot", "arguments": { "step": 2 }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } }
+    ],
+    "nightlyAdditionalCases": [ { "id": "ended-bootstrap-replay", "action": "causalJoin", "arguments": {} } ]
+  }
+}

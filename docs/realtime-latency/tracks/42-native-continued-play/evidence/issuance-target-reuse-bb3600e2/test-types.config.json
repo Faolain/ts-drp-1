@@ -1,0 +1,13 @@
+{
+  "extends": "/private/tmp/ts-drp-issuance-retirement-projection/tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "noEmit": true,
+    "rootDir": "/private/tmp/ts-drp-issuance-retirement-projection"
+  },
+  "include": [
+    "/private/tmp/ts-drp-issuance-retirement-projection/packages/issuance-store/tests/retirement-plan-rewrite.test.ts",
+    "/private/tmp/ts-drp-issuance-retirement-projection/packages/storage-node/tests/issuance-retirement-plan-rewrite.test.ts"
+  ]
+}

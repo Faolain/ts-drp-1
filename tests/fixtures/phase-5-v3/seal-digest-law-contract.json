@@ -1,0 +1,127 @@
+{
+	"schemaVersion": "phase-5a-seal-digest-law-red-v1",
+	"decision": {
+		"id": "PH-P5-D01",
+		"profileId": "seal-digest-identity-v1",
+		"protocolMajor": 3,
+		"registryVersion": 1,
+		"requirements": {
+			"cutValueDigest": "hash-domain-exact-cut-value-bytes",
+			"lockIdentity": "valueDigest",
+			"proposalHash": "hash-domain-exact-seal-proposal-bytes",
+			"qcProposalDigest": "valueDigest",
+			"roundChangeDisposition": "separate-kind-deferred-phase-5d",
+			"sameValueRoundCarryover": true,
+			"sealProposalValueDigest": "valueDigest",
+			"sealVotePhases": ["prepare", "commit"],
+			"sealVoteProposalDigest": "valueDigest"
+		}
+	},
+	"domains": {
+		"cutValue": "ts-drp/hard-epoch-cut/v3",
+		"sealProposal": "ts-drp/seal-proposal/v3"
+	},
+	"baseTupleSha256": {
+		"docs/protocol/amendments-v3.json": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508",
+		"docs/protocol/attested-hard-epochs-v5.md": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8",
+		"packages/protocol-v3/conformance/vectors/registry-v1.json": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741",
+		"packages/protocol-v3/formal/registry-model-signoff.json": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749",
+		"packages/protocol-v3/registry/registry-v1.json": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9",
+		"packages/protocol-v3/registry/registry-v1.schema.json": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+	},
+	"supplement": {
+		"checker": "packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+		"directory": "packages/protocol-v3/supplements/seal-digest-identity-v1",
+		"exactFiles": ["check-freeze.mjs", "freeze-policy.json", "profile.json", "schema.json", "spec.md", "vectors.json"],
+		"protectedArtifacts": [
+			"packages/protocol-v3/supplements/seal-digest-identity-v1/check-freeze.mjs",
+			"packages/protocol-v3/supplements/seal-digest-identity-v1/freeze-policy.json",
+			"packages/protocol-v3/supplements/seal-digest-identity-v1/profile.json",
+			"packages/protocol-v3/supplements/seal-digest-identity-v1/schema.json",
+			"packages/protocol-v3/supplements/seal-digest-identity-v1/spec.md",
+			"packages/protocol-v3/supplements/seal-digest-identity-v1/vectors.json",
+			".github/workflows/protocol-v3-seal-digest-identity.yml",
+			"tests/phase-5a-seal-digest-law-red.test.ts",
+			"tests/fixtures/phase-5-v3/seal-digest-law-contract.json"
+		],
+		"workflow": ".github/workflows/protocol-v3-seal-digest-identity.yml"
+	},
+	"workflowContract": {
+		"baseSha": "${{ github.event.pull_request.base.sha }}",
+		"checkoutRef": "${{ github.sha }}",
+		"fetchDepth": 0,
+		"permissions": { "contents": "read" },
+		"trigger": "pull_request"
+	},
+	"profile": {
+		"decisionId": "PH-P5-D01",
+		"digestIdentities": {
+			"cutValueDigest": "hash-domain-exact-cut-value-bytes",
+			"proposalHash": "hash-domain-exact-seal-proposal-bytes",
+			"qcProposalDigest": "valueDigest",
+			"sealProposalValueDigest": "valueDigest",
+			"sealVoteProposalDigest": "valueDigest"
+		},
+		"lockIdentity": "valueDigest",
+		"profileId": "seal-digest-identity-v1",
+		"protocolMajor": 3,
+		"registryVersion": 1,
+		"roundChangeDisposition": "separate-kind-deferred-phase-5d",
+		"sameValueRoundCarryover": true
+	},
+	"vectors": {
+		"cutValueVectorId": "cut-value-basic",
+		"proposals": [
+			{
+				"canonicalHex": "080505046b696e6405116472702d7365616c2d70726f706f73616c050565706f6368030e0505726f756e64030005086f626a6563744964050a6f626a6563743a637574050b76616c7565446967657374054063353636363138326239633530613930613863356234623631353131393932346432306364653930626137393134353961623331333035616466353038326132",
+				"proposalHashHex": "6c36e33923a8b38fa25a37fa89b12274df3f4f81af48ef9d705a927d9f31b031",
+				"round": 0
+			},
+			{
+				"canonicalHex": "080505046b696e6405116472702d7365616c2d70726f706f73616c050565706f6368030e0505726f756e64030205086f626a6563744964050a6f626a6563743a637574050b76616c7565446967657374054063353636363138326239633530613930613863356234623631353131393932346432306364653930626137393134353961623331333035616466353038326132",
+				"proposalHashHex": "d083a9e393e12e2e2abb02b29ed8e92416cdefa1917fcf97ad79675de114b9af",
+				"round": 1
+			}
+		],
+		"schemaVersion": "seal-digest-identity-vectors-v1",
+		"valueDigestHex": "c5666182b9c50a90a8c5b4b615119924d20cde90ba791459ab31305adf5082a2",
+		"qcBindings": [
+			{
+				"phase": "prepare",
+				"proposalDigestHex": "c5666182b9c50a90a8c5b4b615119924d20cde90ba791459ab31305adf5082a2",
+				"proposalHashHex": "6c36e33923a8b38fa25a37fa89b12274df3f4f81af48ef9d705a927d9f31b031",
+				"round": 0
+			},
+			{
+				"phase": "commit",
+				"proposalDigestHex": "c5666182b9c50a90a8c5b4b615119924d20cde90ba791459ab31305adf5082a2",
+				"proposalHashHex": "d083a9e393e12e2e2abb02b29ed8e92416cdefa1917fcf97ad79675de114b9af",
+				"round": 1
+			}
+		],
+		"voteBindings": [
+			{
+				"phase": "prepare",
+				"proposalDigestHex": "c5666182b9c50a90a8c5b4b615119924d20cde90ba791459ab31305adf5082a2",
+				"proposalHashHex": "6c36e33923a8b38fa25a37fa89b12274df3f4f81af48ef9d705a927d9f31b031",
+				"round": 0
+			},
+			{
+				"phase": "commit",
+				"proposalDigestHex": "c5666182b9c50a90a8c5b4b615119924d20cde90ba791459ab31305adf5082a2",
+				"proposalHashHex": "d083a9e393e12e2e2abb02b29ed8e92416cdefa1917fcf97ad79675de114b9af",
+				"round": 1
+			}
+		]
+	},
+	"mutantRejections": {
+		"BASE_V3_TUPLE_EDIT": "BASE_TUPLE_DRIFT",
+		"CHECKER_WITHOUT_BASE_BOOTSTRAP": "BASE_CHECKER_REQUIRED",
+		"PROPOSAL_HASH_AS_LOCK_IDENTITY": "LOCK_IDENTITY_MISMATCH",
+		"QC_PROPOSAL_HASH_SUBSTITUTION": "QC_BINDING_MISMATCH",
+		"ROUND_BEARING_VALUE_DIGEST": "CUT_VALUE_DIGEST_IDENTITY_MISMATCH",
+		"ROUND_CHANGE_AS_SEAL_VOTE_PHASE": "ROUND_CHANGE_BOUNDARY_MISMATCH",
+		"UNPROTECTED_RED_OWNER": "PROTECTED_ARTIFACT_ROSTER_MISMATCH",
+		"VOTE_PROPOSAL_DIGEST_SUBSTITUTION": "VOTE_BINDING_MISMATCH"
+	}
+}

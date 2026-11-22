@@ -1,0 +1,35 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-ADVANCE-REFLECT-GET",
+      "finding": "inspectCreatorAuthorSettlementAdvance reads currentAcl/successorAcl/predecessor/proposed/frontiers via Reflect.get and Array.isArray without own-data-property or Array.prototype checks, unlike the settlement codec's exactKeys path.",
+      "evidence": "packages/node/src/internal/creator-transition-advance.ts:131",
+      "owner": "packages/node/src/internal/creator-transition-advance.ts",
+      "disposition": "Before f5b wires this as the production adjacency gate, copy inputs with the same own-enumerable exactKeys/Array.prototype discipline as inspectBoundedCreatorTrustAdvance and prepareCreatorAuthorSettlement."
+    },
+    {
+      "id": "P2-EQUIVOCATION-VERIFY-ANCHOR",
+      "finding": "materializeCurrentEquivocationProof refuses cross-anchor same-slot pairs, but verifyEquivocationProof authenticates each vertex against its own expectedAnchor independently and will accept a hand-crafted cross-anchor proof.",
+      "evidence": "packages/protocol-v3/src/index.ts:3725",
+      "owner": "packages/protocol-v3/src/index.ts",
+      "disposition": "Add the same expectedAnchor equality used at materialize (index.ts:3725) to verifyEquivocationProof's two-vertex loop so injected proofs cannot freeze an author across anchors."
+    },
+    {
+      "id": "P2-SETTLEMENT-PROFILE-LEAF",
+      "finding": "settlement-profile.ts re-exports settlementProfileFor from index.ts, so protocol-v2/registry and every other subpath consumer load the full vertex/blueprint index instead of a leaf predicate module.",
+      "evidence": "packages/protocol-v3/src/settlement-profile.ts:1",
+      "owner": "packages/protocol-v3/src/settlement-profile.ts",
+      "disposition": "Define settlementProfileFor in settlement-profile.ts and have index.ts re-export it, inverting the edge so protocol-v2 cannot load index and a later index re-export of the settlement codec cannot cycle."
+    }
+  ],
+  "notes": [
+    "Corrected RED 62f164b6 is causal: ten focused tests fail on missing fence/reservation, settlement codec, advance predicate, ACL v3, predicate consumers, and same-anchor materialize; the helper now asserts SIGNATURE_INVALID and successor-ACL fixtures use the proposed authors.",
+    "GREEN 5bf45aab narrowly implements design item 1: reserved $drp.author-fence.v1, triple [author, admissionEpoch, terminalThrough], successor-key prepare / floor-only open with no current-key comparison, shape-only predecessor, frontierFor/frontierCount, 256 under 32768 with 257/32769 rejection, settlement-only ACL v3 cap 256 / 65536 / decode {65536,4,8192} with v1/v2 65-pins unchanged, one settlementProfileFor predicate, same-anchor materialize.",
+    "Registry enum was not widened; creator-trusted-settlement-v1 is admitted only through the predicate bypass. Root public.ts, protobuf, crypto, and vertex envelope are unchanged. Production ACL open callers still omit expectedProfileId and therefore keep v1/v2; threading profileId is f5b0b/f5b. Inherited Phase-6a and 0b1 failures are outside this diff."
+  ]
+}

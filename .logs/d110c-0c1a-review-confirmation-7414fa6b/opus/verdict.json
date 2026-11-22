@@ -1,0 +1,37 @@
+{
+  "verdict": "APPROVED",
+  "summary": "The extraction is line-for-line behavior-preserving relative to initial GREEN d77ee315: comparing the deleted creator-close.ts block (correction diff lines 11185-11333) against packages/node/src/internal/creator-issuance-retirement-boundary.ts, the only deltas are parameter plumbing (input.currentTrust.currentAnchorDigest/currentEpoch -> input.currentAnchorDigest/currentEpoch, input.graph.vertices -> input.graphVertexDigests, local prior -> input.priorAdmittedAuthorSequence), a hoisted `limit` constant that is arithmetically identical to GREEN's inline min(128, maxEpochVertices+1-rows.length) and its post-push `rows.length - page.length` recomputation, and `observedLineage` returned as Object.freeze({...lineage}) — provably equivalent because prepareCreatorIssuanceRetirement re-copies to a frozen {exhausted, next} (creator-issuance-retirement.ts:262-264) and every store returns a plain cloned lineage. sameIssuanceScope/exactIssuanceCommit/exactIssuancePair moved verbatim; the exact issued/outbox/canonical/graph checks, the 8,192/maxEpochVertices bound, the D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE token, and the returned lineage are unchanged. The module is not in packages/node/package.json exports and is not re-exported from src/index.ts. The ten-case matrix is genuinely exercising, not falsely passing: with MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT=128 and maxEpochVertices=8 every case reads one page and each mutant is constructed to satisfy the earlier gates and trip exactly its target branch — gap and duplicate reach the sequence check (line 104), substitution reaches exactIssuancePair (106), graph re-entry reaches the truncation check (125), incomplete/exhausted lineage reach 97/81, over-limit trips the rows.length>max disjunct (not the lineage disjunct), and empty initialization reaches admitted===null (130). D.110c-0c1b is correctly recognized and blocking: v3-live.ts::issueOneVertex() commits at issuer.issue() (5674) and then has ten committedFailure() returns (5701-5761) before liveJournalStore.appendAccepted() (5765), so a durably committed row can miss journal/graph admission; in the current epoch it only truncates, and after adoption its old epoch/anchor fails the per-row binding check (116-118) and freezes every later close. The plan blocks D.110c-0c1 on \"D.110c-0c1a closure and D.110c-0c1b GREEN\" (95502-95503), names the post-transactIssue window as owner, forbids selecting a repair before the audit, and does not weaken the dense frontier. The Opus P2 is assigned to the correct consumer (D.110c-0c1 owns creatorFilteredIssuanceStore()). Claims are honest: the 0c1a status line still says the slice is not closed, focused.json reports success=true 3/3 with 0 pending/todo, retained.json reports 230/230 across 52 suites, all 23 manifest entries carry status \"0\", and the diagnostic corrections (dropped encodeCanonical import, zsh reserved `status`, 4-GiB Prettier OOM) are disclosed in both ledger.md and the plan. Fixture and test diffs are additive-only. No P0/P1. Four P2s carry owners; D.110c-0c1a may close with D.110c-0c1b blocking next. (Note: SHA-256 manifest recomputation was not possible — Bash is disabled in this session — so custody was verified by content consistency, not by re-hashing.)",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Per-row canonical/anchor/epoch binding branch has no direct mutant",
+      "evidence": "packages/node/src/internal/creator-issuance-retirement-boundary.ts:112-123 (re-encode, hashDomain digest, anchor, author, epoch, objectId, authorSequence); the matrix in tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts:568-585 has no case that perturbs any of these — it is exercised only positively.",
+      "impact": "The single check that rejects a stale-epoch/anchor, wrong-author, wrong-object, or non-canonically-re-encoding row above the boundary could silently regress without any focused test failing; this is precisely the mechanism the D.110c-0c1b failure story depends on.",
+      "required_action": "Owner D.110c-0c1b: its tests-only RED already must prove the next close refuses with exact D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE for a row carrying the old epoch/anchor, which covers this branch through the real product path. No change to this correction."
+    },
+    {
+      "severity": "P2",
+      "title": "Continuation-from-prior-boundary and multi-page paging are not executable-covered",
+      "evidence": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts:554 pins priorAdmittedAuthorSequence: null for all ten cases, and derivationStore (line 53) returns input.rows for every readOutboxPage call, ignoring afterKey and limit; with MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT=128 no case can reach a second loop iteration.",
+      "impact": "boundary.ts:83-95 afterKey seeding and firstExpected = prior + 1 (line 96) — the path taken by every close after epoch 0 — is verified only by diff inspection, not by execution; a regression in cursor construction or resumption arithmetic would pass this suite.",
+      "required_action": "Owner D.110c-0c1b: its required genuine 0->1 and 1->2 close/adoption GREEN exercises the non-null continuation against the real store. Optionally add one non-null-prior success case to the existing matrix when 0c1b lands; not required to close 0c1a."
+    },
+    {
+      "severity": "P2",
+      "title": "Carrier-author binding obligation recorded only in the 0c1a retrospective",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md:96147-96148 is the sole occurrence of the requirement; the D.110c-0c1 section (95500-95566) states only the generic \"authenticate object, author, sequence, signature, anchor/epoch relation ... for any row it discards\" and never requires comparing the opened retirement carrier's author against the independently resolved issuance scope.",
+      "impact": "The D.110c-0c1 implementer reading its own section may bind rows but not the carrier itself, reintroducing the exact gap the close path already closes at creator-close.ts:309.",
+      "required_action": "Owner D.110c-0c1: mirror one sentence into the D.110c-0c1 threat-model list when its RED is written. No confirmation round."
+    },
+    {
+      "severity": "P2",
+      "title": "focused.status records a derived verdict rather than the wrapper exit code",
+      "evidence": ".logs/d110c-0c1a-green-review-correction-d77ee315/focused.status contains \"0\" while ledger.md:39-43 discloses the wrapper actually returned 1 after clobbering zsh's read-only `status` variable.",
+      "impact": "A `.status` file conventionally read as an exit code carries a hand-derived value; an automated custody audit that trusts status files without reading the ledger would draw a false conclusion.",
+      "required_action": "Accepted as disclosed — the primary artifact (focused.json: success=true, numTotalTests 3, numPassedTests 3, numPendingTests 0, numTodoTests 0) and focused.log corroborate it. Owner: evidence-wrapper convention going forward — record the true exit code and put any derived verdict in a separately named file."
+    }
+  ],
+  "green_closes_red": true,
+  "red_causal": true,
+  "scope_preserved": true
+}

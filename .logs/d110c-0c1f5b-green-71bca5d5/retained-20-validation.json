@@ -1,0 +1,67 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 3,
+  "passed": 3,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-20/result.json",
+  "baselineSha256": "fe7eb3dceda9a605f545b1181a3abf359e46cffcc66f71e8f62b151be9654f0d",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1a successor handle registration identity RED"
+      ],
+      "fullName": "D.108d1a successor handle registration identity RED freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface",
+      "status": "passed",
+      "title": "freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface",
+      "duration": 4.280499999999847,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1a successor handle registration identity RED"
+      ],
+      "fullName": "D.108d1a successor handle registration identity RED [RED readiness] requires the private one-shot handle-alias bridge",
+      "status": "passed",
+      "title": "[RED readiness] requires the private one-shot handle-alias bridge",
+      "duration": 0.2691250000000309,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts",
+      "ancestorTitles": [
+        "D.108d1a successor handle registration identity RED"
+      ],
+      "fullName": "D.108d1a successor handle registration identity RED returned hot wrapper retains route, admission, targeted replay and deactivation identity",
+      "status": "passed",
+      "title": "returned hot wrapper retains route, admission, targeted replay and deactivation identity",
+      "duration": 740.4014589999997,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "cf51c4f7eb5c9f5bcea5c6903b8418242fd957185b379bf045883e3d52014159",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

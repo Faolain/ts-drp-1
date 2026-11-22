@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',maxBuffer:16*1024*1024});
+const contractFile='tests/fixtures/phase-5-v3/seal-digest-law-contract.json',contract=JSON.parse(fs.readFileSync(path.join(root,contractFile)));
+const registry='packages/protocol-v3/registry/registry-v1.json',commit='0d6e38c2175806738cc568a56e19e9101a025d05';
+const file='tests/phase-5a-seal-digest-law-red.test.ts',test=fs.readFileSync(path.join(root,file),'utf8'),checker=fs.readFileSync(path.join(root,contract.supplement.checker),'utf8');
+const excerpt=(s,from,to)=>s.split('\n').slice(from-1,to).map((l,i)=>`${from+i}: ${l}`).join('\n');
+const report=JSON.parse(fs.readFileSync(path.join(out,'retained-30/result.json')));
+const tuple=Object.entries(contract.baseTupleSha256).map(([file,expected])=>({file,expected,actual:hash(fs.readFileSync(path.join(root,file))),signedHead:hash(git('show','HEAD:'+file))}));
+const result={head:git('rev-parse','HEAD').trim(),file,testSha256:hash(test),contractFile,contractSha256:hash(fs.readFileSync(path.join(root,contractFile))),tuple,registryCommit:{commit,signature:git('log','-1','--format=%G?',commit).trim(),diff:git('show','--format=fuller',commit,'--',registry),currentMatchesCommit:hash(git('show',commit+':'+registry))===hash(fs.readFileSync(path.join(root,registry)))},testSource:{readiness:excerpt(test,162,185),firstFail:excerpt(test,397,401),secondFailAndConditionalSkips:excerpt(test,531,543)},checkerSource:{sha256:hash(checker),validation:excerpt(checker,243,251)},reporter:{total:report.numTotalTests,passed:report.numPassedTests,failed:report.numFailedTests,pending:report.numPendingTests,success:report.success,files:report.testResults},sourceConclusion:'Signed W0 added optional authorShareMultiplier to frozen registry. Five other tuple hashes remain exact. Neither this registry nor test/checker is one of the dirty parent production owners. Old whole-file SHA pins reject registry; checker carries same pin. The three supplement cases are explicitly skipIf(!SUPPLEMENT_READY); Vitest list omitted them, but runtime JSON reports skipped entries. No sibling-file selection or extra active workload. No test/governance edit, checker rerun or test rerun. This gate is not passed and governance disposition is required.'};
+fs.writeFileSync(path.join(out,'retained-30-attribution.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({mismatches:tuple.filter(r=>r.expected!==r.actual),total:report.numTotalTests,failed:report.numFailedTests,skipped:report.numPendingTests,registryMatchesSignedW0:result.registryCommit.currentMatchesCommit}));

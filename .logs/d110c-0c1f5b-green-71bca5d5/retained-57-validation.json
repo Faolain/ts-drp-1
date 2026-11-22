@@ -1,0 +1,79 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-57/result.json",
+  "baselineSha256": "dec3a424aeca4e49df3acf91f7854cda50e95fde82201a8d102303a225b6ab5a",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED aligns 31/64/65 writer-only and 41 full-shape ACLs under the legacy 8,192-byte ceiling",
+      "status": "passed",
+      "title": "aligns 31/64/65 writer-only and 41 full-shape ACLs under the legacy 8,192-byte ceiling",
+      "duration": 22.36220800000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED rejects each oversized recognized creator-close record loudly instead of omitting it from either scan",
+      "status": "passed",
+      "title": "rejects each oversized recognized creator-close record loudly instead of omitting it from either scan",
+      "duration": 0.9121249999999463,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED uses one opened-snapshot O(1) membership index without changing 8,192 accept/reject decisions in either mode",
+      "status": "passed",
+      "title": "uses one opened-snapshot O(1) membership index without changing 8,192 accept/reject decisions in either mode",
+      "duration": 22.135000000000105,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED accounts an author-specific default-4 epoch share at every ingress/local capacity gate while preserving global close capacity",
+      "status": "passed",
+      "title": "accounts an author-specific default-4 epoch share at every ingress/local capacity gate while preserving global close capacity",
+      "duration": 122.09270800000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "a4df8e000cd6effc917eb706f89b58fa8dc7ab39293784217a415e139418c336",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

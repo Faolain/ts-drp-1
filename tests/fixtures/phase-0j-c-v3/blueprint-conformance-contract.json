@@ -1,0 +1,233 @@
+{
+	"schemaVersion": 1,
+	"runner": {
+		"relativePath": "packages/protocol-v3/scripts/run-blueprint-conformance-v1.mjs",
+		"receiptSchemaVersion": 1
+	},
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"artifactDigestDomain": "ts-drp/blueprint-artifact/v3",
+	"conformance": {
+		"digestDomain": "ts-drp/blueprint-conformance/v1",
+		"corpusVersion": "phase-0j-c-v1",
+		"seed": "0j-c-pr-seed-2026-07-29",
+		"operationOrder": ["append", "set", "append", "set_message", "append"],
+		"initialState": {
+			"messages": [],
+			"settings": {}
+		},
+		"selectedIntrinsicDescriptorTargets": [
+			"Array.prototype",
+			"Date.prototype",
+			"Function.prototype",
+			"JSON",
+			"Math",
+			"Object.prototype",
+			"Promise.prototype",
+			"Reflect"
+		],
+		"pr": {
+			"total": 8,
+			"selected": 5,
+			"dropped": 3
+		},
+		"nightly": {
+			"total": 32,
+			"selected": 16,
+			"dropped": 16,
+			"additionalSelectedCaseIds": [
+				"nightly-safe-min",
+				"nightly-safe-max",
+				"nightly-safe-zero",
+				"nightly-safe-one",
+				"nightly-safe-negative-one",
+				"nightly-non-bmp-pair",
+				"nightly-surrogate-boundary-left",
+				"nightly-surrogate-boundary-right",
+				"nightly-canonical-object-a",
+				"nightly-canonical-object-b",
+				"nightly-negative-zero"
+			]
+		}
+	},
+	"packageTemplate": {
+		"kind": "drp-blueprint-admission-package",
+		"protocolMajor": 3,
+		"schemaVersion": 1,
+		"implementation": {
+			"artifactId": "@example/chat-conformance-blueprint@1.0.0",
+			"runtimeProfile": "ecmascript-2024-sync-v1"
+		},
+		"manifest": {
+			"schemaVersion": 1,
+			"operationDiscriminator": "action",
+			"operations": [
+				{
+					"name": "append",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "nested", "required": false, "type": "canonical-object" },
+							{ "name": "requestOrdinal", "required": false, "type": "safe-integer" },
+							{ "name": "value", "required": true, "type": "string" }
+						]
+					}
+				},
+				{
+					"name": "set",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "key", "required": true, "type": "string" },
+							{ "name": "value", "required": true, "type": "string" }
+						]
+					}
+				},
+				{
+					"name": "set_message",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "index", "required": true, "type": "safe-integer" },
+							{ "name": "value", "required": true, "type": "string" }
+						]
+					}
+				}
+			]
+		}
+	},
+	"artifacts": {
+		"primary": {
+			"file": "chat-conformance-blueprint.mjs",
+			"artifactId": "@example/chat-conformance-blueprint@1.0.0"
+		},
+		"ambientBad": {
+			"file": "chat-conformance-ambient-bad.mjs",
+			"artifactId": "@example/chat-conformance-ambient-bad@1.0.0"
+		},
+		"engineDivergent": {
+			"file": "chat-conformance-engine-divergent.mjs",
+			"artifactId": "@example/chat-conformance-engine-divergent@1.0.0"
+		},
+		"thenable": {
+			"file": "chat-conformance-thenable.mjs",
+			"artifactId": "@example/chat-conformance-thenable@1.0.0"
+		},
+		"intrinsicMutation": {
+			"file": "chat-conformance-intrinsic-mutating.mjs",
+			"artifactId": "@example/chat-conformance-intrinsic-mutating@1.0.0"
+		},
+		"moduleGlobalDrift": {
+			"file": "chat-conformance-module-global-drift.mjs",
+			"artifactId": "@example/chat-conformance-module-global-drift@1.0.0"
+		},
+		"noncanonicalIntermediate": {
+			"file": "chat-conformance-noncanonical-intermediate.mjs",
+			"artifactId": "@example/chat-conformance-noncanonical-intermediate@1.0.0"
+		},
+		"sparseIntermediate": {
+			"file": "chat-conformance-sparse-intermediate.mjs",
+			"artifactId": "@example/chat-conformance-sparse-intermediate@1.0.0"
+		}
+	},
+	"prOperations": [
+		{
+			"id": "pr-negative-zero-non-bmp",
+			"action": "append",
+			"arguments": {
+				"nested": { "boundary": "A😀🚀Z", "least": -9007199254740991, "most": 9007199254740991 },
+				"requestOrdinal": -0,
+				"value": "start😀"
+			}
+		},
+		{
+			"id": "pr-surrogate-boundary-setting",
+			"action": "set",
+			"arguments": { "key": "surrogate-boundary-😀-🚀", "value": "safe:-9007199254740991" }
+		},
+		{
+			"id": "pr-safe-max-non-bmp",
+			"action": "append",
+			"arguments": { "requestOrdinal": 9007199254740991, "value": "middle😀🚀" }
+		},
+		{
+			"id": "pr-replace-message",
+			"action": "set_message",
+			"arguments": { "index": 0, "value": "replaced😀" }
+		},
+		{
+			"id": "pr-canonical-object-safe-min",
+			"action": "append",
+			"arguments": {
+				"nested": { "codePoints": "😀🚀", "ordinal": -9007199254740991 },
+				"requestOrdinal": 7,
+				"value": "end😀"
+			}
+		}
+	],
+	"nightlyOperations": [
+		{
+			"id": "pr-negative-zero-non-bmp",
+			"action": "append",
+			"arguments": {
+				"nested": { "boundary": "A😀🚀Z", "least": -9007199254740991, "most": 9007199254740991 },
+				"requestOrdinal": -0,
+				"value": "start😀"
+			}
+		},
+		{
+			"id": "pr-surrogate-boundary-setting",
+			"action": "set",
+			"arguments": { "key": "surrogate-boundary-😀-🚀", "value": "safe:-9007199254740991" }
+		},
+		{
+			"id": "pr-safe-max-non-bmp",
+			"action": "append",
+			"arguments": { "requestOrdinal": 9007199254740991, "value": "middle😀🚀" }
+		},
+		{
+			"id": "pr-replace-message",
+			"action": "set_message",
+			"arguments": { "index": 0, "value": "replaced😀" }
+		},
+		{
+			"id": "pr-canonical-object-safe-min",
+			"action": "append",
+			"arguments": {
+				"nested": { "codePoints": "😀🚀", "ordinal": -9007199254740991 },
+				"requestOrdinal": 7,
+				"value": "end😀"
+			}
+		},
+		{
+			"id": "nightly-safe-min",
+			"action": "append",
+			"arguments": { "requestOrdinal": -9007199254740991, "value": "min" }
+		},
+		{
+			"id": "nightly-safe-max",
+			"action": "append",
+			"arguments": { "requestOrdinal": 9007199254740991, "value": "max" }
+		},
+		{ "id": "nightly-safe-zero", "action": "append", "arguments": { "requestOrdinal": 0, "value": "zero" } },
+		{ "id": "nightly-safe-one", "action": "append", "arguments": { "requestOrdinal": 1, "value": "one" } },
+		{
+			"id": "nightly-safe-negative-one",
+			"action": "append",
+			"arguments": { "requestOrdinal": -1, "value": "negative-one" }
+		},
+		{ "id": "nightly-non-bmp-pair", "action": "set", "arguments": { "key": "😀", "value": "🚀" } },
+		{ "id": "nightly-surrogate-boundary-left", "action": "set", "arguments": { "key": "A😀", "value": "🚀Z" } },
+		{ "id": "nightly-surrogate-boundary-right", "action": "set", "arguments": { "key": "😀🚀", "value": "A😀🚀Z" } },
+		{
+			"id": "nightly-canonical-object-a",
+			"action": "append",
+			"arguments": { "nested": { "a": 1, "b": "😀" }, "value": "object-a" }
+		},
+		{
+			"id": "nightly-canonical-object-b",
+			"action": "append",
+			"arguments": { "nested": { "a": -1, "b": "🚀" }, "value": "object-b" }
+		},
+		{ "id": "nightly-negative-zero", "action": "append", "arguments": { "requestOrdinal": -0, "value": "again😀" } }
+	]
+}

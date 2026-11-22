@@ -1,0 +1,13 @@
+{
+  "valid": true,
+  "sourceRegexes": [
+    "/--(?:cpu[-_]prof|heap[-_]prof|prof(?:\\b|[-_]))/u",
+    "/--(?:cpu[-_]prof|heap[-_]prof|prof(?:\\b|[-_]))/u",
+    "/\\s/u",
+    "/^\\d+$/u"
+  ],
+  "numericPidControls": true,
+  "profilingFlagControls": true,
+  "exactSourceAndValidatorMarker": "F5B_WIDE_DIAGNOSTIC",
+  "runtimeExecuted": false
+}

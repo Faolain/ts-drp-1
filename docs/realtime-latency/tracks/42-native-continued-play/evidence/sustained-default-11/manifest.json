@@ -1,0 +1,107 @@
+{
+  "schema": "native-continued-play-preparation-1",
+  "configuration": {
+    "kind": "configuration",
+    "sourceHead": "77e641a3932fa3f7a0ca5548f80985de526ddbc7",
+    "sourceDiffSha256": "7c3082439a9fe22d475bd923bc28617242eb7ffeeefa55737777fb74fe57b303",
+    "load": [
+      16.42138671875,
+      19.6728515625,
+      31.1162109375
+    ],
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "epochs": 3,
+    "warmRows": 0,
+    "repairEvery": 25,
+    "reopenAt": 1,
+    "requireProgress": false,
+    "directory": "/private/tmp/active-continued-play-bounded-default-11/grid-sqlite-cPDNfo",
+    "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+    "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+    "tickIntervalMs": 10,
+    "offeredHzPerPeer": 100,
+    "stateSlots": 32,
+    "slotOwnership": "16 disjoint slots per author",
+    "successor": "signed native export over scripted chunk/material transport",
+    "cpuProfiles": false,
+    "observationBufferLimit": 512,
+    "rawHistoryLimit": 64,
+    "taskQuantumHistoryLimit": 256
+  },
+  "verdict": "Default three-epoch observation-mode smoke passed after review correction, including epoch1 strict reopen and later recipient maintenance. Process exited0; no final300 claim.",
+  "files": {
+    "continued-play.jsonl.gz": {
+      "sha256": "e637636f4d21807adb1feeb51cecab9e5e4bc75a0b0da6415cf882677af7fcd4",
+      "decodedSha256": "f91ea4d7fa68a4b8b74b758337de0ff139abb2ef5ff53b502103fcb5c8076c53",
+      "decodedBytes": 354684
+    },
+    "observations.jsonl.gz": {
+      "sha256": "cdc40dc732a45efb94a44ea1a5a47bdcffb9e533b4e73bbe7565efae7766e246",
+      "decodedSha256": "f8e562f9680e0c5c2ab93642960ec471cd3dd3048a650e0cf5b1a946b768c185",
+      "decodedBytes": 3166445
+    },
+    "source.diff.gz": {
+      "sha256": "1d4c739b50b752aaac9155fec57404a8f33b6b7a557508ab7980da8668f0713b",
+      "decodedSha256": "7c3082439a9fe22d475bd923bc28617242eb7ffeeefa55737777fb74fe57b303",
+      "decodedBytes": 58159
+    },
+    "summary.json": {
+      "sha256": "dcbf6135d349bcf620d72230d3dfe09542bc211ee565ada8d4e298a32d3b5d7c",
+      "decodedSha256": "dcbf6135d349bcf620d72230d3dfe09542bc211ee565ada8d4e298a32d3b5d7c"
+    },
+    "test.log.gz": {
+      "sha256": "38ec9904e239e3c19bd3da638b0590f18334242b0fa89500f5ba71905d14f23f",
+      "decodedSha256": "8e1cfc2efedd390e1a6eb597daaec07949e4c942c12757a92627e1a46203a157"
+    },
+    "controls.log.gz": {
+      "sha256": "2fa3d0f73f19881eb898ce165af16a6284c2703b5054bd48854da6071161203f",
+      "decodedSha256": "b13c4ae234ad66634bfe3ec1b56fb1aa4e7d5ebd76e13f8b5fb269379ec70dc8"
+    },
+    "typecheck.log.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "warmSteps": [
+    {
+      "phase": "warm-population",
+      "ms": 990.0959580000008,
+      "cpuUserMs": 980.203,
+      "cpuSystemMs": 100.131,
+      "timerCallbacks": 1,
+      "maxTaskGapMs": 879.3663750000014,
+      "maxTaskCpuMs": 971.671,
+      "ephemeralReceivedByPeer": [
+        0,
+        0
+      ]
+    },
+    {
+      "phase": "warm-convergence",
+      "ms": 1193.943874999999,
+      "cpuUserMs": 1152.103,
+      "cpuSystemMs": 103.72,
+      "timerCallbacks": 3,
+      "maxTaskGapMs": 899.5460419999999,
+      "maxTaskCpuMs": 928.689,
+      "ephemeralReceivedByPeer": [
+        2,
+        2
+      ]
+    }
+  ],
+  "claims": {
+    "epochs": 3,
+    "acceptedIssues": 51,
+    "stateSlots": 32,
+    "automaticRepairs": 1,
+    "reopenEpoch": 1
+  },
+  "limits": [
+    "Production source predates pending responsiveness and authenticated rejoin fixes.",
+    "Controlled raw ephemeral datagrams and scripted signed successor material; genuine durable libp2p ingress.",
+    "Both peers share one process; process CPU includes every thread.",
+    "The warm-population issue train still starves timer/receiver progress; observation-mode pass does not close responsiveness."
+  ]
+}

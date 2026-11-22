@@ -1,0 +1,571 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 45,
+  "passed": 45,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-89f147cc/retained-04/result.json",
+  "baselineSha256": "25cc438008397381893ee035ee04818b4b3ecfbbfa1bf39600b96df039a56f05",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED pins the exact contract owners and case inventory without importing future exports",
+      "status": "passed",
+      "title": "pins the exact contract owners and case inventory without importing future exports",
+      "duration": 2.222500000000025,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory exposes the two plan methods at runtime",
+      "status": "passed",
+      "title": "memory exposes the two plan methods at runtime",
+      "duration": 59.219291999999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser exposes the two plan methods at runtime",
+      "status": "passed",
+      "title": "browser exposes the two plan methods at runtime",
+      "duration": 72.74787500000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node exposes the two plan methods at runtime",
+      "status": "passed",
+      "title": "node exposes the two plan methods at runtime",
+      "duration": 34.29458299999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory applies revision CAS and returns detached durable plans",
+      "status": "passed",
+      "title": "memory applies revision CAS and returns detached durable plans",
+      "duration": 1.9127500000000168,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser applies revision CAS and returns detached durable plans",
+      "status": "passed",
+      "title": "browser applies revision CAS and returns detached durable plans",
+      "duration": 4.689166999999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node applies revision CAS and returns detached durable plans",
+      "status": "passed",
+      "title": "node applies revision CAS and returns detached durable plans",
+      "duration": 5.34045900000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory links a fence atomically with issuance",
+      "status": "passed",
+      "title": "memory links a fence atomically with issuance",
+      "duration": 2.783791000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser links a fence atomically with issuance",
+      "status": "passed",
+      "title": "browser links a fence atomically with issuance",
+      "duration": 4.905333999999982,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node links a fence atomically with issuance",
+      "status": "passed",
+      "title": "node links a fence atomically with issuance",
+      "duration": 6.0777499999999804,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory links one replacement atomically and makes the source entry the restart idempotence key",
+      "status": "passed",
+      "title": "memory links one replacement atomically and makes the source entry the restart idempotence key",
+      "duration": 2.7534579999999664,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser links one replacement atomically and makes the source entry the restart idempotence key",
+      "status": "passed",
+      "title": "browser links one replacement atomically and makes the source entry the restart idempotence key",
+      "duration": 5.324084000000028,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node links one replacement atomically and makes the source entry the restart idempotence key",
+      "status": "passed",
+      "title": "node links one replacement atomically and makes the source entry the restart idempotence key",
+      "duration": 8.336375000000032,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence when the durable plan is absent",
+      "status": "passed",
+      "title": "memory refuses a fence when the durable plan is absent",
+      "duration": 0.5062919999999735,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence when the durable plan is absent",
+      "status": "passed",
+      "title": "browser refuses a fence when the durable plan is absent",
+      "duration": 1.6277919999999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence when the durable plan is absent",
+      "status": "passed",
+      "title": "node refuses a fence when the durable plan is absent",
+      "duration": 4.391542000000015,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence when fenceSequence is already set",
+      "status": "passed",
+      "title": "memory refuses a fence when fenceSequence is already set",
+      "duration": 0.6467079999999896,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence when fenceSequence is already set",
+      "status": "passed",
+      "title": "browser refuses a fence when fenceSequence is already set",
+      "duration": 2.0360000000000014,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence when fenceSequence is already set",
+      "status": "passed",
+      "title": "node refuses a fence when fenceSequence is already set",
+      "duration": 4.320041999999944,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence while manual review is unresolved",
+      "status": "passed",
+      "title": "memory refuses a fence while manual review is unresolved",
+      "duration": 0.7701660000000174,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence while manual review is unresolved",
+      "status": "passed",
+      "title": "browser refuses a fence while manual review is unresolved",
+      "duration": 2.301417000000015,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence while manual review is unresolved",
+      "status": "passed",
+      "title": "node refuses a fence while manual review is unresolved",
+      "duration": 6.349166999999966,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a replacement for an absent entry",
+      "status": "passed",
+      "title": "memory refuses a replacement for an absent entry",
+      "duration": 0.7099999999999795,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a replacement for an absent entry",
+      "status": "passed",
+      "title": "browser refuses a replacement for an absent entry",
+      "duration": 1.9159999999999968,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a replacement for an absent entry",
+      "status": "passed",
+      "title": "node refuses a replacement for an absent entry",
+      "duration": 4.645792000000029,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses an already-linked replacement",
+      "status": "passed",
+      "title": "memory refuses an already-linked replacement",
+      "duration": 0.7282500000000027,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses an already-linked replacement",
+      "status": "passed",
+      "title": "browser refuses an already-linked replacement",
+      "duration": 2.9792919999999867,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses an already-linked replacement",
+      "status": "passed",
+      "title": "node refuses an already-linked replacement",
+      "duration": 5.505208999999979,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a replacement for a manual-review entry",
+      "status": "passed",
+      "title": "memory refuses a replacement for a manual-review entry",
+      "duration": 0.6246670000000449,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a replacement for a manual-review entry",
+      "status": "passed",
+      "title": "browser refuses a replacement for a manual-review entry",
+      "duration": 2.0357910000000174,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a replacement for a manual-review entry",
+      "status": "passed",
+      "title": "node refuses a replacement for a manual-review entry",
+      "duration": 5.426249999999982,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "duration": 0.8659170000000813,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "duration": 0.23812500000008185,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "duration": 2.7763330000000224,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "duration": 3.6777920000000677,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "duration": 6.5774169999999685,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "duration": 6.075874999999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses corrupt plan shapes without creating state",
+      "status": "passed",
+      "title": "memory refuses corrupt plan shapes without creating state",
+      "duration": 0.9843329999999924,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses corrupt plan shapes without creating state",
+      "status": "passed",
+      "title": "browser refuses corrupt plan shapes without creating state",
+      "duration": 1.4070410000000493,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses corrupt plan shapes without creating state",
+      "status": "passed",
+      "title": "node refuses corrupt plan shapes without creating state",
+      "duration": 3.975167000000056,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses pruning a published source while an unlinked plan entry references it",
+      "status": "passed",
+      "title": "memory refuses pruning a published source while an unlinked plan entry references it",
+      "duration": 1.3147920000000113,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses pruning a published source while an unlinked plan entry references it",
+      "status": "passed",
+      "title": "browser refuses pruning a published source while an unlinked plan entry references it",
+      "duration": 3.85129100000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses pruning a published source while an unlinked plan entry references it",
+      "status": "passed",
+      "title": "node refuses pruning a published source while an unlinked plan entry references it",
+      "duration": 6.752583000000072,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser fresh schema is version 2 with exactly the fourth settlementPlans object store",
+      "status": "passed",
+      "title": "browser fresh schema is version 2 with exactly the fourth settlementPlans object store",
+      "duration": 0.7115830000000187,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node migrates the exact v2 authority to a v3 settlement_plans table in place",
+      "status": "passed",
+      "title": "node migrates the exact v2 authority to a v3 settlement_plans table in place",
+      "duration": 6.0599580000000515,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "393c16065b95d56b2de88e8afc95d27d07c7aa41823f8086e0bcc9a6c36c5261",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

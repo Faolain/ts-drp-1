@@ -1,0 +1,14 @@
+{
+  "record": "D.110c-0c1f5b0a",
+  "checkpoint": "RED-corrective",
+  "commit": "6921ec6518c61bc853c41b0044832801671f2121",
+  "agentSourceCommit": "cbd5d7047b7b1798e40b26da7f9d2cdc359b64f6",
+  "files": 2,
+  "tests": 14,
+  "passed": 10,
+  "failed": 4,
+  "skipped": 0,
+  "causal": true,
+  "moduleResolutionFailure": false,
+  "fixtureFailure": false
+}

@@ -1,0 +1,11 @@
+file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-red-03acb4ac/readiness.mjs:8
+for(const pid of r.stdout.trim().split(/\s/u).filter(s=>/^\d+$/u.test(s)).map(Number).filter(p=>p!==process.pid&&p!==process.ppid)){const s=spawnSync('ps',['-p',String(pid),'-o','pid=,ppid=,stat='],{encoding:'utf8'});if(s.status===1)continue;if(s.status!==0)throw Error('PID status');const cwd=spawnSync('lsof',['-a','-p',String(pid),'-d','cwd','-Fn'],{encoding:'utf8'}),taskRelevantCwd=cwd.stdout.split('\n').filter(v=>v.startsWith('n')).some(v=>v.slice(1)===root||v.slice(1).startsWith(root+'/')||/^\/(?:private\/)?tmp\/d110c-f5b-/u.test(v.slice(1)));candidates.push({pid,status:s.stdout.trim(),taskRelevantCwd});if(taskRelevantCwd)throw Error('Competing task runtime PID '+pid);}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
+
+Error: Competing task runtime PID 23057
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-red-03acb4ac/readiness.mjs:8:641
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.15.0

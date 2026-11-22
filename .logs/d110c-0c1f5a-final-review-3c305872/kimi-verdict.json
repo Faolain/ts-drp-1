@@ -1,0 +1,33 @@
+{
+  "verdict": "APPROVED",
+  "summary": "D.110c-0c1f5a GREEN closes the causal RED as scoped. The production change is confined to authorIssuanceFrontiersCandidate() classification in packages/node/src/creator-close.ts:485-554: foreign duplicate/null-prior/regression anomalies freeze that author's frontier at the authenticated prior boundary or null and never abort the close; removed successor writers emit no entry; creator duplicate and regression errors remain exact and fail closed; the adjacent-prefix algorithm, aggregate carrier, signing, transition/adoption, and protocol-v3 boundary are unchanged with no observed maximum or gap crossing. The real fixture proves exact close-set counts, frozen/absent frontiers, verified adoption with post-adoption issue/publish, creator corruption controls, removal omission, and the current-unauthorized fail-closed control. RED is causal (single terminal token, pinned hash verified); GREEN evidence honestly classifies the coverage-threshold outer failure and both intermediate diagnostics; the setup-only sibling root is honestly labeled; the clean-isolated replay at signed 52fe3b44 validates. No P0/P1 findings; three P2 debts recorded.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Plan-listed adversarial matrix items lack dedicated tests",
+      "evidence": "Plan at docs/production-hardening/production-hardening-tdd-plan-v2.md:98278-98281 promises graph-iteration permutation, multiple simultaneous foreign anomalies, creator-plus-foreign anomaly precedence, and the 64-writer bound; tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts delivers only single-anomaly cases plus controls.",
+      "impact": "No plausible untested regression: per-author iteration runs over sorted successorAuthors (creator-close.ts:511), frozen duplicate authors never consult the order-dependent retained sequence (creator-close.ts:528-531), creator errors throw independently of foreign state (creator-close.ts:490-494, 541-543), and the 64-writer bound is retained in the f2 protocol-v3 roster (41/41 in f24-41.json).",
+      "required_action": "Either add the focused mutants in a later slice or amend the plan prose to disposition these items as structurally redundant with the algorithm shape and retained coverage."
+    },
+    {
+      "severity": "P2",
+      "title": "routeRegisteredVertex gossipTopicFor save/restore is not re-entrant",
+      "evidence": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts:1141-1167 captures networkNode.gossipTopicFor into a local and restores it in finally; two concurrent invocations would capture each other's override and leave one synthetic classifier installed permanently after both return.",
+      "impact": "Latent fixture-only hazard. All current call sites are strictly sequential (established-peer routing and contract routeVertex calls await each route), and a poisoned classifier would surface as D110C_FIXTURE_REGISTERED_VERTEX_ADMISSION_TIMEOUT rather than a silent pass, as the retained early-restore diagnostic demonstrates.",
+      "required_action": "Document the sequential-only contract on routeRegisteredVertex, or guard the override with a depth counter/serialization before any future concurrent use."
+    },
+    {
+      "severity": "P2",
+      "title": "Standing f2-fixture frontier-sort correction still pending",
+      "evidence": "Plan at docs/production-hardening/production-hardening-tdd-plan-v2.md:98284-98286 requires the shared f2 fixture's expected-frontier sort to switch from localeCompare to production code-unit ordering on its next edit; the GREEN diff (history.diff) touches only creator-adoption-contract.ts among fixtures, so the f2 fixture was not edited and the correction remains outstanding.",
+      "impact": "None for f5a: the f2 fixture's current expectations pass (f24-41.json 41/41). The debt is a pre-agreed follow-up, not a regression introduced here.",
+      "required_action": "Keep the obligation tracked and apply the code-unit sort the next time the f2 fixture is edited, as the plan already requires."
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true,
+  "retained_behavior_preserved": true,
+  "evidence_sufficient": true,
+  "f5a_closable": true
+}

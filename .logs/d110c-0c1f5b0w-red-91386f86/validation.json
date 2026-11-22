@@ -1,0 +1,138 @@
+{
+  "disposition": "REJECTED_UNEXPECTED_MATRIX_STOP_NO_RERUN",
+  "acceptedF5b0wRed": false,
+  "testCommit": "91386f8658e68d8a2ae76c4a1cfc8a8bee6fa982",
+  "focusedRunCount": 1,
+  "counts": {
+    "selected": 219,
+    "total": 219,
+    "passed": 154,
+    "failed": 65,
+    "skipped": 0,
+    "todo": 0
+  },
+  "files": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "total": 24,
+      "passed": 23,
+      "failed": 1,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "total": 45,
+      "passed": 45,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "total": 22,
+      "passed": 22,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "total": 17,
+      "passed": 10,
+      "failed": 7,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+      "total": 93,
+      "passed": 36,
+      "failed": 57,
+      "message": ""
+    }
+  ],
+  "anomalies": false,
+  "redirectCleanupObservedPending": true,
+  "orderlyRedShutdownClaimed": false,
+  "expectedMatrixHashUnchanged": true,
+  "typecheck": {
+    "baseline": 3,
+    "current": 3,
+    "added": []
+  },
+  "custody": {
+    "stashCount": 27,
+    "stashesUnchanged": true,
+    "untrackedUnchanged": true,
+    "trackedSourceHashesUnchanged": true,
+    "sourceHashesUnchanged": true,
+    "cleanTrackedRun": true,
+    "signedPushedTestHead": true
+  },
+  "contradictions": [
+    {
+      "test": {
+        "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "title": "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+        "status": "failed",
+        "tokens": [],
+        "failureMessages": [
+          "AssertionError: expected { issueTransactions: 1, …(5) } to deeply equal { issueTransactions: 1, …(5) }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:564:93\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ],
+        "duration": 245.36695899999995
+      },
+      "frozen": {
+        "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "title": "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+        "status": "passed",
+        "tokens": []
+      }
+    },
+    {
+      "test": {
+        "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "title": "D.110c-0c1f5b0w durable manual-review hold semantics changed retained held policy remains terminal source-diff refusal rather than redisposition",
+        "status": "failed",
+        "tokens": [],
+        "failureMessages": [
+          "DurableIssuanceError: durable issuance store is closed\n    at createDurableIssuanceFailure (/Users/aristotle/Documents/Projects/ts-drp-1/packages/issuance-store/dist/src/contract.js:45:12)\n    at BrowserIssuanceImplementation._BrowserIssuanceImplementation_assertAvailable (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:1039:43)\n    at BrowserIssuanceImplementation.<anonymous> (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:369:137)\n    at Generator.next (<anonymous>)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:7:71\n    at new Promise (<anonymous>)\n    at __awaiter (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:3:12)\n    at BrowserIssuanceImplementation.readSettlementPlan (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:368:16)\n    at Object.readSettlementPlan (/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/browser-issuance-store.js:1211:63)\n    at Object.readSettlementPlan (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:56:30)"
+        ],
+        "duration": 224.91758400000003
+      },
+      "frozen": {
+        "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "title": "D.110c-0c1f5b0w durable manual-review hold semantics changed retained held policy remains terminal source-diff refusal rather than redisposition",
+        "status": "passed",
+        "tokens": []
+      }
+    },
+    {
+      "counts": {
+        "selected": 219,
+        "total": 219,
+        "passed": 154,
+        "failed": 65,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync,readFileSync,realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+const [root,stage]=process.argv.slice(2),expected='c66e09c2937eaf54853340a8c4c0907c0c986162';
+const git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();
+const head=git('rev-parse','HEAD'),signature=git('log','-1','--format=%G?'),status=git('status','--porcelain=v1','--untracked-files=no');
+if(head!==expected||signature!=='G'||status!=='')throw Error('isolated identity or tracked state differs');
+const files=['examples/v3-room/src/index.ts','packages/node/src/v3-live.ts','tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts','tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts','pnpm-lock.yaml'];
+const hashes=Object.fromEntries(files.map(p=>[p,createHash('sha256').update(readFileSync(resolve(root,p))).digest('hex')]));
+const packages=git('ls-files','packages/*/package.json','examples/*/package.json').split('\n');
+const artifacts=['node_modules',...packages.map(p=>p.replace('package.json','dist'))].filter(p=>existsSync(resolve(root,p)));
+if(stage==='pristine'&&artifacts.length)throw Error('isolated checkout carries runtime artifacts before installation');
+console.log(JSON.stringify({root:realpathSync(root),stage,head,tree:git('rev-parse','HEAD^{tree}'),signature,trackedStatus:status,hashes,preexistingArtifacts:artifacts,node:process.version,execPath:realpathSync(process.execPath),pnpm:execFileSync('pnpm',['--version'],{cwd:root,encoding:'utf8'}).trim(),overlay:false},null,2));

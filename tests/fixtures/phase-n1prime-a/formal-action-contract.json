@@ -1,0 +1,322 @@
+{
+	"schemaVersion": "phase-n1prime-a-formal-action-contract-v2",
+	"protocolMajor": 3,
+	"targetArtifacts": {
+		"model": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+		"signedFieldDerivation": "packages/protocol-v3/formal/signed-field-derivation.json"
+	},
+	"modelStructure": {
+		"signedVertexType": "SignedVertex",
+		"authenticationPredicate": "authenticateSignedVertex",
+		"operationIdentity": "operationIdentity",
+		"stateType": "ModelState",
+		"issuedRecordsField": "issuedRecords",
+		"exposedRecordsField": "exposedIssuedRecords",
+		"remoteDecisionField": "remoteDecisionByEnvelope"
+	},
+	"quint": {
+		"module": "authorLineageActions",
+		"seed": "0x3a11ce",
+		"maxSamples": 256,
+		"maxSteps": 24,
+		"stepAction": "step",
+		"scenarioTests": [
+			"testSuccessfulLocalIssuanceIsContiguous",
+			"testFailedLocalIssuanceConsumesAndExposesNothing",
+			"testRemoteDuplicateAndGapRemainAdmissible",
+			"testEquivocationDetectionAcrossBoundedSequences",
+			"testBoundedCapsStutterWithoutGrowth",
+			"testSignedVertexFieldMutationsFailAuthentication",
+			"testLocalIssueBindsSelectedSequenceIntoSignedRecord",
+			"testRemoteDecisionHistoryIndependentForValidCandidates",
+			"testSameOperationDuplicateIsNotEquivocation",
+			"testDifferentOperationSameSlotDetectsEquivocation",
+			"testSignedFieldsDeriveFromTypedAuthenticatedVertex"
+		],
+		"invariants": [
+			"authorSequenceAuthenticated",
+			"successfulLocalIssuanceContiguous",
+			"failedLocalIssuanceOpaque",
+			"remoteAdmissionArrivalOrderIndependent",
+			"duplicateAndGapNeverReject",
+			"equivocationObservationSound",
+			"localIssuedRecordsBindSelectedSequence",
+			"validRemoteDecisionHistoryIndependent",
+			"operationIdentityGrounded",
+			"boundedStateFinite",
+			"signedFieldDerivationSound"
+		],
+		"witnesses": [
+			"witnessLocalIssueSuccess",
+			"witnessLocalIssueFailure",
+			"witnessRemoteGap",
+			"witnessRemoteDuplicate",
+			"witnessEquivocationDetected",
+			"witnessLocalSignedRecordExposed",
+			"witnessRemoteDecisionAfterHistory",
+			"witnessBoundedStutter"
+		]
+	},
+	"requiredActions": ["issueLocalSuccess", "issueLocalFailure", "admitRemote", "observeRemote", "detectEquivocation"],
+	"signedVertexFields": [
+		"kind",
+		"protocolMajor",
+		"objectId",
+		"epoch",
+		"anchor",
+		"author",
+		"authorSequence",
+		"logicalTime",
+		"dependencies",
+		"operation"
+	],
+	"controls": {
+		"localLineage": {
+			"objectId": "room-A",
+			"author": "alice",
+			"durableLineage": "alice-device-1",
+			"initialNextSequence": 0,
+			"attempts": [
+				{
+					"result": "success",
+					"selectedSequence": 0,
+					"counterBefore": 0,
+					"counterAfter": 1,
+					"signedMaterial": {
+						"stored": true,
+						"exposed": true,
+						"vertex": {
+							"kind": "vertex",
+							"protocolMajor": 3,
+							"objectId": "room-A",
+							"epoch": 0,
+							"anchor": "anchor-0",
+							"author": "alice",
+							"authorSequence": 0,
+							"logicalTime": 0,
+							"dependencies": [],
+							"operation": "operation-0"
+						}
+					}
+				},
+				{
+					"result": "success",
+					"selectedSequence": 1,
+					"counterBefore": 1,
+					"counterAfter": 2,
+					"signedMaterial": {
+						"stored": true,
+						"exposed": true,
+						"vertex": {
+							"kind": "vertex",
+							"protocolMajor": 3,
+							"objectId": "room-A",
+							"epoch": 0,
+							"anchor": "anchor-0",
+							"author": "alice",
+							"authorSequence": 1,
+							"logicalTime": 1,
+							"dependencies": ["digest-0"],
+							"operation": "operation-1"
+						}
+					}
+				},
+				{
+					"result": "failure",
+					"selectedSequence": 2,
+					"counterBefore": 2,
+					"counterAfter": 2,
+					"signedMaterial": null
+				},
+				{
+					"result": "success",
+					"selectedSequence": 2,
+					"counterBefore": 2,
+					"counterAfter": 3,
+					"signedMaterial": {
+						"stored": true,
+						"exposed": true,
+						"vertex": {
+							"kind": "vertex",
+							"protocolMajor": 3,
+							"objectId": "room-A",
+							"epoch": 0,
+							"anchor": "anchor-0",
+							"author": "alice",
+							"authorSequence": 2,
+							"logicalTime": 2,
+							"dependencies": ["digest-1"],
+							"operation": "operation-2"
+						}
+					}
+				}
+			]
+		},
+		"authentication": {
+			"signedVertex": {
+				"kind": "vertex",
+				"protocolMajor": 3,
+				"objectId": "room-A",
+				"epoch": 0,
+				"anchor": "anchor-0",
+				"author": "alice",
+				"authorSequence": 1,
+				"logicalTime": 1,
+				"dependencies": ["digest-0"],
+				"operation": "operation-1"
+			},
+			"fieldMutations": {
+				"kind": "other-kind",
+				"protocolMajor": 4,
+				"objectId": "room-B",
+				"epoch": 1,
+				"anchor": "anchor-1",
+				"author": "mallory",
+				"authorSequence": 2,
+				"logicalTime": 2,
+				"dependencies": ["different-digest"],
+				"operation": "different-operation"
+			}
+		},
+		"remoteDeliveries": [
+			{
+				"name": "gap-first",
+				"candidatesAuthenticated": true,
+				"events": [
+					{
+						"envelopeId": "alice-2",
+						"sequence": 2,
+						"operation": "operation-2",
+						"admission": "accept",
+						"observation": "gap"
+					},
+					{
+						"envelopeId": "alice-0",
+						"sequence": 0,
+						"operation": "operation-0",
+						"admission": "accept",
+						"observation": "first"
+					},
+					{
+						"envelopeId": "alice-2",
+						"sequence": 2,
+						"operation": "operation-2",
+						"admission": "accept",
+						"observation": "duplicate"
+					},
+					{
+						"envelopeId": "alice-1a",
+						"sequence": 1,
+						"operation": "operation-1a",
+						"admission": "accept",
+						"observation": "fills-gap"
+					},
+					{
+						"envelopeId": "alice-1b",
+						"sequence": 1,
+						"operation": "operation-1b",
+						"admission": "accept",
+						"observation": "equivocation"
+					},
+					{
+						"envelopeId": "alice-2b",
+						"sequence": 2,
+						"operation": "operation-2b",
+						"admission": "accept",
+						"observation": "equivocation"
+					}
+				]
+			},
+			{
+				"name": "contiguous-first",
+				"candidatesAuthenticated": true,
+				"events": [
+					{
+						"envelopeId": "alice-0",
+						"sequence": 0,
+						"operation": "operation-0",
+						"admission": "accept",
+						"observation": "first"
+					},
+					{
+						"envelopeId": "alice-1a",
+						"sequence": 1,
+						"operation": "operation-1a",
+						"admission": "accept",
+						"observation": "contiguous"
+					},
+					{
+						"envelopeId": "alice-1b",
+						"sequence": 1,
+						"operation": "operation-1b",
+						"admission": "accept",
+						"observation": "equivocation"
+					},
+					{
+						"envelopeId": "alice-2",
+						"sequence": 2,
+						"operation": "operation-2",
+						"admission": "accept",
+						"observation": "contiguous"
+					},
+					{
+						"envelopeId": "alice-2",
+						"sequence": 2,
+						"operation": "operation-2",
+						"admission": "accept",
+						"observation": "duplicate"
+					},
+					{
+						"envelopeId": "alice-2b",
+						"sequence": 2,
+						"operation": "operation-2b",
+						"admission": "accept",
+						"observation": "equivocation"
+					}
+				]
+			}
+		],
+		"equivocationObservations": [
+			{
+				"objectId": "room-A",
+				"author": "alice",
+				"authorSequence": 1,
+				"operations": ["operation-1a", "operation-1b"],
+				"detected": true
+			},
+			{
+				"objectId": "room-A",
+				"author": "alice",
+				"authorSequence": 2,
+				"operations": ["operation-2", "operation-2b"],
+				"detected": true
+			}
+		],
+		"boundedState": {
+			"caps": {
+				"localNextSequence": 3,
+				"successfulIssuanceCount": 3,
+				"failureAttemptCount": 2,
+				"remoteObservationCount": 8,
+				"phase": 16
+			},
+			"atCapacity": {
+				"before": {
+					"localNextSequence": 3,
+					"successfulIssuanceCount": 3,
+					"failureAttemptCount": 2,
+					"remoteObservationCount": 8,
+					"phase": 16
+				},
+				"after": {
+					"localNextSequence": 3,
+					"successfulIssuanceCount": 3,
+					"failureAttemptCount": 2,
+					"remoteObservationCount": 8,
+					"phase": 16
+				},
+				"stuttered": true
+			}
+		}
+	}
+}

@@ -1,0 +1,9 @@
+{
+  "wholeCustodyCount": 12,
+  "statementCustodyCount": 66,
+  "sourceChecksPassed": true,
+  "sourceNamespaceImport": "../packages/storage/src/maintenance.js",
+  "nativeChild": "source-built native ESM only",
+  "runtimeTestsExecuted": 0,
+  "sourceOnlyCollection": true
+}

@@ -1,0 +1,365 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > treats a compatible pre-sign race as durable truth without reusing the unclassified handle 985ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > rejects stale message progress before the missing fence 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > rejects stale transform-me progress before the missing fence 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > does not interpret an absent legacy entry as a durable replacement link 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses wrong-sequence ambiguous progress readback 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses unchanged-revision ambiguous progress readback 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses surplus-revision ambiguous progress readback 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses skipped-range ambiguous progress readback 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses duplicate-range ambiguous progress readback 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses incompatible-prefix ambiguous progress readback 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0u room reconciliation boundaries > refuses wrong-final-scalar ambiguous progress readback 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks 8ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing 2ms
+ × tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement 7ms
+   → D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG: expected false to be true // Object.is equality
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] rebases a published displaced source without requiring in-memory target-map presence 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] surfaces an ACL source into a durable manual-review entry before any fence 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts > D.110c-0c1f5b0c room settlement orchestration RED > keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence 1ms
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > refuses held issue promptly after the real durable plan write without an issuance effect 274ms
+   → expected 1 to be +0 // Object.is equality
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > creator-held seal reaches the existing close owner and exact successor-codec terminus 202ms
+   → expected 1 to be +0 // Object.is equality
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > no-hold creator close retains the exact existing thrown codec terminus 228ms
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link 191ms
+   → expected 1 to be +0 // Object.is equality
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses rehearsal without target import or terminal effect 189ms
+   → expected 1 to be +0 // Object.is equality
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses activation without target import or terminal effect 335ms
+   → expected 1 to be +0 // Object.is equality
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > changed retained held policy remains terminal source-diff refusal rather than redisposition 168ms
+   → v3 room displacement policy is invalid
+ × tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus 10332ms
+   → D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG: expected false to be true // Object.is equality
+   → Hook timed out in 10000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > transforms 2 actual source intents and persists exact real Node batch times 237ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > transforms 16 actual source intents and persists exact real Node batch times 348ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed before-commit failure onto a fresh active owner 258ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed partial-unknown failure onto a fresh active owner 306ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed final-unknown failure onto a fresh active owner 286ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock 490ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > keeps a store-close cleanup failure terminal after signed recovery 264ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure false) 253ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts > D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure true) 236ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > pins the exact contract owners and case inventory without importing future exports 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory exposes the two plan methods at runtime 39ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser exposes the two plan methods at runtime 32ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node exposes the two plan methods at runtime 29ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory applies revision CAS and returns detached durable plans 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser applies revision CAS and returns detached durable plans 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node applies revision CAS and returns detached durable plans 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory links a fence atomically with issuance 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser links a fence atomically with issuance 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node links a fence atomically with issuance 5ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory links one replacement atomically and makes the source entry the restart idempotence key 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser links one replacement atomically and makes the source entry the restart idempotence key 5ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node links one replacement atomically and makes the source entry the restart idempotence key 6ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a fence when the durable plan is absent 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a fence when the durable plan is absent 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses a fence when the durable plan is absent 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a fence when fenceSequence is already set 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a fence when fenceSequence is already set 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses a fence when fenceSequence is already set 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a fence while manual review is unresolved 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a fence while manual review is unresolved 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses a fence while manual review is unresolved 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a replacement for an absent entry 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a replacement for an absent entry 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses a replacement for an absent entry 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses an already-linked replacement 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses an already-linked replacement 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses an already-linked replacement 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses a replacement for a manual-review entry 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses a replacement for a manual-review entry 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses a replacement for a manual-review entry 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither 7ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither 5ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses corrupt plan shapes without creating state 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses corrupt plan shapes without creating state 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses corrupt plan shapes without creating state 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > memory refuses pruning a published source while an unlinked plan entry references it 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser refuses pruning a published source while an unlinked plan entry references it 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node refuses pruning a published source while an unlinked plan entry references it 6ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > browser fresh schema is version 2 with exactly the fourth settlementPlans object store 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts > D.110c-0c1f5b0s settlement-plan contract RED > node migrates the exact v2 authority to a v3 settlement_plans table in place 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > replays exact above-snapshot evidence once after authority/base validation and before resumed issue 454ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > replays authenticated notifications after callback two rejects without duplicating canonical state or issuance 383ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > fails closed and releases successor custody when recovered sink fails 306ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts > D.110c-0c1f5b0u genuine successor recovered-delivery RED > fails closed and releases successor custody when recovered commit fails 373ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > pins 16 as accepted and 17 as rejected without treating 17 as a settlement source 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > accepts only the exact five-key progress effect and copies its digest 0ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress codec RED > validates a progress effect as a closed commit instead of failing on a future export 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > memory atomically records a partial chunk, then only the final chunk projects replacementSequence 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser atomically records a partial chunk, then only the final chunk projects replacementSequence 11ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node atomically records a partial chunk, then only the final chunk projects replacementSequence 8ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > uses exact error ownership for malformed commits, stale progress and corrupt stored values 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > round-trips nested progress through browser structured clone and Node JSON without changing schemas 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > browser reopens before/after partial and final chunks without losing exact progress 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t settlement progress store RED > node reopens before/after partial and final chunks without losing exact progress 9ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t Node pre-reservation and split RED > keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split 83ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t Node pre-reservation and split RED > refuses malformed and stale progress before signing, while a valid exact prefix issues 41ms
+ ✓ tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts > D.110c-0c1f5b0t Node pre-reservation and split RED > pins the progress owners without confusing a source-shape diagnostic with runtime proof 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > pins a real Node-assembled sixteen-entry progress chunk to its final child logical time 119ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > ordinary entries fields do not impersonate an application batch 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > ordinary batch.entries fields do not impersonate an application batch 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > genuine nested applicationBatch derives the final child rather than outer time 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects negative child time without publishing a durable chunk 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects non-integer child time without publishing a durable chunk 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects duplicate child time without publishing a durable chunk 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > rejects regressed child time without publishing a durable chunk 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u exact store logical-time owner > refuses a structurally batch-shaped carrier beyond the canonical operation ceiling 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u zero-chunk origination ownership > memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u zero-chunk origination ownership > browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append 8ms
+ ✓ tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts > D.110c-0c1f5b0u zero-chunk origination ownership > node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append 7ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses source-digest direct CAS 9ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses disposition direct CAS 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses link direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > unlinked refuses progress direct CAS 1ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses source-digest direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses disposition direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses link direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses progress direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses source-digest direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses disposition direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses link direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > empty-progress refuses progress direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses source-digest direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses disposition direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses link direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > in-progress refuses progress direct CAS 1ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses source-digest direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses disposition direct CAS 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses link direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed-progress refuses progress direct CAS 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final expire to manual-review redisposition 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final rebase to manual-review redisposition 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > refuses final transform to manual-review redisposition 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact digest 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > manual-review retains its exact disposition 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress cannot be removed while retaining its source and link 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > completed progress freezes every chunk field and completion bounds 5ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > retains undefined to exact empty progress initialization control 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w memory retained settlement entries > store removal control permits an owner re-derived plan without claiming store authentication 0ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses source-digest direct CAS 5ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses disposition direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses link direct CAS 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > unlinked refuses progress direct CAS 1ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses source-digest direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses disposition direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses link direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses progress direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses source-digest direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses disposition direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses link direct CAS 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > empty-progress refuses progress direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses source-digest direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses disposition direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses link direct CAS 2ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > in-progress refuses progress direct CAS 1ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses source-digest direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses disposition direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses link direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed-progress refuses progress direct CAS 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final expire to manual-review redisposition 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final rebase to manual-review redisposition 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > refuses final transform to manual-review redisposition 6ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link 1ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact digest 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > manual-review retains its exact disposition 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress cannot be removed while retaining its source and link 2ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > completed progress freezes every chunk field and completion bounds 6ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > retains undefined to exact empty progress initialization control 1ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w browser retained settlement entries > store removal control permits an owner re-derived plan without claiming store authentication 1ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses source-digest direct CAS 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses disposition direct CAS 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses link direct CAS 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > unlinked refuses progress direct CAS 3ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses source-digest direct CAS 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses disposition direct CAS 9ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses link direct CAS 5ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses progress direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses source-digest direct CAS 4ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses disposition direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses link direct CAS 5ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > empty-progress refuses progress direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > in-progress refuses source-digest direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > in-progress refuses disposition direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > in-progress refuses link direct CAS 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > in-progress refuses progress direct CAS 3ms
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses source-digest direct CAS 6ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses disposition direct CAS 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses link direct CAS 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed-progress refuses progress direct CAS 6ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final expire to manual-review redisposition 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final rebase to manual-review redisposition 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > refuses final transform to manual-review redisposition 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > legacy-linked refuses manual-review redisposition without altering its link 5ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress refuses manual-review redisposition even if progress is stripped 5ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact digest 4ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > manual-review retains its exact disposition 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress cannot be removed while retaining its source and link 3ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ × tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > completed progress freezes every chunk field and completion bounds 10ms
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+   → D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+   → D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > retains undefined to exact empty progress initialization control 6ms
+ ✓ tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts > D.110c-0c1f5b0w node retained settlement entries > store removal control permits an owner re-derived plan without claiming store authentication 3ms
+ ✓ tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts > D.110c-0c1f5b0v replayable callback contract > documents both existing callback surfaces without changing their type shapes 118ms
+ ✓ tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts > D.110c-0c1f5b0v replayable callback contract > pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks 726ms
+
+ Test Files  3 failed | 5 passed (8)
+      Tests  65 failed | 154 passed (219)
+   Start at  09:19:29
+   Duration  21.86s (transform 1.01s, setup 0ms, collect 1.68s, tests 18.79s, environment 1ms, prepare 331ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0w-red-8f91396a/reporter.json

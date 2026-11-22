@@ -1,0 +1,160 @@
+{
+  "file": "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+  "sha256": "24b7a57addf2b77ca6987cee6ac5f4d10586b63a23e0ed6c79d4dbdc78d28181",
+  "syntaxDiagnostics": 0,
+  "title": "rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings",
+  "fullName": "D.110c-0c1f5b live snapshot fixture contract rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings",
+  "tests": 1,
+  "assertionCount": 16,
+  "assertions": [
+    {
+      "start": 1454,
+      "line": 26,
+      "text": "expect(readiness)"
+    },
+    {
+      "start": 1837,
+      "line": 30,
+      "text": "expect(journalBefore.page)"
+    },
+    {
+      "start": 2289,
+      "line": 37,
+      "text": "expect(issuanceBefore.lineage)"
+    },
+    {
+      "start": 2364,
+      "line": 38,
+      "text": "expect(issuanceBefore.issued)"
+    },
+    {
+      "start": 2476,
+      "line": 39,
+      "text": "expect(issuanceBefore.outbox)"
+    },
+    {
+      "start": 2583,
+      "line": 40,
+      "text": "expect(issuanceBefore.plan)"
+    },
+    {
+      "start": 3586,
+      "line": 64,
+      "text": "expect(input)"
+    },
+    {
+      "start": 3628,
+      "line": 65,
+      "text": "expect(fixture.exactCanonicalAnchorPreimageBytes)"
+    },
+    {
+      "start": 3740,
+      "line": 66,
+      "text": "expect(fixture.detachedAnchorSignature)"
+    },
+    {
+      "start": 3832,
+      "line": 67,
+      "text": "expect(fixture.exactCanonicalParametersCarrierBytes)"
+    },
+    {
+      "start": 3961,
+      "line": 70,
+      "text": "expect({\n\t\t\t\t\treadiness: await bindings.journal.readiness({ scope }),\n\t\t\t\t\tpage: await bindings.journal.readPage(pageInput),\n\t\t\t\t})"
+    },
+    {
+      "start": 4121,
+      "line": 74,
+      "text": "expect({\n\t\t\t\t\tlineage: await bindings.issuanceStore.readLineage(issuanceScope),\n\t\t\t\t\tissued: await bindings.issuanceStore.readIssued(issuanceScope, 0),\n\t\t\t\t\toutbox: await bindings.issuanceStore.readOutboxPage({ scope: issuanceScope }),\n\t\t\t\t\tplan: await bindings.issuanceStore.readSettlementPlan(issuanceScope),\n\t\t\t\t})"
+    },
+    {
+      "start": 4474,
+      "line": 80,
+      "text": "expect(bindings.journal.installGenesis(input))"
+    },
+    {
+      "start": 4669,
+      "line": 86,
+      "text": "expect(bindings.journal.installGenesis(input))"
+    },
+    {
+      "start": 4923,
+      "line": 93,
+      "text": "expect(recovered)"
+    },
+    {
+      "start": 4975,
+      "line": 95,
+      "text": "expect(observation, \"F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION\")"
+    }
+  ],
+  "recoveryCalls": 1,
+  "recoveryBeforeFinalOutcome": true,
+  "protectedHashes": {
+    "tests/fixtures/phase-4b-v3/live-snapshot.ts": "6765ca20adabc41567024174c079b438134e636108b24738c33c65c59daed759",
+    "tests/fixtures/phase-3a1b-p3/live-fixture.ts": "cd89c4c8e95961c6687b97ffaedf08302f405435fe6b75e7c6d39148a15919f8",
+    "packages/live-journal/src/types.ts": "c5f67bcc4415bd991954aa7a85ccea203cc67ca23df208681e064a6719e238d7",
+    "packages/issuance-store/src/types.ts": "2100ed2037bfb027d9f6090f843f04d9d448135498fa256e208afdd67ec65b8d"
+  },
+  "configHashes": {
+    "tsconfig.json": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/tsconfig.json",
+      "sha256": "c68194b8cdcef373208451dc230d668399cdcc165e7fb924c100ddf27e582e10"
+    },
+    "vite.config.mts": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/vite.config.mts",
+      "sha256": "6c15cd76cf3197d8f08608f28909731d55b7f07a661fada577aaecbe4b81c610"
+    },
+    "pnpm-lock.yaml": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/pnpm-lock.yaml",
+      "sha256": "56e8b9b56d7e76d4651daec66b6ff8c0bc8150ce9fab588b97b1887f417d1251"
+    },
+    ".npmrc": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/.npmrc",
+      "sha256": "025227bc08cee71693361e932b5e5b517688b4bc93eddcf737324d85fad765c6"
+    },
+    "package.json": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/package.json",
+      "sha256": "1baa6c3967e63f1d8af5f1e70c6b6c62e032a90e770f18dd3d86f5cfc40e1a55"
+    },
+    "node_modules/typescript/package.json": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/typescript@5.8.2/node_modules/typescript/package.json",
+      "sha256": "d0f478cc679c121c2925bd99ee054291b913173ca845dc57f75fb9b22aa3708f"
+    },
+    "node_modules/vitest/package.json": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/package.json",
+      "sha256": "ba469146d1321f03316531f945bd78baf501828bdd2bc73a117dac2197b3d49d"
+    },
+    "node_modules/vite/package.json": {
+      "physical": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/package.json",
+      "sha256": "5380336b824951b6a6b688161864565b4d978682306f03b6805ab7417bd2b6d8"
+    }
+  },
+  "node": {
+    "version": "v22.15.0",
+    "path": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "sha256": "6a1137a572bc6648411bfe51032173a535e010576cad6da87547f414daa11fdb"
+  },
+  "typescript": "5.8.2",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-red-03acb4ac/focused.json"
+  ],
+  "expected": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "token": "F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION",
+    "actualObservation": "missing-required-rejection"
+  },
+  "runtimeExecuted": false
+}

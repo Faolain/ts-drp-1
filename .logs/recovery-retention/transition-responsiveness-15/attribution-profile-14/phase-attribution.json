@@ -1,0 +1,6350 @@
+{
+  "note": "macOS hrtime and V8 CPU clock differ by a constant offset; calibrated median first Profiler.start completion sample against the four epoch-4 recorded hrtimes; other epochs may have delayed start-callback delivery. Anchor spread and end residuals are reported below; interval labels are approximate at sampling resolution. Sample weights are elapsed intervals, not exact CPU; process CPU may include background threads. Inspector-start overhead excluded.",
+  "clockOffsetUs": 59194256025,
+  "anchorOffsets": [
+    59194256004,
+    59194256024,
+    59194256025,
+    59194256033
+  ],
+  "anchorSpreadUs": 29,
+  "endResidualsUs": [
+    {
+      "phase": "seal-1",
+      "us": -533.125
+    },
+    {
+      "phase": "adopt-1",
+      "us": -554.458984375
+    },
+    {
+      "phase": "install-1",
+      "us": -1774.5
+    },
+    {
+      "phase": "maintenance-1",
+      "us": -486.4169921875
+    },
+    {
+      "phase": "seal-2",
+      "us": -954.5
+    },
+    {
+      "phase": "adopt-2",
+      "us": -1158.416015625
+    },
+    {
+      "phase": "install-2",
+      "us": -552.291015625
+    },
+    {
+      "phase": "maintenance-2",
+      "us": -2026.0419921875
+    },
+    {
+      "phase": "seal-3",
+      "us": -586.75
+    },
+    {
+      "phase": "adopt-3",
+      "us": -503.791015625
+    },
+    {
+      "phase": "install-3",
+      "us": -1134.0419921875
+    },
+    {
+      "phase": "maintenance-3",
+      "us": -463.5830078125
+    },
+    {
+      "phase": "seal-4",
+      "us": -580.25
+    },
+    {
+      "phase": "adopt-4",
+      "us": -430.5830078125
+    },
+    {
+      "phase": "install-4",
+      "us": -491.25
+    },
+    {
+      "phase": "maintenance-4",
+      "us": -500.5419921875
+    }
+  ],
+  "result": [
+    {
+      "phase": "seal-4",
+      "name": "whole-step",
+      "from": 67803.260625,
+      "to": 68016.381375,
+      "samples": 142,
+      "sampleWeightedMs": 212.24,
+      "categories": {
+        "canonical/protocol/crypto JS": 99.91,
+        "native SQLite calls": 48.33,
+        "garbage collection": 7.29,
+        "storage JS": 7.5,
+        "node/other JS": 49.21
+      },
+      "self": [
+        {
+          "ms": 7.29,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.46,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 3.04,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.63,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "runClose",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 825
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeHexBytes",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 436
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "withoutControlCandidates",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 1324
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "authenticate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 2623
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6318
+        },
+        {
+          "ms": 1.54,
+          "fn": "getAllPeers",
+          "url": "packages/network/src/node.ts",
+          "transformedLine": 2108
+        },
+        {
+          "ms": 1.54,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 1.54,
+          "fn": "canonicalResourceLimits",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 909
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeEncoded",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 136
+        },
+        {
+          "ms": 1.54,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "read",
+          "url": "packages/node/src/internal/creator-snapshot-data.ts",
+          "transformedLine": 76
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 212.24,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 166.91,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 118.78,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 117.08,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 48.12,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 48.12,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 48.12,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 22.67,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 20.67,
+          "fn": "runClose",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 825
+        },
+        {
+          "ms": 19.71,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 19.71,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 19.71,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 19.71,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 19.71,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 19.71,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 19.71,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 19.71,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 19.71,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 19.63,
+          "fn": "",
+          "url": "packages/node/src/creator-close.ts",
+          "transformedLine": 2790
+        },
+        {
+          "ms": 15.04,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 10.62,
+          "fn": "#commitCandidate",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1722
+        },
+        {
+          "ms": 10.62,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 10.54,
+          "fn": "recordClosedMembership",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 1433
+        },
+        {
+          "ms": 9.21,
+          "fn": "acquireRecoveryRoleCertificate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 1225
+        },
+        {
+          "ms": 9.13,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        }
+      ]
+    },
+    {
+      "phase": "seal-4",
+      "name": "largest-quantum-0",
+      "from": 67872.393167,
+      "to": 68016.381375,
+      "processCpuMs": 170.053,
+      "samples": 97,
+      "sampleWeightedMs": 143.11,
+      "categories": {
+        "node/other JS": 37.61,
+        "native SQLite calls": 29.96,
+        "canonical/protocol/crypto JS": 68,
+        "storage JS": 4.5,
+        "garbage collection": 3.04
+      },
+      "self": [
+        {
+          "ms": 4.46,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 3.04,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3.04,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.63,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "runClose",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 825
+        },
+        {
+          "ms": 1.54,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 1.54,
+          "fn": "canonicalResourceLimits",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 909
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeEncoded",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 136
+        },
+        {
+          "ms": 1.54,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "read",
+          "url": "packages/node/src/internal/creator-snapshot-data.ts",
+          "transformedLine": 76
+        },
+        {
+          "ms": 1.54,
+          "fn": "exactRecord",
+          "url": "packages/storage/src/snapshot-transfer.ts",
+          "transformedLine": 84
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureCreatorSnapshotRecoveryRoles",
+          "url": "packages/protocol-v3/src/internal/creator-forward-promotion.ts",
+          "transformedLine": 130
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.54,
+          "fn": "digest",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 327
+        },
+        {
+          "ms": 1.54,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "detach",
+          "url": "packages/node/src/internal/creator-snapshot-data.ts",
+          "transformedLine": 41
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/creator-adoption.ts",
+          "transformedLine": 307
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 143.11,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 140.07,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 115.98,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 115.98,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 24.08,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 24.08,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 24.08,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 20.67,
+          "fn": "runClose",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 825
+        },
+        {
+          "ms": 19.63,
+          "fn": "",
+          "url": "packages/node/src/creator-close.ts",
+          "transformedLine": 2790
+        },
+        {
+          "ms": 15.04,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 10.58,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 10.54,
+          "fn": "recordClosedMembership",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 1433
+        },
+        {
+          "ms": 9.13,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 9.13,
+          "fn": "",
+          "url": "packages/storage-node/src/seal-evidence.ts",
+          "transformedLine": 39
+        },
+        {
+          "ms": 9.13,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 9.13,
+          "fn": "run",
+          "url": "packages/storage-node/src/internal/signing-lease.ts",
+          "transformedLine": 46
+        },
+        {
+          "ms": 9.13,
+          "fn": "put",
+          "url": "packages/storage-node/src/seal-evidence.ts",
+          "transformedLine": 35
+        },
+        {
+          "ms": 9.13,
+          "fn": "persistEvidence",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 800
+        },
+        {
+          "ms": 9.13,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 9.13,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 9.13,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 9.13,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 9.13,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 9.13,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 9.13,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        }
+      ]
+    },
+    {
+      "phase": "seal-4",
+      "name": "largest-quantum-1",
+      "from": 67805.346667,
+      "to": 67872.393167,
+      "processCpuMs": 79.027,
+      "samples": 45,
+      "sampleWeightedMs": 67.05,
+      "categories": {
+        "native SQLite calls": 17.99,
+        "canonical/protocol/crypto JS": 30.21,
+        "garbage collection": 4.25,
+        "storage JS": 3,
+        "node/other JS": 11.6
+      },
+      "self": [
+        {
+          "ms": 4.25,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeHexBytes",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 436
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "withoutControlCandidates",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 1324
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "authenticate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 2623
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6318
+        },
+        {
+          "ms": 1.54,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "hashDomain",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1457
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "authenticatedSettlementPair",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 1070
+        },
+        {
+          "ms": 1.54,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 67.05,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 24.75,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 23.66,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 23.66,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 23.66,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 11.7,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 10.2,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 10.2,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 10.2,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 10.2,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 10.2,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 10.2,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 10.2,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 10.2,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 10.2,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 9.21,
+          "fn": "acquireRecoveryRoleCertificate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 1225
+        },
+        {
+          "ms": 6.08,
+          "fn": "#commitCandidate",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1722
+        },
+        {
+          "ms": 6.08,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 6.08,
+          "fn": "authenticate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 2623
+        },
+        {
+          "ms": 6.04,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 4.58,
+          "fn": "acquireClosedData",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5956
+        },
+        {
+          "ms": 4.54,
+          "fn": "reserveUnsignedIntent",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 583
+        },
+        {
+          "ms": 4.42,
+          "fn": "",
+          "url": "packages/node/src/creator-close.ts",
+          "transformedLine": 2790
+        },
+        {
+          "ms": 4.25,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3.08,
+          "fn": "readCreatorReplayRows",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6441
+        }
+      ]
+    },
+    {
+      "phase": "seal-4",
+      "name": "largest-quantum-2",
+      "from": 67803.260625,
+      "to": 67805.346667,
+      "processCpuMs": 2.091,
+      "samples": 2,
+      "sampleWeightedMs": 2.09,
+      "categories": {
+        "canonical/protocol/crypto JS": 1.7,
+        "native SQLite calls": 0.39
+      },
+      "self": [
+        {
+          "ms": 1.7,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 0.39,
+          "fn": "DatabaseSync",
+          "url": "",
+          "transformedLine": 0
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 2.09,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 2.09,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.7,
+          "fn": "decodeCanonical",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1279
+        },
+        {
+          "ms": 1.7,
+          "fn": "applyPreparedBlueprintOperationWith",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 1935
+        },
+        {
+          "ms": 1.7,
+          "fn": "applyPreparedBlueprintOperationToCanonicalState",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 1932
+        },
+        {
+          "ms": 1.7,
+          "fn": "apply",
+          "url": "packages/compaction/src/blueprint-fold.ts",
+          "transformedLine": 141
+        },
+        {
+          "ms": 1.7,
+          "fn": "foldBlueprintEpoch",
+          "url": "packages/compaction/src/blueprint-fold.ts",
+          "transformedLine": 181
+        },
+        {
+          "ms": 1.7,
+          "fn": "stageClosedBlueprintEpoch",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 13309
+        },
+        {
+          "ms": 1.7,
+          "fn": "",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 13389
+        },
+        {
+          "ms": 1.7,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 0.39,
+          "fn": "DatabaseSync",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 0.39,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 0.39,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 0.39,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 0.39,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 0.39,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 0.39,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 0.39,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 0.39,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        }
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "name": "whole-step",
+      "from": 68253.961,
+      "to": 68619.405417,
+      "samples": 249,
+      "sampleWeightedMs": 364.58,
+      "categories": {
+        "canonical/protocol/crypto JS": 136.75,
+        "node/other JS": 91.46,
+        "native SQLite calls": 75.34,
+        "storage JS": 19.5,
+        "garbage collection": 24.92,
+        "V8/native/unknown": 12.08,
+        "idle": 4.54
+      },
+      "self": [
+        {
+          "ms": 24.92,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.54,
+          "fn": "(idle)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3.04,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 2.63,
+          "fn": "readSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 296
+        },
+        {
+          "ms": 2.21,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.71,
+          "fn": "capturePromotionRecord",
+          "url": "packages/protocol-v3/src/internal/creator-forward-promotion.ts",
+          "transformedLine": 18
+        },
+        {
+          "ms": 1.71,
+          "fn": "outboxRowSnapshot",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5992
+        },
+        {
+          "ms": 1.67,
+          "fn": "signingHex",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 273
+        },
+        {
+          "ms": 1.58,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "decodeUTF8",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.58,
+          "fn": "roleInventory",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 903
+        },
+        {
+          "ms": 1.58,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "deriveCreatorCloseHistory",
+          "url": "packages/node/src/internal/creator-close-history.ts",
+          "transformedLine": 44
+        },
+        {
+          "ms": 1.54,
+          "fn": "appendAccepted",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 855
+        },
+        {
+          "ms": 1.54,
+          "fn": "hasExpectedPhysicalSchema",
+          "url": "packages/storage-node/src/internal/schema-sqlite.ts",
+          "transformedLine": 68
+        },
+        {
+          "ms": 1.54,
+          "fn": "run",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureIssuanceRetirementControl",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1212
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "denseStrings",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 4148
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 364.58,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 81.17,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 45,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 43.5,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 43.5,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 36.17,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 36.17,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 24.92,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 23.71,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 22.5,
+          "fn": "readProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13063
+        },
+        {
+          "ms": 21,
+          "fn": "composeProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13904
+        },
+        {
+          "ms": 15,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 14.71,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 13.67,
+          "fn": "prepareCreatorOrdinarySourceReadinessForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 4579
+        },
+        {
+          "ms": 12.17,
+          "fn": "buildCreatorOrdinaryFinishingResourceProgramForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 11348
+        },
+        {
+          "ms": 12.04,
+          "fn": "acquireClosedData",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5956
+        },
+        {
+          "ms": 11.96,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 11.96,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 11.96,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 11.96,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 11.96,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 11.96,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 11.96,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 11.96,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 11.96,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        }
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "name": "largest-quantum-0",
+      "from": 68394.494334,
+      "to": 68482.471625,
+      "processCpuMs": 211.10899999999998,
+      "samples": 62,
+      "sampleWeightedMs": 87.98,
+      "categories": {
+        "node/other JS": 18.77,
+        "native SQLite calls": 17.42,
+        "canonical/protocol/crypto JS": 28.21,
+        "garbage collection": 14.5,
+        "V8/native/unknown": 6.08,
+        "storage JS": 3
+      },
+      "self": [
+        {
+          "ms": 14.5,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 2.63,
+          "fn": "readSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 296
+        },
+        {
+          "ms": 1.71,
+          "fn": "outboxRowSnapshot",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5992
+        },
+        {
+          "ms": 1.67,
+          "fn": "signingHex",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 273
+        },
+        {
+          "ms": 1.58,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "decodeUTF8",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.58,
+          "fn": "roleInventory",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 903
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "readPreparedCreatorSuccessorAnchorForSizing",
+          "url": "packages/protocol-v3/src/creator-close.ts",
+          "transformedLine": 596
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeEncoded",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 136
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5755
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "read",
+          "url": "packages/node/src/internal/creator-snapshot-data.ts",
+          "transformedLine": 76
+        },
+        {
+          "ms": 1.54,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.5,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "isAnchorTrustStateRecordBytes",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 666
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeKey",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 526
+        },
+        {
+          "ms": 1.5,
+          "fn": "exactDataRecord",
+          "url": "packages/protocol-v3/src/latched-acl.ts",
+          "transformedLine": 30
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeUTF8",
+          "url": "",
+          "transformedLine": 0
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 87.98,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 14.5,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.54,
+          "fn": "acquireClosedData",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5956
+        },
+        {
+          "ms": 7.29,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 7.29,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 347
+        },
+        {
+          "ms": 7.29,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 7.29,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        },
+        {
+          "ms": 6.21,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 5.88,
+          "fn": "readSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 296
+        },
+        {
+          "ms": 5.88,
+          "fn": "captureSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 280
+        },
+        {
+          "ms": 4.71,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 4.5,
+          "fn": "acquireDependencyLocks",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 582
+        },
+        {
+          "ms": 4.5,
+          "fn": "acquireSigningDependencies",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 451
+        },
+        {
+          "ms": 4.46,
+          "fn": "checkedRead",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 2563
+        },
+        {
+          "ms": 4.08,
+          "fn": "prepare",
+          "url": "packages/node/src/creator-close.ts",
+          "transformedLine": 1332
+        },
+        {
+          "ms": 3.13,
+          "fn": "readRecoveryMetadata",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 836
+        },
+        {
+          "ms": 3.13,
+          "fn": "allocateDependencySlot",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 542
+        },
+        {
+          "ms": 3.13,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 698
+        },
+        {
+          "ms": 3.13,
+          "fn": "runTransaction",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 61
+        },
+        {
+          "ms": 3.13,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 698
+        },
+        {
+          "ms": 3.08,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 3.08,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 3.08,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 3.08,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 3.08,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        }
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "name": "largest-quantum-1",
+      "from": 68543.073209,
+      "to": 68613.174084,
+      "processCpuMs": 109.74600000000001,
+      "samples": 50,
+      "sampleWeightedMs": 70.1,
+      "categories": {
+        "node/other JS": 22.18,
+        "native SQLite calls": 13.79,
+        "canonical/protocol/crypto JS": 26.62,
+        "storage JS": 4.5,
+        "garbage collection": 3
+      },
+      "self": [
+        {
+          "ms": 3,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "isClosedRecord",
+          "url": "packages/storage/dist/src/internal/validation.js",
+          "transformedLine": 132
+        },
+        {
+          "ms": 1.54,
+          "fn": "encodeCanonical",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 795
+        },
+        {
+          "ms": 1.54,
+          "fn": "verifyEd25519",
+          "url": "packages/protocol-v3/src/internal/ed25519-verify.ts",
+          "transformedLine": 12
+        },
+        {
+          "ms": 1.54,
+          "fn": "#mechanics",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 127
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 3
+        },
+        {
+          "ms": 1.54,
+          "fn": "bytesEqual",
+          "url": "packages/storage/dist/src/internal/validation.js",
+          "transformedLine": 45
+        },
+        {
+          "ms": 1.54,
+          "fn": "canonicalRecordResourceForSizing",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 977
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 81
+        },
+        {
+          "ms": 1.54,
+          "fn": "canonicalResourceLimits",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 909
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 11625
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "append",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9432
+        },
+        {
+          "ms": 1.54,
+          "fn": "buildCreatorOrdinaryFinishingResourceProgramForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 11348
+        },
+        {
+          "ms": 1.5,
+          "fn": "roomHeadImageDigest",
+          "url": "packages/storage/dist/src/room-head.js",
+          "transformedLine": 102
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 1.5,
+          "fn": "readControl",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 396
+        },
+        {
+          "ms": 1.5,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 70.1,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 14.89,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 14.34,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 14.34,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 14.34,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 13.67,
+          "fn": "prepareCreatorOrdinarySourceReadinessForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 4579
+        },
+        {
+          "ms": 12.17,
+          "fn": "buildCreatorOrdinaryFinishingResourceProgramForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 11348
+        },
+        {
+          "ms": 10.33,
+          "fn": "prepareCreatorOrdinarySourceReadinessForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 4579
+        },
+        {
+          "ms": 6.96,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 4.58,
+          "fn": "record",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9533
+        },
+        {
+          "ms": 4.54,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 4.54,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        },
+        {
+          "ms": 4.46,
+          "fn": "acquireCreatorOrdinaryIssuanceMaintenanceProof",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 4900
+        },
+        {
+          "ms": 4.42,
+          "fn": "runTransaction",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 61
+        },
+        {
+          "ms": 4.42,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 1825
+        },
+        {
+          "ms": 3.08,
+          "fn": "acquireSigningDependencies",
+          "url": "packages/seal/src/creator.ts",
+          "transformedLine": 451
+        },
+        {
+          "ms": 3.04,
+          "fn": "readRetirementImagePoint",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 129
+        },
+        {
+          "ms": 3.04,
+          "fn": "runBoundedSteps",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 466
+        },
+        {
+          "ms": 3.04,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 461
+        },
+        {
+          "ms": 3.04,
+          "fn": "checkCurrency",
+          "url": "packages/storage/dist/src/internal/bounded-read.js",
+          "transformedLine": 784
+        },
+        {
+          "ms": 3.04,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5181
+        },
+        {
+          "ms": 3,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 3,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 347
+        },
+        {
+          "ms": 3,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3,
+          "fn": "creatorOrdinaryApplicationResourceMaterialForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 3582
+        }
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "name": "largest-quantum-2",
+      "from": 68482.471625,
+      "to": 68543.073209,
+      "processCpuMs": 71.817,
+      "samples": 43,
+      "sampleWeightedMs": 60.6,
+      "categories": {
+        "node/other JS": 17.35,
+        "canonical/protocol/crypto JS": 27.5,
+        "native SQLite calls": 9.75,
+        "garbage collection": 1.5,
+        "V8/native/unknown": 3,
+        "storage JS": 1.5
+      },
+      "self": [
+        {
+          "ms": 3.04,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "composeProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13904
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "maintenanceWidthSum",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9224
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5505
+        },
+        {
+          "ms": 1.54,
+          "fn": "materialSteps",
+          "url": "packages/storage/dist/src/internal/bounded-read.js",
+          "transformedLine": 372
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "measure",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9253
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.5,
+          "fn": "hex",
+          "url": "packages/storage/dist/src/values.js",
+          "transformedLine": 20
+        },
+        {
+          "ms": 1.5,
+          "fn": "",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1470
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.5,
+          "fn": "sameBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 571
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.5,
+          "fn": "maintenanceCanonicalWidth",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9249
+        },
+        {
+          "ms": 1.5,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "measure",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9253
+        },
+        {
+          "ms": 1.5,
+          "fn": "encodeCanonical",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 795
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 60.6,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 22.5,
+          "fn": "readProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13063
+        },
+        {
+          "ms": 21,
+          "fn": "composeProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13904
+        },
+        {
+          "ms": 8.96,
+          "fn": "evaluateSchedule",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13906
+        },
+        {
+          "ms": 8.96,
+          "fn": "includeSchedule",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 16237
+        },
+        {
+          "ms": 4.54,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 4.29,
+          "fn": "prepareClosedJournalMembershipPrefix",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 7775
+        },
+        {
+          "ms": 4.29,
+          "fn": "closedJournalMembershipPrefix",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 7757
+        },
+        {
+          "ms": 4.29,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 7917
+        },
+        {
+          "ms": 3.04,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3.04,
+          "fn": "readRecoveryMetadata",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 836
+        },
+        {
+          "ms": 3.04,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 1381
+        },
+        {
+          "ms": 3.04,
+          "fn": "runTransaction",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 61
+        },
+        {
+          "ms": 3.04,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 1376
+        },
+        {
+          "ms": 3.04,
+          "fn": "issuanceUnsignedPostimageWidths",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 368
+        },
+        {
+          "ms": 3,
+          "fn": "journalFutureAppendPostimageWidths",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 1100
+        },
+        {
+          "ms": 3,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 3,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 2.88,
+          "fn": "advanceMaintenanceParticipants",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13979
+        },
+        {
+          "ms": 2.54,
+          "fn": "runBoundedSteps",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 466
+        },
+        {
+          "ms": 2.54,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 461
+        },
+        {
+          "ms": 2.54,
+          "fn": "checkCurrency",
+          "url": "packages/storage/dist/src/internal/bounded-read.js",
+          "transformedLine": 784
+        },
+        {
+          "ms": 2.54,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 519
+        },
+        {
+          "ms": 2.54,
+          "fn": "checkCurrentSource",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 6856
+        },
+        {
+          "ms": 1.85,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        }
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "name": "floor-begin-through-authority-rebind",
+      "from": 68296.657375,
+      "to": 68353.757959,
+      "samples": 39,
+      "sampleWeightedMs": 57.1,
+      "categories": {
+        "V8/native/unknown": 2.34,
+        "native SQLite calls": 13.38,
+        "canonical/protocol/crypto JS": 18.12,
+        "node/other JS": 20.38,
+        "garbage collection": 2.88
+      },
+      "self": [
+        {
+          "ms": 2.88,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureIssuanceRetirementControl",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1212
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCanonical",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1279
+        },
+        {
+          "ms": 1.5,
+          "fn": "issuanceRetirementBytesEqual",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1281
+        },
+        {
+          "ms": 1.5,
+          "fn": "finishSorted",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 580
+        },
+        {
+          "ms": 1.5,
+          "fn": "double",
+          "url": "node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js",
+          "transformedLine": 220
+        },
+        {
+          "ms": 1.5,
+          "fn": "isPlainObject",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 213
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "apply",
+          "url": "examples/grid/src/zone-state-artifact.mjs",
+          "transformedLine": 101
+        },
+        {
+          "ms": 1.5,
+          "fn": "processSendQueue",
+          "url": "node_modules/.pnpm/@libp2p+utils@7.2.4/node_modules/@libp2p/utils/dist/src/abstract-message-stream.js",
+          "transformedLine": 323
+        },
+        {
+          "ms": 1.5,
+          "fn": "isClosedDurableIssuanceRecord",
+          "url": "packages/issuance-store/dist/src/contract.js",
+          "transformedLine": 85
+        },
+        {
+          "ms": 1.5,
+          "fn": "isValidDurableScopeField",
+          "url": "packages/issuance-store/dist/src/contract.js",
+          "transformedLine": 105
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "publishCandidate",
+          "url": "packages/node/src/creator-adoption-commit.ts",
+          "transformedLine": 404
+        },
+        {
+          "ms": 1.5,
+          "fn": "isClosedRecord",
+          "url": "packages/storage/dist/src/internal/validation.js",
+          "transformedLine": 132
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.5,
+          "fn": "defineDenseElement",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 670
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "exactCanonicalBootstrapOperationBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 560
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "hasCapturedSharedBacking",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 242
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 57.1,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 29.26,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 29.26,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 29.26,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 13.54,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 10.54,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 10.54,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 10.54,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 10.54,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 10.54,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 10.54,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 10.54,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 10.54,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 10.54,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 6,
+          "fn": "reserveUnsignedIntent",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 583
+        },
+        {
+          "ms": 6,
+          "fn": "recoverV3LiveReplica",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9580
+        },
+        {
+          "ms": 4.54,
+          "fn": "#commitCandidate",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1722
+        },
+        {
+          "ms": 4.54,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 4.5,
+          "fn": "authenticatedTerminal",
+          "url": "packages/node/src/creator-adoption-commit.ts",
+          "transformedLine": 250
+        },
+        {
+          "ms": 4.5,
+          "fn": "activateCreatorSuccessorLive",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 16351
+        },
+        {
+          "ms": 3,
+          "fn": "activateCreatorSuccessorLive",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 16351
+        },
+        {
+          "ms": 3,
+          "fn": "consumeCreatorSuccessorLive",
+          "url": "packages/node/src/internal/creator-successor-live.ts",
+          "transformedLine": 44
+        },
+        {
+          "ms": 3,
+          "fn": "activateMaterialOwned",
+          "url": "packages/node/src/creator-adoption-activate.ts",
+          "transformedLine": 309
+        },
+        {
+          "ms": 3,
+          "fn": "activateMaterial",
+          "url": "packages/node/src/creator-adoption-activate.ts",
+          "transformedLine": 278
+        },
+        {
+          "ms": 3,
+          "fn": "activateCreatorSuccessorAdoption",
+          "url": "packages/node/src/creator-adoption-activate.ts",
+          "transformedLine": 394
+        }
+      ]
+    },
+    {
+      "phase": "adopt-4",
+      "name": "post-activation-publication-drain",
+      "from": 68353.757959,
+      "to": 68540.423459,
+      "samples": 129,
+      "sampleWeightedMs": 186.67,
+      "categories": {
+        "node/other JS": 39.7,
+        "idle": 4.54,
+        "native SQLite calls": 37.46,
+        "canonical/protocol/crypto JS": 70.88,
+        "storage JS": 8.96,
+        "garbage collection": 17.54,
+        "V8/native/unknown": 7.58
+      },
+      "self": [
+        {
+          "ms": 17.54,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.54,
+          "fn": "(idle)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 2.63,
+          "fn": "readSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 296
+        },
+        {
+          "ms": 2.21,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.71,
+          "fn": "outboxRowSnapshot",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5992
+        },
+        {
+          "ms": 1.67,
+          "fn": "signingHex",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 273
+        },
+        {
+          "ms": 1.58,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "decodeUTF8",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.58,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.58,
+          "fn": "roleInventory",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 903
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "compareBytes",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 86
+        },
+        {
+          "ms": 1.54,
+          "fn": "resolveCreatorAnchorTrustMaterial",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 1105
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCanonicalWithExactness",
+          "url": "packages/protocol-v3/src/internal/canonical-exactness.ts",
+          "transformedLine": 5
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "node_modules/.pnpm/@libp2p+peer-collections@7.0.23/node_modules/@libp2p/peer-collections/dist/src/set.js",
+          "transformedLine": 32
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "readPreparedCreatorSuccessorAnchorForSizing",
+          "url": "packages/protocol-v3/src/creator-close.ts",
+          "transformedLine": 596
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeEncoded",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 136
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5755
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 186.67,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 22.5,
+          "fn": "readProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13063
+        },
+        {
+          "ms": 21,
+          "fn": "composeProspectiveCreatorMaintenancePrefixesForSizing",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13904
+        },
+        {
+          "ms": 17.54,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 16.75,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 12.04,
+          "fn": "acquireClosedData",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5956
+        },
+        {
+          "ms": 9.17,
+          "fn": "acquireRecoveryRoleCertificate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 1225
+        },
+        {
+          "ms": 8.96,
+          "fn": "evaluateSchedule",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 13906
+        },
+        {
+          "ms": 8.96,
+          "fn": "includeSchedule",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 16237
+        },
+        {
+          "ms": 7.29,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 7.29,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 347
+        },
+        {
+          "ms": 7.29,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 7.29,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        },
+        {
+          "ms": 6.21,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 6,
+          "fn": "acquireDependencyLocks",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 582
+        },
+        {
+          "ms": 5.96,
+          "fn": "checkedRead",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 2563
+        },
+        {
+          "ms": 5.88,
+          "fn": "readSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 296
+        },
+        {
+          "ms": 5.88,
+          "fn": "captureSigningRetirementDataImage",
+          "url": "packages/seal/src/internal/seal-vote-intent.ts",
+          "transformedLine": 280
+        },
+        {
+          "ms": 5.71,
+          "fn": "readRetirementImagePoint",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 129
+        },
+        {
+          "ms": 4.58,
+          "fn": "roleInventory",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 903
+        },
+        {
+          "ms": 4.58,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 1038
+        },
+        {
+          "ms": 4.58,
+          "fn": "runTransaction",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 61
+        },
+        {
+          "ms": 4.58,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 1036
+        },
+        {
+          "ms": 4.58,
+          "fn": "openCreatorSnapshotRecoveryRoleReadbackOwned",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 2704
+        },
+        {
+          "ms": 4.58,
+          "fn": "readback",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 2239
+        }
+      ]
+    },
+    {
+      "phase": "install-4",
+      "name": "whole-step",
+      "from": 68881.752084,
+      "to": 70653.511834,
+      "samples": 1196,
+      "sampleWeightedMs": 1771.76,
+      "categories": {
+        "node/other JS": 471.45,
+        "garbage collection": 80.3,
+        "canonical/protocol/crypto JS": 737.21,
+        "storage JS": 149.91,
+        "native SQLite calls": 221.88,
+        "V8/native/unknown": 58.26,
+        "idle": 52.75
+      },
+      "self": [
+        {
+          "ms": 80.3,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 52.75,
+          "fn": "(idle)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 12.09,
+          "fn": "(program)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 11.96,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 10.71,
+          "fn": "readOutboxPage",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1243
+        },
+        {
+          "ms": 10.46,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 10.38,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 9.17,
+          "fn": "reuse",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6211
+        },
+        {
+          "ms": 9.13,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 9.08,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 9.04,
+          "fn": "copySettlementPlanRow",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 376
+        },
+        {
+          "ms": 9,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 8.96,
+          "fn": "reuse",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6211
+        },
+        {
+          "ms": 7.54,
+          "fn": "copyDetachedBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 541
+        },
+        {
+          "ms": 7.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.46,
+          "fn": "process",
+          "url": "node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/sha256.js",
+          "transformedLine": 63
+        },
+        {
+          "ms": 7.29,
+          "fn": "copyCanonicalForAdmittedView",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 3231
+        },
+        {
+          "ms": 6.08,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 6.08,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 6.04,
+          "fn": "sameBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 571
+        },
+        {
+          "ms": 6.04,
+          "fn": "outboxRowSnapshot",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5992
+        },
+        {
+          "ms": 6,
+          "fn": "readSettlementPlanRow",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 450
+        },
+        {
+          "ms": 5.96,
+          "fn": "publicKeyBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 4248
+        },
+        {
+          "ms": 5.92,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.63,
+          "fn": "retirementRows",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 512
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 1771.76,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 514.91,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 414.83,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 217.38,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 204.25,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 204.25,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 194.54,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 194.54,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 99.25,
+          "fn": "classifyPlaneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9116
+        },
+        {
+          "ms": 94.62,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 94.17,
+          "fn": "authenticatedSettlementSourceRow",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9232
+        },
+        {
+          "ms": 81.92,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 80.3,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 70.21,
+          "fn": "readBoundedRecoveryCensus",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 726
+        },
+        {
+          "ms": 70.21,
+          "fn": "readBoundedRecoveryCensus",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2080
+        },
+        {
+          "ms": 63.29,
+          "fn": "authenticatedSettlementSourceRow",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9232
+        },
+        {
+          "ms": 60.37,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 60.37,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 60.37,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 60.37,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 60.37,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 60.37,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 60.37,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 60.37,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 60.37,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        }
+      ]
+    },
+    {
+      "phase": "install-4",
+      "name": "largest-quantum-0",
+      "from": 70534.255375,
+      "to": 70652.142292,
+      "processCpuMs": 140.752,
+      "samples": 81,
+      "sampleWeightedMs": 117.89,
+      "categories": {
+        "native SQLite calls": 16.08,
+        "V8/native/unknown": 4.21,
+        "storage JS": 8.75,
+        "garbage collection": 3.04,
+        "canonical/protocol/crypto JS": 54.29,
+        "node/other JS": 31.51
+      },
+      "self": [
+        {
+          "ms": 3.04,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.63,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "issuanceRetirementBytesEqual",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1281
+        },
+        {
+          "ms": 1.54,
+          "fn": "copyDurableIssuanceBytes",
+          "url": "packages/issuance-store/dist/src/contract.js",
+          "transformedLine": 149
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUTF8",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "encode",
+          "url": "node:internal/encoding",
+          "transformedLine": 351
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.54,
+          "fn": "",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 2231
+        },
+        {
+          "ms": 1.54,
+          "fn": "bytes",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 435
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "reconstructJournalRetirementDrainSource",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 2026
+        },
+        {
+          "ms": 1.54,
+          "fn": "uint16BEDecode",
+          "url": "node_modules/.pnpm/@chainsafe+libp2p-noise@17.0.0/node_modules/@chainsafe/libp2p-noise/dist/src/encoder.js",
+          "transformedLine": 9
+        },
+        {
+          "ms": 1.54,
+          "fn": "foreignBytes",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 441
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "snapshotRecord",
+          "url": "packages/live-journal/dist/src/contract.js",
+          "transformedLine": 139
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "isClosedRecord",
+          "url": "packages/storage/dist/src/internal/validation.js",
+          "transformedLine": 132
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "encodeUtf8String",
+          "url": "",
+          "transformedLine": 0
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 117.89,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 66.72,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 65.87,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 65.87,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 65.87,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 44.29,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 32.38,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 32.38,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 32.38,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 32.38,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 32.38,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 32.38,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 32.38,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 32.38,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 32.38,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 11.33,
+          "fn": "checkQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1429
+        },
+        {
+          "ms": 9.83,
+          "fn": "readQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1415
+        },
+        {
+          "ms": 9.08,
+          "fn": "readQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1415
+        },
+        {
+          "ms": 9.08,
+          "fn": "retainOwnQuotePostimage",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1444
+        },
+        {
+          "ms": 9.08,
+          "fn": "#commitCandidate",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1722
+        },
+        {
+          "ms": 9.08,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 7.46,
+          "fn": "appendAccepted",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 855
+        },
+        {
+          "ms": 7.33,
+          "fn": "handleV3IngressWithSource",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5443
+        },
+        {
+          "ms": 6.08,
+          "fn": "reserveUnsignedIntent",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 583
+        },
+        {
+          "ms": 6,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        }
+      ]
+    },
+    {
+      "phase": "install-4",
+      "name": "largest-quantum-1",
+      "from": 70417.561709,
+      "to": 70534.255375,
+      "processCpuMs": 147.483,
+      "samples": 80,
+      "sampleWeightedMs": 116.69,
+      "categories": {
+        "node/other JS": 25.19,
+        "idle": 1.54,
+        "V8/native/unknown": 8.92,
+        "canonical/protocol/crypto JS": 39.75,
+        "storage JS": 18,
+        "garbage collection": 8.92,
+        "native SQLite calls": 14.38
+      },
+      "self": [
+        {
+          "ms": 8.92,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3.04,
+          "fn": "collect",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 247
+        },
+        {
+          "ms": 1.54,
+          "fn": "(idle)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "encode",
+          "url": "node:internal/encoding",
+          "transformedLine": 351
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "isClosedDurableIssuanceRecord",
+          "url": "packages/issuance-store/dist/src/contract.js",
+          "transformedLine": 85
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCanonical",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1279
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureIssuanceRetirementPreparation",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1158
+        },
+        {
+          "ms": 1.54,
+          "fn": "bytes",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 435
+        },
+        {
+          "ms": 1.54,
+          "fn": "record",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 85
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeStringBuffer",
+          "url": "node_modules/.pnpm/protons-runtime@7.0.0/node_modules/protons-runtime/dist/src/utils/writer.js",
+          "transformedLine": 416
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeSnapshotManifest",
+          "url": "packages/protocol-v3/src/snapshot-transfer.ts",
+          "transformedLine": 277
+        },
+        {
+          "ms": 1.54,
+          "fn": "Reader",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1009
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureKnownResourceTotals",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 403
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "iterateSqliteRows",
+          "url": "packages/storage-node/src/internal/sqlite-iterator.ts",
+          "transformedLine": 3
+        },
+        {
+          "ms": 1.54,
+          "fn": "hashMemoKey",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1389
+        },
+        {
+          "ms": 1.54,
+          "fn": "creatorOrdinaryRuntimeJournalGeometryForSizing",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 13461
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "varUint",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 420
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 116.69,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 104.82,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 60.42,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 60.42,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 60.42,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 44.4,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 44.4,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 37.63,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 27.08,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 27.08,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 27.08,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 27.08,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 27.08,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 27.08,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 27.08,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 27.08,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 27.08,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 10.5,
+          "fn": "checkQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1429
+        },
+        {
+          "ms": 9,
+          "fn": "readQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1415
+        },
+        {
+          "ms": 8.92,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.67,
+          "fn": "handleV3IngressWithSource",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5443
+        },
+        {
+          "ms": 7.58,
+          "fn": "appendAccepted",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 855
+        },
+        {
+          "ms": 7.21,
+          "fn": "#commitCandidate",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1722
+        },
+        {
+          "ms": 7.21,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 6.13,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        }
+      ]
+    },
+    {
+      "phase": "install-4",
+      "name": "largest-quantum-2",
+      "from": 70303.47625,
+      "to": 70417.561709,
+      "processCpuMs": 124.956,
+      "samples": 76,
+      "sampleWeightedMs": 114.09,
+      "categories": {
+        "native SQLite calls": 22.61,
+        "V8/native/unknown": 5.96,
+        "node/other JS": 19.31,
+        "canonical/protocol/crypto JS": 51.25,
+        "garbage collection": 2.96,
+        "storage JS": 12
+      },
+      "self": [
+        {
+          "ms": 3,
+          "fn": "loadNodeBoundedReadRequest",
+          "url": "packages/storage-node/src/internal/bounded-read.ts",
+          "transformedLine": 8
+        },
+        {
+          "ms": 3,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 2.96,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "issuanceRetirementBytesEqual",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1281
+        },
+        {
+          "ms": 1.54,
+          "fn": "varUint",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 420
+        },
+        {
+          "ms": 1.54,
+          "fn": "reserveUnsignedIntent",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 583
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "encodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 217
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "issuanceRetirementBytesEqual",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1281
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "DatabaseSync",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "compareBytes",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 86
+        },
+        {
+          "ms": 1.54,
+          "fn": "compareBytes",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 86
+        },
+        {
+          "ms": 1.54,
+          "fn": "hashDomain",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1457
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "next",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "captureRoomHeadState",
+          "url": "packages/storage/dist/src/room-head.js",
+          "transformedLine": 324
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 114.09,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 46.47,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 46.47,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 46.47,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 40.79,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 30.21,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 30.21,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 30.21,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 30.21,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 30.21,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 30.21,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 30.21,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 30.21,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 30.21,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 10.58,
+          "fn": "checkQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1429
+        },
+        {
+          "ms": 9.04,
+          "fn": "readQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1415
+        },
+        {
+          "ms": 7.54,
+          "fn": "#commitCandidate",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1722
+        },
+        {
+          "ms": 7.54,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 7.54,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 7.54,
+          "fn": "handleV3IngressWithSource",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5443
+        },
+        {
+          "ms": 7.5,
+          "fn": "readQuoteCurrency",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1415
+        },
+        {
+          "ms": 7.5,
+          "fn": "retainOwnQuotePostimage",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1444
+        },
+        {
+          "ms": 6.04,
+          "fn": "retirementImage",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 233
+        },
+        {
+          "ms": 6.04,
+          "fn": "appendAccepted",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 855
+        },
+        {
+          "ms": 6,
+          "fn": "collect",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 247
+        }
+      ]
+    },
+    {
+      "phase": "install-4",
+      "name": "floor-begin-through-authority-rebind",
+      "from": 69424.284042,
+      "to": 69495.265292,
+      "samples": 51,
+      "sampleWeightedMs": 70.98,
+      "categories": {
+        "canonical/protocol/crypto JS": 33.93,
+        "node/other JS": 16.04,
+        "native SQLite calls": 7.1,
+        "V8/native/unknown": 1.29,
+        "garbage collection": 2.13,
+        "storage JS": 10.5
+      },
+      "self": [
+        {
+          "ms": 2.13,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "deriveReferences",
+          "url": "packages/node/src/internal/creator-adoption-references.ts",
+          "transformedLine": 45
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "hashMemoKey",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1389
+        },
+        {
+          "ms": 1.54,
+          "fn": "isCapturedPlainRecord",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 296
+        },
+        {
+          "ms": 1.54,
+          "fn": "hasCapturedSharedBacking",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 242
+        },
+        {
+          "ms": 1.54,
+          "fn": "hashMemoKey",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1389
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepareExistingCreatorGeneration",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 1344
+        },
+        {
+          "ms": 1.54,
+          "fn": "source",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6170
+        },
+        {
+          "ms": 1.54,
+          "fn": "u64be",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1365
+        },
+        {
+          "ms": 1.54,
+          "fn": "readOutboxPage",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1243
+        },
+        {
+          "ms": 1.5,
+          "fn": "",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1470
+        },
+        {
+          "ms": 1.5,
+          "fn": "boundedRetirementAdmissionSteps",
+          "url": "packages/storage/dist/src/internal/bounded-read.js",
+          "transformedLine": 479
+        },
+        {
+          "ms": 1.5,
+          "fn": "copyClosure",
+          "url": "packages/storage/dist/src/internal/validation.js",
+          "transformedLine": 195
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "hashDomain",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1457
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.5,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "reuse",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6211
+        },
+        {
+          "ms": 1.5,
+          "fn": "cloneDurableSignedEnvelope",
+          "url": "packages/issuance-store/dist/src/contract.js",
+          "transformedLine": 284
+        },
+        {
+          "ms": 1.5,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.5,
+          "fn": "envelopeSnapshot",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5984
+        },
+        {
+          "ms": 1.5,
+          "fn": "copyCanonicalForAdmittedView",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 3231
+        },
+        {
+          "ms": 1.5,
+          "fn": "rowFromSql",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 477
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 70.98,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 27.67,
+          "fn": "recoverV3LiveReplica",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9580
+        },
+        {
+          "ms": 10,
+          "fn": "classifyPlaneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9116
+        },
+        {
+          "ms": 9,
+          "fn": "nominatedFuture",
+          "url": "packages/node/src/creator-adoption-commit.ts",
+          "transformedLine": 417
+        },
+        {
+          "ms": 7.67,
+          "fn": "reuse",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6211
+        },
+        {
+          "ms": 7.67,
+          "fn": "extract",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6313
+        },
+        {
+          "ms": 7.67,
+          "fn": "extractAuthorizedV3Vertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5301
+        },
+        {
+          "ms": 7.67,
+          "fn": "authenticateRecoveryVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6317
+        },
+        {
+          "ms": 7.5,
+          "fn": "compareControl",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 269
+        },
+        {
+          "ms": 7.5,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 246
+        },
+        {
+          "ms": 7.5,
+          "fn": "future",
+          "url": "packages/storage/dist/src/retirement-control.js",
+          "transformedLine": 731
+        },
+        {
+          "ms": 7.5,
+          "fn": "publishNominatedFutureGeneration",
+          "url": "packages/storage/dist/src/retirement-control.js",
+          "transformedLine": 913
+        },
+        {
+          "ms": 6.04,
+          "fn": "authenticatedTerminal",
+          "url": "packages/node/src/creator-adoption-commit.ts",
+          "transformedLine": 250
+        },
+        {
+          "ms": 5.13,
+          "fn": "readOutboxPage",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9435
+        },
+        {
+          "ms": 4.54,
+          "fn": "cleanupCreatorSettlementSuccessor",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 16076
+        },
+        {
+          "ms": 4.46,
+          "fn": "appendAccepted",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 855
+        },
+        {
+          "ms": 4.21,
+          "fn": "activateCreatorSuccessorLive",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 16351
+        },
+        {
+          "ms": 3.83,
+          "fn": "performCreatorSuccessorAdoption",
+          "url": "packages/node/src/v3-room.ts",
+          "transformedLine": 4812
+        },
+        {
+          "ms": 3.08,
+          "fn": "snapshotClosedInput",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 340
+        },
+        {
+          "ms": 3.08,
+          "fn": "snapshotExtractInput",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 3306
+        },
+        {
+          "ms": 3.08,
+          "fn": "extractAdmittedReceivedVertex",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 3376
+        },
+        {
+          "ms": 3.08,
+          "fn": "",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6313
+        },
+        {
+          "ms": 3.08,
+          "fn": "authenticatedStaged",
+          "url": "packages/node/src/creator-adoption-commit.ts",
+          "transformedLine": 292
+        },
+        {
+          "ms": 3.08,
+          "fn": "source",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6170
+        },
+        {
+          "ms": 3.04,
+          "fn": "hashDomain",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1457
+        }
+      ]
+    },
+    {
+      "phase": "install-4",
+      "name": "post-activation-publication-drain",
+      "from": 69495.265292,
+      "to": 70603.10275,
+      "samples": 743,
+      "sampleWeightedMs": 1107.84,
+      "categories": {
+        "native SQLite calls": 124.53,
+        "node/other JS": 305.08,
+        "canonical/protocol/crypto JS": 446.19,
+        "idle": 43.84,
+        "storage JS": 100.67,
+        "V8/native/unknown": 38.71,
+        "garbage collection": 48.83
+      },
+      "self": [
+        {
+          "ms": 48.83,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 43.84,
+          "fn": "(idle)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 11.96,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 10.71,
+          "fn": "readOutboxPage",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1243
+        },
+        {
+          "ms": 10.46,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 9.17,
+          "fn": "reuse",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6211
+        },
+        {
+          "ms": 9.13,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 9.04,
+          "fn": "copySettlementPlanRow",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 376
+        },
+        {
+          "ms": 9,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 7.67,
+          "fn": "(program)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.58,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 7.54,
+          "fn": "copyDetachedBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 541
+        },
+        {
+          "ms": 7.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.46,
+          "fn": "process",
+          "url": "node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/sha256.js",
+          "transformedLine": 63
+        },
+        {
+          "ms": 7.42,
+          "fn": "reuse",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6211
+        },
+        {
+          "ms": 7.33,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 6.08,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 6.08,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 6.04,
+          "fn": "outboxRowSnapshot",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 5992
+        },
+        {
+          "ms": 5.96,
+          "fn": "publicKeyBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 4248
+        },
+        {
+          "ms": 4.63,
+          "fn": "retirementRows",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 512
+        },
+        {
+          "ms": 4.58,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 4.58,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 4.54,
+          "fn": "sameBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 571
+        },
+        {
+          "ms": 4.54,
+          "fn": "process",
+          "url": "node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/sha256.js",
+          "transformedLine": 63
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 1107.84,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 485.29,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 274.55,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 137.75,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 133.88,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 133.88,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 126.22,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 126.22,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 94.62,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 92.25,
+          "fn": "classifyPlaneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9116
+        },
+        {
+          "ms": 83.63,
+          "fn": "authenticatedSettlementSourceRow",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 9232
+        },
+        {
+          "ms": 81.92,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 70.21,
+          "fn": "readBoundedRecoveryCensus",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 726
+        },
+        {
+          "ms": 70.21,
+          "fn": "readBoundedRecoveryCensus",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2080
+        },
+        {
+          "ms": 60.37,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 60.37,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 60.37,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 60.37,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 60.37,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 60.37,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 60.37,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 60.37,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 60.37,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 59.46,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 59.46,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        }
+      ]
+    },
+    {
+      "phase": "maintenance-4",
+      "name": "whole-step",
+      "from": 71016.690667,
+      "to": 73331.586125,
+      "samples": 1521,
+      "sampleWeightedMs": 2314.06,
+      "categories": {
+        "node/other JS": 616.31,
+        "native SQLite calls": 463.03,
+        "canonical/protocol/crypto JS": 840.34,
+        "storage JS": 161.87,
+        "garbage collection": 133.79,
+        "V8/native/unknown": 87.55,
+        "idle": 11.17
+      },
+      "self": [
+        {
+          "ms": 133.79,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 15.42,
+          "fn": "append",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 9432
+        },
+        {
+          "ms": 14.75,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 11.17,
+          "fn": "(idle)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 10.5,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 9.04,
+          "fn": "(program)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 9.04,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 9,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 8.12,
+          "fn": "decodeCapturedJournalRetirementNativeCarriers",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 587
+        },
+        {
+          "ms": 7.63,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.58,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 7.42,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 6.04,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 6,
+          "fn": "sameBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 571
+        },
+        {
+          "ms": 5.71,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 5.46,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 5.38,
+          "fn": "",
+          "url": "packages/storage/src/snapshot-transfer.ts",
+          "transformedLine": 697
+        },
+        {
+          "ms": 5.17,
+          "fn": "sameBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 571
+        },
+        {
+          "ms": 4.96,
+          "fn": "captureRoomHeadImage",
+          "url": "packages/storage/dist/src/room-head.js",
+          "transformedLine": 78
+        },
+        {
+          "ms": 4.92,
+          "fn": "hashDomain",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1457
+        },
+        {
+          "ms": 4.71,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.67,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.67,
+          "fn": "writeFileUtf8",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.63,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 258
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 2314.06,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1289.79,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 850.17,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 835.38,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 835.38,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 439.62,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 439.62,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 133.79,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 87.87,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 86.79,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 81.21,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        },
+        {
+          "ms": 79.66,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 76.62,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 76.62,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 347
+        },
+        {
+          "ms": 55.46,
+          "fn": "acquireCoordinator",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 16469
+        },
+        {
+          "ms": 54.04,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        },
+        {
+          "ms": 52.71,
+          "fn": "acquireRetirementControl",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 197
+        },
+        {
+          "ms": 52.71,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 519
+        },
+        {
+          "ms": 52.71,
+          "fn": "acquireAhe",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 16467
+        },
+        {
+          "ms": 52.59,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 51.67,
+          "fn": "releaseRetirementRead",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 545
+        },
+        {
+          "ms": 51.67,
+          "fn": "applyClosedEpochRetirementIntent",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 572
+        },
+        {
+          "ms": 51.67,
+          "fn": "acquireCoordinator",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 16469
+        },
+        {
+          "ms": 47.13,
+          "fn": "acquireRetirementControl",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 197
+        },
+        {
+          "ms": 47.13,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 519
+        }
+      ]
+    },
+    {
+      "phase": "maintenance-4",
+      "name": "largest-quantum-0",
+      "from": 73141.745709,
+      "to": 73289.17,
+      "processCpuMs": 132.28900000000002,
+      "samples": 87,
+      "sampleWeightedMs": 147.42,
+      "categories": {
+        "node/other JS": 48.43,
+        "native SQLite calls": 21.46,
+        "canonical/protocol/crypto JS": 37.96,
+        "storage JS": 7.21,
+        "garbage collection": 26.21,
+        "V8/native/unknown": 6.17
+      },
+      "self": [
+        {
+          "ms": 26.21,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 4.42,
+          "fn": "decodeSnapshotManifest",
+          "url": "packages/protocol-v3/src/snapshot-transfer.ts",
+          "transformedLine": 277
+        },
+        {
+          "ms": 4.04,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 4,
+          "fn": "",
+          "url": "node_modules/.pnpm/vite-node@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite-node/dist/source-map.mjs",
+          "transformedLine": 748
+        },
+        {
+          "ms": 3.71,
+          "fn": "resolve",
+          "url": "node:path",
+          "transformedLine": 1260
+        },
+        {
+          "ms": 2.42,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 2.38,
+          "fn": "read",
+          "url": "packages/node/src/internal/creator-snapshot-data.ts",
+          "transformedLine": 76
+        },
+        {
+          "ms": 2.21,
+          "fn": "cloneDurableSignedEnvelope",
+          "url": "packages/issuance-store/dist/src/contract.js",
+          "transformedLine": 284
+        },
+        {
+          "ms": 2.21,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.96,
+          "fn": "copyDetachedBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 541
+        },
+        {
+          "ms": 1.96,
+          "fn": "validateDigestArray",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 1447
+        },
+        {
+          "ms": 1.92,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.83,
+          "fn": "stat",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.83,
+          "fn": "sameBytes",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 571
+        },
+        {
+          "ms": 1.79,
+          "fn": "encode",
+          "url": "node:internal/encoding",
+          "transformedLine": 351
+        },
+        {
+          "ms": 1.79,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.79,
+          "fn": "digestBytes",
+          "url": "packages/storage/dist/src/retirement-control.js",
+          "transformedLine": 388
+        },
+        {
+          "ms": 1.71,
+          "fn": "canonicalResourceLimits",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 909
+        },
+        {
+          "ms": 1.71,
+          "fn": "",
+          "url": "packages/protocol-v3/src/creator-close.ts",
+          "transformedLine": 115
+        },
+        {
+          "ms": 1.71,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.67,
+          "fn": "toPeerPB",
+          "url": "node_modules/.pnpm/@libp2p+peer-store@12.0.23/node_modules/@libp2p/peer-store/dist/src/utils/to-peer-pb.js",
+          "transformedLine": 6
+        },
+        {
+          "ms": 1.67,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.67,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.67,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 622
+        },
+        {
+          "ms": 1.67,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 147.42,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 64.42,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 64.42,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 64.42,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 26.21,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 9.12,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 8.38,
+          "fn": "readRetirementImagePoint",
+          "url": "packages/storage-node/src/internal/create-scaffold.ts",
+          "transformedLine": 129
+        },
+        {
+          "ms": 7.63,
+          "fn": "acquireRecoveryRoleCertificate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 1225
+        },
+        {
+          "ms": 7.13,
+          "fn": "",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 4107
+        },
+        {
+          "ms": 5.83,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 5.67,
+          "fn": "authenticate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 2623
+        },
+        {
+          "ms": 5.25,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 5.25,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 347
+        },
+        {
+          "ms": 5.25,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 5.25,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        },
+        {
+          "ms": 4.79,
+          "fn": "runTransaction",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 61
+        },
+        {
+          "ms": 4.79,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 1036
+        },
+        {
+          "ms": 4.71,
+          "fn": "acquireClosedData",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5956
+        },
+        {
+          "ms": 4.67,
+          "fn": "readCreatorReplayRows",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 6441
+        },
+        {
+          "ms": 4.58,
+          "fn": "acquireClosedData",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 5956
+        },
+        {
+          "ms": 4.42,
+          "fn": "openCreatorSnapshotRecoveryRoleReadbackOwned",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 2704
+        },
+        {
+          "ms": 4.42,
+          "fn": "readback",
+          "url": "packages/node/src/internal/creator-transition-advance.ts",
+          "transformedLine": 2239
+        },
+        {
+          "ms": 4.42,
+          "fn": "decodeSnapshotManifest",
+          "url": "packages/protocol-v3/src/snapshot-transfer.ts",
+          "transformedLine": 277
+        },
+        {
+          "ms": 4.42,
+          "fn": "captureCreatorClosedSnapshotEvidence",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 2294
+        },
+        {
+          "ms": 4,
+          "fn": "",
+          "url": "node_modules/.pnpm/vite-node@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite-node/dist/source-map.mjs",
+          "transformedLine": 748
+        }
+      ]
+    },
+    {
+      "phase": "maintenance-4",
+      "name": "largest-quantum-1",
+      "from": 71898.123,
+      "to": 72037.649459,
+      "processCpuMs": 155.46,
+      "samples": 95,
+      "sampleWeightedMs": 139.53,
+      "categories": {
+        "node/other JS": 29.27,
+        "canonical/protocol/crypto JS": 75.08,
+        "native SQLite calls": 10.67,
+        "garbage collection": 9.04,
+        "storage JS": 6.46,
+        "V8/native/unknown": 9
+      },
+      "self": [
+        {
+          "ms": 9.04,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 3.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 3,
+          "fn": "decode",
+          "url": "node:internal/encoding",
+          "transformedLine": 442
+        },
+        {
+          "ms": 1.58,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 258
+        },
+        {
+          "ms": 1.58,
+          "fn": "exec",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "releaseRetirementRead",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 545
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureJournalRetirementControlWithPlan",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 282
+        },
+        {
+          "ms": 1.54,
+          "fn": "flattenEncoded",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 147
+        },
+        {
+          "ms": 1.54,
+          "fn": "collect",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 247
+        },
+        {
+          "ms": 1.54,
+          "fn": "finishSorted",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 580
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.54,
+          "fn": "next",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "retirementDrainPlan",
+          "url": "packages/seal/src/internal/signing-storage-codec.ts",
+          "transformedLine": 284
+        },
+        {
+          "ms": 1.54,
+          "fn": "all",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "encode",
+          "url": "node:internal/encoding",
+          "transformedLine": 351
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeInternal",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1195
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "captureJournalRetirementControlWithPlan",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 282
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 139.53,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 119.94,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 107.17,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 107.17,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 46.75,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 951
+        },
+        {
+          "ms": 46.75,
+          "fn": "",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1769
+        },
+        {
+          "ms": 16.62,
+          "fn": "issuanceRetirementTransitionRows",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1587
+        },
+        {
+          "ms": 15.08,
+          "fn": "applyClosedEpochRetirementIntent",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 572
+        },
+        {
+          "ms": 13.62,
+          "fn": "assertIssuanceRetirementPreparationRows",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1624
+        },
+        {
+          "ms": 12.78,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 12.4,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 12.4,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 11,
+          "fn": "issuanceRetirementImage",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1321
+        },
+        {
+          "ms": 10.54,
+          "fn": "",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 1752
+        },
+        {
+          "ms": 10.54,
+          "fn": "",
+          "url": "packages/live-journal/dist/src/retirement.js",
+          "transformedLine": 2135
+        },
+        {
+          "ms": 9.13,
+          "fn": "acquire",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 505
+        },
+        {
+          "ms": 9.13,
+          "fn": "",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 682
+        },
+        {
+          "ms": 9.13,
+          "fn": "retirementReadback",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 564
+        },
+        {
+          "ms": 9.13,
+          "fn": "transition",
+          "url": "packages/node/src/internal/closed-epoch-cleanup.ts",
+          "transformedLine": 670
+        },
+        {
+          "ms": 9.04,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 9,
+          "fn": "collect",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 247
+        },
+        {
+          "ms": 9,
+          "fn": "retirementImage",
+          "url": "packages/storage-node/src/live-journal.ts",
+          "transformedLine": 233
+        },
+        {
+          "ms": 7.58,
+          "fn": "acquireRetirementControl",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 905
+        },
+        {
+          "ms": 7.58,
+          "fn": "acquireRetirementControl",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2089
+        },
+        {
+          "ms": 7.58,
+          "fn": "",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 2457
+        }
+      ]
+    },
+    {
+      "phase": "maintenance-4",
+      "name": "largest-quantum-2",
+      "from": 71018.372709,
+      "to": 71154.654792,
+      "processCpuMs": 150.006,
+      "samples": 95,
+      "sampleWeightedMs": 136.28,
+      "categories": {
+        "node/other JS": 41.2,
+        "native SQLite calls": 29.58,
+        "canonical/protocol/crypto JS": 52.29,
+        "storage JS": 6,
+        "garbage collection": 5.67,
+        "V8/native/unknown": 1.54
+      },
+      "self": [
+        {
+          "ms": 5.67,
+          "fn": "(garbage collector)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeUtf8",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 454
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeUtf8Range",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1087
+        },
+        {
+          "ms": 1.54,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "finishSorted",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 580
+        },
+        {
+          "ms": 1.54,
+          "fn": "mod",
+          "url": "node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js",
+          "transformedLine": 29
+        },
+        {
+          "ms": 1.54,
+          "fn": "apply",
+          "url": "examples/grid/src/zone-state-artifact.mjs",
+          "transformedLine": 101
+        },
+        {
+          "ms": 1.54,
+          "fn": "decodeCollection",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 1106
+        },
+        {
+          "ms": 1.54,
+          "fn": "DatabaseSync",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.54,
+          "fn": "writeValue",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 632
+        },
+        {
+          "ms": 1.54,
+          "fn": "issuanceRetirementBytesEqual",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1281
+        },
+        {
+          "ms": 1.54,
+          "fn": "issuanceRetirementBytesEqual",
+          "url": "packages/issuance-store/dist/src/retirement.js",
+          "transformedLine": 1281
+        },
+        {
+          "ms": 1.54,
+          "fn": "validateRecoveryManifest",
+          "url": "packages/storage/src/snapshot-transfer.ts",
+          "transformedLine": 548
+        },
+        {
+          "ms": 1.54,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "get",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.54,
+          "fn": "copyExactCarrier",
+          "url": "packages/protocol-v3/src/snapshot-transfer.ts",
+          "transformedLine": 124
+        },
+        {
+          "ms": 1.54,
+          "fn": "detach",
+          "url": "packages/node/src/internal/creator-snapshot-data.ts",
+          "transformedLine": 41
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "",
+          "url": "packages/storage/dist/src/internal/bounded-read.js",
+          "transformedLine": 836
+        },
+        {
+          "ms": 1.5,
+          "fn": "writeString",
+          "url": "packages/canonical/dist/src/internal/codec.js",
+          "transformedLine": 494
+        },
+        {
+          "ms": 1.5,
+          "fn": "prepare",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 1.5,
+          "fn": "safe",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 15
+        }
+      ],
+      "inclusive": [
+        {
+          "ms": 136.28,
+          "fn": "(root)",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 93.23,
+          "fn": "runMicrotasks",
+          "url": "",
+          "transformedLine": 0
+        },
+        {
+          "ms": 93.23,
+          "fn": "runNextTicks",
+          "url": "node:internal/process/task_queues",
+          "transformedLine": 62
+        },
+        {
+          "ms": 93.23,
+          "fn": "listOnTimeout",
+          "url": "node:internal/timers",
+          "transformedLine": 526
+        },
+        {
+          "ms": 93.23,
+          "fn": "processTimers",
+          "url": "node:internal/timers",
+          "transformedLine": 506
+        },
+        {
+          "ms": 15.04,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 12.08,
+          "fn": "nativeSignAdmission",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1374
+        },
+        {
+          "ms": 12.08,
+          "fn": "admittedSign",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10900
+        },
+        {
+          "ms": 12.08,
+          "fn": "",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2162
+        },
+        {
+          "ms": 12.08,
+          "fn": "buildInNativeJob",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10892
+        },
+        {
+          "ms": 12.08,
+          "fn": "#transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1350
+        },
+        {
+          "ms": 12.08,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 1320
+        },
+        {
+          "ms": 12.08,
+          "fn": "transactIssue",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 2077
+        },
+        {
+          "ms": 12.08,
+          "fn": "transactWithPlanEffect",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10882
+        },
+        {
+          "ms": 12.08,
+          "fn": "issue",
+          "url": "packages/protocol-v3/src/index.ts",
+          "transformedLine": 2138
+        },
+        {
+          "ms": 10.42,
+          "fn": "",
+          "url": "packages/storage-node/src/snapshot-transfer.ts",
+          "transformedLine": 521
+        },
+        {
+          "ms": 10.28,
+          "fn": "readCreatorRecoveryDependencyCensus",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 7473
+        },
+        {
+          "ms": 9.04,
+          "fn": "acquireRecoveryRoleCertificate",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 1225
+        },
+        {
+          "ms": 7.46,
+          "fn": "issueOneVertex",
+          "url": "packages/node/src/v3-live.ts",
+          "transformedLine": 10830
+        },
+        {
+          "ms": 6.08,
+          "fn": "acquireCreatorOrdinaryIssuanceMaintenanceProof",
+          "url": "packages/node/src/internal/creator-closed-rollback-data.ts",
+          "transformedLine": 4900
+        },
+        {
+          "ms": 6.04,
+          "fn": "reserveUnsignedIntent",
+          "url": "packages/storage-node/src/internal/node-issuance-store.ts",
+          "transformedLine": 583
+        },
+        {
+          "ms": 6,
+          "fn": "readSqliteSigningImage",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 49
+        },
+        {
+          "ms": 6,
+          "fn": "",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 347
+        },
+        {
+          "ms": 6,
+          "fn": "transact",
+          "url": "packages/storage-node/src/internal/signing-database.ts",
+          "transformedLine": 146
+        },
+        {
+          "ms": 6,
+          "fn": "#acquire",
+          "url": "packages/storage-node/src/internal/signing-retirement.ts",
+          "transformedLine": 343
+        }
+      ]
+    }
+  ]
+}

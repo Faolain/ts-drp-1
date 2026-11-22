@@ -1,0 +1,15 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+ ✓ packages/node/tests/closed-epoch-retirement-sequencing.test.ts (18 tests) 72ms
+(node:58149) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/creator-maintenance-host-turn-native.test.ts (2 tests) 34866ms
+   ✓ joins genuine native participant custody before a maintenance host turn and handles close  15684ms
+   ✓ joins genuine native participant custody before a maintenance host turn and handles foreign-native-control  19181ms
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  12:30:52
+   Duration  41.54s (transform 3.26s, setup 0ms, collect 6.10s, tests 34.94s, environment 0ms, prepare 95ms)
+

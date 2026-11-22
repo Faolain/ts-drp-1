@@ -1,0 +1,37 @@
+{
+	"schemaVersion": "ts-drp-blueprint-artifact-profile-freeze-v1",
+	"profileId": "ts-drp-blueprint-artifact-profile-v1",
+	"frozenTuple": {
+		"checkpoint": "907fae437e558145f63614cd6b5de925ea4bd8c2",
+		"freezePolicyPath": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+		"freezePolicySha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+		"protectedPathCount": 47,
+		"protectedPathStatesSha256": "023e7b50c11eff2d5fd4d0d8c5ea6da8d54ad095d73d24b7d3badea2e3769637"
+	},
+	"protectedArtifacts": [
+		"docs/protocol/blueprint-artifact-profile-v3.md",
+		"docs/protocol/blueprint-artifact-profile-v3.json",
+		"packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json",
+		"packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json",
+		"packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs",
+		".github/workflows/protocol-v3-blueprint-artifact-profile.yml",
+		"tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+		"tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+		"tests/fixtures/phase-0j-b-v3/chat-blueprint.mjs",
+		"tests/fixtures/phase-0j-b-v3/public-entry-type-audit.ts",
+		"tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json"
+	],
+	"checkerSha256": "2d6423f70322f2b22698d1fb15af352f03f88f48ac3174de7f593f196ec9831d",
+	"artifactSha256": {
+		"docs/protocol/blueprint-artifact-profile-v3.md": "cf39631756c9766d956112098970478e59c8ecb712634438b35cdd69330bbd53",
+		"docs/protocol/blueprint-artifact-profile-v3.json": "9ab7cf506591047ccbc85eeacc25008b88d873ded30278ca849783e50ea29034",
+		"packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json": "288ff9f264cddcad35d19c358f2c0ca4519ba45ebc371b160dbfa74f26f9bd83",
+		"packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs": "2d6423f70322f2b22698d1fb15af352f03f88f48ac3174de7f593f196ec9831d",
+		".github/workflows/protocol-v3-blueprint-artifact-profile.yml": "82230a6369408949b00c47d28799e18206d4822b8d98f5e90226829a3d0996f3",
+		"tests/protocol-v3-blueprint-runtime-0j-b.test.ts": "40c7d5c5bbea476a4f7ccec919db6c89b677d31e46173afcd52f4ec8dd82a5d1",
+		"tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json": "61e6267c7ea773a52d5cfa6c735eddcdaaf8dcccce90e460938d0617fdf8029f",
+		"tests/fixtures/phase-0j-b-v3/chat-blueprint.mjs": "69f15bd856d2aeb2970db15252ab2718fe00b1469f14dab90c91b5347cef758c",
+		"tests/fixtures/phase-0j-b-v3/public-entry-type-audit.ts": "16bb7100eef78791d6cf440dc122c8a7688cf166cd1afb5079f424c45d72c180",
+		"tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json": "43e3bd46979761347514c75f80e28e6b15692aede6dfd71bdf8bbcb202f9e88a"
+	}
+}

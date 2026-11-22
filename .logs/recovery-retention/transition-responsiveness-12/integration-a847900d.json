@@ -1,0 +1,45 @@
+{
+  "reviewedComposition": "a847900d",
+  "packagesAndExamplesExactlyMatchReviewedComposition": true,
+  "conflictResolution": "Only inspected conflict hunks were resolved: cooperativeCheckpoint callback name, cut-binding import, eligible(entry) checks alongside checkpoints. All other independently merged edits were retained.",
+  "builds": "issuance-store, live-journal, protocol-v3, storage, node, storage-node and storage-browser passed",
+  "gate": {
+    "initial": "92/108 passed; 16 checkpoint-gap cases in two suites failed because the old compiled storage floor still enforced adjacent-only epochs",
+    "afterDependencyRefresh": "Only those two suites rerun: 23/23 passed; the other four suites had 85/85 passing cases in the initial run",
+    "sourceChangesDuringGate": "none; only generated dependency artifacts refreshed"
+  },
+  "logs": [
+    {
+      "name": "integration-deps-build.log",
+      "sha256": "a23a12fb3dcdbe3b4b478a41eabcf303614d0b31d826f5dbe18db59bbe3bfb1d"
+    },
+    {
+      "name": "integration-protocol-build.log",
+      "sha256": "7cd94d05afe83e7bba2c282c95c438aefa1bdeb582d18591b450addd1889eeec"
+    },
+    {
+      "name": "integration-storage-build.log",
+      "sha256": "1ec71b5944a5e5b899d0205d50631dd899716318c7f299f5695abec9548f8f52"
+    },
+    {
+      "name": "integration-node-build.log",
+      "sha256": "ecd80eb441ee33d14372cbb07a3a4dec09451fd776ceaa6b2ce7e57b3668344d"
+    },
+    {
+      "name": "integration-storage-node-build.log",
+      "sha256": "f5700a508ce6b6863fea028634b8889324defc1a6b4478755aae85a08372a64a"
+    },
+    {
+      "name": "integration-storage-browser-build.log",
+      "sha256": "8fd833aba6e3f5badb2552b2327f224b95a6712d13c1d157cacd25a049f2a76e"
+    },
+    {
+      "name": "integration-initial-gate.log",
+      "sha256": "e1ce8f383791179196d4e58b0a76939370f7f9a23eb16473079eb16456e7245f"
+    },
+    {
+      "name": "integration-refreshed-rejoin-gate.log",
+      "sha256": "a40340b19c2e848a2dca3ddcc86d7a3db30692d46d8b90820fdf2a6f9fcbf358"
+    }
+  ]
+}

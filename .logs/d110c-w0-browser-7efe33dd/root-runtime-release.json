@@ -1,0 +1,10 @@
+{
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "gate": "browser-24",
+  "maxInvocations": 1,
+  "runtimeRosterSha256": "5214a38d6f881921051f7ad486920a903fa91e51728496c98550e89d51be9c66",
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "scope": "One execution of the existing activation Playwright configuration: exactly24cases across Chromium, Firefox and WebKit, one worker, zero retries, unchanged300000ms global timeout with330000ms external process ceiling. No source edits, package builds, other gates or reviewers.",
+  "prerequisites": "Root independently verified original W0 7, retained222 and supplemental3 outcomes plus the exact51-entry regression seal7c50bb00d2160a7f0d4bf48d0713e9ba3cbec81d1c349e544095d6cae01afe10. Browser collection matched all24historical identities;1081inputs frozen; both shim paths absent.",
+  "implementation": "Use the existing project browser tests and their in-memory test server, not an interactive app-browser substitute. Only setup-owned shim lifetime may be created/removed by the existing global setup."
+}

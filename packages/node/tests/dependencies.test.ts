@@ -53,6 +53,8 @@ function createFakeNetwork(): FakeNetworkControls {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn(() => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn(() => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn(() => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((handler) => {
@@ -93,28 +95,25 @@ describe("DRPNode dependencies", () => {
 		await node.start();
 		expect(fake.start).toHaveBeenCalledOnce();
 		expect(fake.messageHandlers).toHaveLength(1);
-		expect(fake.groupHandlers).toHaveLength(1);
+		expect(fake.groupHandlers).toHaveLength(0);
 		expect(fake.networkNode.connectToBootstraps).not.toHaveBeenCalled();
 		expect(node["_intervals"].has("interval::reconnect")).toBe(false);
 
-		const object = await node.createObject({ id: "fake-object" });
+		const customGroup = "fake-custom-group";
+		node.addCustomGroup(customGroup);
 		await fake.messageHandlers[0](
-			Message.create({ objectId: object.id, sender: "remote-peer", type: MessageType.MESSAGE_TYPE_CUSTOM })
+			Message.create({ objectId: customGroup, sender: "remote-peer", type: MessageType.MESSAGE_TYPE_CUSTOM })
 		);
 		expect(dispatchMessage).toHaveBeenCalledOnce();
 
-		vi.spyOn(fake.networkNode, "getSubscribedTopics").mockReturnValue([object.id]);
-		vi.spyOn(fake.networkNode, "getGroupPeers").mockReturnValue(["remote-peer"]);
-		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
-		fake.groupHandlers[0]({ peerId: "remote-peer", subscribed: true, topic: object.id });
-		await vi.waitFor(() => expect(syncObject).toHaveBeenCalledWith(object.id, "remote-peer"));
+		// The removed Object/SYNC group-change branch remains historical evidence.
 
 		await node.restart();
 		expect(node.networkNode).toBe(fake.networkNode);
 		expect(fake.start).toHaveBeenCalledTimes(2);
 		expect(fake.stop).toHaveBeenCalledOnce();
 		expect(fake.messageHandlers).toHaveLength(1);
-		expect(fake.groupHandlers).toHaveLength(1);
+		expect(fake.groupHandlers).toHaveLength(0);
 		expect(node["_intervals"].has("interval::reconnect")).toBe(false);
 
 		await node.stop();

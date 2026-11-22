@@ -1,0 +1,32 @@
+diff --git a/dist/src/connection.js b/dist/src/connection.js
+--- a/dist/src/connection.js
++++ b/dist/src/connection.js
+@@ -203,8 +203,10 @@ export class Connection extends TypedEventEmitter {
+                         connection = c;
+                         resolve();
+                     });
+-                    if (result instanceof Promise) {
+-                        result.catch(reject);
++                    // Native async/foreign-realm promises need not inherit the
++                    // current global Promise (for example with Zone.js loaded).
++                    if (result != null) {
++                        Promise.resolve(result).catch(reject);
+                     }
+                 }
+                 catch (err) {
+diff --git a/src/connection.ts b/src/connection.ts
+--- a/src/connection.ts
++++ b/src/connection.ts
+@@ -277,8 +277,10 @@ export class Connection extends TypedEventEmitter<ConnectionEvents> implements Conn
+             resolve()
+           })
+ 
+-          if (result instanceof Promise) {
+-            result.catch(reject)
++          // Native async/foreign-realm promises need not inherit the
++          // current global Promise (for example with Zone.js loaded).
++          if (result != null) {
++            Promise.resolve(result).catch(reject)
+           }
+         } catch (err) {
+           reject(err)

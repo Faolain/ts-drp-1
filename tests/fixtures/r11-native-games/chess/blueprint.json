@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "kind": "ts-drp-blueprint-authoring-source",
+  "artifactId": "r11-native-short-chess.v1",
+  "runtimeProfile": "ecmascript-2024-sync-v1",
+  "operationDiscriminator": "action",
+  "workBudgetProfile": "blueprint-work-budget-v1",
+  "operations": [
+    { "name": "causalJoin", "reducerBinding": "causalJoinReducer", "maxCanonicalOperationBytes": 192,
+      "argumentSchema": { "kind": "closed-record", "fields": [] } },
+    { "name": "chessMove", "reducerBinding": "chessMoveReducer", "maxCanonicalOperationBytes": 256,
+      "argumentSchema": { "kind": "closed-record", "fields": [
+        { "name": "from", "required": true, "type": "string" },
+        { "name": "ply", "required": true, "type": "safe-integer" },
+        { "name": "to", "required": true, "type": "string" }
+      ] } }
+  ],
+  "conformance": {
+    "corpusVersion": "r11-native-short-chess.v1",
+    "seed": "r11-native-short-chess-2026-10-12",
+    "initialState": { "version": 1, "kind": "chess", "controller": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "board": "RNBQKBNRPPPPPPPP................................pppppppprnbqkbnr", "turn": 1, "ply": 0, "status": "playing", "winner": 0, "history": [] },
+    "prCases": [
+      { "id": "bootstrap", "action": "causalJoin", "arguments": {} },
+      { "id": "f2-f3", "action": "chessMove", "arguments": { "ply": -0, "from": "f2", "to": "f3" }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+      { "id": "e7-e5", "action": "chessMove", "arguments": { "ply": 1, "from": "e7", "to": "e5" }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+      { "id": "g2-g4", "action": "chessMove", "arguments": { "ply": 2, "from": "g2", "to": "g4" }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+      { "id": "d8-h4-mate", "action": "chessMove", "arguments": { "ply": 3, "from": "d8", "to": "h4" }, "executionContext": { "author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } }
+    ],
+    "nightlyAdditionalCases": [ { "id": "ended-bootstrap-replay", "action": "causalJoin", "arguments": {} } ]
+  }
+}

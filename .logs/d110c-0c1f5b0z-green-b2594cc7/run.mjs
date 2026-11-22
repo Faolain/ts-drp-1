@@ -1,0 +1,22 @@
+import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync, openSync, closeSync, writeSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+const [label,cwd,command,...args]=process.argv.slice(2);
+if(!label || !cwd || !command || !/^[a-z0-9-]+$/.test(label)) throw Error('invalid command');
+const root=resolve(dirname(new URL(import.meta.url).pathname),label);
+mkdirSync(root);
+const start=new Date().toISOString();
+writeFileSync(resolve(root,'command.json'),JSON.stringify({cwd,command,args,start},null,2)+'\n',{flag:'wx'});
+const out=openSync(resolve(root,'stdout'),'wx'), err=openSync(resolve(root,'stderr'),'wx');
+const child=spawn(command,args,{cwd,env:process.env});
+child.stdout.on('data',b=>writeSync(out,b));
+child.stderr.on('data',b=>writeSync(err,b));
+let spawnError;
+child.on('error',e=>{spawnError=String(e)});
+child.on('close',(code,signal)=>{
+ closeSync(out);closeSync(err);
+ const result={code,signal,spawnError,start,finish:new Date().toISOString(),pid:child.pid};
+ writeFileSync(resolve(root,'status.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+ console.log(JSON.stringify({label,...result}));
+ process.exitCode=code??1;
+});

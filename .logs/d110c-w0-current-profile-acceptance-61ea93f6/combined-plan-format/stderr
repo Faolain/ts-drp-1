@@ -1,0 +1,52 @@
+
+<--- Last few GCs --->
+
+[36446:0xc48400000]     5723 ms: Mark-Compact (reduce) 4096.5 (4111.0) -> 4086.5 (4094.2) MB, pooled: 0 MB, 11.62 / 0.00 ms  (+ 0.1 ms in 0 steps since start of marking, biggest step 0.0 ms, walltime since start of marking 14 ms) (average mu = 0.633, curr[36446:0xc48400000]     5739 ms: Mark-Compact 4096.6 (4104.0) -> 4096.3 (4107.0) MB, pooled: 0 MB, 14.38 / 0.00 ms  (average mu = 0.454, current mu = 0.118) allocation failure; scavenge might not succeed
+
+
+<--- JS stacktrace --->
+
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x104867484 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 2: 0x104a2da48 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 3: 0x104c3b9a0 v8::internal::Heap::stack() [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 4: 0x104c39d40 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 5: 0x104c2e328 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 6: 0x104c2eb60 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 7: 0x104c02e64 v8::internal::FactoryBase<v8::internal::Factory>::NewRawTwoByteString(int, v8::internal::AllocationType) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 8: 0x104f41ac4 v8::internal::String::SlowFlatten(v8::internal::Isolate*, v8::internal::Handle<v8::internal::ConsString>, v8::internal::AllocationType) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+ 9: 0x104c150e0 v8::internal::Factory::NewProperSubString(v8::internal::Handle<v8::internal::String>, int, int) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+10: 0x105044528 v8::internal::Runtime_StringSubstring(int, unsigned long*, v8::internal::Isolate*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+11: 0x1054edaf4 Builtins_CEntry_Return1_ArgvOnStack_NoBuiltinExit [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+12: 0x1054588d4 Builtins_StringSubstring [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+13: 0x10fd28a18 
+14: 0x10fd38db8 
+15: 0x10fd0a930 
+16: 0x105458ef0 Builtins_InterpreterEntryTrampoline [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+17: 0x105458ef0 Builtins_InterpreterEntryTrampoline [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+18: 0x105458ef0 Builtins_InterpreterEntryTrampoline [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+19: 0x105458ef0 Builtins_InterpreterEntryTrampoline [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+20: 0x105495290 Builtins_AsyncFunctionAwaitResolveClosure [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+21: 0x1055604d8 Builtins_PromiseFulfillReactionJob [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+22: 0x105485594 Builtins_RunMicrotasks [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+23: 0x105456af4 Builtins_JSRunMicrotasksEntry [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+24: 0x104b938dc v8::internal::(anonymous namespace)::Invoke(v8::internal::Isolate*, v8::internal::(anonymous namespace)::InvokeParams const&) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+25: 0x104b94184 v8::internal::(anonymous namespace)::InvokeWithTryCatch(v8::internal::Isolate*, v8::internal::(anonymous namespace)::InvokeParams const&) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+26: 0x104b942bc v8::internal::Execution::TryRunMicrotasks(v8::internal::Isolate*, v8::internal::MicrotaskQueue*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+27: 0x104bc1538 v8::internal::MicrotaskQueue::RunMicrotasks(v8::internal::Isolate*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+28: 0x104bc1cbc v8::internal::MicrotaskQueue::PerformCheckpoint(v8::Isolate*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+29: 0x10476d9a8 node::InternalCallbackScope::Close() [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+30: 0x10476d474 node::InternalCallbackScope::~InternalCallbackScope() [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+31: 0x10486b574 node::fs::FileHandle::CloseReq::Resolve() [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+32: 0x104885a0c node::fs::FileHandle::ClosePromise()::$_0::__invoke(uv_fs_s*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+33: 0x10485f9a0 node::MakeLibuvRequestCallback<uv_fs_s, void (*)(uv_fs_s*)>::Wrapper(uv_fs_s*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+34: 0x1054330d4 uv__work_done [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+35: 0x105436b84 uv__async_io [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+36: 0x10544a398 uv__io_poll [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+37: 0x1054370ec uv_run [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+38: 0x10476e508 node::SpinEventLoopInternal(node::Environment*) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+39: 0x1048b045c node::NodeMainInstance::Run() [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+40: 0x1048254cc node::Start(int, char**) [/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node]
+41: 0x196e5dd54 start [/usr/lib/dyld]

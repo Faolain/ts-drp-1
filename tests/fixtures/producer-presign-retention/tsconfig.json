@@ -1,0 +1,24 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"paths": {
+			"@ts-drp/*": ["../../../packages/*/dist/src/index.d.ts", "../../../packages/*"],
+			"@ts-drp/protocol-v3": ["../../../packages/protocol-v3/dist/src/public.d.ts"],
+			"@ts-drp/issuance-store/maintenance": ["../../../packages/issuance-store/dist/src/maintenance.d.ts"],
+			"@ts-drp/keychain/finality": ["../../../packages/keychain/dist/src/finality.d.ts"]
+		}
+	},
+	"files": [
+		"fixture.ts",
+		"native-modules.ts",
+		"native-child.ts",
+		"native-parent.ts",
+		"../../producer-presign-feasibility.test.ts",
+		"../../producer-presign-retention-red.test.ts",
+		"../../producer-presign-retention-native-red.test.ts"
+	],
+	"include": []
+}

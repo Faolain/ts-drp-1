@@ -1,52 +1,16 @@
 import { type PeerId, type TypedEventTarget } from "@libp2p/interface";
 
-import { type IACL } from "./acl.js";
-import { type DRPIntervalDiscoveryOptions } from "./drp-interval-discovery.js";
 import { type DRPIntervalReconnectOptions } from "./drp-interval-reconnect.js";
-import { type IDRP } from "./drp.js";
-import {
-	type FetchState,
-	type FetchStateResponse,
-	type IDRPObject,
-	type NodeEventName,
-	type Update,
-	type Vertex,
-} from "./index.js";
-import { type IntervalRunnerOptions } from "./interval-runner.js";
+import { type FetchState, type FetchStateResponse, type NodeEventName, type Update, type Vertex } from "./index.js";
 import { type KeychainOptions } from "./keychain.js";
 import { type LoggerOptions } from "./logger.js";
-import { type IMetrics } from "./metrics.js";
 import { type DRPNetworkNode, type DRPNetworkNodeConfig } from "./network.js";
 
 export interface DRPNodeConfig {
 	log_config?: LoggerOptions;
 	network_config?: DRPNetworkNodeConfig;
 	keychain_config?: KeychainOptions;
-	interval_discovery_options?: Omit<DRPIntervalDiscoveryOptions, "id" | "networkNode">;
-	interval_sync_options?: Omit<IntervalRunnerOptions, "fn" | "id">;
 	interval_reconnect_options?: Omit<DRPIntervalReconnectOptions, "id" | "networkNode">;
-}
-
-interface NodeObjectOptionsBase<T> {
-	id?: string;
-	acl?: IACL;
-	drp?: T;
-	metrics?: IMetrics;
-	log_config?: LoggerOptions;
-}
-
-export interface NodeCreateObjectOptions<T extends IDRP> extends NodeObjectOptionsBase<T> {
-	sync?: {
-		enabled: boolean;
-		peerId?: string;
-	};
-}
-
-export interface NodeConnectObjectOptions<T extends IDRP> extends NodeObjectOptionsBase<T> {
-	id: string;
-	sync?: {
-		peerId?: string;
-	};
 }
 
 export interface PeerInfo {
@@ -146,11 +110,6 @@ export interface NodeEvents {
 	[NodeEventName.DRP_ATTESTATION_UPDATE]: CustomEvent<ObjectId>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface DRPObjectSubscribeCallback<T extends IDRP = any> {
-	(objectId: string, object: IDRPObject<T>): void;
-}
-
 export interface IDRPNode extends TypedEventTarget<NodeEvents> {
 	/**
 	 * The configuration of the node
@@ -178,29 +137,12 @@ export interface IDRPNode extends TypedEventTarget<NodeEvents> {
 	 */
 	restart(config?: DRPNodeConfig): Promise<void>;
 
-	/**
-	 * Create a new object
-	 * @param options
-	 */
-	createObject<T extends IDRP>(options: NodeCreateObjectOptions<T>): Promise<IDRPObject<T>>;
+	/** Subscribe to a transport-only custom group. */
+	addCustomGroup(group: string): void;
 
-	/**
-	 * Get an object by id
-	 * @param id The id of the object
-	 */
-	get<T extends IDRP>(id: string): IDRPObject<T> | undefined;
+	/** Send custom bytes with honest local transport completion. */
+	sendGroupMessage(group: string, data: Uint8Array): Promise<void>;
 
-	/**
-	 * Connect to an object
-	 * @param id The id of the object
-	 * @param object The object
-	 */
-	put<T extends IDRP>(id: string, object: IDRPObject<T>): void;
-
-	/**
-	 * Subscribe to an object
-	 * @param id The id of the object
-	 * @param callback The callback to call when the object changes
-	 */
-	subscribe<T extends IDRP>(id: string, callback: DRPObjectSubscribeCallback<T>): void;
+	/** Send custom bytes to one transport peer. */
+	sendCustomMessage(peerId: string, data: Uint8Array): Promise<void>;
 }

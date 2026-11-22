@@ -1,0 +1,1707 @@
+{
+  "method": "One sequential baseline/candidate pair; real native storage/durable localhost transport, controlled ephemeral datagrams, fixed 32 state slots; 4 epochs; reopen at epoch 2; inspector/trace off. Other agent jobs held and reaped; external shared host not controlled. Process CPU includes background threads and GC; quantum spans are timer-delimited observations, not a proved JS task or frame-time bound.",
+  "runs": {
+    "baseline": {
+      "configuration": {
+        "kind": "configuration",
+        "sourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "sourceHead": "613ab64756ffef08e37ee3527eb85073381691f2",
+        "sourceDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load": [
+          9.078125,
+          9.60595703125,
+          13.11083984375
+        ],
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "epochs": 4,
+        "warmRows": 0,
+        "traceWork": false,
+        "repairEvery": 25,
+        "reopenAt": 2,
+        "requireProgress": false,
+        "directory": "/private/tmp/active-continued-play-baseline-12/grid-sqlite-uzAJDg",
+        "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+        "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+        "tickIntervalMs": 10,
+        "offeredHzPerPeer": 100,
+        "stateSlots": 32,
+        "slotOwnership": "16 disjoint slots per author",
+        "successor": "signed native export over scripted chunk/material transport",
+        "cpuProfiles": false,
+        "observationBufferLimit": 512,
+        "rawHistoryLimit": 64,
+        "taskQuantumHistoryLimit": 256
+      },
+      "steps": [
+        {
+          "phase": "warm-population",
+          "ms": 716.0827499999996,
+          "cpuUserMs": 766.936,
+          "cpuSystemMs": 77.933,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 657.1979999999994,
+          "maxTaskCpuMs": 768.769,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "warm-convergence",
+          "ms": 551.4124160000001,
+          "cpuUserMs": 649.822,
+          "cpuSystemMs": 43.039,
+          "timerCallbacks": 2,
+          "maxTaskGapMs": 446.4053329999997,
+          "maxTaskCpuMs": 570.018,
+          "taskQuantumCount": 3,
+          "ephemeralReceivedByPeer": [
+            1,
+            1
+          ],
+          "remoteAcceptedByPeer": [
+            17,
+            17
+          ]
+        },
+        {
+          "phase": "seal-1",
+          "ms": 155.69504199999938,
+          "cpuUserMs": 165.83,
+          "cpuSystemMs": 13.042,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 155.69504199999938,
+          "maxTaskCpuMs": 178.872,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-1",
+          "ms": 249.79995799999597,
+          "cpuUserMs": 285.839,
+          "cpuSystemMs": 13.31,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 249.79995799999597,
+          "maxTaskCpuMs": 299.149,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-1",
+          "ms": 512.4682089999988,
+          "cpuUserMs": 651.402,
+          "cpuSystemMs": 26.964,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 503.6010000000024,
+          "maxTaskCpuMs": 654.532,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-1",
+          "ms": 53.784499999994296,
+          "cpuUserMs": 74.363,
+          "cpuSystemMs": 4.603,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 53.784499999994296,
+          "maxTaskCpuMs": 78.966,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "seal-2",
+          "ms": 131.31500000000233,
+          "cpuUserMs": 128.795,
+          "cpuSystemMs": 11.72,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 131.31500000000233,
+          "maxTaskCpuMs": 140.515,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-2",
+          "ms": 234.67341699999815,
+          "cpuUserMs": 287.785,
+          "cpuSystemMs": 12.871,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 234.67341699999815,
+          "maxTaskCpuMs": 300.656,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-2",
+          "ms": 630.4813330000034,
+          "cpuUserMs": 666.784,
+          "cpuSystemMs": 23.59,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 628.6157499999972,
+          "maxTaskCpuMs": 688.5010000000001,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-2",
+          "ms": 61.156833000000915,
+          "cpuUserMs": 58.356,
+          "cpuSystemMs": 5.07,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 61.156833000000915,
+          "maxTaskCpuMs": 63.426,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "seal-3",
+          "ms": 165.05208299999504,
+          "cpuUserMs": 162.357,
+          "cpuSystemMs": 16.313,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 165.05208299999504,
+          "maxTaskCpuMs": 178.67,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-3",
+          "ms": 253.7131670000017,
+          "cpuUserMs": 255.565,
+          "cpuSystemMs": 16.359,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 253.7131670000017,
+          "maxTaskCpuMs": 271.924,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-3",
+          "ms": 792.9673330000005,
+          "cpuUserMs": 887.049,
+          "cpuSystemMs": 28.676,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 784.9800000000032,
+          "maxTaskCpuMs": 904.856,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-3",
+          "ms": 613.3016659999994,
+          "cpuUserMs": 651.289,
+          "cpuSystemMs": 36.076,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 613.3016659999994,
+          "maxTaskCpuMs": 687.365,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "seal-4",
+          "ms": 247.45483300000342,
+          "cpuUserMs": 273.591,
+          "cpuSystemMs": 17.153,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 247.45483300000342,
+          "maxTaskCpuMs": 290.744,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-4",
+          "ms": 266.028707999998,
+          "cpuUserMs": 303.944,
+          "cpuSystemMs": 16.589,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 266.028707999998,
+          "maxTaskCpuMs": 320.533,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-4",
+          "ms": 1117.3440829999963,
+          "cpuUserMs": 1188.876,
+          "cpuSystemMs": 32.752,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 1112.856166999998,
+          "maxTaskCpuMs": 1217.0420000000001,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-4",
+          "ms": 2138.6842500000057,
+          "cpuUserMs": 2238.58,
+          "cpuSystemMs": 118.324,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 2138.6842500000057,
+          "maxTaskCpuMs": 2356.904,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        }
+      ],
+      "groups": {
+        "warm-population": {
+          "count": 1,
+          "totalWallMs": 716.0827499999996,
+          "totalCpuMs": 844.869,
+          "maxTaskGapMs": 657.1979999999994,
+          "maxTaskCpuMs": 768.769,
+          "timerCallbacks": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        "warm-convergence": {
+          "count": 1,
+          "totalWallMs": 551.4124160000001,
+          "totalCpuMs": 692.861,
+          "maxTaskGapMs": 446.4053329999997,
+          "maxTaskCpuMs": 570.018,
+          "timerCallbacks": 2,
+          "ephemeralReceivedByPeer": [
+            1,
+            1
+          ],
+          "remoteAcceptedByPeer": [
+            17,
+            17
+          ]
+        },
+        "seal": {
+          "count": 4,
+          "totalWallMs": 699.5169580000002,
+          "totalCpuMs": 788.801,
+          "maxTaskGapMs": 247.45483300000342,
+          "maxTaskCpuMs": 290.744,
+          "timerCallbacks": 0,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        "adopt": {
+          "count": 4,
+          "totalWallMs": 1004.2152499999938,
+          "totalCpuMs": 1192.2620000000002,
+          "maxTaskGapMs": 266.028707999998,
+          "maxTaskCpuMs": 320.533,
+          "timerCallbacks": 0,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        "install": {
+          "count": 4,
+          "totalWallMs": 3053.260957999999,
+          "totalCpuMs": 3506.093,
+          "maxTaskGapMs": 1112.856166999998,
+          "maxTaskCpuMs": 1217.0420000000001,
+          "timerCallbacks": 4,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        "maintenance": {
+          "count": 4,
+          "totalWallMs": 2866.9272490000003,
+          "totalCpuMs": 3186.661,
+          "maxTaskGapMs": 2138.6842500000057,
+          "maxTaskCpuMs": 2356.904,
+          "timerCallbacks": 0,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        }
+      },
+      "summary": {
+        "floorTransitionObservationCount": 0,
+        "floorTransitionObservations": [],
+        "kind": "summary",
+        "status": "passed",
+        "completedEpochs": 4,
+        "epochs": 4,
+        "repaired": 1,
+        "reopened": 1,
+        "acceptedIssues": 57,
+        "expectedBlocks": 32,
+        "counters": {
+          "timerCallbacks": 4441,
+          "offered": [
+            4441,
+            4441
+          ],
+          "busy": [
+            0,
+            0
+          ],
+          "unavailable": [
+            2,
+            2
+          ],
+          "published": [
+            4439,
+            4437
+          ],
+          "rejected": [
+            0,
+            0
+          ],
+          "received": [
+            4433,
+            4433
+          ],
+          "remote": [
+            43,
+            22
+          ]
+        },
+        "timerMaxGapMs": 2146.2190000000046,
+        "eventLoopP99Ms": 17.252351,
+        "eventLoopMaxMs": 2367.684607,
+        "observationRows": 25948,
+        "observationFlushes": 55,
+        "observationHighWater": 512,
+        "raw": {
+          "sends": 64,
+          "routes": 2,
+          "reconciliations": 128
+        },
+        "nativeAfterClose": {
+          "files": 19,
+          "bytes": 1077248,
+          "byFile": [
+            {
+              "name": "0e77c3eacaefb824295a69dcf52d3e3b0b697a86fc5c0f02255443c659baf5ca.sqlite.drp-live-journal-v1.sqlite",
+              "bytes": 167936,
+              "kind": "primaryOrOther",
+              "tables": {
+                "accepted_entries": [
+                  24,
+                  13767
+                ],
+                "retirement_controls": [
+                  1,
+                  759
+                ],
+                "scopes": [
+                  5,
+                  27481
+                ]
+              }
+            },
+            {
+              "name": "0f952a1f7f5eceff38a6342dc93becd7abc1893a462e11ec4d3e8788300f53bf.sqlite.drp-issuance-v1.sqlite",
+              "bytes": 49152,
+              "kind": "primaryOrOther",
+              "tables": {
+                "issuance_outbox": [
+                  6,
+                  870
+                ],
+                "issued_records": [
+                  6,
+                  3992
+                ],
+                "lineages": [
+                  1,
+                  104
+                ],
+                "retirement_controls": [
+                  1,
+                  1135
+                ],
+                "settlement_plans": [
+                  1,
+                  106
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite",
+              "bytes": 94208,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_chunks_v2": [
+                  2,
+                  5582
+                ],
+                "snapshot_dependency_slots": [
+                  3,
+                  444
+                ],
+                "snapshot_owner_v2": [
+                  1,
+                  0
+                ],
+                "snapshot_retirement_controls": [
+                  1,
+                  1016
+                ],
+                "snapshot_scopes_v2": [
+                  2,
+                  18908
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "5a409435a3ee45078061ca2d518da0b4f44995b49c4fa9d07d81dabb30f10365.sqlite.drp-issuance-v1.sqlite",
+              "bytes": 122880,
+              "kind": "primaryOrOther",
+              "tables": {
+                "issuance_outbox": [
+                  59,
+                  8555
+                ],
+                "issued_records": [
+                  59,
+                  38086
+                ],
+                "lineages": [
+                  1,
+                  104
+                ],
+                "retirement_controls": [
+                  1,
+                  9255
+                ],
+                "settlement_plans": [
+                  1,
+                  2526
+                ]
+              }
+            },
+            {
+              "name": "a3154531d65a2ed53616664a30e8a4cbea933bdfda01ff07fb39c0877e7a8078.sqlite",
+              "bytes": 73728,
+              "kind": "primaryOrOther",
+              "tables": {
+                "signing_meta": [
+                  2,
+                  595
+                ],
+                "signing_rows": [
+                  12,
+                  21419
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite",
+              "bytes": 57344,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_chunks_v2": [
+                  2,
+                  5582
+                ],
+                "snapshot_dependency_slots": [
+                  4,
+                  480
+                ],
+                "snapshot_owner_v2": [
+                  1,
+                  0
+                ],
+                "snapshot_retirement_controls": [
+                  1,
+                  1016
+                ],
+                "snapshot_scopes_v2": [
+                  2,
+                  3151
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-3.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "c7c9970c6cd5d7510fb16b4a0d51db6921cfb37a687ba13ec384bc73ba0b1ca5.sqlite",
+              "bytes": 131072,
+              "kind": "primaryOrOther",
+              "tables": {
+                "blobs": [
+                  25,
+                  33269
+                ],
+                "generations": [
+                  5,
+                  5494
+                ],
+                "objects": [
+                  1,
+                  326
+                ],
+                "promotions": [
+                  30,
+                  5040
+                ],
+                "retirement_controls": [
+                  1,
+                  3045
+                ]
+              }
+            },
+            {
+              "name": "cab58fe2ad79324fae6766861782e5899662a6ff976a3ee6b90aff0d4e839279.sqlite",
+              "bytes": 126976,
+              "kind": "primaryOrOther",
+              "tables": {
+                "blobs": [
+                  26,
+                  35835
+                ],
+                "generations": [
+                  5,
+                  5482
+                ],
+                "objects": [
+                  1,
+                  326
+                ],
+                "promotions": [
+                  26,
+                  4368
+                ],
+                "retirement_controls": [
+                  1,
+                  3045
+                ]
+              }
+            },
+            {
+              "name": "de385738a40fe24a8e5038b7c6d6138394b459aac5518e7a01ded74d7bea4194.sqlite.drp-live-journal-v1.sqlite",
+              "bytes": 167936,
+              "kind": "primaryOrOther",
+              "tables": {
+                "accepted_entries": [
+                  32,
+                  10576
+                ],
+                "retirement_controls": [
+                  1,
+                  759
+                ],
+                "scopes": [
+                  5,
+                  26432
+                ]
+              }
+            },
+            {
+              "name": "fa86fe213cfe893e81e84cbb97f5d2055dcc399e2c2c58f9030cc6079ee87626.sqlite",
+              "bytes": 12288,
+              "kind": "primaryOrOther",
+              "tables": {
+                "signing_meta": [
+                  2,
+                  591
+                ],
+                "signing_rows": [
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "peer-0-external-floor.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "room_head": [
+                  1,
+                  651
+                ]
+              }
+            },
+            {
+              "name": "peer-1-external-floor.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "room_head": [
+                  1,
+                  651
+                ]
+              }
+            }
+          ],
+          "byKind": {
+            "wal": 0,
+            "sharedMemory": 0,
+            "primaryOrOther": 1077248
+          }
+        }
+      }
+    },
+    "candidate": {
+      "configuration": {
+        "kind": "configuration",
+        "sourceRoot": "/private/tmp/ts-drp-transition-responsiveness",
+        "sourceHead": "ef5d986443b6606a864d1c17171ba3f20954486d",
+        "sourceDiffSha256": "00cb5300107128bb1e2c77bbdf3b8e3d3880accd191632d523089b0f691431b5",
+        "load": [
+          9.3603515625,
+          9.7314453125,
+          12.78173828125
+        ],
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "epochs": 4,
+        "warmRows": 0,
+        "traceWork": false,
+        "repairEvery": 25,
+        "reopenAt": 2,
+        "requireProgress": false,
+        "directory": "/private/tmp/active-continued-play-candidate-12/grid-sqlite-FoLhEu",
+        "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+        "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+        "tickIntervalMs": 10,
+        "offeredHzPerPeer": 100,
+        "stateSlots": 32,
+        "slotOwnership": "16 disjoint slots per author",
+        "successor": "signed native export over scripted chunk/material transport",
+        "cpuProfiles": false,
+        "observationBufferLimit": 512,
+        "rawHistoryLimit": 64,
+        "taskQuantumHistoryLimit": 256
+      },
+      "steps": [
+        {
+          "phase": "warm-population",
+          "ms": 1440.0722910000004,
+          "cpuUserMs": 1613.834,
+          "cpuSystemMs": 151.03,
+          "timerCallbacks": 26,
+          "maxTaskGapMs": 115.02045799999996,
+          "maxTaskCpuMs": 136.255,
+          "taskQuantumCount": 27,
+          "ephemeralReceivedByPeer": [
+            23,
+            23
+          ],
+          "remoteAcceptedByPeer": [
+            16,
+            11
+          ]
+        },
+        {
+          "phase": "warm-convergence",
+          "ms": 106.31695800000034,
+          "cpuUserMs": 114.985,
+          "cpuSystemMs": 9.422,
+          "timerCallbacks": 6,
+          "maxTaskGapMs": 39.815042000000176,
+          "maxTaskCpuMs": 44.903999999999996,
+          "taskQuantumCount": 7,
+          "ephemeralReceivedByPeer": [
+            6,
+            6
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            6
+          ]
+        },
+        {
+          "phase": "seal-1",
+          "ms": 133.12249999999767,
+          "cpuUserMs": 132.811,
+          "cpuSystemMs": 11.571,
+          "timerCallbacks": 2,
+          "maxTaskGapMs": 92.23537499999657,
+          "maxTaskCpuMs": 98.786,
+          "taskQuantumCount": 3,
+          "ephemeralReceivedByPeer": [
+            2,
+            2
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-1",
+          "ms": 297.5508750000008,
+          "cpuUserMs": 314.623,
+          "cpuSystemMs": 18.512,
+          "timerCallbacks": 6,
+          "maxTaskGapMs": 92.63779200000135,
+          "maxTaskCpuMs": 103.43700000000001,
+          "taskQuantumCount": 7,
+          "ephemeralReceivedByPeer": [
+            2,
+            2
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-1",
+          "ms": 580.3135830000028,
+          "cpuUserMs": 652.735,
+          "cpuSystemMs": 29.905,
+          "timerCallbacks": 19,
+          "maxTaskGapMs": 96.03450000000157,
+          "maxTaskCpuMs": 121.21600000000001,
+          "taskQuantumCount": 20,
+          "ephemeralReceivedByPeer": [
+            16,
+            16
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-1",
+          "ms": 58.006750000000466,
+          "cpuUserMs": 62.119,
+          "cpuSystemMs": 5.402,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 58.006750000000466,
+          "maxTaskCpuMs": 67.521,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "seal-2",
+          "ms": 98.11737500000163,
+          "cpuUserMs": 93.337,
+          "cpuSystemMs": 8.514,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 67.60891699999775,
+          "maxTaskCpuMs": 70.771,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            1,
+            1
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-2",
+          "ms": 286.666541999999,
+          "cpuUserMs": 320.951,
+          "cpuSystemMs": 17.332,
+          "timerCallbacks": 9,
+          "maxTaskGapMs": 92.65691700000025,
+          "maxTaskCpuMs": 99.04,
+          "taskQuantumCount": 10,
+          "ephemeralReceivedByPeer": [
+            2,
+            2
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-2",
+          "ms": 810.2679159999971,
+          "cpuUserMs": 862.26,
+          "cpuSystemMs": 33.398,
+          "timerCallbacks": 36,
+          "maxTaskGapMs": 75.59712500000023,
+          "maxTaskCpuMs": 94.895,
+          "taskQuantumCount": 37,
+          "ephemeralReceivedByPeer": [
+            33,
+            33
+          ],
+          "remoteAcceptedByPeer": [
+            2,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-2",
+          "ms": 65.32287499999802,
+          "cpuUserMs": 65.375,
+          "cpuSystemMs": 6.001,
+          "timerCallbacks": 0,
+          "maxTaskGapMs": 65.32287499999802,
+          "maxTaskCpuMs": 71.376,
+          "taskQuantumCount": 1,
+          "ephemeralReceivedByPeer": [
+            0,
+            0
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "seal-3",
+          "ms": 137.98649999999907,
+          "cpuUserMs": 165.241,
+          "cpuSystemMs": 11.926,
+          "timerCallbacks": 1,
+          "maxTaskGapMs": 91.7221669999999,
+          "maxTaskCpuMs": 118.89,
+          "taskQuantumCount": 2,
+          "ephemeralReceivedByPeer": [
+            1,
+            1
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-3",
+          "ms": 313.1321250000037,
+          "cpuUserMs": 338.517,
+          "cpuSystemMs": 18.402,
+          "timerCallbacks": 7,
+          "maxTaskGapMs": 67.674208000004,
+          "maxTaskCpuMs": 76.69200000000001,
+          "taskQuantumCount": 8,
+          "ephemeralReceivedByPeer": [
+            2,
+            2
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-3",
+          "ms": 976.7643749999988,
+          "cpuUserMs": 1060.605,
+          "cpuSystemMs": 33.146,
+          "timerCallbacks": 55,
+          "maxTaskGapMs": 124.26079200000095,
+          "maxTaskCpuMs": 156.04999999999998,
+          "taskQuantumCount": 56,
+          "ephemeralReceivedByPeer": [
+            52,
+            52
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-3",
+          "ms": 740.1906670000026,
+          "cpuUserMs": 877.293,
+          "cpuSystemMs": 47.977,
+          "timerCallbacks": 12,
+          "maxTaskGapMs": 122.3373750000028,
+          "maxTaskCpuMs": 134.07999999999998,
+          "taskQuantumCount": 13,
+          "ephemeralReceivedByPeer": [
+            12,
+            12
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            0
+          ]
+        },
+        {
+          "phase": "seal-4",
+          "ms": 208.66762500000186,
+          "cpuUserMs": 225.207,
+          "cpuSystemMs": 12.016,
+          "timerCallbacks": 2,
+          "maxTaskGapMs": 140.69854200000555,
+          "maxTaskCpuMs": 152.49900000000002,
+          "taskQuantumCount": 3,
+          "ephemeralReceivedByPeer": [
+            2,
+            2
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "adopt-4",
+          "ms": 366.2623750000057,
+          "cpuUserMs": 414.86,
+          "cpuSystemMs": 20.133,
+          "timerCallbacks": 8,
+          "maxTaskGapMs": 77.5667919999978,
+          "maxTaskCpuMs": 79.80600000000001,
+          "taskQuantumCount": 9,
+          "ephemeralReceivedByPeer": [
+            2,
+            2
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        {
+          "phase": "install-4",
+          "ms": 1350.779333999999,
+          "cpuUserMs": 1418.041,
+          "cpuSystemMs": 37.295,
+          "timerCallbacks": 76,
+          "maxTaskGapMs": 173.8815409999952,
+          "maxTaskCpuMs": 184.859,
+          "taskQuantumCount": 77,
+          "ephemeralReceivedByPeer": [
+            73,
+            73
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            0
+          ]
+        },
+        {
+          "phase": "maintenance-4",
+          "ms": 2393.758833,
+          "cpuUserMs": 2657.495,
+          "cpuSystemMs": 127.685,
+          "timerCallbacks": 44,
+          "maxTaskGapMs": 161.27104200000758,
+          "maxTaskCpuMs": 173.977,
+          "taskQuantumCount": 45,
+          "ephemeralReceivedByPeer": [
+            44,
+            44
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            1
+          ]
+        }
+      ],
+      "groups": {
+        "warm-population": {
+          "count": 1,
+          "totalWallMs": 1440.0722910000004,
+          "totalCpuMs": 1764.864,
+          "maxTaskGapMs": 115.02045799999996,
+          "maxTaskCpuMs": 136.255,
+          "timerCallbacks": 26,
+          "ephemeralReceivedByPeer": [
+            23,
+            23
+          ],
+          "remoteAcceptedByPeer": [
+            16,
+            11
+          ]
+        },
+        "warm-convergence": {
+          "count": 1,
+          "totalWallMs": 106.31695800000034,
+          "totalCpuMs": 124.407,
+          "maxTaskGapMs": 39.815042000000176,
+          "maxTaskCpuMs": 44.903999999999996,
+          "timerCallbacks": 6,
+          "ephemeralReceivedByPeer": [
+            6,
+            6
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            6
+          ]
+        },
+        "seal": {
+          "count": 4,
+          "totalWallMs": 577.8940000000002,
+          "totalCpuMs": 660.6229999999999,
+          "maxTaskGapMs": 140.69854200000555,
+          "maxTaskCpuMs": 152.49900000000002,
+          "timerCallbacks": 6,
+          "ephemeralReceivedByPeer": [
+            6,
+            6
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        "adopt": {
+          "count": 4,
+          "totalWallMs": 1263.6119170000093,
+          "totalCpuMs": 1463.33,
+          "maxTaskGapMs": 92.65691700000025,
+          "maxTaskCpuMs": 103.43700000000001,
+          "timerCallbacks": 30,
+          "ephemeralReceivedByPeer": [
+            8,
+            8
+          ],
+          "remoteAcceptedByPeer": [
+            0,
+            0
+          ]
+        },
+        "install": {
+          "count": 4,
+          "totalWallMs": 3718.1252079999977,
+          "totalCpuMs": 4127.385,
+          "maxTaskGapMs": 173.8815409999952,
+          "maxTaskCpuMs": 184.859,
+          "timerCallbacks": 186,
+          "ephemeralReceivedByPeer": [
+            174,
+            174
+          ],
+          "remoteAcceptedByPeer": [
+            5,
+            0
+          ]
+        },
+        "maintenance": {
+          "count": 4,
+          "totalWallMs": 3257.279125000001,
+          "totalCpuMs": 3849.3469999999998,
+          "maxTaskGapMs": 161.27104200000758,
+          "maxTaskCpuMs": 173.977,
+          "timerCallbacks": 56,
+          "ephemeralReceivedByPeer": [
+            56,
+            56
+          ],
+          "remoteAcceptedByPeer": [
+            1,
+            1
+          ]
+        }
+      },
+      "summary": {
+        "floorTransitionObservationCount": 0,
+        "floorTransitionObservations": [],
+        "kind": "summary",
+        "status": "passed",
+        "completedEpochs": 4,
+        "epochs": 4,
+        "repaired": 1,
+        "reopened": 1,
+        "acceptedIssues": 57,
+        "expectedBlocks": 32,
+        "counters": {
+          "timerCallbacks": 4755,
+          "offered": [
+            4755,
+            4755
+          ],
+          "busy": [
+            0,
+            0
+          ],
+          "unavailable": [
+            10,
+            10
+          ],
+          "published": [
+            4745,
+            4742
+          ],
+          "rejected": [
+            0,
+            0
+          ],
+          "received": [
+            4708,
+            4708
+          ],
+          "remote": [
+            43,
+            22
+          ]
+        },
+        "timerMaxGapMs": 173.8815409999952,
+        "eventLoopP99Ms": 64.585727,
+        "eventLoopMaxMs": 174.325759,
+        "observationRows": 27773,
+        "observationFlushes": 56,
+        "observationHighWater": 512,
+        "raw": {
+          "sends": 64,
+          "routes": 2,
+          "reconciliations": 128
+        },
+        "nativeAfterClose": {
+          "files": 19,
+          "bytes": 1073152,
+          "byFile": [
+            {
+              "name": "0e77c3eacaefb824295a69dcf52d3e3b0b697a86fc5c0f02255443c659baf5ca.sqlite.drp-live-journal-v1.sqlite",
+              "bytes": 167936,
+              "kind": "primaryOrOther",
+              "tables": {
+                "accepted_entries": [
+                  24,
+                  13569
+                ],
+                "retirement_controls": [
+                  1,
+                  759
+                ],
+                "scopes": [
+                  5,
+                  28207
+                ]
+              }
+            },
+            {
+              "name": "0f952a1f7f5eceff38a6342dc93becd7abc1893a462e11ec4d3e8788300f53bf.sqlite.drp-issuance-v1.sqlite",
+              "bytes": 49152,
+              "kind": "primaryOrOther",
+              "tables": {
+                "issuance_outbox": [
+                  6,
+                  870
+                ],
+                "issued_records": [
+                  6,
+                  3926
+                ],
+                "lineages": [
+                  1,
+                  104
+                ],
+                "retirement_controls": [
+                  1,
+                  1135
+                ],
+                "settlement_plans": [
+                  1,
+                  106
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite",
+              "bytes": 94208,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_chunks_v2": [
+                  2,
+                  5582
+                ],
+                "snapshot_dependency_slots": [
+                  3,
+                  444
+                ],
+                "snapshot_owner_v2": [
+                  1,
+                  0
+                ],
+                "snapshot_retirement_controls": [
+                  1,
+                  1016
+                ],
+                "snapshot_scopes_v2": [
+                  2,
+                  18908
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "5a409435a3ee45078061ca2d518da0b4f44995b49c4fa9d07d81dabb30f10365.sqlite.drp-issuance-v1.sqlite",
+              "bytes": 122880,
+              "kind": "primaryOrOther",
+              "tables": {
+                "issuance_outbox": [
+                  59,
+                  8555
+                ],
+                "issued_records": [
+                  59,
+                  38350
+                ],
+                "lineages": [
+                  1,
+                  104
+                ],
+                "retirement_controls": [
+                  1,
+                  9255
+                ],
+                "settlement_plans": [
+                  1,
+                  2501
+                ]
+              }
+            },
+            {
+              "name": "a3154531d65a2ed53616664a30e8a4cbea933bdfda01ff07fb39c0877e7a8078.sqlite",
+              "bytes": 73728,
+              "kind": "primaryOrOther",
+              "tables": {
+                "signing_meta": [
+                  2,
+                  595
+                ],
+                "signing_rows": [
+                  12,
+                  21419
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite",
+              "bytes": 57344,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_chunks_v2": [
+                  2,
+                  5582
+                ],
+                "snapshot_dependency_slots": [
+                  4,
+                  480
+                ],
+                "snapshot_owner_v2": [
+                  1,
+                  0
+                ],
+                "snapshot_retirement_controls": [
+                  1,
+                  1016
+                ],
+                "snapshot_scopes_v2": [
+                  2,
+                  3151
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-3.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "snapshot_dependency_lock": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "c7c9970c6cd5d7510fb16b4a0d51db6921cfb37a687ba13ec384bc73ba0b1ca5.sqlite",
+              "bytes": 135168,
+              "kind": "primaryOrOther",
+              "tables": {
+                "blobs": [
+                  25,
+                  33269
+                ],
+                "generations": [
+                  5,
+                  5494
+                ],
+                "objects": [
+                  1,
+                  326
+                ],
+                "promotions": [
+                  30,
+                  5040
+                ],
+                "retirement_controls": [
+                  1,
+                  3045
+                ]
+              }
+            },
+            {
+              "name": "cab58fe2ad79324fae6766861782e5899662a6ff976a3ee6b90aff0d4e839279.sqlite",
+              "bytes": 122880,
+              "kind": "primaryOrOther",
+              "tables": {
+                "blobs": [
+                  26,
+                  35835
+                ],
+                "generations": [
+                  5,
+                  5482
+                ],
+                "objects": [
+                  1,
+                  326
+                ],
+                "promotions": [
+                  26,
+                  4368
+                ],
+                "retirement_controls": [
+                  1,
+                  3045
+                ]
+              }
+            },
+            {
+              "name": "de385738a40fe24a8e5038b7c6d6138394b459aac5518e7a01ded74d7bea4194.sqlite.drp-live-journal-v1.sqlite",
+              "bytes": 163840,
+              "kind": "primaryOrOther",
+              "tables": {
+                "accepted_entries": [
+                  32,
+                  10510
+                ],
+                "retirement_controls": [
+                  1,
+                  759
+                ],
+                "scopes": [
+                  5,
+                  26300
+                ]
+              }
+            },
+            {
+              "name": "fa86fe213cfe893e81e84cbb97f5d2055dcc399e2c2c58f9030cc6079ee87626.sqlite",
+              "bytes": 12288,
+              "kind": "primaryOrOther",
+              "tables": {
+                "signing_meta": [
+                  2,
+                  591
+                ],
+                "signing_rows": [
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "name": "peer-0-external-floor.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "room_head": [
+                  1,
+                  651
+                ]
+              }
+            },
+            {
+              "name": "peer-1-external-floor.sqlite",
+              "bytes": 8192,
+              "kind": "primaryOrOther",
+              "tables": {
+                "room_head": [
+                  1,
+                  651
+                ]
+              }
+            }
+          ],
+          "byKind": {
+            "wal": 0,
+            "sharedMemory": 0,
+            "primaryOrOther": 1073152
+          }
+        }
+      }
+    }
+  }
+}

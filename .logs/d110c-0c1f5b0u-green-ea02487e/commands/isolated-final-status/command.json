@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b0u-green-75Jm2F/checkout",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import{execFileSync,spawnSync}from\"node:child_process\";import assert from\"node:assert/strict\";const status=execFileSync(\"git\",[\"status\",\"--porcelain=v1\",\"--untracked-files=no\"],{encoding:\"utf8\"});assert.equal(status,\"\");const ports=Object.fromEntries([4174,4175,51000,51002].map(p=>{const r=spawnSync(\"lsof\",[\"-nP\",`-iTCP:${p}`,\"-sTCP:LISTEN\"],{encoding:\"utf8\"});return[p,{status:r.status,stdout:r.stdout,stderr:r.stderr}]}));console.log(JSON.stringify({head:execFileSync(\"git\",[\"rev-parse\",\"HEAD\"],{encoding:\"utf8\"}).trim(),trackedStatus:status,ports},null,2));"
+  ],
+  "start": "2026-09-05T06:51:45.304Z"
+}

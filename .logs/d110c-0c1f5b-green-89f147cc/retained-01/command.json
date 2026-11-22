@@ -1,0 +1,26 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-2l-a-shared-issuance-contract.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-89f147cc/retained-01/result.json"
+  ],
+  "startedAt": "2026-09-05T22:30:22.542Z",
+  "head": "89f147cc351d3de156f861dc0a72bc900aef4676",
+  "ownerHashes": {
+    "examples/v3-room/src/index.ts": "9bbef5c26be7281ecc5676a557000e32d5e2df273825b41b3d216e4087049082",
+    "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+    "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+    "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+    "packages/node/src/v3-live.ts": "389f6d9104b25ac58ef3f4b8e3b5fe6e33f4c516ae167926c9edbcc56265e602",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+    "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+  }
+}

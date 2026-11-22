@@ -1,0 +1,38 @@
+{
+  "classification": "CAUSAL_COMPILER_RED_EXACT41",
+  "compilerTerminalExit": 1,
+  "matrixValidatorExit": 0,
+  "typecheckPassed": false,
+  "programExecutions": 1,
+  "diagnosticCount": 41,
+  "targetDiagnostics": 0,
+  "productionDiagnostics": 0,
+  "groups": {
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts TS7006": 34,
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts TS2322": 1,
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts TS2739": 1,
+    "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts TS2339": 5
+  },
+  "programSources": 906,
+  "compilerReadInputs": 1132,
+  "moduleResolutions": 2107,
+  "typeResolutions": 37,
+  "coreRoster": {
+    "files": 8,
+    "total": 72
+  },
+  "prospectiveCombinedRoster": {
+    "files": 12,
+    "total": 78,
+    "pendingRootSignedCorrection": true
+  },
+  "runtimeExecutions": 0,
+  "noFixtureOrProductionEdits": true,
+  "owners": 8,
+  "built": 7,
+  "retainedHashes": 79,
+  "protectedPaths": 86522,
+  "stashCount": 27,
+  "rootWillReviewAndCommit": true,
+  "agentCommitted": false
+}

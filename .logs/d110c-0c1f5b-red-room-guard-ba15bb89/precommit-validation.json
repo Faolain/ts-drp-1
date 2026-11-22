@@ -1,0 +1,25 @@
+{
+  "base": "435bb0ef753b3d62729e776e476a22f26ba73c9f",
+  "tests": "ba15bb894d324bb8d8a0d8a7da3f3e61042a0283",
+  "signature": "G",
+  "singleLiteralChange": {
+    "from": "createV3ChatApplication(\"guard\")",
+    "to": "createV3ChatApplication(\"alice\")",
+    "allOtherBytesIdentical": true
+  },
+  "mainChecks": {
+    "format": 0,
+    "lint": 0,
+    "diffCheck": 0
+  },
+  "previousStopPreserved": true,
+  "typeDebtDisposition": {
+    "plan": "435bb0ef753b3d62729e776e476a22f26ba73c9f",
+    "expectedTarget": 0,
+    "expectedExternal": 41,
+    "baseline": "61a793d38a9fa1eafd9639aa41de2335f9891695",
+    "owner": "Existing creator-adoption and successor-product fixture static-contract owners",
+    "deadline": "Parent static closure",
+    "notTypecheckPass": true
+  }
+}

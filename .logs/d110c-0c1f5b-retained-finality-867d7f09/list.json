@@ -1,0 +1,78 @@
+[
+  {
+    "name": "Phase 5a-c atomic seal safety RED > executes independent registry, identity, schema and transaction controls before readiness",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5a-c atomic seal safety RED > typechecks and executes the exact bounded n=4 Quint witness",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5a-c atomic seal safety RED > [RED readiness] requires the complete four-owner atomic product graph",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5a-c atomic seal safety RED > binds a genuine certified roster key to its independent signer ID",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5a-c atomic seal safety RED > authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5a-c atomic seal safety RED > releases only a detached durable carrier after the exact state-slot-outbox commit",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5a-c atomic seal safety RED > rejects wrong authority, stale revision and conflicting same-slot bytes without release",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5a-c-seal-safety-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > freezes the exact six RED and exact twenty-four GREEN owner rosters",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > keeps the inherited schema-v2 voter as an executable pre-readiness control",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > defines one additive v3 store while preserving the frozen four-store vote transaction",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > closes the causal crash and mutation catalog without adding authority",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > [RED readiness] requires the complete creator actor and evidence graph",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > keeps the actor, evidence, and finality subpaths closed",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > persists the close candidate before either durable vote and releases only finalized evidence",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > re-verifies complete durable QC bytes before reopening signing authority",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > reopens exact finalized custody and rejects a conflicting close without rewriting bytes",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > rejects raw-digest signing and a copied actor capability causally",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  },
+  {
+    "name": "Phase 5e durable creator actor RED > copies all close carriers before awaiting storage and fences effects after stop",
+    "file": "/private/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/tests/phase-5e-creator-actor-red.test.ts"
+  }
+]

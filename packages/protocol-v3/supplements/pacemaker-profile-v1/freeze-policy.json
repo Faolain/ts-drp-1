@@ -1,0 +1,27 @@
+{
+	"schemaVersion": "ts-drp-pacemaker-profile-freeze-v1",
+	"profile": "pacemaker-profile-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-pacemaker-profile.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/profile.json",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/schema.json",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/spec.md",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/vectors.json",
+		".github/workflows/protocol-v3-pacemaker-profile.yml",
+		"tests/phase-5d-pacemaker-law-red.test.ts",
+		"tests/fixtures/phase-5d-v3/pacemaker-law-contract.json"
+	],
+	"checkerSha256": "298c235167f6ee8cacfbcecbd244f9e5c8e5edd64b9f72a89566b0e8c9893d64",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/profile.json": "a3db1f1bbffc19c1339f14a520c373966958bf6ad5cddca7104ff1a0e707a28e",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/schema.json": "445d7f74a0a7cef6e602d92671e12f1f9e5abf7d07fdbd0f1ebaef8bd059d38d",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/spec.md": "09c195481e1faba36ed0fdbdbf9935f4eac47e1ae4a5d2fb51c69b34850e5c1d",
+		"packages/protocol-v3/supplements/pacemaker-profile-v1/vectors.json": "09086c6019e336452080e02035a09893e5445fa3dff171c0fe29ba62ab9d6336",
+		".github/workflows/protocol-v3-pacemaker-profile.yml": "632230e0b735609a07a1f6477a5a2b77a91284a57a50c1e25470e796ba959ef6",
+		"tests/phase-5d-pacemaker-law-red.test.ts": "da0e65c5940e9c0bbf9451367db9a037f42623b88ca37747dbcbb0dc909c2beb",
+		"tests/fixtures/phase-5d-v3/pacemaker-law-contract.json": "0e5e9a9625a91041619cbb4c06cb2cd7cb0a266de0a6855ad0431f001a675761"
+	}
+}

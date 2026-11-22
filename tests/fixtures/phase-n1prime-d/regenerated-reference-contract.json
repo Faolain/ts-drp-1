@@ -1,0 +1,307 @@
+{
+	"schemaVersion": "phase-n1prime-d-regenerated-reference-red-v2",
+	"slice": "Phase -1'd RED",
+	"status": "RED",
+	"neutralProtocol": {
+		"transport": "one JSON request on stdin; one JSON response on stdout; stderr empty; exit status 0",
+		"requestShape": {
+			"operation": "one required operation name",
+			"cases": "ordered array of cases"
+		},
+		"responseShape": {
+			"results": "ordered array with exactly one result per case"
+		},
+		"operations": [
+			"encode-corpus",
+			"decode-corpus",
+			"validate-cases",
+			"issue-next",
+			"digest-received",
+			"verify-received"
+		],
+		"operationContracts": {
+			"encode-corpus": {
+				"caseFields": ["id", "kind", "input"],
+				"inputOnlyExample": {
+					"id": "example-encode-signer-set",
+					"kind": "signerSet",
+					"input": {
+						"signers": [
+							{
+								"signerId": "example-author",
+								"publicKey": "0101010101010101010101010101010101010101010101010101010101010101"
+							}
+						]
+					}
+				},
+				"semantics": "Normalize input under the named registered kind, canonically encode the normalized value, construct that kind's ordered registered hash parts, and frame/hash them under the kind domain."
+			},
+			"decode-corpus": {
+				"caseFields": ["id", "canonicalHex"],
+				"optionalCaseFields": ["expectedErrorCategory"],
+				"inputOnlyExample": {
+					"id": "example-decode",
+					"canonicalHex": "<lowercase-even-length-canonical-input-hex>"
+				},
+				"semantics": "Decode canonicalHex under the authoritative grammar. Success returns the decoded JSON-transport value. A grammar-owned malformed case reports its category through the declared decode-failure adapter. The unsafe-integral scalar Float64 case remains outside this governed corpus."
+			},
+			"validate-cases": {
+				"caseFields": ["id", "request"],
+				"semantics": "Classify each input-only request against the registry, cross-major, signed-field and replica-local wire rules. The reason is an output and is intentionally absent here.",
+				"cases": [
+					{
+						"id": "anti-copy-reserved",
+						"request": {
+							"field": "cryptoSuiteId",
+							"kind": "epochAnchor",
+							"value": "p256-sha256-v3"
+						}
+					},
+					{
+						"id": "malformed-author-sequence-negative",
+						"request": {
+							"kind": "vertex",
+							"authorSequence": -1
+						}
+					},
+					{
+						"id": "anti-copy-sequence",
+						"request": {
+							"kind": "vertex"
+						}
+					},
+					{
+						"id": "anti-copy-anchor",
+						"request": {
+							"kind": "roundChange"
+						}
+					},
+					{
+						"id": "anti-copy-context",
+						"request": {
+							"key": "context",
+							"kind": "state"
+						}
+					},
+					{
+						"id": "anti-copy-domain",
+						"request": {
+							"candidateDomain": "ts-drp/vertex/v2",
+							"expectedDomain": "ts-drp/vertex/v3",
+							"expectedMajor": 3,
+							"kind": "vertex"
+						}
+					},
+					{
+						"id": "cross-major-domain-v3-on-v2",
+						"request": {
+							"candidateDomain": "ts-drp/vertex/v3",
+							"expectedDomain": "ts-drp/vertex/v2",
+							"expectedMajor": 2,
+							"kind": "vertex"
+						}
+					},
+					{
+						"id": "anti-copy-suite",
+						"request": {
+							"candidateSuite": "ed25519-sha256-v1",
+							"expectedMajor": 3,
+							"expectedSuite": "ed25519-sha256-v3",
+							"kind": "vertex"
+						}
+					},
+					{
+						"id": "cross-major-suite-v3-on-v2",
+						"request": {
+							"candidateSuite": "ed25519-sha256-v3",
+							"expectedMajor": 2,
+							"expectedSuite": "ed25519-sha256-v1",
+							"kind": "vertex"
+						}
+					}
+				]
+			},
+			"issue-next": {
+				"caseFields": ["id", "request"],
+				"requestFields": ["before", "candidate", "publicKeyHex"],
+				"optionalRequestFields": ["privateKeyHex"],
+				"inputOnlyExample": {
+					"id": "example-issue-next",
+					"request": {
+						"before": {
+							"anchor": "0101010101010101010101010101010101010101010101010101010101010101",
+							"epoch": 0,
+							"exhausted": false,
+							"lastIssued": -1
+						},
+						"candidate": {
+							"anchor": "0101010101010101010101010101010101010101010101010101010101010101",
+							"author": "example-author",
+							"authorSequence": 0,
+							"dependencies": [],
+							"epoch": 0,
+							"kind": "drp-vertex",
+							"logicalTime": 0,
+							"objectId": "object:example",
+							"operation": {
+								"action": "set",
+								"key": "example",
+								"value": true
+							},
+							"protocolMajor": 3
+						},
+						"privateKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+						"publicKeyHex": "030a107bff3ce10d12572b04818f051e27d17be51bbdd82099a9d85e9fb3"
+					}
+				},
+				"semantics": "Apply the sustainable local-lineage issuance transition to before and candidate. privateKeyHex is present only for signing-capable cases. Instrument digest, sign and publication calls and return the post-state without mutating the request."
+			},
+			"digest-received": {
+				"caseFields": ["id", "domain", "receivedHex", "reencodedHex"],
+				"inputOnlyExample": {
+					"id": "example-digest-received",
+					"domain": "ts-drp/vertex/v3",
+					"receivedHex": "<lowercase-even-length-received-preimage-hex>",
+					"reencodedHex": "<lowercase-even-length-reencoded-preimage-hex>"
+				},
+				"semantics": "Hash the exact receivedHex bytes and the separately supplied reencodedHex bytes independently under domain; never substitute re-encoding for received bytes."
+			},
+			"verify-received": {
+				"caseFields": ["id", "domain", "publicKeyHex", "receivedHex", "signatureHex"],
+				"inputOnlyExample": {
+					"id": "example-verify-received",
+					"domain": "ts-drp/vertex/v3",
+					"publicKeyHex": "<32-byte-lowercase-hex>",
+					"receivedHex": "<lowercase-even-length-received-preimage-hex>",
+					"signatureHex": "<64-byte-lowercase-hex-input>"
+				},
+				"semantics": "Compute the registered digest from exact receivedHex bytes under domain and verify signatureHex with strict Ed25519 verification against publicKeyHex."
+			}
+		},
+		"decodeFailureAdapter": "A single-case nonzero process result is normalized only when stderr ends in a grammar-owned category; all other process failures are protocol failures.",
+		"comparison": "deep equality after JSON parse; case order, ids, canonical bytes, parts, digest, normalized/decode value, error category, validation reason, issuance state, instrumentation, publication, signature and verification result are significant"
+	},
+	"acceptedInputs": {
+		"registry": {
+			"path": "packages/protocol-v3/registry/registry-v1.json",
+			"sha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+		},
+		"schema": {
+			"path": "packages/protocol-v3/registry/registry-v1.schema.json",
+			"sha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+		},
+		"specification": {
+			"path": "docs/protocol/attested-hard-epochs-v5.md",
+			"sha256": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8"
+		},
+		"amendments": {
+			"path": "docs/protocol/amendments-v3.json",
+			"sha256": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508"
+		},
+		"modelSignoff": {
+			"path": "packages/protocol-v3/formal/registry-model-signoff.json",
+			"sha256": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749"
+		},
+		"formalActions": {
+			"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+		},
+		"formalDerivation": {
+			"path": "packages/protocol-v3/formal/signed-field-derivation.json",
+			"sha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+		},
+		"formalVariables": {
+			"path": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+			"sha256": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13"
+		},
+		"grammarMarkdown": {
+			"path": "docs/protocol/canonical-tag-codec-v1.md",
+			"sha256": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036"
+		},
+		"grammarMachine": {
+			"path": "docs/protocol/canonical-tag-codec-v1.json",
+			"sha256": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e"
+		},
+		"originalReference": {
+			"path": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+			"sha256": "abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc"
+		},
+		"originalProvenance": {
+			"path": "packages/protocol-v3/conformance/original-reference/provenance.json",
+			"sha256": "8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3"
+		},
+		"replacementVectors": {
+			"path": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+			"sha256": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741"
+		},
+		"correctedC2Red": {
+			"path": "tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
+			"sha256": "d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12"
+		},
+		"correctedC2Fixture": {
+			"path": "tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json",
+			"sha256": "17e22228adc677f9287ced3610211b21ec926e7647b1179574f2299359ccca62"
+		},
+		"exhaustionRed": {
+			"path": "tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts",
+			"sha256": "23c5f1eb8d87f9fa9a758670216430d1bc96b8aaa6b4912a4d53690a1f9ae1b1"
+		},
+		"exhaustionFixture": {
+			"path": "tests/fixtures/phase-n1prime-c-exhaustion/paired-issuance-contract.json",
+			"sha256": "793da47de639ba3d40a205aab301e0b8b2a456347ded7b3d7a3c4bf3159dcd77"
+		}
+	},
+	"targets": {
+		"source": "packages/protocol-v3/conformance/regenerated-reference/reference.mjs",
+		"provenance": "packages/protocol-v3/conformance/regenerated-reference/provenance.json"
+	},
+	"governedCorpus": {
+		"encodeVectorCount": 27,
+		"registeredKindCount": 19,
+		"validateReasonCount": 9,
+		"issueCaseCount": 5,
+		"receivedCaseCount": 1,
+		"decodePositiveSources": ["all 27 replacement-vector canonicalHex values", "all grammar positiveCorpus cases"],
+		"decodeNegativeSources": [
+			"all grammar malformed decodeNegativeCorpus cases; limit-only controls remain owned by the grammar-extraction gate because the fixed original CLI exposes no per-call decoder-limit input",
+			"all grammar precedenceProbes, each bound to a concrete dual-defect decodeNegativeCorpus case"
+		],
+		"excludedDecodeCase": "unsafe-integral-scalar-float64-decode"
+	},
+	"explicitNonclaims": [
+		"the five issuance cases do not independently kill deletion of the defensive current >= MAX_SAFE branch",
+		"the five issuance cases do not independently kill deletion of the private-key-presence branch",
+		"the five issuance cases do not independently kill deletion of the next-sequence branch"
+	],
+	"futureGreenAuthorRestriction": {
+		"mustBeDifferentAgent": true,
+		"mayReadWhileAuthoring": [
+			"accepted normative tuple",
+			"authoritative canonical grammar and machine companion",
+			"this neutral stdin/stdout operation contract"
+		],
+		"mustNotReadWhileAuthoring": [
+			"original-reference implementation source",
+			"predecessor implementation source",
+			"TypeScript implementation source",
+			"replacement-vector outputs"
+		],
+		"mustNotExecuteUntilSourceAndProvenanceFixedAndHashed": ["opaque original reference"],
+		"permanentlyBarredFrom": ["later TypeScript v3 port"],
+		"postComparisonCorrection": "requires a logged source/provenance re-freeze before any new comparison; silent tuning is forbidden"
+	},
+	"redAuthorAttestation": {
+		"wroteNeitherReference": true,
+		"wroteNeitherCRed": true,
+		"wroteNeitherVectorMint": true,
+		"willNotAuthorRegeneratedReference": true,
+		"willNotAuthorTypescriptPort": true,
+		"readNoOriginalReferenceImplementationSource": true,
+		"readNoPredecessorOrTypescriptImplementationSource": true,
+		"originalReferenceExecutionWasOpaqueCliOnly": true
+	},
+	"runtime": {
+		"peerInvocationMaxMs": 5000,
+		"totalComparatorMaxMs": 30000
+	}
+}

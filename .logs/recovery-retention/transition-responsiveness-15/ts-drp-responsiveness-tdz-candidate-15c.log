@@ -1,0 +1,32 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+(node:43903) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |candidate| tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 2059ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  2031ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |candidate| tests/phase-6a-creator-adoption-commit-red.test.ts [ tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  |candidate| tests/phase-6a-creator-adoption-red.test.ts [ tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  |candidate| tests/phase-6b-d110c-b-hot-adoption.test.ts [ tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ReferenceError: Cannot access '__vite_ssr_import_8__' before initialization
+ ❯ createAnchorTrustApi packages/protocol-v3/src/index.ts:1882:4
+    1880|   openCurrentAnchorTrust,
+    1881|   resolveCurrentEpochAuthorizedAuthor,
+    1882|   [certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
+       |    ^
+    1883|   [creatorAnchorTrustCheckpointPredecessorMinter]: mintCreatorAnchorTr…
+    1884|   [creatorAnchorTrustResolver]: resolveCreatorAnchorTrustMaterial,
+ ❯ packages/protocol-v3/src/anchor-trust-singleton.ts:12:24
+ ❯ packages/protocol-v3/src/creator-checkpoint.ts:3:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  3 failed | 1 passed (4)
+      Tests  2 passed (2)
+   Start at  12:09:14
+   Duration  3.17s (transform 2.22s, setup 0ms, collect 703ms, tests 2.06s, environment 0ms, prepare 275ms)
+

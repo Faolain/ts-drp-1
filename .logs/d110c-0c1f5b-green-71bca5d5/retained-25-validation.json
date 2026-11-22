@@ -1,0 +1,103 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 6,
+  "passed": 6,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-25/result.json",
+  "baselineSha256": "62d4068e7a26c355c82ef7d784fe4fb5fd065719415b58313802d43cf8a39b4d",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED latches paging corruption when lineage is absent",
+      "status": "passed",
+      "title": "latches paging corruption when lineage is absent",
+      "duration": 64.76700000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED latches paging corruption when lineage is present at the child ordinal",
+      "status": "passed",
+      "title": "latches paging corruption when lineage is present at the child ordinal",
+      "duration": 6.295374999999979,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED latches paging corruption when lineage is lagging behind the child ordinal",
+      "status": "passed",
+      "title": "latches paging corruption when lineage is lagging behind the child ordinal",
+      "duration": 6.116874999999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED returns a complete pending after ordinary advance closure",
+      "status": "passed",
+      "title": "returns a complete pending after ordinary advance closure",
+      "duration": 8.05070900000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED returns a complete published at exhausted maximum closure",
+      "status": "passed",
+      "title": "returns a complete published at exhausted maximum closure",
+      "duration": 8.033624999999972,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "ancestorTitles": [
+        "Phase 2l-c independent SQLite structure oracles"
+      ],
+      "fullName": "Phase 2l-c independent SQLite structure oracles proves exact columns, no foreign keys, and only inherent primary-key indexes",
+      "status": "passed",
+      "title": "proves exact columns, no foreign keys, and only inherent primary-key indexes",
+      "duration": 1.6229579999999828,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "f67fecb001f60a714f5d9c2355bffe6872876fae6f793be020d49d92f7e72f7a",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

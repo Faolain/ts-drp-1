@@ -1,0 +1,41 @@
+I'll start by reading the required audits, plan, first-review ledger, and the commit-range design sources so the confirmation can be exact.Next I’ll load the confirmation schema/prompt, the plan slices, and the current source seams named by the audits.The plan grep came up empty, so I’ll search the TDD plan more precisely and keep reading the commit diff plus named source seams.I’ll keep going through the remaining commit-diff and the named current source owners, including the TDD-plan slices.I’ll inspect D.110c-0b, Phase-7/100-transition census rules, and the remaining named protocol/storage/room seams.I have enough to judge the combined design against the first-review union, D.110c-0b, and the f5b0p-a RED slice.{
+  "verdict": "APPROVED",
+  "summary": "The combined f5b0/f5b0p amendment at 7ecd5f19 closes the first-review P0/P1 union without reopening accepted D.110c evidence. Genesis-bound creator-trusted-settlement-v1 plus a creator-signed Merkle AVL retired-author root/count authenticates current frontiers to ordinary openers under the existing D.110c-0b one-of-one creator model and expected-head freshness floor; dictionary paths are creator-only for membership-changing close. Node/ref metadata, path-only AVL verification, intermediate-root batch witnesses, successor-delete paths, and assert-absent|insert|delete suffice for membership, nonmembership, and updates. Same-key re-entry restores exact boundaries; only verified nonmembership starts sequence zero; retained-role and same-staged-ACL remove/re-add are classified from current/final snapshots. Write-before-sign with candidate/current/two-rollback reachability fails closed; unavailable backing stalls that close rather than implying freshness. Explicit O(R) registry backing is consistent with the non-negotiable: O(64) active checkpoint, age-independent ordinary cold reopen, and no hidden O(history)/O(N-transitions) authority bootstrap. D.110c-0b requires constant-bounded stores required for ordinary reopen and forbids hiding O(N) authority data in archive used to open; it does not require O(1) total durable bytes under unbounded distinct-key churn. The sibling profile avoids unverifiable v1 migration, preserves existing creator-trusted-v1 rooms, and honestly widens profile unions. f5b0p-a tests-only RED may begin exactly as sliced. No production GREEN, f5b0a RED, multi-epoch workload, or campaign is authorized.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Registry store contract omits an explicit candidate-to-current promote/install",
+      "evidence": ".logs/d110c-0c1f5b0p-design-e6a67013/design.md Store contract names only prove, transactTransition, and reclaim, while Write-before-sign steps 3–7 and the crash matrix require a candidate after commit, both roots after signature, and current plus two rollback roots after adoption. transactTransition CASes from the registered current root, so the next membership-changing close cannot use the adopted checkpoint root until candidate is promoted.",
+      "impact": "Does not affect f5b0p-a codec RED. f5b0p-b/f5b could otherwise treat transactTransition as installing current (breaking write-before-sign) or leave CAS stuck after the first adopted membership change.",
+      "required_action": "Owner f5b0p-b: freeze one closed install/promote receipt that CASes the authenticated successor from candidate to current and demotes the prior current into the rollback set; f5b calls it at adoption. Do not add creator-close integration in p-b GREEN."
+    },
+    {
+      "severity": "P2",
+      "title": "Settlement checkpoint codec is dual-owned by f5b0p-a and f5b0a",
+      "evidence": "f5b0p design TDD slice 1 RED includes root/count checkpoint fields and the measured 64-frontier ceiling; parent design TDD slice 3 f5b0a RED/GREEN owns canonical checkpoint shapes, signature/domain, and genesis/settled predecessor rules. Plan D.110c-0c1f5b0 also splits f5b0p-a registry/profile codecs from f5b0a checkpoint codecs.",
+      "impact": "f5b0p-a tests-only RED can still pin the measured 7,064-byte record. Later GREEN could fork field sets or double-implement the signed checkpoint.",
+      "required_action": "Owner f5b0p-a: pin node/proof/witness/profile unions and the registry field grammar/measurement as conformance vectors only. Owner f5b0a: sole signed checkpoint codec GREEN; consume that grammar, do not fork it."
+    },
+    {
+      "severity": "P2",
+      "title": "Restored null admittedThrough has no numeric next-sequence rule",
+      "evidence": "f5b0p ACL transition law says a re-added member’s next sequence must be strictly above admittedThrough; the failure matrix repeats strictly greater than admitted boundary. Parent design genesis/scan treats null as start-at-zero. A key admitted with null/null, removed, then re-added restores null/null, so strictly-above-null is undefined.",
+      "impact": "Honest never-authored re-entry should resume at sequence zero, same as genesis. Unspecified comparison could be implemented as a hard failure or an accidental reset skip.",
+      "required_action": "Owner f5b0p-a/f5b: pin that a restored null admittedThrough uses the same genesis zero-start rule; strictly-greater applies only to non-null admittedThrough."
+    },
+    {
+      "severity": "P2",
+      "title": "Settlement mode must be the genesis profile, not checkpoint presence",
+      "evidence": "Parent design Admission still says Node requires settlement mode to be active. The deleted migration text admitted settlement controls only after an authenticated settlement checkpoint. f5b0p Genesis-bound profile makes settlement mandatory from epoch zero via creator-trusted-settlement-v1, with the implicit genesis sentinel and first close emitting the first checkpoint.",
+      "impact": "If f5b0b reuses the old checkpoint-present gate, epoch-0 zero-intent/genesis-gap statements would be unrepresentable until after the first close.",
+      "required_action": "Owner f5b0b: bind settlement mode to the genesis profile ID; do not require a prior settlement checkpoint before admitting settlement-profile control vertices."
+    }
+  ],
+  "design_sound": true,
+  "authority_sound": true,
+  "compatibility_sound": true,
+  "bounded_state_sound": true,
+  "plan_sufficient": true,
+  "red_authorized": true,
+  "scope_preserved": true
+}

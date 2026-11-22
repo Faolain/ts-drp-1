@@ -22,6 +22,19 @@ describe("Handle message correctly", () => {
 	let drpObjectNode2: DRPObject<SetDRP<number>>;
 	let libp2pNode2: Libp2p;
 	let libp2pNode1: Libp2p;
+	const sharedACL = (): ReturnType<typeof createACL> => {
+		const acl = createACL({ admins: [node1.networkNode.peerId, node2.networkNode.peerId] });
+		acl.context = {
+			caller: node1.networkNode.peerId,
+		};
+		acl.setKey(node1.keychain.blsPublicKey);
+
+		acl.context = {
+			caller: node2.networkNode.peerId,
+		};
+		acl.setKey(node2.keychain.blsPublicKey);
+		return acl;
+	};
 
 	const isDialable = async (node: DRPNetworkNode, timeout = false): Promise<boolean> => {
 		let resolver: (value: boolean) => void;
@@ -101,24 +114,13 @@ describe("Handle message correctly", () => {
 		await node1.networkNode.connect(node2.networkNode.getMultiaddrs() ?? []);
 		await connected;
 
-		const acl = createACL({ admins: [node1.networkNode.peerId, node2.networkNode.peerId] });
-		acl.context = {
-			caller: node1.networkNode.peerId,
-		};
-		acl.setKey(node1.keychain.blsPublicKey);
-
-		acl.context = {
-			caller: node2.networkNode.peerId,
-		};
-		acl.setKey(node2.keychain.blsPublicKey);
-
 		drpObjectNode2 = await node2.createObject({
 			drp: new SetDRP<number>(),
-			acl,
+			acl: sharedACL(),
 		});
 		drpObjectNode1 = await node1.createObject({
 			drp: new SetDRP<number>(),
-			acl,
+			acl: sharedACL(),
 			id: drpObjectNode2.id,
 		});
 	});
@@ -180,6 +182,7 @@ describe("Handle message correctly", () => {
 
 		await Promise.all([
 			node3.connectObject({
+				acl: sharedACL(),
 				id: drpObjectNode2.id,
 				sync: {
 					peerId: node2.networkNode.peerId,

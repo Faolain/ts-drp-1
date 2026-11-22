@@ -1,0 +1,24 @@
+{
+  "numericOnly": true,
+  "noArgvOrComm": true,
+  "candidates": [
+    {
+      "pid": 46383,
+      "status": "46383 46357 S",
+      "taskRelevantCwd": false
+    },
+    {
+      "pid": 46386,
+      "status": "46386 46383 S",
+      "taskRelevantCwd": false
+    },
+    {
+      "pid": 49133,
+      "status": "49133 46386 R",
+      "taskRelevantCwd": false
+    }
+  ],
+  "taskCompetitors": 0,
+  "longEnvironmentUnset": true,
+  "unrelatedProcessesDoNotBlock": true
+}

@@ -1,0 +1,2 @@
+tests/creator-maintenance-host-turn-native.test.ts(72,34): error TS2345: Argument of type 'any[]' is not assignable to parameter of type '[namedParameters: Record<string, SQLInputValue>, ...anonymousParameters: SQLInputValue[]]'.
+  Source provides no match for required element at position 0 in target.

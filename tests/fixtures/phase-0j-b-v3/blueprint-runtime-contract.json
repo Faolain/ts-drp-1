@@ -1,0 +1,160 @@
+{
+	"artifactDigestDomain": "ts-drp/blueprint-artifact/v3",
+	"artifactFile": "chat-blueprint.mjs",
+	"artifactDigest": "73bcb8418e36b81c0f71017c3ce16508e9a7c58b5e5dec264562b7ac4de318c3",
+	"expectedBlueprintDigest": "7b3d12f2406f1574d64027e9c393d9f806780f6420d89bfd736527ec2a51c678",
+	"governance": {
+		"profileId": "ts-drp-blueprint-artifact-profile-v1",
+		"runtimeProfile": "ecmascript-2024-sync-v1",
+		"pureAllowlist": {
+			"identifiers": ["Infinity", "NaN", "undefined"],
+			"mathMembers": [
+				"E",
+				"LN10",
+				"LN2",
+				"LOG10E",
+				"LOG2E",
+				"PI",
+				"SQRT1_2",
+				"SQRT2",
+				"abs",
+				"acos",
+				"acosh",
+				"asin",
+				"asinh",
+				"atan",
+				"atan2",
+				"atanh",
+				"cbrt",
+				"ceil",
+				"clz32",
+				"cos",
+				"cosh",
+				"exp",
+				"expm1",
+				"floor",
+				"fround",
+				"hypot",
+				"imul",
+				"log",
+				"log10",
+				"log1p",
+				"log2",
+				"max",
+				"min",
+				"pow",
+				"round",
+				"sign",
+				"sin",
+				"sinh",
+				"sqrt",
+				"tan",
+				"tanh",
+				"trunc"
+			]
+		},
+		"protectedArtifacts": [
+			"docs/protocol/blueprint-artifact-profile-v3.md",
+			"docs/protocol/blueprint-artifact-profile-v3.json",
+			"packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json",
+			"packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json",
+			"packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs",
+			".github/workflows/protocol-v3-blueprint-artifact-profile.yml",
+			"tests/protocol-v3-blueprint-runtime-0j-b.test.ts",
+			"tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json",
+			"tests/fixtures/phase-0j-b-v3/chat-blueprint.mjs",
+			"tests/fixtures/phase-0j-b-v3/public-entry-type-audit.ts",
+			"tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json"
+		],
+		"frozenTuple": {
+			"checkpoint": "907fae437e558145f63614cd6b5de925ea4bd8c2",
+			"freezePolicyPath": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+			"freezePolicySha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+			"protectedPathCount": 47,
+			"protectedPathStatesSha256": "023e7b50c11eff2d5fd4d0d8c5ea6da8d54ad095d73d24b7d3badea2e3769637"
+		},
+		"immutableArtifactSha256": {
+			"packages/protocol-v3/conformance/freeze-policy-v3.json": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+			"packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs": "0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de",
+			"packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json": "d7ad1f6442b04cdfeb993cecd0e96435c27149b175071a019ee60456b27de6e0",
+			"packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs": "137f058914d284f891a8f77d31f51c1ce74ff6c38c49969aec82c306eb1b445d",
+			"packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json": "31975a9ef6d16e9cdd836fe9b87b2b369aab0ede69e1d6763a8f75ad46bafc56",
+			"tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts": "26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938"
+		}
+	},
+	"package": {
+		"kind": "drp-blueprint-admission-package",
+		"protocolMajor": 3,
+		"schemaVersion": 1,
+		"implementation": {
+			"artifactDigest": "73bcb8418e36b81c0f71017c3ce16508e9a7c58b5e5dec264562b7ac4de318c3",
+			"artifactId": "@example/chat-blueprint@1.0.0",
+			"runtimeProfile": "ecmascript-2024-sync-v1"
+		},
+		"manifest": {
+			"schemaVersion": 1,
+			"operationDiscriminator": "action",
+			"operations": [
+				{
+					"name": "append",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{
+								"name": "nested",
+								"required": false,
+								"type": "canonical-object"
+							},
+							{
+								"name": "requestOrdinal",
+								"required": false,
+								"type": "safe-integer"
+							},
+							{
+								"name": "value",
+								"required": false,
+								"type": "string"
+							}
+						]
+					}
+				},
+				{
+					"name": "set",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{
+								"name": "key",
+								"required": true,
+								"type": "string"
+							},
+							{
+								"name": "value",
+								"required": true,
+								"type": "string"
+							}
+						]
+					}
+				},
+				{
+					"name": "set_message",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{
+								"name": "key",
+								"required": true,
+								"type": "string"
+							},
+							{
+								"name": "value",
+								"required": true,
+								"type": "string"
+							}
+						]
+					}
+				}
+			]
+		}
+	}
+}

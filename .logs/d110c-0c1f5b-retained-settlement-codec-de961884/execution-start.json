@@ -1,0 +1,19 @@
+{
+  "head": "de961884d9d3204f2c67561e96434995c6f0fafe",
+  "remote": "de961884d9d3204f2c67561e96434995c6f0fafe",
+  "signature": "G",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-settlement-codec-de961884/focused.json"
+  ],
+  "matrixSha256": "c4fd8541d75f0e3019c474d1a15f72d0b7d03733c13368e5a18c39c40bc5d4b8",
+  "executionCount": 1,
+  "startedAt": "2026-09-06T01:14:33.715Z"
+}

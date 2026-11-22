@@ -1,0 +1,109 @@
+{
+  "exactRoster": true,
+  "tests": 7,
+  "files": 2,
+  "passed": 7,
+  "failed": 0,
+  "pending": 0,
+  "todo": 0,
+  "skipped": 0,
+  "otherStatuses": [],
+  "failures": [],
+  "passedCases": [
+    {
+      "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+      "name": "D.110c-0b1 bounded protocol and control boundaries > authenticates the full aggregate-bearing closure before trust-only projection",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+      "name": "D.110c-0b1 bounded protocol and control boundaries > opens both aggregates against independent authenticated checkpoint and closure bindings",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+      "name": "D.110c-0b1 bounded protocol and control boundaries > opens the genuine immediate predecessor and current checkpoint from pinned genesis",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+      "name": "D.110c-0b1 bounded protocol and control boundaries > retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+      "name": "D.110c-0b1 bounded checkpoint and control-proof GREEN > opens the genuine epoch-two checkpoint from pinned genesis and its immediate pair",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+      "name": "D.110c-0b1 bounded checkpoint and control-proof GREEN > retires the stale proof pair and predecessor ACL under the bounded advance",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+      "name": "D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner",
+      "status": "passed",
+      "failureMessages": []
+    }
+  ],
+  "newControlsPassed": true,
+  "quiescent": true,
+  "elapsedMs": 6345,
+  "unexpectedOutcomes": [],
+  "green": true,
+  "diagnostic": {
+    "bounded": {
+      "kind": "successor",
+      "ok": true
+    },
+    "coldReopen": {
+      "handle": {
+        "epoch": 2,
+        "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topic": "drp/v3/1/c52c86b371f162957c8618749848cdc0682d3cb01ac08c221f3fcb4f30c2d0c8"
+      },
+      "lifecycle": "active",
+      "ok": true,
+      "recovery": "active-new",
+      "trust": {
+        "currentAnchorDigest": "fbf757eb90d1439c930e75ea42feec47b93cd5e94537757325754f4bf3cf2a71",
+        "currentEpoch": 2,
+        "genesisAnchorDigest": "61e16c6bbdef967621055eace74c462aac45f656adae6258e2a4f90f4baaf909",
+        "objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "profileId": "creator-trusted-v1"
+      }
+    },
+    "coldIssued": {
+      "authorSequence": 4,
+      "digest": "16b427a4a3e73eed5cfc2e2059c0d43aca91e32201fd1c986409d97e09ee542a",
+      "kind": "accepted",
+      "ok": true
+    },
+    "coldPublished": {
+      "kind": "published",
+      "ok": true
+    },
+    "coldBootstrapInputs": [
+      {
+        "pinMatchesOriginal": true,
+        "pinPresent": true,
+        "site": "epoch-two"
+      }
+    ],
+    "census": {
+      "current": 7,
+      "proposed": 6,
+      "active": 7
+    }
+  },
+  "originalStaticHandoffPreserved": true,
+  "genuineSkipBudgetChildExecutedOnce": false,
+  "currentSuccessorControl": "Not executed by checkpoint gate"
+}

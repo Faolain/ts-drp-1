@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import ts from '/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/typescript/lib/typescript.js';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),file='tests/phase-3a1b-p3-live-transport-red.test.ts',old='.logs/d110c-0c1f5b-retained-transport-native-a430272a',hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=f=>fs.readFileSync(path.join(root,f),'utf8'),json=f=>JSON.parse(read(f));
+const text=read(file),unit=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true),report=json(old+'/focused.json'),prior=json(old+'/custody-after.json');
+if(unit.parseDiagnostics.length||hash(text)!=='809c5b7858ac5d530179a35167b65bf2ec600b7adee78aa0d4ecb028f563056a')throw Error('Source identity/syntax differs');
+const entries=report.testResults.flatMap(s=>s.assertionResults.map(t=>({file:path.basename(s.name),title:t.title,fullName:t.fullName,ancestorTitles:t.ancestorTitles,priorStatus:t.status})));
+if(entries.length!==24||entries.some(e=>e.priorStatus!=='passed'||e.file!==path.basename(file)))throw Error('Accepted roster differs');
+const titles=[],allAssertions=[],subset=[],selected=['reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation','serializes genuine egress and classifies page, publish and mark deactivation races'];
+const isAssertion=n=>ts.isExpressionStatement(n)&&/^(?:await )?expect(?:\(|ClosedFrozenActivationFailure\()/.test(n.getText(unit));
+const tree=n=>({kind:ts.SyntaxKind[n.kind],text:n.getChildCount(unit)===0?n.getText(unit):undefined,children:n.getChildren(unit).map(tree)});
+function visit(n){if(isAssertion(n))allAssertions.push({start:n.getStart(unit),end:n.end,text:n.getText(unit),tree:tree(n)});if(ts.isCallExpression(n)&&ts.isIdentifier(n.expression)&&n.expression.text==='it'&&ts.isStringLiteral(n.arguments[0])){const title=n.arguments[0].text;titles.push(title);if(selected.includes(title)){function capture(c){if(isAssertion(c))subset.push(c.getText(unit));ts.forEachChild(c,capture)}capture(n.arguments[1].body)}}ts.forEachChild(n,visit)}visit(unit);
+if(titles.length!==24||JSON.stringify([...titles].sort())!==JSON.stringify(entries.map(e=>e.title).sort())||subset.length!==123||JSON.stringify(subset)!==JSON.stringify(prior.runtimeAssertions))throw Error('Titles or accepted123 subset differs');
+const data={file,testSha256:hash(text),report:old+'/focused.json',reportSha256:hash(read(old+'/focused.json')),acceptedSubsetSource:old+'/custody-after.json',acceptedSubsetSourceSha256:hash(read(old+'/custody-after.json')),entries,titles,allAssertionStatementCount:allAssertions.length,allAssertions,acceptedRuntimeSubsetCount:subset.length,acceptedRuntimeSubsetTitles:selected,acceptedRuntimeSubset:subset,syntaxDiagnostics:0,runtimeExecutions:0,collectionExecutions:0,astParsingOnly:true};
+fs.writeFileSync(path.join(out,'frozen-oracles.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({titles:titles.length,allAssertionStatements:allAssertions.length,acceptedTwoBodySubset:subset.length,runtimeExecutions:0}));

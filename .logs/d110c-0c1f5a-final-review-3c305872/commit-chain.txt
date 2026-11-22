@@ -1,0 +1,79 @@
+commit 3c305872fbee759b1b6386c10a1d1ebbde3dd6e6
+gpg: Signature made Thu Sep  3 17:59:13 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 17:59:13 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 17:59:13 2026 -0400
+
+    test: record isolated foreign frontier proof
+
+ .../production-hardening-tdd-plan-v2.md            | 34 ++++++++++++++++++----
+ 1 file changed, 29 insertions(+), 5 deletions(-)
+
+commit 52fe3b44a40ab025102cad7637bbd10fae6edaac
+gpg: Signature made Thu Sep  3 17:55:03 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 17:55:03 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 17:55:03 2026 -0400
+
+    fix: keep foreign frontier anomalies author-local
+
+ .../production-hardening-tdd-plan-v2.md            |  63 +++++++++++-
+ packages/node/src/creator-close.ts                 |  23 ++++-
+ .../phase-6a-v3/creator-adoption-contract.ts       |   4 +-
+ .../foreign-author-close-liveness-contract.ts      | 106 +++++++++++++++++----
+ ...0c1f5-foreign-author-close-liveness-red.test.ts |   8 +-
+ 5 files changed, 173 insertions(+), 31 deletions(-)
+
+commit e379cfd2854cbcb9db117960388e311251c9f086
+gpg: Signature made Thu Sep  3 17:28:22 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 17:28:22 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 17:28:22 2026 -0400
+
+    test: prove foreign frontier close liveness red
+
+ .../production-hardening-tdd-plan-v2.md             | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+commit 466169aaf7c74b0c08b14e8c5f00b20f8710bfb8
+gpg: Signature made Thu Sep  3 17:25:41 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 17:25:41 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 17:25:41 2026 -0400
+
+    test: confirm foreign frontier liveness red
+
+ .../production-hardening-tdd-plan-v2.md            | 119 +++++++++++++--------
+ .../foreign-author-close-liveness-contract.ts      |  19 +++-
+ ...0c1f5-foreign-author-close-liveness-red.test.ts |   4 +-
+ 3 files changed, 93 insertions(+), 49 deletions(-)
+
+commit 052eaa2151e57633485565ea5135f725e723183c
+gpg: Signature made Thu Sep  3 17:00:47 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 17:00:47 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 17:00:47 2026 -0400
+
+    test: diagnose foreign frontier liveness red
+
+ .../production-hardening-tdd-plan-v2.md            |  90 ++++--
+ .../phase-6a-v3/creator-adoption-contract.ts       |  83 ++++--
+ .../foreign-author-close-liveness-contract.ts      | 328 +++++++++++++++++++++
+ .../phase-6b-d110c-a/repeat-close-contract.ts      |  50 +++-
+ ...0c1f5-foreign-author-close-liveness-red.test.ts |  15 +
+ 5 files changed, 506 insertions(+), 60 deletions(-)

@@ -1,0 +1,6 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts
+  9:51  error  Unable to resolve path to module '@ts-drp/storage-browser/issuance'  import/no-unresolved
+
+✖ 1 problem (1 error, 0 warnings)
+

@@ -1,0 +1,11 @@
+{
+  "kind": "read-only custody invocation cwd error",
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-f031b166",
+  "command": "node .logs/d110c-0c1f5b-red-row-689c6948/custody.mjs preflight",
+  "nodeStatus": 1,
+  "error": "MODULE_NOT_FOUND: /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-f031b166/.logs/d110c-0c1f5b-red-row-689c6948/custody.mjs",
+  "shellStatus": 0,
+  "shellStatusExplanation": "The same diagnostic cell subsequently verified the immutable stopped manifest successfully; its final status was therefore zero, not a claim that the failed node invocation passed.",
+  "correction": "Invoke the same custody recorder from the repository root. No source, assertion, dependency, runtime fixture, or recorder semantics changed.",
+  "focusedRunConsumed": false
+}

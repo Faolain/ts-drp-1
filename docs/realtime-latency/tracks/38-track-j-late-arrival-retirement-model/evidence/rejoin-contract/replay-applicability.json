@@ -1,0 +1,178 @@
+{
+  "baselineReplayCommit": "4db21f1052ec061f7a7428a8bd09ff0e5e057c10",
+  "inspectedIntegratedCommit": "7b5a6a5786f1df57a8bf377fce3e63577deaa5e3",
+  "claim": "Source correspondence audit, not semantic refinement or rerun of prior 59 checks.",
+  "files": {
+    "packages/node/src/v3-live.ts": {
+      "baselineHash": "6d2813d3b822eb266ffe760038c35206de0be46418df6e47ab25b85601e465f8",
+      "currentHash": "85db2432f5c904f9ff702728443c2718f683053252bcfaa877b2a63b6ea4e214",
+      "symbols": {
+        "beginRetainedReplayTransition": {
+          "baselineHash": "bb09363bfadf1488259056f583dd1d9d6494e2e0212f5f07f7f062e77ba1019e",
+          "currentHash": "bb09363bfadf1488259056f583dd1d9d6494e2e0212f5f07f7f062e77ba1019e",
+          "identical": true
+        },
+        "retireRetainedReplay": {
+          "baselineHash": "5c691f918813b13ea629fdd740fb1dcf870cc86320ea209553d0b5590dedc341",
+          "currentHash": "5c691f918813b13ea629fdd740fb1dcf870cc86320ea209553d0b5590dedc341",
+          "identical": true
+        },
+        "prepareRetainedReplay": {
+          "baselineHash": "76caab4ce169233b65edaed620da18cf84b822ac6b411e28cee83cd8845018c0",
+          "currentHash": "76caab4ce169233b65edaed620da18cf84b822ac6b411e28cee83cd8845018c0",
+          "identical": true
+        },
+        "republishRetained": {
+          "baselineHash": "428a8bff7863b9b3ea672e233a3145eca7964a928b0c85ef57063b2117d7e740",
+          "currentHash": "428a8bff7863b9b3ea672e233a3145eca7964a928b0c85ef57063b2117d7e740",
+          "identical": true
+        },
+        "withCurrentRetainedRead": {
+          "baselineHash": "49d0e5112546971827fb2d8ce00907b2fd3abcdfc4997bd960661d906f8434d3",
+          "currentHash": "49d0e5112546971827fb2d8ce00907b2fd3abcdfc4997bd960661d906f8434d3",
+          "identical": true
+        },
+        "reserveEgressAdmission": {
+          "baselineHash": "6948787f19d5b3f5b27c36ef0998be6885a59edfc8dd29b4cf3343497076d708",
+          "currentHash": "6948787f19d5b3f5b27c36ef0998be6885a59edfc8dd29b4cf3343497076d708",
+          "identical": true
+        },
+        "releaseEgressAdmission": {
+          "baselineHash": "8dcdb0e039ac746716a7283a720e12c20eea7b898515b11c5c09a25cee53ce06",
+          "currentHash": "8dcdb0e039ac746716a7283a720e12c20eea7b898515b11c5c09a25cee53ce06",
+          "identical": true
+        },
+        "joinEgressAdmissionOwner": {
+          "baselineHash": "0d5013da3dc56e79a2273f519b11e1c2fb76d84ccf505d5f12f2b19e2f0fbf04",
+          "currentHash": "0d5013da3dc56e79a2273f519b11e1c2fb76d84ccf505d5f12f2b19e2f0fbf04",
+          "identical": true
+        },
+        "enqueueRetainedPublication": {
+          "baselineHash": "a0979ae4a8daaae5a2bf4b43ec06a26ea9f0f93325ed20c13ab7d0e5a413fb20",
+          "currentHash": "a0979ae4a8daaae5a2bf4b43ec06a26ea9f0f93325ed20c13ab7d0e5a413fb20",
+          "identical": true
+        },
+        "readCreatorRecoveryDependencyCensus": {
+          "baselineHash": "93627dde47c18238dab21d76b42c8086c53bb9664cc8dfac944519d2624d4bfc",
+          "currentHash": "cff37d02846a6c801ef267e8a01569bdfd0c2fe76b23ee6b7960ecb30070325c",
+          "identical": false
+        },
+        "runCreatorOrdinaryReadinessMaintenance": {
+          "baselineHash": "3dcfe6ca9ae7c157f202d5f537d552ce89393279dd89b9a4ce0f29c79baad37c",
+          "currentHash": "3eda41b1baec09882d25adc91278e75558eef34a3ff277c2a1c9e94412bab2ae",
+          "identical": false
+        }
+      }
+    },
+    "packages/node/src/internal/creator-closed-rollback-data.ts": {
+      "baselineHash": "b218cda2a68f58b6cf220e1a02e103a457ef57436581b355fe6f170dd46dc374",
+      "currentHash": "1c772b0b66e96ba53167905c2202f6cf754b89b1dafbc5528925744bae5f525e",
+      "symbols": {
+        "borrowJournalHeaderHold": {
+          "baselineHash": "2a9cbdd8e28d3f861535e8c092dd702664f10d6022c53cf97d020266d1501719",
+          "currentHash": "2a9cbdd8e28d3f861535e8c092dd702664f10d6022c53cf97d020266d1501719",
+          "identical": true
+        },
+        "closedIssuanceProtectedRecordsForRetirement": {
+          "baselineHash": "4dd2cfe473129890f07d97818707ffb087dfe48fb71519d2e577a3c7cd71ac23",
+          "currentHash": "798b7998cf6a951e4745a6df76ae2b49befefdf600010bcd6d5dd6a3bce9efa8",
+          "identical": false
+        },
+        "createCreatorSnapshotRecoveryMaintenanceJob": {
+          "baselineHash": "e862041bd3f9b5a2e7a0c6e4c50103c50dde8510e766b1acf24f3f7206f61092",
+          "currentHash": "e561e06b047e420c2b3a31d58525593d0b7d467185b9586edbcb6a2bada61543",
+          "identical": false
+        },
+        "acquireCreatorIssuanceMaintenanceProof": {
+          "baselineHash": "a10fc59e1adb4df85ba764c5a30dcaf0f6400998870ae417d04cc1f2a64e670a",
+          "currentHash": "e235dda282ebccf379e68fab74b55783e23346e831077bfdfb4bfbb1f2266e79",
+          "identical": false
+        }
+      }
+    },
+    "packages/issuance-store/src/retirement.ts": {
+      "baselineHash": "805a2f552a017e74dad9178acc7e989583e11b2b92f90fc4d16b2a5b77e7cdf0",
+      "currentHash": "d04b09a28fb2ff5520e3aa4f9949fbfc1d4481a14ccffc3050ddf00b179c74de",
+      "symbols": {
+        "issuanceUnsignedOwnMaterialByteLength": {
+          "baselineHash": null,
+          "currentHash": "ea49d9ebb3302cd83587b17e18b4e06045bf387ee102445a89b211018dd83c9e",
+          "identical": false
+        }
+      }
+    },
+    "packages/storage-node/src/internal/node-issuance-store.ts": {
+      "baselineHash": "c156ef6e4ab61dc5e8a4927f87fc6255a179374d9aa06106b6e24c7a143908c7",
+      "currentHash": "46a07737fdcddae311c0a679a788614862b67b2848256c4a367b2db1a85a1566",
+      "symbols": {
+        "#withNativeSignAdmission": {
+          "baselineHash": "f37135dbd03ebf80948b96deacdf47334f33986810a1e5f55b333d3ed514e4ff",
+          "currentHash": "f37135dbd03ebf80948b96deacdf47334f33986810a1e5f55b333d3ed514e4ff",
+          "identical": true
+        },
+        "#transactIssue": {
+          "baselineHash": "438b570052ae762489ddf405a4e8a3cbc27f2724ed4de4a1dd64a2d515b0bea7",
+          "currentHash": "089f548387ebd8c4741f72915762a3adc344b92d1ce3290cbc7dc5878877e0ca",
+          "identical": false
+        },
+        "reserveUnsignedIntent": {
+          "baselineHash": "4dbe40aeb48f1f6d46dc5c4c5b1c4511be85e591e80b9a3dc802fb137535207e",
+          "currentHash": "90946418881048116817d1d2f325fbcdbd351e5907e784b9d6c243c18cc41963",
+          "identical": false
+        }
+      }
+    }
+  },
+  "priorFormalInputs": {
+    "packages/protocol-v3/formal/check-replay-custody.mjs": {
+      "baselineHash": "e3d0b54a56cf10a00f7a06e913a55b92d6bc2fdc701e37e7344e8659f12eb5a1",
+      "currentHash": "e3d0b54a56cf10a00f7a06e913a55b92d6bc2fdc701e37e7344e8659f12eb5a1",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/replay-read-custody.qnt": {
+      "baselineHash": "4f2293f58d30d654f7d2ac61c579c0cb455254bf9abb2092def9200e47a8fbc0",
+      "currentHash": "4f2293f58d30d654f7d2ac61c579c0cb455254bf9abb2092def9200e47a8fbc0",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/replay-egress-pool.qnt": {
+      "baselineHash": "ebf925b3fb12ee0214dd543bccd72af3cb362aeb6bb195bbd7270b343a5368cd",
+      "currentHash": "ebf925b3fb12ee0214dd543bccd72af3cb362aeb6bb195bbd7270b343a5368cd",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/replay-broadcast-rounds.qnt": {
+      "baselineHash": "a3c7349510b2586a79f4ef42f3a7c0d99dccff39c0e038702d7d09e4f4f3fd01",
+      "currentHash": "a3c7349510b2586a79f4ef42f3a7c0d99dccff39c0e038702d7d09e4f4f3fd01",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/retirement-intent-selection.qnt": {
+      "baselineHash": "3ba89910e43a7c3cf46418955eb1a47b7e2e6cbf0f0f1023880d01d658757c6a",
+      "currentHash": "3ba89910e43a7c3cf46418955eb1a47b7e2e6cbf0f0f1023880d01d658757c6a",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/retirement-recovery-admission.qnt": {
+      "baselineHash": "787a5e20c321f0b3ef2ba243ea7891fb3a86ef6d8c695df139a342ab28a0b40a",
+      "currentHash": "787a5e20c321f0b3ef2ba243ea7891fb3a86ef6d8c695df139a342ab28a0b40a",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/issuance-quote-currency.qnt": {
+      "baselineHash": "21c98e9e5af6c7871c094da10ede594ff72bde1fa45b88bfdbfb6e611ef31983",
+      "currentHash": "21c98e9e5af6c7871c094da10ede594ff72bde1fa45b88bfdbfb6e611ef31983",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/current-fence-projection.qnt": {
+      "baselineHash": "b72d9eb59e75ab9ec7db77b9ef9a9f0b9cd64bdce16a836b46c95138f8a1d7df",
+      "currentHash": "b72d9eb59e75ab9ec7db77b9ef9a9f0b9cd64bdce16a836b46c95138f8a1d7df",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/source-age-projection.qnt": {
+      "baselineHash": "00c88c6e581baef35498eda0162c39725f1264ee23fd3bd31ed533350c5e6605",
+      "currentHash": "00c88c6e581baef35498eda0162c39725f1264ee23fd3bd31ed533350c5e6605",
+      "identical": true
+    },
+    "packages/protocol-v3/formal/current-fence-bridge.qnt": {
+      "baselineHash": "c3be5b947edf32471599d9f1f1a34b7a4189bf94e76421072789984a1ed0378b",
+      "currentHash": "c3be5b947edf32471599d9f1f1a34b7a4189bf94e76421072789984a1ed0378b",
+      "identical": true
+    }
+  }
+}

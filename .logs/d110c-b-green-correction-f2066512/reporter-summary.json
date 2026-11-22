@@ -1,0 +1,173 @@
+[
+  {
+    "file": "diagnostic-focused-initial.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:37:01.881Z",
+      "duration": 2238.182,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "diagnostic-focused-lock-expectation.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:37:27.085Z",
+      "duration": 2649.3669999999997,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "diagnostic-focused-pre-isolation-green.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:37:50.293Z",
+      "duration": 2618.0890000000004,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "diagnostic-retained-stale-expectation.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:38:17.815Z",
+      "duration": 23999.357,
+      "expected": 15,
+      "skipped": 12,
+      "unexpected": 3,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "focused-browser-final.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:58:32.705Z",
+      "duration": 2882.4759999999997,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "focused-browser-pre-failed-lock-proof.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:43:47.321Z",
+      "duration": 2644.531,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "focused-browser-predecessor-count-diagnostic.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:43:30.848Z",
+      "duration": 2422.1020000000003,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-activation-browser.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:47:08.871Z",
+      "duration": 22463.463,
+      "expected": 24,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-live-close-browser.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:47:35.753Z",
+      "duration": 25107.595,
+      "expected": 9,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-node-correction.json",
+    "playwright": null,
+    "vitest": {
+      "success": true,
+      "numTotalTestSuites": 6,
+      "numPassedTestSuites": 6,
+      "numFailedTestSuites": 0,
+      "numTotalTests": 9,
+      "numPassedTests": 9,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-product-browser-fields-leaked.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:41:25.608Z",
+      "duration": 23253.47,
+      "expected": 18,
+      "skipped": 9,
+      "unexpected": 3,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-product-browser-final.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:58:42.124Z",
+      "duration": 66217.435,
+      "expected": 30,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-product-browser-pre-failed-lock-proof.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:43:55.008Z",
+      "duration": 65962.902,
+      "expected": 30,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  }
+]

@@ -1,0 +1,6 @@
+packages/node/src/internal/creator-transition-advance.ts
+packages/node/src/v3-live.ts
+packages/protocol-v3/package.json
+packages/protocol-v3/src/internal/received-vertex-authentication.ts
+vite.config.mts
+

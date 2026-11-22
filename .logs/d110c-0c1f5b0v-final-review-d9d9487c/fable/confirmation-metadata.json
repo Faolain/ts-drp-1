@@ -1,0 +1,8 @@
+{
+  "session_id": "e57364e1-8dbb-46f4-80b4-fbe1719afcd6",
+  "is_error": false,
+  "stop_reason": "tool_use",
+  "total_cost_usd": 6.6641,
+  "num_turns": 108,
+  "permission_denials": []
+}

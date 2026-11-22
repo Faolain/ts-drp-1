@@ -1,0 +1,16 @@
+{
+	"p0_count": 0,
+	"p1_count": 2,
+	"blocking": [
+		{
+			"severity": "P1",
+			"title": "Rejected GREEN left the 3x historical-issuance cap on the legacy profile",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P1",
+			"title": "Retained gates still count the invalid comment-only reachability oracle and pin the wrong cap",
+			"owner": "f5b0d"
+		}
+	]
+}

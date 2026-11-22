@@ -1,0 +1,20 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout",
+  "command": "git",
+  "args": [
+    "sparse-checkout",
+    "set",
+    "--no-cone",
+    "/packages/",
+    "/examples/",
+    "/tests/",
+    "/scripts/",
+    "/configs/",
+    "/patches/",
+    "/*",
+    "!/.logs/",
+    "!/docs/",
+    "!/specs/"
+  ],
+  "start": "2026-09-06T01:11:43.506Z"
+}

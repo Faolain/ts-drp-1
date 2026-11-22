@@ -1,0 +1,7 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/closed-epoch-cleanup.ts
+  481:1  warning  Missing JSDoc @param "input.settlement" description  jsdoc/require-param-description
+  481:1  warning  Missing JSDoc @param "input.settlement" description  jsdoc/require-param-description
+
+✖ 2 problems (0 errors, 2 warnings)
+

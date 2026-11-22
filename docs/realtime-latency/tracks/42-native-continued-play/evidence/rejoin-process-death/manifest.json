@@ -1,0 +1,458 @@
+{
+  "schema": "native-rejoin-process-death-evidence-1",
+  "sourceHead": "a847900d72252ab08fc1b48fff0724138dd5ca12",
+  "sourceCheckout": "/private/tmp/ts-drp-rejoin-sigkill-reviewed",
+  "finalDefaultDirectory": "/var/folders/nc/wtz0wjt15p31kbd23yn_lfx00000gn/T/creator-rejoin-sigkill-1792769492475",
+  "harnessSourceHashes": {
+    "tests/creator-rejoin-sigkill-native.test.ts": "443040cdb7d1681909c40d6dac2b918d28b8be767dc5ebeb7fee33d73cf06624",
+    "tests/fixtures/rejoin-sigkill/native.ts": "fa1cdc65a31b876337b8adba4811075615ad5836b9a22153c59893f7811c45fb",
+    "tests/fixtures/rejoin-sigkill/worker.child.ts": "ba87ebf898642bc007f2d073a0a5ea2ef8f07422763f15406ea561dff029019b",
+    "tests/fixtures/rejoin-sigkill/vitest.config.ts": "98950dc971f5d0ec748ef7579efb60928b787b67c5a02463687b1ba03c7c66f7",
+    "tests/fixtures/rejoin-sigkill/vitest.workspace.ts": "344b91f5c2e2d8e73cf8bb4374401939e0f2a89905b397faf164435f4da95f8e"
+  },
+  "compiledRuntimeFileCount": 399,
+  "summary": [
+    {
+      "edge": "floor-commit",
+      "boundary": "public floor.commit returned",
+      "death": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "killedPid": 11265,
+      "recoveredPid": 11318,
+      "targetA": {
+        "aclDigest": "372a74b2aa66ac27bb5921f0770d98a2303b2c2a0f876ff2b05d8c5d472d5021",
+        "anchorDigest": "776c16e400b0034766a2a4e2e3c5311435e6ddbeec25f333b8c1f56f6d62bd4d",
+        "epoch": 2,
+        "genesisAnchorDigest": "e6bd25868b6a09e500b406f0f9459db99a9899ed735f1015dbc481d2581a576e",
+        "lifecycle": "active",
+        "objectId": "creator:cb1d44020d60c461c1e03b30b035518a",
+        "profileId": "creator-trusted-settlement-v1"
+      },
+      "targetB": {
+        "aclDigest": "29f05efc67493ee2ade68841c5d2b18b2cc9337d09539e1b46ecb8d85d12e5e7",
+        "anchorDigest": "8c160b0f3f41b3b998fc8745e27ca9f6c54aa0ec91626f2d9736b1caee479825",
+        "epoch": 4,
+        "genesisAnchorDigest": "e6bd25868b6a09e500b406f0f9459db99a9899ed735f1015dbc481d2581a576e",
+        "lifecycle": "active",
+        "objectId": "creator:cb1d44020d60c461c1e03b30b035518a",
+        "profileId": "creator-trusted-settlement-v1"
+      },
+      "moduleEntriesAtDeath": 262,
+      "moduleEntriesAfterRecovery": 262,
+      "continued": true,
+      "productionInterceptorsInstalledDuringRecovery": false
+    },
+    {
+      "edge": "receipt-commit",
+      "boundary": "real snapshot COMMIT returned",
+      "death": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "killedPid": 11085,
+      "recoveredPid": 11103,
+      "targetA": {
+        "aclDigest": "7a059607f075b2cddd07453b076a2161e8c6436bb9830d04049142c3447734f8",
+        "anchorDigest": "4522818f5af8a5da9db41f185085e7f2e6ed2cb9f4bc94dafcbfb9e6afde2c6d",
+        "epoch": 2,
+        "genesisAnchorDigest": "703484f84de27f4946377762c294fc1bfc6b0c88477794f160347a5ee0404c4e",
+        "lifecycle": "active",
+        "objectId": "creator:883683da41aa24bbe7304298a594c47e",
+        "profileId": "creator-trusted-settlement-v1"
+      },
+      "targetB": {
+        "aclDigest": "9753bc69cbe01ac191d8d964621fa0000e74ffdae3e00d98859de951709313a7",
+        "anchorDigest": "cb5dbf74a111acb07cbb16f0ab2f4ad654ffded1307984a0958be0719fa6ce15",
+        "epoch": 4,
+        "genesisAnchorDigest": "703484f84de27f4946377762c294fc1bfc6b0c88477794f160347a5ee0404c4e",
+        "lifecycle": "active",
+        "objectId": "creator:883683da41aa24bbe7304298a594c47e",
+        "profileId": "creator-trusted-settlement-v1"
+      },
+      "moduleEntriesAtDeath": 262,
+      "moduleEntriesAfterRecovery": 262,
+      "continued": true,
+      "productionInterceptorsInstalledDuringRecovery": false
+    }
+  ],
+  "verification": {
+    "completePackageBuild": 0,
+    "focusedTypeScript": 0,
+    "focusedESLint": 0,
+    "defaultMacOSTempPathCuts": "2/2",
+    "spacedWorkspaceURL": "fileURLToPath decoded exact path with spaces",
+    "nativeRetry": {
+      "command": "node scripts/ensure-native-deps.mjs",
+      "exitCode": 0,
+      "note": "Authorized direct tool invocation, after initial npm-cache permission failure; no redirected retry ran."
+    },
+    "independentReview": {
+      "exitCode": 0,
+      "findings": [
+        "P2 canonical database path comparison",
+        "P2 workspace URL decoding"
+      ],
+      "allFindingsFixed": true
+    },
+    "allOwnedChildrenReaped": true
+  },
+  "limits": [
+    "Native SQLite public-room fixture with scripted native-byte transport, not browser/WebRTC or end-to-end network performance.",
+    "a847900d checkpoint only; full-removal completion, author-expiry and final performance changes were not present.",
+    "Run01 failed during package loading before either crash cut; no production regression claim.",
+    "Run02 applies only to explicit canonical temporary paths; the earlier five-file source was reconstructed by reversing the verified fixes, with every byte matching its recorded source hash."
+  ],
+  "artifacts": {
+    "setup-failure-01/floor-commit/mutate.log.gz": {
+      "sha256": "1913adb929497079b0b40f920fcdccf3ed860886e23c7fc08974cbb5102b13b0",
+      "bytes": 889,
+      "decodedSha256": "83f7a5348a8a8195762a1ba39e052112c60ea7013b54b85536d8bb3c79f4e983"
+    },
+    "setup-failure-01/floor-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "setup-failure-01/floor-commit/source.json.gz": {
+      "sha256": "4d011e6ebeedafcc7f8027835ab603d75a1986df81ceb0c6e6c66bb02c2397cb",
+      "bytes": 2559,
+      "decodedSha256": "f706b83212b715a953c6f91155ff6760090eabee283a8339e2dc81e78f1257cc"
+    },
+    "setup-failure-01/receipt-commit/mutate.log.gz": {
+      "sha256": "f29c34fe6ca9083bc5f9cfc70d0ea629b3d5d6959b78240fc6a1e4f8d9263b62",
+      "bytes": 889,
+      "decodedSha256": "77d1f36c60d7ee822311184e007b24ded1ef3476391c587b65a61e509f05cb3f"
+    },
+    "setup-failure-01/receipt-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "setup-failure-01/receipt-commit/source.json.gz": {
+      "sha256": "4d011e6ebeedafcc7f8027835ab603d75a1986df81ceb0c6e6c66bb02c2397cb",
+      "bytes": 2559,
+      "decodedSha256": "f706b83212b715a953c6f91155ff6760090eabee283a8339e2dc81e78f1257cc"
+    },
+    "canonical-path-02/floor-commit/death.json.gz": {
+      "sha256": "d378b00b28296e0eeed7c3341a4056302fd0ff42bacc1feff644bce96b95ee81",
+      "bytes": 21859,
+      "decodedSha256": "7334fc3fe8f12696fab41e2fcc8d345cf68e44445430a2f5708af976c2adbb88"
+    },
+    "canonical-path-02/floor-commit/mutate.log.gz": {
+      "sha256": "6d4fc24d7fb543fbca9801c27c4a869cc2fadaf194676c4008c96739488131bd",
+      "bytes": 190,
+      "decodedSha256": "9dbbcedef4fdebf1ae9298af322a5d7c143aafc9807a9841fe7a60fab73f08ae"
+    },
+    "canonical-path-02/floor-commit/prepared.json.gz": {
+      "sha256": "aa9b7b5fc4a7684a8048e48ea35d7b43f1009ef74a18aae75281303096d8552d",
+      "bytes": 4861,
+      "decodedSha256": "6abac032ec37bb9877a80a02f5890b61c6c84cd8eeb744aa448829d06086b8ef"
+    },
+    "canonical-path-02/floor-commit/ready-to-kill.json.gz": {
+      "sha256": "28d318b5866fa19d0fbfff0569ebd528cdb3d41ffa3514f90103701792496a29",
+      "bytes": 44351,
+      "decodedSha256": "14cc3a21a730e511b2f2a455d59749825ccba57535d3cca3dc6bcd6f5dd24ad1"
+    },
+    "canonical-path-02/floor-commit/recover.log.gz": {
+      "sha256": "6e726e581f71e54da1519009cc7364891726f57ead33778cd964e0194efed6d8",
+      "bytes": 367,
+      "decodedSha256": "48a341b5d1711dc98c733d4b3a6f24d6c0f4b0b61dbfc5051b277fdf559382d8"
+    },
+    "canonical-path-02/floor-commit/recovered.json.gz": {
+      "sha256": "7d84c0897c7f7591e7c76282401d0fa8eb58d22bd40764a9a9dc4cd2dd3dde82",
+      "bytes": 57860,
+      "decodedSha256": "d4b1b96f99579e9a8b4bc20d0d44b1524663265649cf25607871bc1c01e3b82b"
+    },
+    "canonical-path-02/floor-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "canonical-path-02/floor-commit/source.json.gz": {
+      "sha256": "bdd0cadfd1ffa6f4153bfc486ad7964b7b7608b5a004ce46ea3c45783c41c0e5",
+      "bytes": 21274,
+      "decodedSha256": "a28afec20f7c75cf834cfeccc6ce5f02f98440caccac6b53f10be22efa175597"
+    },
+    "canonical-path-02/receipt-commit/death.json.gz": {
+      "sha256": "941efe3ef9545a36c5f57806ce0feeb1bd776bcf899a0ceb4528a90d668b6042",
+      "bytes": 21859,
+      "decodedSha256": "059d929874bfbbb4c936e98d22ee651092e11da6595fd1ef7e3286dbf127cbca"
+    },
+    "canonical-path-02/receipt-commit/mutate.log.gz": {
+      "sha256": "600610f6c207d00723aa10bfe5cd9498c26c55c1a0c190b773e426a2fcd32fc8",
+      "bytes": 189,
+      "decodedSha256": "7734739e5b87145bb55301e694f8750240ce2a61cb4e05dda099299640a1ccfb"
+    },
+    "canonical-path-02/receipt-commit/prepared.json.gz": {
+      "sha256": "08e7b133a01ba89f371f6e03bdf9e3f80b6f28f0ddccc5fdbe56d598021c7118",
+      "bytes": 4856,
+      "decodedSha256": "465ae55db8bd5cf0becfd22be944fd45971721ace496d9704e6b6a8dc32fda78"
+    },
+    "canonical-path-02/receipt-commit/ready-to-kill.json.gz": {
+      "sha256": "405427d7205b9843a84acfe89afe45c38483d053a663dcf87cdfca1cad5e8530",
+      "bytes": 43503,
+      "decodedSha256": "5129ccc25ae0332c1ef252e440eb9e0e777ca2d8badb8170749d5b9f6701125a"
+    },
+    "canonical-path-02/receipt-commit/recover.log.gz": {
+      "sha256": "b6999f26586a7815674e08a725b6e4ee1de4a7c0db95087d36764ae03a66346e",
+      "bytes": 367,
+      "decodedSha256": "a61253df0efca2a6a34f8b219c01319d8b3fbaf1e1865d73e8a53773cec60206"
+    },
+    "canonical-path-02/receipt-commit/recovered.json.gz": {
+      "sha256": "67ed60a6a2a8b987d720b45faceb17715ea1cccfcd0889daca0453ed759a056f",
+      "bytes": 57837,
+      "decodedSha256": "1d535d07b57662d6c861bb12a832b18197322051e4dae98a4e292d2ce59f4c94"
+    },
+    "canonical-path-02/receipt-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "canonical-path-02/receipt-commit/source.json.gz": {
+      "sha256": "bdd0cadfd1ffa6f4153bfc486ad7964b7b7608b5a004ce46ea3c45783c41c0e5",
+      "bytes": 21274,
+      "decodedSha256": "a28afec20f7c75cf834cfeccc6ce5f02f98440caccac6b53f10be22efa175597"
+    },
+    "default-path-03/floor-commit/death.json.gz": {
+      "sha256": "2ad28f911397fdd9745d8f95c3aee9bfa69f523bab32dc89863cc6122f0ca556",
+      "bytes": 21865,
+      "decodedSha256": "d1356668dd62ae0689b4d1c9aa4bed67507b30e16763775d2b2e17aab5da8932"
+    },
+    "default-path-03/floor-commit/mutate.log.gz": {
+      "sha256": "e88a21672a84ba26e8b76ba68b9348f9d5c1154b167c58837576b445b1e22503",
+      "bytes": 190,
+      "decodedSha256": "102b9be8866a7c0e1ab4d4d836c87cc3f58cbbd89c548cb9adc87d0e14b2c56b"
+    },
+    "default-path-03/floor-commit/prepared.json.gz": {
+      "sha256": "17a2792aff7f2d4c533a0bf80907cd9f96ed9d9fdfa5fbcd9aa73a8f3c24b7d7",
+      "bytes": 4866,
+      "decodedSha256": "934251afbd0418b21ab7edbf98afb5884806497526da1f6625bd038d469dabd5"
+    },
+    "default-path-03/floor-commit/ready-to-kill.json.gz": {
+      "sha256": "1ea439a200a62aa804e6a24a798ce704ee895a486cab7cbb9c646b5f584a5671",
+      "bytes": 44339,
+      "decodedSha256": "aca1a34daf4bf9647f962e6e0fa9daa3f2c41520f92fbf0bb96d2ed5ef01a0c7"
+    },
+    "default-path-03/floor-commit/recover.log.gz": {
+      "sha256": "be2bb232c42b645d50195452797edeb3d7aea653186fc7405ffeef76453fcb10",
+      "bytes": 364,
+      "decodedSha256": "e1e6c380d50146cc80379c1bd0bd8cbba1e3c0a5631dc63283c7ced439c416f4"
+    },
+    "default-path-03/floor-commit/recovered.json.gz": {
+      "sha256": "89c438c2bf6c65709aba929fc5f93d0dd8c1f9d21e4f29bcb25e9bb87dd21c0f",
+      "bytes": 57854,
+      "decodedSha256": "7310fe9c2b14d09101082a199d1fafae9103c04584fecced7e64808bc1518d83"
+    },
+    "default-path-03/floor-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "default-path-03/floor-commit/source.json.gz": {
+      "sha256": "960a6833050ad448558c83308ea67ed910c746da5dc8f37969f5dcbd8e697acc",
+      "bytes": 21276,
+      "decodedSha256": "2f8ba282e6e07d8d7ce53d48f383c4a076cd5949bf8a4f7bda2ce0b303010ecc"
+    },
+    "default-path-03/floor-commit/native-after-recovery.tar.gz": {
+      "sha256": "7c8d37ae86cd13ad6543014ed0b898981b238394c164659f274f0df9eb144130",
+      "bytes": 58882,
+      "decodedSha256": "9a7482af2c328661b0a83745c1afd19b69f2c01f0900329c199f03e008b981c2"
+    },
+    "default-path-03/receipt-commit/death.json.gz": {
+      "sha256": "8d92dc9c7ae0b0f32df947c2ec3139a8e715e44e7cd26b890f87e7dd9ef9fb62",
+      "bytes": 21853,
+      "decodedSha256": "d0a10cac454447a03e3d6f3e69c52e6c935e2263e7273881fa79fc55317a06a5"
+    },
+    "default-path-03/receipt-commit/mutate.log.gz": {
+      "sha256": "afa5cfda147e025704fd855f5ebe534ec8e9b2fed63662a361e347b89510ae91",
+      "bytes": 190,
+      "decodedSha256": "2f6c8cc9e2cd304e1566817fda74dc8006ca24f44120b6b9071701cfbbdcc1d7"
+    },
+    "default-path-03/receipt-commit/prepared.json.gz": {
+      "sha256": "1e673fa5c999541ae737186c4049ead57f9d5ab276d31c35b7f21b3ad7f7fabb",
+      "bytes": 4878,
+      "decodedSha256": "4f3e6ff5036b4e81db1033698779da0a97d9829be557488a466ec2783c4ff006"
+    },
+    "default-path-03/receipt-commit/ready-to-kill.json.gz": {
+      "sha256": "c9f502be00eb7d49b7edc6bf80f9e021ffa2c1bad20af34da63412e9d6c9ec77",
+      "bytes": 43513,
+      "decodedSha256": "75a8627e04069764ae40401e772a3d771adfa0e50673a20665e269f3dfa73c7a"
+    },
+    "default-path-03/receipt-commit/recover.log.gz": {
+      "sha256": "c35c32f61eddc41948ee1b4828dff23f68824634dfffe0e457ad351bc7c30f25",
+      "bytes": 363,
+      "decodedSha256": "b2849682a6fa7d9f5b8ef693e9f682156cba6d71301a470ddbe36ce0b647914c"
+    },
+    "default-path-03/receipt-commit/recovered.json.gz": {
+      "sha256": "00662adcc0d9147ff151b8fe300864efb9249969cb79c2ec109114f424411110",
+      "bytes": 57801,
+      "decodedSha256": "bed8917bfbbc93f36b5c3e1cb3d5fae1ae0f464f8ae1125b707c968c2f77e3b7"
+    },
+    "default-path-03/receipt-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "default-path-03/receipt-commit/source.json.gz": {
+      "sha256": "960a6833050ad448558c83308ea67ed910c746da5dc8f37969f5dcbd8e697acc",
+      "bytes": 21276,
+      "decodedSha256": "2f8ba282e6e07d8d7ce53d48f383c4a076cd5949bf8a4f7bda2ce0b303010ecc"
+    },
+    "default-path-03/receipt-commit/native-after-recovery.tar.gz": {
+      "sha256": "ce609600bcf722eab51b2f0dc3da04cbbbeddcf721546680288870adf82d41de",
+      "bytes": 58600,
+      "decodedSha256": "10ebde48157a5a9bd2a3a60236a89a9e30d3efcfc45487a26f3ba2803e31d5be"
+    },
+    "review-default-path-negative/floor-commit/death.json.gz": {
+      "sha256": "daf51ff86cd90a7305f4f15550ffe41d424e83d78270593f6f6489880e12d4fd",
+      "bytes": 21859,
+      "decodedSha256": "8d185010c3f89a0e640e5abbbdfbd03cf30b2a78b4c40a851c8002717c47c129"
+    },
+    "review-default-path-negative/floor-commit/mutate.log.gz": {
+      "sha256": "367bec51991726cccaa2f56eab9af4af11a758287e484b8110fed8b1ceef86f2",
+      "bytes": 189,
+      "decodedSha256": "9eb6ffce757356f785d752171b1a5ab436da760acf8cd309a1a4b2196df4e92f"
+    },
+    "review-default-path-negative/floor-commit/prepared.json.gz": {
+      "sha256": "bb55b626272aaf01bb410a069ff4e4b2e17b100d8763d1af6706104cc7e86342",
+      "bytes": 4841,
+      "decodedSha256": "a031b146d81af4ddda8013db51fad716b8b5bfc3128d0fd33e2d4f1b89e83796"
+    },
+    "review-default-path-negative/floor-commit/ready-to-kill.json.gz": {
+      "sha256": "55839339630cbdd02508565fd07da1c0954ea670c2cc9b093b92af4310404741",
+      "bytes": 44335,
+      "decodedSha256": "0e35f5ec434e6c83d66be902c40400e9a16a4464126ecd8c74fa5af4d8f384d4"
+    },
+    "review-default-path-negative/floor-commit/recover.log.gz": {
+      "sha256": "a944564b2525db9e272441827ee84a7dc4ef0e318cab2faa4e880ec488f9ee20",
+      "bytes": 366,
+      "decodedSha256": "e816994aa88942ba36598f772d1e905d8b5d0435aadb1a6e8b988650c732b530"
+    },
+    "review-default-path-negative/floor-commit/recovered.json.gz": {
+      "sha256": "475df50b39184f845abac656314ede993f50b4cffe3104fa090b497d53f7b568",
+      "bytes": 57853,
+      "decodedSha256": "352afd3bb6a293bebc0287774dafedbb25d67d57b82cf0da277f84144fda7f1d"
+    },
+    "review-default-path-negative/floor-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "review-default-path-negative/floor-commit/source.json.gz": {
+      "sha256": "ee2416a40f97ebbc86ee39d93411e562c7fb16201325e6877e07ddc68a160052",
+      "bytes": 21275,
+      "decodedSha256": "52d8196b5c23520d491a9f5158ed559b607c939740052ec799c083e5675f67ea"
+    },
+    "review-default-path-negative/receipt-commit/mutate.log.gz": {
+      "sha256": "952af1459def99cdba0f26a0fc9df3ade25d9b36cceaacff45225a72737ce04d",
+      "bytes": 650,
+      "decodedSha256": "86f2b7a9f687bb5dd1697179371c453e5b8ee057e92dfbf04f163a6bf7d81c62"
+    },
+    "review-default-path-negative/receipt-commit/prepared.json.gz": {
+      "sha256": "b611e09581f4357b305c758ca3038e4118a9a80acbc3ad4776c0f9b83770c16b",
+      "bytes": 4871,
+      "decodedSha256": "c913e9e00d1431ed97b411be230484c45e6a7f3596fdf9b5c3969227946c9035"
+    },
+    "review-default-path-negative/receipt-commit/source.diff.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "review-default-path-negative/receipt-commit/source.json.gz": {
+      "sha256": "ee2416a40f97ebbc86ee39d93411e562c7fb16201325e6877e07ddc68a160052",
+      "bytes": 21275,
+      "decodedSha256": "52d8196b5c23520d491a9f5158ed559b607c939740052ec799c083e5675f67ea"
+    },
+    "setup-failure-01/parent.log.gz": {
+      "sha256": "3dd7f9111d6c57420cb22cf9258088e2dad6e9602e6aca76ac0d110f4b8c8fca",
+      "bytes": 1383,
+      "decodedSha256": "d5afbd93c0d08934d22b4eef3a3abe6ca37758eef064b1b1f4d3d362082cc8ac"
+    },
+    "canonical-path-02/parent.log.gz": {
+      "sha256": "316afd4ca46a63f6be818d33e38caa463836bb78d32d266f46074c349c7c7eb4",
+      "bytes": 316,
+      "decodedSha256": "11d9d6d3956c33f6d1655f4a57a28ebc39a4b40b0ab347159d1ac9695325565d"
+    },
+    "default-path-03/parent.log.gz": {
+      "sha256": "0ff4d4ada52ab93062523db01efaf0d6bf31e767b81541eaa037cebf5d079a10",
+      "bytes": 315,
+      "decodedSha256": "a492e25c5d8829979b10a2f439130dc05c94b5f61653966e241299598c3d6b8c"
+    },
+    "review/codex.log.gz": {
+      "sha256": "bdf1619d17e9987a5891fabeabc893a40277d30d6d81b9acc456721511f596e7",
+      "bytes": 41075,
+      "decodedSha256": "90038c33b87b5ac3ac9bd59730683857672f0ae070df2002c46888df04febd32"
+    },
+    "setup/install.log.gz": {
+      "sha256": "b6c87a28d011f7212276208438f48816e8a398acbf1b46b359059d2b4967a063",
+      "bytes": 1042,
+      "decodedSha256": "f5ecba8646c8ddabc1048f13cb9a0e09a97218c9fc90d3f1dd44b6cff1f94cb0"
+    },
+    "setup/native-initial-failure.log.gz": {
+      "sha256": "4ace8375f3ab221c08a31fbd70d18b0a6a623122d0ebfbf5b21c1ac761713cb8",
+      "bytes": 557,
+      "decodedSha256": "f5a302c48fb6eb1f71b7f5bc1b25ce29eab414311e664bfaa9f0c754370f585a"
+    },
+    "setup/initial-build.log.gz": {
+      "sha256": "71f1ac01426816227414913f9258f4cbf94dfa0db3143608445145ac7fdf1b36",
+      "bytes": 1009,
+      "decodedSha256": "02947420e59216058f54c59c598618ace3b50312227379c94440fc79a2d3c028"
+    },
+    "setup/node-build.log.gz": {
+      "sha256": "78266ad121435c9c81419ebede2fb0472188a94ebcb95df44964bf5e1731b639",
+      "bytes": 217,
+      "decodedSha256": "baed964c9c02832c6dc04308d17a8c2b353af0094829f7486052118c0eb94e42"
+    },
+    "setup/storage-node-build.log.gz": {
+      "sha256": "620753e474b649f57df208904cd8da79e1314fbd4a1009f9e36ce3fccf693af9",
+      "bytes": 123,
+      "decodedSha256": "c28b1860233fddef2f92fb75c6c6cd68b0e4b86c9e2b97b3d5a3995de931af75"
+    },
+    "setup/complete-build.log.gz": {
+      "sha256": "af2c661f29319bf0c0e41323cb56b3ec4990a8e3a55bc56750d0ddfd1f141cb2",
+      "bytes": 798,
+      "decodedSha256": "53089f5c13bdfa2aa11601f915c669bd16be2200d6fcbc1816d29a3104dfa42e"
+    },
+    "verification/typecheck-initial.log.gz": {
+      "sha256": "9110802294acabbd6b9b9841b6041e9c1e865111577ccf1f9982d2f69b0fc2ec",
+      "bytes": 1074,
+      "decodedSha256": "76137002e424a4e60d7aebaa4925a6934c052eddbc94094a0fb75ad6ef908491"
+    },
+    "verification/typecheck-source-before-fixes.log.gz": {
+      "sha256": "26ef35442181417af9c89169d50d696fa3c81c5af12d4f250749c7c53fb1ba27",
+      "bytes": 330,
+      "decodedSha256": "fe03375c026748cc3c05cbcd7b7a4fee664f880d02fe8e2bebe4456ae0a2abcd"
+    },
+    "verification/typecheck-final.log.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "verification/lint-final.log.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "bytes": 20,
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "verification/tsconfig.json.gz": {
+      "sha256": "e8b598f080d7f6b60739e22c07db728e4e6286a18d3d7246103dddc9321f8b03",
+      "bytes": 496,
+      "decodedSha256": "98b0023b3e2f9befd459532ad9e086ddff3ad57fec053aacb8000ef6c5b49225"
+    },
+    "default-path-03/harness-source.tar.gz": {
+      "sha256": "aab6e1fa81bcd84a2733b94d75a0bbc383090697f67be5cb5039aee35520406c",
+      "bytes": 9157,
+      "decodedSha256": "e57899e6c861d5ea19d458bc7a4fc8644c40b8bb089eedb04c16b598e2765cd9"
+    },
+    "canonical-path-02/harness-source.tar.gz": {
+      "sha256": "3c7a662af975a777115c2ef45cb0171dca9d5c4c133f23e88c864bb60ccc84ba",
+      "bytes": 9101,
+      "decodedSha256": "55a666d4a9d6d4e61425480aa06fb0ab921cd7aef987f23f82fad7b0663f63de"
+    },
+    "RESULT.md": {
+      "sha256": "a72b2851dba8054e3350af0362502cb726b2389f49c3de519d6b128ecff12844",
+      "bytes": 2486
+    }
+  }
+}

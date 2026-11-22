@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/fixtures/phase-5-v3/seal-types.ts",
+    "tests/fixtures/phase-5e-v3/creator-actor-contract.ts",
+    "tests/phase-5e-creator-actor-red.test.ts"
+  ],
+  "start": "2026-09-05T23:49:13.937Z"
+}

@@ -1,0 +1,1 @@
+{"frozen":true,"runtimeReleased":false,"files":14,"cases":51,"inputs":942,"sourcePatchSha256":"de542f01a1eabbe1d215d10c2939150c55326d9510c62e3100d3e3f13483933a","redGate":{"cases":7,"budgetMs":120000},"greenProposal":{"cases":51,"budgetMs":240000}}

@@ -1,0 +1,69 @@
+[
+  {
+    "name": "worktree",
+    "command": "git",
+    "args": [
+      "-C",
+      "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "worktree",
+      "add",
+      "--detach",
+      "/tmp/d110c-f5b0u-red-QjViix/checkout",
+      "a9ba60abd22bc182c85afbd6755b3a79d2448d22"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T04:04:24.846Z",
+    "finishedAt": "2026-09-05T04:04:28.429Z",
+    "elapsedMs": 3583
+  },
+  {
+    "name": "install",
+    "command": "pnpm",
+    "args": [
+      "install",
+      "--offline",
+      "--frozen-lockfile",
+      "--ignore-scripts"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-red-QjViix/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T04:04:28.429Z",
+    "finishedAt": "2026-09-05T04:04:40.498Z",
+    "elapsedMs": 12069
+  },
+  {
+    "name": "build-packages",
+    "command": "pnpm",
+    "args": [
+      "build:packages"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-red-QjViix/checkout",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T04:04:40.499Z",
+    "finishedAt": "2026-09-05T04:05:21.791Z",
+    "elapsedMs": 41292
+  },
+  {
+    "name": "list",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "list",
+      "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+      "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-red-QjViix/checkout",
+    "status": 1,
+    "signal": null,
+    "startedAt": "2026-09-05T04:05:21.792Z",
+    "finishedAt": "2026-09-05T04:05:25.507Z",
+    "elapsedMs": 3715
+  }
+]

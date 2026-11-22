@@ -1,0 +1,16 @@
+{
+	"recordId": "D.110c-0c1f5b0b",
+	"reviewedGreen": "93585bf3ba62ae662c2963fd13be2ee051451fa2",
+	"evidenceAnchor": "9b02f9c27d6173b92265b23ccd205405c9383741",
+	"status": "BLOCK",
+	"p0": ["join/causalJoin control classification changes creator-trusted-v1 sink, reservation, and fold behavior"],
+	"p1": [
+		"ordinary same-store displaced authorSequence zero rows are skipped",
+		"settlement recovery skips the issued/outbox corruption cross-check",
+		"ISSUANCE_OUTCOME_UNKNOWN preempts the terminal outcome-unknown latch"
+	],
+	"correctiveRedAlsoOwns": [
+		"malformed settlement-plan reads fail closed with a typed result",
+		"retained legacy join/causalJoin and shared-fixture consumers are exercised"
+	]
+}

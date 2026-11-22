@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "HEAD^",
+    "HEAD",
+    "--check",
+    "--",
+    "tests/phase-3a1b-p2-outbox-publication-contract.test.ts"
+  ],
+  "start": "2026-09-06T00:53:59.292Z"
+}

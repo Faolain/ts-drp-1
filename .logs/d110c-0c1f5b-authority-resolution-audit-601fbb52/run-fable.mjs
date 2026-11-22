@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn, execFileSync, spawnSync } from 'node:child_process';
+const root = '/Users/aristotle/Documents/Projects/ts-drp-1';
+const out = path.dirname(new URL(import.meta.url).pathname);
+const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
+const head = git('rev-parse', 'HEAD');
+if (head !== '601fbb52c7377f1f2783539eae55b1e478c82451' || git('log', '-1', '--format=%G?') !== 'G' || git('ls-remote', 'origin', 'refs/heads/codex/phase3a1b-p6-golden-path').split(/\s+/u)[0] !== head || git('diff', '--cached', '--name-only')) throw Error('Signed/pushed HEAD/index');
+for (const port of [4174, 4175, 51000, 51002]) { const r = spawnSync('lsof', ['-nP', '-i:' + port, '-t'], { encoding: 'utf8' }); if (![0, 1].includes(r.status) || r.stdout.trim()) throw Error('Fixed port occupied'); }
+const dir = path.join(out, 'fable');
+fs.mkdirSync(dir);
+const stdout = fs.openSync(path.join(dir, 'events.jsonl'), 'wx');
+const stderr = fs.openSync(path.join(dir, 'stderr.log'), 'wx');
+const script = "alias claude-phel='CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude'\neval 'claude-phel -p --restricted --strict-mcp-config --tools Read,Glob,Grep --allowedTools Read,Glob,Grep --model \"claude-fable-5-1[1m]\" --effort high --output-format stream-json --verbose'";
+const start = new Date().toISOString();
+const child = spawn('zsh', ['-f', '-c', script], { cwd: root, stdio: ['pipe', stdout, stderr] });
+fs.writeFileSync(path.join(dir, 'command.json'), JSON.stringify({ command: ['zsh', '-f', '-c', script], head, start, pid: child.pid, prompt: path.join(out, 'fable-prompt.md'), mode: 'read-only API consultation', authorization: 'User standing API-consult instruction and current full grid-composition authorization' }, null, 2) + '\n', { flag: 'wx' });
+child.stdin.end(fs.readFileSync(path.join(out, 'fable-prompt.md')));
+console.log(JSON.stringify({ pid: child.pid, start, model: 'fable-5.1', effort: 'high' }));
+child.on('error', e => fs.writeFileSync(path.join(dir, 'spawn-error.json'), JSON.stringify({ message: e.message }), { flag: 'wx' }));
+child.on('close', (code, signal) => { fs.closeSync(stdout); fs.closeSync(stderr); fs.writeFileSync(path.join(dir, 'status.json'), JSON.stringify({ code, signal, start, finish: new Date().toISOString() }, null, 2) + '\n', { flag: 'wx' }); console.log(JSON.stringify({ code, signal })); process.exitCode = code ?? 1; });

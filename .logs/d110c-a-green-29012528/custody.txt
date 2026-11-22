@@ -1,0 +1,14 @@
+branch=codex/phase3a1b-p6-golden-path
+red_head=29012528145e3f7ae2bf056ba351459b90cd8aa0
+red_origin=29012528145e3f7ae2bf056ba351459b90cd8aa0
+stash_count=27
+protected_present=.agents
+protected_present=.claude
+protected_present=.pnpm-store
+d110a_invocations=0
+long_campaign_invocations=0
+d110c_a_gate_fable_invocations=0
+d110c_a_collaboration_subagents=0
+separate_authorized_d110c_0b_fable_session=fc758ff4-ab4f-434c-9d0a-99d243f8fba0
+package_json_sha256=1baa6c3967e63f1d8af5f1e70c6b6c62e032a90e770f18dd3d86f5cfc40e1a55
+pnpm_lock_sha256=73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99

@@ -1,0 +1,405 @@
+{
+  "floorTransitionObservationCount": 0,
+  "floorTransitionObservations": [],
+  "kind": "summary",
+  "status": "passed",
+  "completedEpochs": 4,
+  "epochs": 4,
+  "repaired": 1,
+  "reopened": 1,
+  "acceptedIssues": 57,
+  "expectedBlocks": 32,
+  "counters": {
+    "timerCallbacks": 5082,
+    "offered": [
+      5082,
+      5082
+    ],
+    "busy": [
+      0,
+      0
+    ],
+    "unavailable": [
+      14,
+      14
+    ],
+    "published": [
+      5068,
+      5065
+    ],
+    "rejected": [
+      0,
+      0
+    ],
+    "received": [
+      4993,
+      4993
+    ],
+    "remote": [
+      43,
+      22
+    ]
+  },
+  "timerMaxGapMs": 265.2358329999988,
+  "eventLoopP99Ms": 58.785791,
+  "eventLoopMaxMs": 276.824063,
+  "observationRows": 29614,
+  "observationFlushes": 61,
+  "observationHighWater": 512,
+  "raw": {
+    "sends": 64,
+    "routes": 2,
+    "reconciliations": 128
+  },
+  "nativeAfterClose": {
+    "files": 20,
+    "bytes": 1093632,
+    "byFile": [
+      {
+        "name": "0e77c3eacaefb824295a69dcf52d3e3b0b697a86fc5c0f02255443c659baf5ca.sqlite.drp-live-journal-v1.sqlite",
+        "bytes": 167936,
+        "kind": "primaryOrOther",
+        "tables": {
+          "accepted_entries": [
+            24,
+            13569
+          ],
+          "retirement_controls": [
+            1,
+            759
+          ],
+          "scopes": [
+            5,
+            28075
+          ]
+        }
+      },
+      {
+        "name": "0f952a1f7f5eceff38a6342dc93becd7abc1893a462e11ec4d3e8788300f53bf.sqlite.drp-issuance-v1.sqlite",
+        "bytes": 49152,
+        "kind": "primaryOrOther",
+        "tables": {
+          "issuance_outbox": [
+            6,
+            870
+          ],
+          "issued_records": [
+            6,
+            3992
+          ],
+          "lineages": [
+            1,
+            104
+          ],
+          "retirement_controls": [
+            1,
+            1135
+          ],
+          "settlement_plans": [
+            1,
+            106
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite",
+        "bytes": 102400,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_chunks_v2": [
+            3,
+            8373
+          ],
+          "snapshot_dependency_slots": [
+            4,
+            648
+          ],
+          "snapshot_owner_v2": [
+            1,
+            0
+          ],
+          "snapshot_retirement_controls": [
+            1,
+            1295
+          ],
+          "snapshot_scopes_v2": [
+            3,
+            25354
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-3.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "5a409435a3ee45078061ca2d518da0b4f44995b49c4fa9d07d81dabb30f10365.sqlite.drp-issuance-v1.sqlite",
+        "bytes": 122880,
+        "kind": "primaryOrOther",
+        "tables": {
+          "issuance_outbox": [
+            59,
+            8555
+          ],
+          "issued_records": [
+            59,
+            38218
+          ],
+          "lineages": [
+            1,
+            104
+          ],
+          "retirement_controls": [
+            1,
+            9367
+          ],
+          "settlement_plans": [
+            1,
+            3327
+          ]
+        }
+      },
+      {
+        "name": "a3154531d65a2ed53616664a30e8a4cbea933bdfda01ff07fb39c0877e7a8078.sqlite",
+        "bytes": 73728,
+        "kind": "primaryOrOther",
+        "tables": {
+          "signing_meta": [
+            2,
+            595
+          ],
+          "signing_rows": [
+            12,
+            21419
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite",
+        "bytes": 57344,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_chunks_v2": [
+            2,
+            5582
+          ],
+          "snapshot_dependency_slots": [
+            4,
+            480
+          ],
+          "snapshot_owner_v2": [
+            1,
+            0
+          ],
+          "snapshot_retirement_controls": [
+            1,
+            1016
+          ],
+          "snapshot_scopes_v2": [
+            2,
+            3151
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-3.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "c7c9970c6cd5d7510fb16b4a0d51db6921cfb37a687ba13ec384bc73ba0b1ca5.sqlite",
+        "bytes": 135168,
+        "kind": "primaryOrOther",
+        "tables": {
+          "blobs": [
+            25,
+            33269
+          ],
+          "generations": [
+            5,
+            5494
+          ],
+          "objects": [
+            1,
+            326
+          ],
+          "promotions": [
+            30,
+            5040
+          ],
+          "retirement_controls": [
+            1,
+            3045
+          ]
+        }
+      },
+      {
+        "name": "cab58fe2ad79324fae6766861782e5899662a6ff976a3ee6b90aff0d4e839279.sqlite",
+        "bytes": 122880,
+        "kind": "primaryOrOther",
+        "tables": {
+          "blobs": [
+            26,
+            35835
+          ],
+          "generations": [
+            5,
+            5482
+          ],
+          "objects": [
+            1,
+            326
+          ],
+          "promotions": [
+            26,
+            4368
+          ],
+          "retirement_controls": [
+            1,
+            3297
+          ]
+        }
+      },
+      {
+        "name": "de385738a40fe24a8e5038b7c6d6138394b459aac5518e7a01ded74d7bea4194.sqlite.drp-live-journal-v1.sqlite",
+        "bytes": 167936,
+        "kind": "primaryOrOther",
+        "tables": {
+          "accepted_entries": [
+            85,
+            32997
+          ],
+          "retirement_controls": [
+            1,
+            1037
+          ],
+          "scopes": [
+            5,
+            53721
+          ]
+        }
+      },
+      {
+        "name": "fa86fe213cfe893e81e84cbb97f5d2055dcc399e2c2c58f9030cc6079ee87626.sqlite",
+        "bytes": 12288,
+        "kind": "primaryOrOther",
+        "tables": {
+          "signing_meta": [
+            2,
+            591
+          ],
+          "signing_rows": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "peer-0-external-floor.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "room_head": [
+            1,
+            651
+          ]
+        }
+      },
+      {
+        "name": "peer-1-external-floor.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "room_head": [
+            1,
+            651
+          ]
+        }
+      }
+    ],
+    "byKind": {
+      "wal": 0,
+      "sharedMemory": 0,
+      "primaryOrOther": 1093632
+    }
+  }
+}

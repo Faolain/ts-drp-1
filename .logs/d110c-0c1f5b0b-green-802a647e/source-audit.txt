@@ -1,0 +1,14 @@
+Only packages/node/src/v3-live.ts changed.
+
+Hunk 1 gates the generic ISSUANCE_OUTCOME_UNKNOWN issuance-rejected return on
+settlementProfileFor(profileId) === "v1". The preceding terminal transaction
+branch remains unchanged and therefore retains precedence. Legacy nonterminal
+signer-resolved ambiguity reaches the unchanged parent admission-rejected arm.
+
+Hunk 2 removes only the join/causalJoin exemptions from the legacy reserved
+rebase predicate. Settlement controls continue to return [] through the first,
+profile-aware isControlOperation clause. No ingress, recovery, sink, fold,
+reservation, codec, store, wire, API, dependency, or threshold seam changed.
+
+Exact precommit production patch SHA-256:
+45d768ccace40f95ee88130342e4e2aea30df9cdda0557c0a0cf9d5caf4d4436

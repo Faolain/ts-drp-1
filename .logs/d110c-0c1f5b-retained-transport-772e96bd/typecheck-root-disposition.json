@@ -1,0 +1,25 @@
+{
+  "authority": "Root explicit continuation disposition",
+  "base": "18e6454593c8774c605bbba9359d4a89d50b7465",
+  "tests": "772e96bdad4f1b881fd547e09e849c97226cb980",
+  "classification": "INHERITED_TYPE_DIAGNOSTICS_REMAIN_OPEN",
+  "targetDiagnostics": 13,
+  "externalDiagnostics": 0,
+  "changedLineDiagnostics": 0,
+  "authorizedHelperRegionOverlap": true,
+  "overlap": {
+    "code": 2322,
+    "currentLine": 461,
+    "baselineLine": 457,
+    "token": "return",
+    "length": 6,
+    "owner": "fakeIssuanceStore",
+    "cause": "Inherited missing-required-settlement-method return typing"
+  },
+  "owner": "Retained transport fixture static contract",
+  "deadline": "Parent static closure",
+  "notTypecheckPass": true,
+  "preservePreflightStatus": 1,
+  "authorizedNext": "Freeze original24 titles from existing list; sole unfiltered24 runtime. No preflight/list/build/baseline rerun or test changes.",
+  "clarification": "Prior agent summary incorrectly described a diagnostic range spanning the return object. Raw d.start/length identifies only the unchanged six-character return token within the authorized helper region; that regional overlap remains explicit."
+}

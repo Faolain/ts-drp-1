@@ -1,0 +1,241 @@
+{
+	"schemaVersion": 2,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "v3-chat.v1",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "action",
+	"workBudgetProfile": "blueprint-work-budget-v1",
+	"operations": [
+		{
+			"name": "acl",
+			"reducerBinding": "aclReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "group",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "kind",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "target",
+						"required": true,
+						"type": "string"
+					}
+				]
+			}
+		},
+		{
+			"name": "applicationBatch",
+			"reducerBinding": "applicationBatchReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "batch",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "causalJoin",
+			"reducerBinding": "causalJoinReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": []
+			}
+		},
+		{
+			"name": "join",
+			"reducerBinding": "joinReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "clientId",
+						"required": true,
+						"type": "string"
+					}
+				]
+			}
+		},
+		{
+			"name": "message",
+			"reducerBinding": "messageReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "clientOperationId",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "text",
+						"required": true,
+						"type": "string"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationActivation",
+			"reducerBinding": "migrationActivationReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "decision",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationRecord",
+			"reducerBinding": "migrationRecordReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "record",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "v3-chat-flat-v1",
+		"seed": "v3-chat-conformance-2026-10-10",
+		"initialState": [],
+		"prCases": [
+			{
+				"id": "batch-negative-zero",
+				"action": "applicationBatch",
+				"arguments": {
+					"batch": {
+						"version": 1,
+						"entries": [
+							{
+								"logicalTime": -0,
+								"operation": {
+									"action": "message",
+									"clientOperationId": "batch-0",
+									"text": "first"
+								}
+							},
+							{
+								"logicalTime": 1,
+								"operation": {
+									"action": "message",
+									"clientOperationId": "batch-1",
+									"text": "second"
+								}
+							}
+						]
+					}
+				}
+			},
+			{
+				"id": "acl",
+				"action": "acl",
+				"arguments": {
+					"group": "writer",
+					"kind": "grant",
+					"target": "alice"
+				}
+			},
+			{
+				"id": "causal-join",
+				"action": "causalJoin",
+				"arguments": {}
+			},
+			{
+				"id": "join",
+				"action": "join",
+				"arguments": {
+					"clientId": "alice"
+				}
+			},
+			{
+				"id": "message",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "message-0",
+					"text": "hello"
+				}
+			},
+			{
+				"id": "migration-activation",
+				"action": "migrationActivation",
+				"arguments": {
+					"decision": {
+						"version": 1
+					}
+				}
+			},
+			{
+				"id": "migration-record",
+				"action": "migrationRecord",
+				"arguments": {
+					"record": {
+						"applicationStateDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"archivePolicy": "retain-source",
+						"authorityKind": "creator-ed25519-registered-vertex-v1",
+						"exactCanonicalApplicationStateBytes": "conformance-only",
+						"kind": "ts-drp-v3-room-migration-record",
+						"rehearsalNonce": "conformance-only",
+						"sourceAcceptedOperationCount": 0,
+						"sourceAcceptedOperationsDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"sourceAnchorDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"sourceBlueprintDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"sourceCreatorAuthor": "conformance-only",
+						"sourceObjectId": "conformance-only",
+						"targetAnchorDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"targetBlueprintDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"targetCreatorAuthor": "conformance-only",
+						"targetImportOperationCount": 0,
+						"targetImportOperationsDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+						"targetObjectId": "conformance-only",
+						"version": 1
+					}
+				}
+			}
+		],
+		"nightlyAdditionalCases": [
+			{
+				"id": "message-unicode",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "message-unicode",
+					"text": "棋 ♟ café"
+				}
+			},
+			{
+				"id": "message-empty",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "message-empty",
+					"text": ""
+				}
+			}
+		]
+	}
+}

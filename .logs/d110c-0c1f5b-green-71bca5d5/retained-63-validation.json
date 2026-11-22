@@ -1,0 +1,55 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-63/result.json",
+  "baselineSha256": "aa39130707492c6404d6a65d3a64b2a8ed9d4beca8b90d1e4bcddc7c9bd15151",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0v replayable callback contract"
+      ],
+      "fullName": "D.110c-0c1f5b0v replayable callback contract documents both existing callback surfaces without changing their type shapes",
+      "status": "passed",
+      "title": "documents both existing callback surfaces without changing their type shapes",
+      "duration": 121.04112499999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0v replayable callback contract"
+      ],
+      "fullName": "D.110c-0c1f5b0v replayable callback contract pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks",
+      "status": "passed",
+      "title": "pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks",
+      "duration": 832.528292,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "72978a669b5effdbb8d8defd1224feed498912a0b63ae68e224dcba184fc9337",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

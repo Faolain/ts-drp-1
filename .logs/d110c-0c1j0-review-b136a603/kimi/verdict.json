@@ -1,0 +1,48 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-1",
+      "finding": "Invite-consumption boundary is enforced in code but unpinned by any test: decodeCreatorInvite calls assertSupportedGenesisLineagePolicy, yet the RED file exercises only createV3RoomCreatorInviteMaterial. No test proves fixed-creator acceptance or reserved-mode D110C_LINEAGE_POLICY_UNSUPPORTED rejection at consumption, so a future refactor could drop the decode-side gate silently.",
+      "evidence": "examples/v3-room/src/index.ts:694; tests/d110c-0c1j0-lineage-policy-red.test.ts:139-157",
+      "owner": "D.110c-0c1j proper (Node acceptedParameterDigest/migration-boundary slice)",
+      "disposition": "Add a consumption-path pin (round-trip encodeCreatorInvite/decodeCreatorInvite with explicit fixed-creator and each reserved mode) when 0c1j proper lands; acceptable for the reservation slice since creation is tested and both paths share one helper."
+    },
+    {
+      "id": "P2-2",
+      "finding": "GREEN evidence misstates Node's parameter schema as 'seven-field'; at b136a603 the protocol-v3 registry-v1.json parameters kind already had eight numeric fields (authorShareMultiplier present). Substantive claim — Node cannot consume explicit-present parameters and this slice makes no live-Node acceptance claim — is correct and appropriately disclaimed.",
+      "evidence": ".logs/d110c-0c1j0-green-b136a603/results.md:11; packages/protocol-v3/registry/registry-v1.json (kinds.parameters.fields); packages/node/src/v3-live.ts:1191",
+      "owner": "evidence keeper for the 0c1j lineage",
+      "disposition": "Correct the field count on the next evidence touch; no re-review needed."
+    },
+    {
+      "id": "P2-3",
+      "finding": "The room-level gate is mode-only: a hand-crafted carrier whose lineagePolicy has mode 'fixed-creator' but grammar-invalid siblings (e.g. maximumEpochs: 10, extra keys, bytes verification key) passes both v3-room boundaries, though the registry builder rejects it and live Node rejects the carrier by schema key set and digest pin. Fail-closed grammar enforcement exists only at the registry layer.",
+      "evidence": "examples/v3-room/src/index.ts:628-642; packages/protocol-v2/src/registry.ts:495-519; packages/node/src/v3-live.ts:1256",
+      "owner": "D.110c-0c1j proper",
+      "disposition": "Acceptable layering for the reservation slice (parameters are digest-bound and Node admission fails closed); revisit only if the example room gate ever becomes the sole admission point."
+    },
+    {
+      "id": "P2-4",
+      "finding": "Validator permits ephemeral-chain with maximumEpochs: null; only the non-ephemeral-modes-must-be-null direction is enforced. The plan shape comment ('ephemeral-chain only; else null') does not state whether ephemeral-chain requires a concrete bound, and the mode is room-rejected today, so this is inert.",
+      "evidence": "packages/protocol-v2/src/registry.ts:504-512",
+      "owner": "D.110c-0c1j proper (ephemeral-chain implementation)",
+      "disposition": "Decide null-vs-required when ephemeral-chain is implemented; no change now."
+    }
+  ],
+  "notes": [
+    "RED causality verified: at 507e5541 the focused file fails 4/5 for the named missing capability — test 1 fails on the registry fields assertion (no lineagePolicy field), tests 2-4 fail with 'unknown field lineagePolicy for registry kind parameters' from makeRegistryPreimageBuilder (registry.ts:560), and the old-binary control (test 5) passes pre- and post-GREEN. Anchor faf0932e is an ancestor of the RED commit; RED and GREEN commits are GPG-signed (G); GREEN did not modify the RED test file, and tests/d110c-0c1j0-lineage-policy-red.test.ts is byte-unchanged since 507e5541.",
+    "Grammar exact in registry.ts:492-519: precisely the four keys enforced (extra/missing rejected); mode limited to fixed-creator|ephemeral-chain|durable-pinned|durable-recursive; maximumEpochs must be null or a non-negative safe integer and non-null only for ephemeral-chain; allowedUpgrade limited to none|recursive-v1; recursiveVerificationKeyId must be string|null, so Uint8Array fails closed (RED 'verification key bytes' case pins this).",
+    "Omission is byte-identical: the builder skips absent optional fields (registry.ts:575-576), and RED test 1 pins the exact 155-byte carrier hex, digest cd31923f..., preimage digest 26af70b1..., pinned genesis anchor da25ccd1..., and anchor parametersDigest — all passing post-GREEN.",
+    "Explicit fixed-creator binds a distinct parameters digest into the anchor and is accepted at material creation (test 2); reserved modes are codec-valid (normalized.lineagePolicy round-trips) and rejected at creation with D110C_LINEAGE_POLICY_UNSUPPORTED (test 3), with the same helper called at invite consumption (v3-room index.ts:694, all five decodeCreatorInvite call sites covered).",
+    "Legacy vectors unmutated: the registry-v5.json diff is purely additive (new parameters-lineagePolicy-fixed-creator vector after parameters-baseline, identical domain convention ts-drp/parameters/v2); registryVersion remains 5 (field-registry.json:2); the golden harness recomputes canonicalHex/partsHex/digestHex for the new vector against both the TS and reference codecs, and the earlier-version byte-identity gate is intact.",
+    "Companion optional-field coverage does not weaken required-field checks: golden-vectors.test.ts:287-292 still asserts required-field presence, omission-throws for required const-less fields, wrong-type-throws and unknown-field-throws for every vector; lineagePolicy is the only optional field in the registry; a coverage vector for it was added to registry-coverage-vectors.json.",
+    "Scope preserved: b136a603 touches only protocol-v2 registry/validator/tests and the example genesis builder examples/v3-room (explicitly owned by the slice); zero changes under packages/protocol-v3, packages/node, manifests, lockfile, wire, or crypto. v3-chat (index.ts:595) and grid (v3-zone.ts:1697) funnel through createV3RoomCreatorInviteMaterial and inherit the gate without edits.",
+    "No hidden Node regression: Node snapshots parameterRegistry from @ts-drp/protocol-v3/registry/registry-v1.json (v3-live.ts:55), untouched by this slice, so PARAMETER_SCHEMA construction (snapshotDenseArray of 8 safe-integer fields) is unaffected; explicit-present lineagePolicy carriers would fail Node admission twice over (unknown key at v3-live.ts:1256 and the supported-digest pin at :1300). GREEN evidence correctly disclaims any live-Node acceptance and defers the acceptedParameterDigest/migration boundary to D.110c-0c1j proper; no prohibited Node edit was demanded or made.",
+    "Evidence manifests are self-excluding (3 entries each for 4-file directories) and the GREEN gates recorded (focused 5/5, retained 33/33 + coverage gate 1/1, builds/typechecks/lint/format/signature) are consistent with the reviewed diff."
+  ]
+}

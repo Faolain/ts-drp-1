@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "--filter",
+    "@ts-drp/node",
+    "typecheck"
+  ],
+  "startedAt": "2026-09-05T21:00:55.430Z",
+  "head": "d8cdb62038f7372d6f458dc43dec84e7a9ab6029",
+  "ownerHashes": {
+    "examples/v3-room/src/index.ts": "0d205ed1d34fcf75663316460ba590f47d53a7e5e2dd4e9229e4b85da9dbaac4",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "1e83897f17208aa05b2b4d82e79b1dd0c14022473a2c3bed2b633e1e406021f6",
+    "packages/node/src/internal/creator-transition-advance.ts": "ddf78cc0ff8bda651982fe7d2d926192baf90796ed2dbd78ee4340ff18c599b4",
+    "packages/node/src/v3-live.ts": "639a9b0fa1f6bbfcc04bb11b7c25eacc2a65e574354903224018e25ebeaa9c41",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+    "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "9eabd6692fcbc7232a0fc160692b37423e9ec0af0df8f35b39ddfdad6401eda0"
+  }
+}

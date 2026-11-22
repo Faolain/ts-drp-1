@@ -1,0 +1,74 @@
+name: Protocol v3 pacemaker profile freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-pacemaker-profile:
+    name: Require immutable protocol-v3 pacemaker profile supplement
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: "10.24.0"
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Run merge-base-pinned pacemaker profile checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/supplements/pacemaker-profile-v1/check-freeze.mjs
+          POLICY: packages/protocol-v3/supplements/pacemaker-profile-v1/freeze-policy.json
+          PROFILE: packages/protocol-v3/supplements/pacemaker-profile-v1/profile.json
+          SCHEMA: packages/protocol-v3/supplements/pacemaker-profile-v1/schema.json
+          SPECIFICATION: packages/protocol-v3/supplements/pacemaker-profile-v1/spec.md
+          VECTORS: packages/protocol-v3/supplements/pacemaker-profile-v1/vectors.json
+          WORKFLOW: .github/workflows/protocol-v3-pacemaker-profile.yml
+          RED_TEST: tests/phase-5d-pacemaker-law-red.test.ts
+          RED_CONTRACT: tests/fixtures/phase-5d-v3/pacemaker-law-contract.json
+        run: |
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-pacemaker-profile-base.mjs"
+            PROTOCOL_V3_PACEMAKER_PROFILE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-pacemaker-profile-base.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$POLICY" \
+            && ! git cat-file -e "$BASE_SHA:$PROFILE" \
+            && ! git cat-file -e "$BASE_SHA:$SCHEMA" \
+            && ! git cat-file -e "$BASE_SHA:$SPECIFICATION" \
+            && ! git cat-file -e "$BASE_SHA:$VECTORS" \
+            && ! git cat-file -e "$BASE_SHA:$WORKFLOW" \
+            && ! git cat-file -e "$BASE_SHA:$RED_TEST" \
+            && ! git cat-file -e "$BASE_SHA:$RED_CONTRACT"; then
+            PROTOCOL_V3_PACEMAKER_PROFILE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" node "$CHECKER" "$BASE_SHA"
+          else
+            echo "Pacemaker profile bootstrap is fail-closed and atomic." >&2
+            exit 1
+          fi
+          PROTOCOL_V3_PACEMAKER_PROFILE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" node "$CHECKER" "$BASE_SHA"
+      - name: Run Phase 5d formal gate when the model lands
+        env:
+          APALACHE_VERSION: "0.56.1"
+          FORMAL_MODEL: packages/seal/formal/seal-pacemaker.qnt
+        run: |
+          if [ -f "$FORMAL_MODEL" ]; then
+            pnpm run phase5d:formal
+          else
+            echo "Phase 5d formal model is not present yet; formal success is not claimed."
+          fi

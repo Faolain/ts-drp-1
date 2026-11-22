@@ -1,0 +1,9 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/closed-epoch-cleanup.ts
+  482:1  warning  Duplicate @param "input.settlement"                  jsdoc/check-param-names
+  482:1  warning  Missing JSDoc @param "input.settlement" description  jsdoc/require-param-description
+  482:1  warning  Duplicate @param "input.settlement"                  jsdoc/check-param-names
+  482:1  warning  Missing JSDoc @param "input.settlement" description  jsdoc/require-param-description
+
+✖ 4 problems (0 errors, 4 warnings)
+

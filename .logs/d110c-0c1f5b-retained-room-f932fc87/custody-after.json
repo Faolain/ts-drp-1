@@ -1,0 +1,189 @@
+{
+  "stage": "after",
+  "head": "f932fc87cab77e22b2d3994b8af288e9e491547a",
+  "signature": "G",
+  "productionHashes": {
+    "examples/v3-room/src/index.ts": "9bbef5c26be7281ecc5676a557000e32d5e2df273825b41b3d216e4087049082",
+    "packages/node/src/creator-adoption.ts": "a668a8c02f28cb4f936a0883fdaeee37a327774860fe173213fba0c0e3ab870a",
+    "packages/node/src/creator-close.ts": "df18f730c730533c7943d41dab1f26cab3718b1206f35a2bae50da82cc499c9d",
+    "packages/node/src/internal/creator-transition-advance.ts": "3275d9c48d5c73cd657ac4c919d1d6d3c880804a4ffc961814e8248a2d336a30",
+    "packages/node/src/v3-live.ts": "389f6d9104b25ac58ef3f4b8e3b5fe6e33f4c516ae167926c9edbcc56265e602",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "83b9951b8257ba83fbfe48774d67dfda67f38a724f97b792891d55230af206e0",
+    "packages/protocol-v3/src/creator-close.ts": "9be57652a1fc7a8bb90e5642ed080607f6125e4978e6a3c99d913033116327ee",
+    "packages/node/src/internal/closed-epoch-cleanup.ts": "cc0008bb180d02c434a3355c54b03365434ed348198fc9bba452fa66e73ac2d3"
+  },
+  "productionPreserved": true,
+  "partialPatchSha256": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+  "stashCount": 27,
+  "stashesSha256": "b426dba61f4f05787e77e297b02dd2ed84ef692908df757777f0c328c1d0e9c3",
+  "protectedPaths": 86522,
+  "allProtectedPathsExist": true,
+  "retainedHashes": {
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts": "3eaf77c0438df09af30509c839531e78576a5fe6e88c70ea2983ee997807c885",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts": "b0f2f3a2d45c39a7798845e4312b8d55201a4a6f6de3b0a05a34ad24e615b2e6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/transient-payload-application.ts": "47890a195e57bf0f1f14a573270c7cfdcd8af95ca841e50e236481fd9c0215a6",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts": "18a6166b71b9cfee0ecaeb91ce521daebc5aba8efdffa7fe858465805c3fd14c",
+    "tests/phase-5a-c-seal-safety-red.test.ts": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+    "tests/phase-5e-creator-actor-red.test.ts": "f589a071a3844c31254ec648d2c0a6cf29b2f14cf29551d58556a24cbb48c906",
+    "tests/fixtures/phase-5-v3/seal-types.ts": "002405797fbeec6ddcb18c28f2261ba27b28d5e601cfd8a73b586d20077488d8",
+    "tests/fixtures/phase-5e-v3/creator-actor-contract.ts": "627b4dd02f716a3b457dc718f27e0ae9ec98a432fe8f68b2f4622d9f64ecb1ae"
+  },
+  "spans": [
+    {
+      "start": 122,
+      "end": 186,
+      "text": "import { encodeCanonical, hashDomain } from \"@ts-drp/canonical\";"
+    },
+    {
+      "start": 9895,
+      "end": 12424,
+      "text": "function invite(anchor: string): V3RoomCreatorInviteMaterial {\n\t// These canonical records exercise room composition under the existing mocked trust boundary.\n\t// The a/b pins and detached signatures remain markers, not authenticated genesis proof.\n\tconst objectId = `creator:${\"d\".repeat(32)}`;\n\tconst creator = \"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\";\n\tconst digest = (domain: string, bytes: Uint8Array): string =>\n\t\tArray.from(hashDomain(domain, bytes), (byte) => byte.toString(16).padStart(2, \"0\")).join(\"\");\n\tconst signerSet = [{ publicKey: creator, signerId: \"creator\" }];\n\tconst exactCanonicalSignerSetBytes = encodeCanonical(signerSet);\n\tconst exactCanonicalProfileBytes = encodeCanonical({\n\t\tcryptoSuiteId: \"ed25519-sha256-v3\",\n\t\tprofileId: \"creator-trusted-v1\",\n\t\tquorum: 1,\n\t\tsigners: signerSet,\n\t});\n\tconst exactCanonicalLatchedAclBytes = encodeCanonical({\n\t\tepoch: 0,\n\t\tkind: \"drp-v3-latched-acl\",\n\t\tmembers: [{ author: creator, finalityKey: creator, groups: [\"admin\", \"finality\", \"writer\"] }],\n\t\tobjectId,\n\t\tpermissionless: false,\n\t\tversion: 1,\n\t});\n\tconst exactCanonicalParametersCarrierBytes = encodeCanonical({\n\t\tmaxEpochVertices: 8192,\n\t\tmaxEpochBytes: 8_388_608,\n\t\tmaxDependencies: 16,\n\t\tsnapshotChunkBytes: 131_072,\n\t\tmaxSnapshotBytes: 268_435_456,\n\t\tmaxPendingEntries: 4096,\n\t\tmaxPendingBytes: 16_777_216,\n\t});\n\tconst emptyRoot = \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\";\n\tconst exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({\n\t\taclDigest: digest(\"ts-drp/latched-acl/v3\", exactCanonicalLatchedAclBytes),\n\t\tarchiveIndexRoot: emptyRoot,\n\t\tblueprintDigest: \"b\".repeat(64),\n\t\tcryptoSuiteId: \"ed25519-sha256-v3\",\n\t\tcutDigest: \"0\".repeat(64),\n\t\tepoch: 0,\n\t\thistoryRoot: emptyRoot,\n\t\thistorySize: 0,\n\t\tkind: \"drp-epoch-anchor\",\n\t\tobjectId,\n\t\tparametersDigest: digest(\"ts-drp/parameters/v3\", exactCanonicalParametersCarrierBytes),\n\t\tpreviousAnchor: \"0\".repeat(64),\n\t\tprofileDigest: digest(\"ts-drp/profile/v3\", exactCanonicalProfileBytes),\n\t\tprotocolMajor: 3,\n\t\tsignerSetDigest: digest(\"ts-drp/signer-set/v3\", exactCanonicalSignerSetBytes),\n\t\tstateDigest: digest(\"ts-drp/state/v3\", encodeCanonical({ anchor })),\n\t});\n\treturn Object.freeze({\n\t\tdetachedGenesisSignature: new Uint8Array(64).fill(anchor === \"a\".repeat(64) ? 1 : 2),\n\t\texactCanonicalGenesisAnchorPreimageBytes,\n\t\texactCanonicalLatchedAclBytes,\n\t\texactCanonicalParametersCarrierBytes,\n\t\texactCanonicalProfileBytes,\n\t\texactCanonicalSignerSetBytes,\n\t\tpinnedGenesisAnchorDigest: anchor,\n\t});\n}"
+    },
+    {
+      "start": 19397,
+      "end": 19818,
+      "text": "encodeCanonical({\n\t\t\t\t\tepoch: 0,\n\t\t\t\t\tkind: \"drp-v3-latched-acl\",\n\t\t\t\t\tmembers: [\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\tauthor: \"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\n\t\t\t\t\t\t\tfinalityKey: \"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\n\t\t\t\t\t\t\tgroups: [\"admin\", \"finality\", \"writer\"],\n\t\t\t\t\t\t},\n\t\t\t\t\t],\n\t\t\t\t\tobjectId: `creator:${\"d\".repeat(32)}`,\n\t\t\t\t\tpermissionless: false,\n\t\t\t\t\tversion: 1,\n\t\t\t\t})"
+    }
+  ],
+  "priorSpans": [
+    {
+      "start": 122,
+      "end": 174,
+      "text": "import { encodeCanonical } from \"@ts-drp/canonical\";"
+    },
+    {
+      "start": 9883,
+      "end": 10402,
+      "text": "function invite(anchor: string): V3RoomCreatorInviteMaterial {\n\treturn Object.freeze({\n\t\tdetachedGenesisSignature: new Uint8Array(64).fill(anchor === \"a\".repeat(64) ? 1 : 2),\n\t\texactCanonicalGenesisAnchorPreimageBytes: Uint8Array.of(anchor === \"a\".repeat(64) ? 1 : 2),\n\t\texactCanonicalLatchedAclBytes: Uint8Array.of(3),\n\t\texactCanonicalParametersCarrierBytes: Uint8Array.of(4),\n\t\texactCanonicalProfileBytes: Uint8Array.of(5),\n\t\texactCanonicalSignerSetBytes: Uint8Array.of(6),\n\t\tpinnedGenesisAnchorDigest: anchor,\n\t});\n}"
+    },
+    {
+      "start": 17375,
+      "end": 17391,
+      "text": "Uint8Array.of(3)"
+    }
+  ],
+  "syntaxDiagnostics": 0,
+  "allOutsideAuthorizedSpansPreserved": true,
+  "titles": [
+    "separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+    "recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+    "does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+    "rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+    "retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+    "orders exact rebase and transform inputs while expire and held review perform no issue",
+    "closes one source exactly once after every child has a terminal outcome",
+    "preserves published source work and completes pending work only after target acceptance",
+    "batches sixteen compatible rebases behind one target signature",
+    "splits seventeen compatible rebases into sixteen plus one",
+    "refuses a foreign-author displaced intent before signing or issuing",
+    "sorts displaced pages before assigning fresh target logical times",
+    "suppresses an accepted exact identity before issue and rejects changed bytes",
+    "keeps the source pending and terminally exposes target issue or publication failure",
+    "keeps a failed source completion pending and retries it on reopen",
+    "fails unknown policy and unstable transform identity before target issuance",
+    "keeps a transformed source pending when the product projection rejects its replacement",
+    "keeps a recovered projection-rejected replacement and its source pending without reissue",
+    "rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+    "keeps the reserved terminal activation outside the real chat and zone displacement policies"
+  ],
+  "immutable": [
+    {
+      "name": "d110c-0c1f5b0r-design-3a156aca",
+      "entries": 3,
+      "manifestSha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-observer-78e068a8",
+      "entries": 63,
+      "manifestSha256": "fb5f83746c7690a6c53cdccd5edc3821687042ed2832ed6165b862407f488148"
+    },
+    {
+      "name": "d110c-0c1f5b-red-checkpoint-link-f83764c5",
+      "entries": 71,
+      "manifestSha256": "606860edd135b91fbd1eb71b3ebed39caaa80860485024bff1564a7d65797a39"
+    },
+    {
+      "name": "d110c-0c1f5b-green-d8cdb620",
+      "entries": 77,
+      "manifestSha256": "0f4facc68a059323e1d8aa9d76b0c7ecaea9d43a74684f70cb2643b3bd34993f"
+    },
+    {
+      "name": "d110c-0c1f5b-green-729be70e",
+      "entries": 61,
+      "manifestSha256": "432a74a1d229346b225e96e7314435271e32acb653f8d1012c48aade4d565be0"
+    },
+    {
+      "name": "d110c-0c1f5b-red-scalar-6353eb61",
+      "entries": 75,
+      "manifestSha256": "4590049f6472fd0eb5699ed795289803ad3ca7197545356b5049ccf4ba77d0f0"
+    },
+    {
+      "name": "d110c-0c1f5b-green-89f147cc",
+      "entries": 137,
+      "manifestSha256": "9ee19175cda3b5a1db33319c16478b3c01f3ea5c30db08a1d0a99566c3c4ef4c"
+    },
+    {
+      "name": "d110c-0c1f5b-retained-counter-bc7d615b",
+      "entries": 66,
+      "manifestSha256": "aade868d5db834154c300c5d60a68cc217a792f8eecc90c4e8811b67d9d9a69d"
+    },
+    {
+      "name": "d110c-0c1f5b-green-ab98cce6",
+      "entries": 458,
+      "manifestSha256": "16888af6758fb12fa0cf4c55cf231babac0b468665e04b7a8e6f4976a4f41523"
+    },
+    {
+      "name": "d110c-0c1f5b-retained-finality-867d7f09",
+      "entries": 89,
+      "manifestSha256": "2ef800b9201a882c3c0c1cf1910bdf3cd470cb01f5420640e1cd9cbfeca7ed76"
+    },
+    {
+      "name": "d110c-0c1f5b-green-finality-140a3053",
+      "entries": 15,
+      "manifestSha256": "64919377b2fabf9fda671d2bc3554a11f2c095069f400ad821494bd2539ab4a3"
+    }
+  ],
+  "testSha256": "22e809bf725bebb2c3f85642ae3c9857fcc90c218ed1e9886ffe8cf903276d2f",
+  "sourceAttribution": {
+    "functions": [
+      {
+        "name": "assertSupportedGenesisLineagePolicy",
+        "signed": "function assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes: Uint8Array): void {\n\tconst parameters = decodeCanonical(exactCanonicalParametersCarrierBytes);\n\tif (parameters === null || typeof parameters !== \"object\" || Array.isArray(parameters)) return;\n\tif (!Object.hasOwn(parameters, \"lineagePolicy\")) return;\n\tconst lineagePolicy = (parameters as Readonly<Record<string, unknown>>).lineagePolicy;\n\tif (lineagePolicy === null || typeof lineagePolicy !== \"object\" || Array.isArray(lineagePolicy)) {\n\t\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n\t}\n\tconst mode = (lineagePolicy as Readonly<Record<string, unknown>>).mode;\n\tif (mode === \"fixed-creator\") return;\n\tif (mode === \"ephemeral-chain\" || mode === \"durable-pinned\" || mode === \"durable-recursive\") {\n\t\tthrow new TypeError(UNSUPPORTED_LINEAGE_POLICY);\n\t}\n\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n}",
+        "pending": "function assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes: Uint8Array): void {\n\tconst parameters = decodeCanonical(exactCanonicalParametersCarrierBytes);\n\tif (parameters === null || typeof parameters !== \"object\" || Array.isArray(parameters)) return;\n\tif (!Object.hasOwn(parameters, \"lineagePolicy\")) return;\n\tconst lineagePolicy = (parameters as Readonly<Record<string, unknown>>).lineagePolicy;\n\tif (lineagePolicy === null || typeof lineagePolicy !== \"object\" || Array.isArray(lineagePolicy)) {\n\t\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n\t}\n\tconst mode = (lineagePolicy as Readonly<Record<string, unknown>>).mode;\n\tif (mode === \"fixed-creator\") return;\n\tif (mode === \"ephemeral-chain\" || mode === \"durable-pinned\" || mode === \"durable-recursive\") {\n\t\tthrow new TypeError(UNSUPPORTED_LINEAGE_POLICY);\n\t}\n\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n}"
+      },
+      {
+        "name": "decodeCreatorInvite",
+        "signed": "function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {\n\tconst encoded = bytes(invite);\n\tconst decoded = decodeCanonical(encoded, { maxBytes: 65_536, maxDepth: 4, maxItems: 128 });\n\tif (\n\t\ttypeof decoded !== \"object\" ||\n\t\tdecoded === null ||\n\t\tObject.getPrototypeOf(decoded) !== null ||\n\t\t!sameBytes(encodeCanonical(decoded), encoded)\n\t) {\n\t\tthrow new TypeError(\"v3 room creator invite is invalid\");\n\t}\n\tconst keys = Reflect.ownKeys(decoded);\n\tif (\n\t\tkeys.length !== CREATOR_INVITE_KEYS.length ||\n\t\tkeys.some((key) => typeof key !== \"string\" || !CREATOR_INVITE_KEYS.includes(key))\n\t) {\n\t\tthrow new TypeError(\"v3 room creator invite fields are invalid\");\n\t}\n\tconst record = decoded as Record<string, unknown>;\n\tconst values = Object.fromEntries(\n\t\tCREATOR_INVITE_KEYS.map((key) => {\n\t\t\tconst descriptor = Object.getOwnPropertyDescriptor(record, key);\n\t\t\tif (descriptor === undefined || !(\"value\" in descriptor) || descriptor.enumerable !== true) {\n\t\t\t\tthrow new TypeError(\"v3 room creator invite field ownership is invalid\");\n\t\t\t}\n\t\t\treturn [key, descriptor.value] as const;\n\t\t})\n\t) as Record<(typeof CREATOR_INVITE_KEYS)[number], unknown>;\n\tif (values.kind !== \"ts-drp-example-v3-room-creator-invite\" || values.version !== 1) {\n\t\tthrow new TypeError(\"v3 room creator invite version is invalid\");\n\t}\n\tif (\n\t\ttypeof values.pinnedGenesisAnchorDigest !== \"string\" ||\n\t\t!/^[0-9a-f]{64}$/u.test(values.pinnedGenesisAnchorDigest)\n\t) {\n\t\tthrow new TypeError(\"v3 room creator invite anchor is invalid\");\n\t}\n\tconst detachedGenesisSignature = inviteBytes(values, \"detachedGenesisSignature\");\n\tif (detachedGenesisSignature.byteLength !== 64) {\n\t\tthrow new TypeError(\"v3 room creator invite signature is invalid\");\n\t}\n\tconst exactCanonicalParametersCarrierBytes = inviteBytes(values, \"exactCanonicalParametersCarrierBytes\");\n\tassertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes);\n\treturn Object.freeze({\n\t\tdetachedGenesisSignature,\n\t\texactCanonicalLatchedAclBytes: inviteBytes(values, \"exactCanonicalLatchedAclBytes\"),\n\t\texactCanonicalGenesisAnchorPreimageBytes: inviteBytes(values, \"exactCanonicalGenesisAnchorPreimageBytes\"),\n\t\texactCanonicalParametersCarrierBytes,\n\t\texactCanonicalProfileBytes: inviteBytes(values, \"exactCanonicalProfileBytes\"),\n\t\texactCanonicalSignerSetBytes: inviteBytes(values, \"exactCanonicalSignerSetBytes\"),\n\t\tpinnedGenesisAnchorDigest: values.pinnedGenesisAnchorDigest,\n\t});\n}",
+        "pending": "function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {\n\tconst encoded = bytes(invite);\n\tconst decoded = decodeCanonical(encoded, { maxBytes: 65_536, maxDepth: 4, maxItems: 128 });\n\tif (\n\t\ttypeof decoded !== \"object\" ||\n\t\tdecoded === null ||\n\t\tObject.getPrototypeOf(decoded) !== null ||\n\t\t!sameBytes(encodeCanonical(decoded), encoded)\n\t) {\n\t\tthrow new TypeError(\"v3 room creator invite is invalid\");\n\t}\n\tconst keys = Reflect.ownKeys(decoded);\n\tif (\n\t\tkeys.length !== CREATOR_INVITE_KEYS.length ||\n\t\tkeys.some((key) => typeof key !== \"string\" || !CREATOR_INVITE_KEYS.includes(key))\n\t) {\n\t\tthrow new TypeError(\"v3 room creator invite fields are invalid\");\n\t}\n\tconst record = decoded as Record<string, unknown>;\n\tconst values = Object.fromEntries(\n\t\tCREATOR_INVITE_KEYS.map((key) => {\n\t\t\tconst descriptor = Object.getOwnPropertyDescriptor(record, key);\n\t\t\tif (descriptor === undefined || !(\"value\" in descriptor) || descriptor.enumerable !== true) {\n\t\t\t\tthrow new TypeError(\"v3 room creator invite field ownership is invalid\");\n\t\t\t}\n\t\t\treturn [key, descriptor.value] as const;\n\t\t})\n\t) as Record<(typeof CREATOR_INVITE_KEYS)[number], unknown>;\n\tif (values.kind !== \"ts-drp-example-v3-room-creator-invite\" || values.version !== 1) {\n\t\tthrow new TypeError(\"v3 room creator invite version is invalid\");\n\t}\n\tif (\n\t\ttypeof values.pinnedGenesisAnchorDigest !== \"string\" ||\n\t\t!/^[0-9a-f]{64}$/u.test(values.pinnedGenesisAnchorDigest)\n\t) {\n\t\tthrow new TypeError(\"v3 room creator invite anchor is invalid\");\n\t}\n\tconst detachedGenesisSignature = inviteBytes(values, \"detachedGenesisSignature\");\n\tif (detachedGenesisSignature.byteLength !== 64) {\n\t\tthrow new TypeError(\"v3 room creator invite signature is invalid\");\n\t}\n\tconst exactCanonicalParametersCarrierBytes = inviteBytes(values, \"exactCanonicalParametersCarrierBytes\");\n\tassertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes);\n\treturn Object.freeze({\n\t\tdetachedGenesisSignature,\n\t\texactCanonicalLatchedAclBytes: inviteBytes(values, \"exactCanonicalLatchedAclBytes\"),\n\t\texactCanonicalGenesisAnchorPreimageBytes: inviteBytes(values, \"exactCanonicalGenesisAnchorPreimageBytes\"),\n\t\texactCanonicalParametersCarrierBytes,\n\t\texactCanonicalProfileBytes: inviteBytes(values, \"exactCanonicalProfileBytes\"),\n\t\texactCanonicalSignerSetBytes: inviteBytes(values, \"exactCanonicalSignerSetBytes\"),\n\t\tpinnedGenesisAnchorDigest: values.pinnedGenesisAnchorDigest,\n\t});\n}"
+      },
+      {
+        "name": "migrationCreatorAuthor",
+        "signed": "function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {\n\tconst decoded = decodeCanonical(material.exactCanonicalLatchedAclBytes, {\n\t\tmaxBytes: 65_536,\n\t\tmaxDepth: 6,\n\t\tmaxItems: 512,\n\t});\n\tconst members = exactDenseArray(\n\t\tdecoded !== null && typeof decoded === \"object\" ? Reflect.get(decoded, \"members\") : undefined\n\t);\n\tconst candidates = (members ?? []).flatMap((value) => {\n\t\tconst member = exactRecord(value, [\"author\", \"finalityKey\", \"groups\"]);\n\t\tconst groups = exactDenseArray(member?.groups);\n\t\treturn member !== undefined &&\n\t\t\ttypeof member.author === \"string\" &&\n\t\t\t/^[0-9a-f]{64}$/u.test(member.author) &&\n\t\t\tmember.finalityKey === member.author &&\n\t\t\tgroups?.includes(\"admin\") === true &&\n\t\t\tgroups.includes(\"finality\") &&\n\t\t\tgroups.includes(\"writer\")\n\t\t\t? [member.author]\n\t\t\t: [];\n\t});\n\tif (candidates.length !== 1) {\n\t\tthrow new TypeError(\"v3 room migration creator application author is invalid\");\n\t}\n\treturn candidates[0] as string;\n}",
+        "pending": "function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {\n\tconst decoded = migrationLatchedAcl(material);\n\tconst members = exactDenseArray(\n\t\tdecoded !== null && typeof decoded === \"object\" ? Reflect.get(decoded, \"members\") : undefined\n\t);\n\tconst candidates = (members ?? []).flatMap((value) => {\n\t\tconst member = exactRecord(value, [\"author\", \"finalityKey\", \"groups\"]);\n\t\tconst groups = exactDenseArray(member?.groups);\n\t\treturn member !== undefined &&\n\t\t\ttypeof member.author === \"string\" &&\n\t\t\t/^[0-9a-f]{64}$/u.test(member.author) &&\n\t\t\tmember.finalityKey === member.author &&\n\t\t\tgroups?.includes(\"admin\") === true &&\n\t\t\tgroups.includes(\"finality\") &&\n\t\t\tgroups.includes(\"writer\")\n\t\t\t? [member.author]\n\t\t\t: [];\n\t});\n\tif (candidates.length !== 1) {\n\t\tthrow new TypeError(\"v3 room migration creator application author is invalid\");\n\t}\n\treturn candidates[0] as string;\n}"
+      },
+      {
+        "name": "migrationInviteAuthority",
+        "signed": "function migrationInviteAuthority(material: V3RoomCreatorInviteMaterial): Readonly<{\n\treadonly blueprintDigest: string;\n\treadonly creatorAuthor: string;\n\treadonly objectId: string;\n\treadonly signerSetDigest: string;\n}> {\n\tconst preimage = decodeCanonical(material.exactCanonicalGenesisAnchorPreimageBytes, {\n\t\tmaxBytes: 65_536,\n\t\tmaxDepth: 4,\n\t\tmaxItems: 128,\n\t});\n\tconst blueprintDigest =\n\t\tpreimage !== null && typeof preimage === \"object\" ? Reflect.get(preimage, \"blueprintDigest\") : undefined;\n\tconst objectId = preimage !== null && typeof preimage === \"object\" ? Reflect.get(preimage, \"objectId\") : undefined;\n\tconst acl = decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });\n\tconst aclObjectId = acl !== null && typeof acl === \"object\" ? Reflect.get(acl, \"objectId\") : undefined;\n\tif (\n\t\tpreimage === null ||\n\t\ttypeof preimage !== \"object\" ||\n\t\ttypeof blueprintDigest !== \"string\" ||\n\t\t!/^[0-9a-f]{64}$/u.test(blueprintDigest) ||\n\t\ttypeof objectId !== \"string\" ||\n\t\taclObjectId !== objectId\n\t) {\n\t\tthrow new TypeError(\"v3 room migration invite authority is invalid\");\n\t}\n\treturn Object.freeze({\n\t\tblueprintDigest,\n\t\tcreatorAuthor: migrationCreatorAuthor(material),\n\t\tobjectId,\n\t\tsignerSetDigest: digest(\"ts-drp/signer-set/v3\", material.exactCanonicalSignerSetBytes),\n\t});\n}",
+        "pending": "function migrationInviteAuthority(material: V3RoomCreatorInviteMaterial): Readonly<{\n\treadonly blueprintDigest: string;\n\treadonly creatorAuthor: string;\n\treadonly objectId: string;\n\treadonly signerSetDigest: string;\n}> {\n\tconst preimage = decodeCanonical(material.exactCanonicalGenesisAnchorPreimageBytes, {\n\t\tmaxBytes: 65_536,\n\t\tmaxDepth: 4,\n\t\tmaxItems: 128,\n\t});\n\tconst blueprintDigest =\n\t\tpreimage !== null && typeof preimage === \"object\" ? Reflect.get(preimage, \"blueprintDigest\") : undefined;\n\tconst objectId = preimage !== null && typeof preimage === \"object\" ? Reflect.get(preimage, \"objectId\") : undefined;\n\tconst acl = migrationLatchedAcl(material);\n\tconst aclObjectId = acl !== null && typeof acl === \"object\" ? Reflect.get(acl, \"objectId\") : undefined;\n\tif (\n\t\tpreimage === null ||\n\t\ttypeof preimage !== \"object\" ||\n\t\ttypeof blueprintDigest !== \"string\" ||\n\t\t!/^[0-9a-f]{64}$/u.test(blueprintDigest) ||\n\t\ttypeof objectId !== \"string\" ||\n\t\taclObjectId !== objectId\n\t) {\n\t\tthrow new TypeError(\"v3 room migration invite authority is invalid\");\n\t}\n\treturn Object.freeze({\n\t\tblueprintDigest,\n\t\tcreatorAuthor: migrationCreatorAuthor(material),\n\t\tobjectId,\n\t\tsignerSetDigest: digest(\"ts-drp/signer-set/v3\", material.exactCanonicalSignerSetBytes),\n\t});\n}"
+      },
+      {
+        "name": "migrationLatchedAcl",
+        "signed": null,
+        "pending": "function migrationLatchedAcl(material: V3RoomCreatorInviteMaterial): unknown {\n\tconst profile = decodeCanonical(material.exactCanonicalProfileBytes);\n\tconst settlement =\n\t\tprofile !== null && typeof profile === \"object\" && settlementProfileFor(Reflect.get(profile, \"profileId\")) === \"v1\";\n\tconst decoded = decodeCanonical(material.exactCanonicalLatchedAclBytes, {\n\t\tmaxBytes: 65_536,\n\t\tmaxDepth: settlement ? 4 : 6,\n\t\tmaxItems: settlement ? 8_192 : 512,\n\t});\n\tif (\n\t\tsettlement &&\n\t\tdecoded !== null &&\n\t\ttypeof decoded === \"object\" &&\n\t\tReflect.get(decoded, \"version\") === 3 &&\n\t\t(exactDenseArray(Reflect.get(decoded, \"members\"))?.length ?? Infinity) <= 256\n\t)\n\t\treturn decoded;\n\treturn decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });\n}"
+      }
+    ],
+    "attributionHashes": {
+      "packages/protocol-v3/registry/registry-v1.json": "663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190",
+      "packages/protocol-v3/src/index.ts": "54b8bcbc5cee28daba0e831d40a9dad31bdceb440d364dd337c09553648766ca",
+      "packages/protocol-v3/src/latched-acl.ts": "f8c7e85b996f9e9fafd0e23b8509e6cd9a684b625e052afcee158a1cd039efc1",
+      "packages/compaction/src/ct-merkle.ts": "921d7f0cff4ae5533b40d098cb2e0b7c49db503fe244762740dfef1316d5f302",
+      "tests/fixtures/phase-3g/rebase-outbox-fixture.ts": "26965b64f44f40f1e55a64e62c3247d8a2dbbc1c981b86e79a7517da88a6a577"
+    },
+    "controlledCompositionNotAuthenticatedGenesis": true,
+    "legacyProfile": true,
+    "sevenRequiredNumericParameters": true,
+    "independentAclExpectation": true,
+    "noProductionChanges": true
+  },
+  "trackedStatus": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/closed-epoch-cleanup.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts"
+}

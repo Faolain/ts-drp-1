@@ -1,0 +1,12 @@
+{
+  "command": [
+    "node",
+    ".logs/d110c-0c1f5b-green-79743f98/bounds.mjs"
+  ],
+  "startedAt": "2026-09-05T15:43:25.889Z",
+  "endedAt": "2026-09-05T15:43:26.047Z",
+  "status": 0,
+  "signal": null,
+  "stdout": "{\n  \"measurementOnlyLimits\": {\n    \"maxBytes\": 1048576,\n    \"maxDepth\": 16,\n    \"maxItems\": 16384\n  },\n  \"productLimits\": {\n    \"stateBytes\": 32768,\n    \"batchBytes\": 65536\n  },\n  \"at33000\": {\n    \"singleMessageState\": 33046,\n    \"twoIntentBatch\": 66237,\n    \"mainSecondCloseState\": 33271,\n    \"mainFinalMessages\": 66518,\n    \"wideFinal262Messages\": 210773\n  },\n  \"minimalEqualTextForBatchOverflow\": 32650,\n  \"maximumEqualTextWithinState\": {\n    \"mainSecondClose\": 32497,\n    \"mainFinal\": 16126,\n    \"wideFinal\": 3333\n  },\n  \"proposedSmallTransform256\": {\n    \"mainFinal\": 1028,\n    \"wideFinal\": 14303,\n    \"batch\": 747\n  }\n}\n",
+  "stderr": ""
+}

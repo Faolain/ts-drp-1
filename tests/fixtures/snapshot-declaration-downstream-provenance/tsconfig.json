@@ -1,0 +1,29 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2023",
+		"paths": {
+			"@ts-drp/canonical": ["./packages/canonical/dist/src/index.d.ts"],
+			"@ts-drp/control-plane": ["./packages/control-plane/dist/src/index.d.ts"],
+			"@ts-drp/issuance-store": ["./packages/issuance-store/dist/src/index.d.ts"],
+			"@ts-drp/live-journal": ["./packages/live-journal/dist/src/index.d.ts"],
+			"@ts-drp/message-queue": ["./packages/message-queue/dist/src/index.d.ts"],
+			"@ts-drp/types": ["./packages/types/dist/src/index.d.ts"],
+			"@ts-drp/*": ["./packages/*"]
+		}
+	},
+	"files": [
+		"child.ts",
+		"pull.test.ts",
+		"vitest.config.mts",
+		"vitest.workspace.ts",
+		"vitest.red.config.mts",
+		"vitest.red.workspace.ts",
+		"../../snapshot-declaration-downstream-provenance-red.test.ts"
+	],
+	"include": []
+}

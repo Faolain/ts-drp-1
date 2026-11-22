@@ -1,0 +1,16 @@
+{
+  "label": "main-typecheck",
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "budgetMs": 120000,
+  "command": [
+    "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/typecheck.mjs",
+    "main"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "testsExecuted": 0
+}

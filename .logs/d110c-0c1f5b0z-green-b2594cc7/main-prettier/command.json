@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "packages/storage/src/maintenance.ts",
+    "packages/storage-browser/src/internal/ahe-reclamation.ts",
+    "packages/storage-node/src/internal/ahe-reclamation.ts"
+  ],
+  "start": "2026-09-05T19:57:08.839Z"
+}

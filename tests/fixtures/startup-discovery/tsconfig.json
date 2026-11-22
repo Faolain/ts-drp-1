@@ -1,0 +1,15 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"paths": { "@ts-drp/*": ["./packages/*/dist/index.d.ts"] }
+	},
+	"include": ["./*.ts"]
+}

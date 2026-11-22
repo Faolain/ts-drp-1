@@ -1,0 +1,11 @@
+{
+  "status": "CAUSAL_CORRECTIVE_RED_NOT_GREEN",
+  "selected": 1,
+  "files": 1,
+  "failures": [
+    "AssertionError: D110C_0C1F5B0U_QUEUED_ISSUE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:430:80\n    at file:///private/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+    "AssertionError: D110C_0C1F5B0U_MIGRATION_DID_NOT_RESUME: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:431:78\n    at file:///private/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+    "AssertionError: D110C_0C1F5B0U_MIGRATION_ACTIVATION_DID_NOT_RESUME: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:432:95\n    at file:///private/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+  ],
+  "mainCustodyUnchanged": true
+}

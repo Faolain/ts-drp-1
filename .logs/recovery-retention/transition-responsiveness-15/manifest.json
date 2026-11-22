@@ -1,0 +1,178 @@
+{
+  "purpose": "Reviewed recovery-row scheduling, actual native owner/close controls, exact baseline collection classification, one quiet continued-play candidate, and prior profile attribution.",
+  "review": "Only P2 finding concerned temporary checkout-specific configs; removed both from checkout and kept measurement configs only as archived evidence. Reviewer found no actionable recovery checkpoint defect.",
+  "baselineCollection": "Initial baseline15 accidentally collected 108 suites including .claude worktrees and is not validity evidence. Exact root-only baseline15c/candidate15c each selected four named suites: authorized recovery2/2 passed, other three failed identically during protocol-v3 module TDZ collection.",
+  "comparisonCaveat": "Candidate15 is not a new paired before/after measurement. Pair12 differs in production composition and stream interleaving; no equal-work CPU efficiency claim.",
+  "parentHEAD": "329b08ccb2354bfea9dfd68a6ca95ff339d1ed3a",
+  "sourceDiffSha256": "e93b8e0beaef9e233bae7ecd783eb3c7df60f8ce25c1971bda323547e9afc0f9",
+  "files": {
+    "ts-drp-responsiveness-review-15.log.gz": {
+      "originalSHA256": "25cf9ffce2cadcc95f71633d0502918a5d02f5ea2c797300562fd2348474071d",
+      "uncompressedBytes": 212570
+    },
+    "ts-drp-responsiveness-boundary-15c.log": {
+      "originalSHA256": "d1f10b05f2a99d28c51c0e09e2b34b9de010542f2b04d8565ccbb73518a462b7",
+      "uncompressedBytes": 1114
+    },
+    "ts-drp-responsiveness-typecheck-15.log": {
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0
+    },
+    "ts-drp-responsiveness-lint-15.log": {
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0
+    },
+    "ts-drp-responsiveness-tdz-baseline-15.log": {
+      "originalSHA256": "3b7c6d8dc8259ceebe57a286dcd09bdfea3e5a464888f9adbb8d910fa807d031",
+      "uncompressedBytes": 32777
+    },
+    "ts-drp-responsiveness-tdz-baseline-15c.log": {
+      "originalSHA256": "960501cb7c4a1cc63874913d22040157cc23f3bd14266a099db30652dd9e5620",
+      "uncompressedBytes": 1709
+    },
+    "ts-drp-responsiveness-tdz-candidate-15c.log": {
+      "originalSHA256": "d54cc1acf5ff375ce7510cf7ea33455838f97ba78fdf7b84dae554384e8c357b",
+      "uncompressedBytes": 1714
+    },
+    "ts-drp-responsiveness-tdz-baseline-15.json": {
+      "originalSHA256": "ba6a2e7b104a0b7943bc7fb13b674d68c84a1bba21f41441c4c4dcf2f62d94d9",
+      "uncompressedBytes": 2486
+    },
+    "responsiveness-15-tdz-baseline.config.mts": {
+      "originalSHA256": "048aa9e6d584c184ad12956463d3b912b121aff4cf439446b97426aab4f34a3a",
+      "uncompressedBytes": 679
+    },
+    "responsiveness-15-tdz-baseline.workspace.mjs": {
+      "originalSHA256": "c8a580f6009dcfecef2fc72dca715d144dfbf407e5828b65d768d288ab242092",
+      "uncompressedBytes": 75
+    },
+    "responsiveness-15-tdz-candidate.config.mts": {
+      "originalSHA256": "28f80bc37b71eccaa5f991e444d12bbed7ab351824ad6bcbf49aa8c17e09e5d5",
+      "uncompressedBytes": 684
+    },
+    "responsiveness-15-tdz-candidate.workspace.mjs": {
+      "originalSHA256": "f0b9d9903c901815ea1cc6de6aaf59719ff1ec59301e789c90d0b121dedcf56d",
+      "uncompressedBytes": 76
+    },
+    "responsiveness-15-candidate.config.mts": {
+      "originalSHA256": "a262bd4d5a35572bd09800061fc1247dbb92716b4f233ca055af88c0feccc3e9",
+      "uncompressedBytes": 534
+    },
+    "responsiveness-15-candidate.workspace.mjs": {
+      "originalSHA256": "bddec2611deb9d682262d9ebea40acdebb68a4b9ae3cc9b7ca769b9d6b61f039",
+      "uncompressedBytes": 72
+    },
+    "active-continued-play-native-candidate-15.log": {
+      "originalSHA256": "251c843dd99c4278e33c4912bf19dae88e8cefb242e77432e3fab023f6fd7a07",
+      "uncompressedBytes": 2570
+    },
+    "ts-drp-responsiveness-candidate-15-summary.json": {
+      "originalSHA256": "842afe9017624d4182b65c2381c5162236c071a96e2a4e5390b40f5562d72aec",
+      "uncompressedBytes": 13611
+    },
+    "attribute-responsiveness-profile-bounded.mjs": {
+      "originalSHA256": "d9c6eb5f069c7d34f35a8ff6291e98488e6871f22fc9c3633bbb6f1a7132d3b0",
+      "uncompressedBytes": 4065
+    },
+    "quiet-candidate-15/summary.json": {
+      "originalSHA256": "265d587530a84b5bd3ef0424744b179ab23a95bdc857539eca9d6ad79d4bfbb9",
+      "uncompressedBytes": 9287
+    },
+    "quiet-candidate-15/observations.jsonl.gz": {
+      "originalSHA256": "15bcc15679ae4f449e55b208f933de38c2772dc117f3efdefea0c98ca4fa98a3",
+      "uncompressedBytes": 3644064
+    },
+    "quiet-candidate-15/continued-play.jsonl.gz": {
+      "originalSHA256": "ead81a420c29d0d5a5c5d86b256d94d150f33762f3582988effdcf9781ccbe92",
+      "uncompressedBytes": 460056
+    },
+    "quiet-candidate-15/source.diff": {
+      "originalSHA256": "e93b8e0beaef9e233bae7ecd783eb3c7df60f8ce25c1971bda323547e9afc0f9",
+      "uncompressedBytes": 14633
+    },
+    "attribution-profile-14/summary.json": {
+      "originalSHA256": "79f290ed4c0b09c3219c0eb246993ca26ea7eb9004a0452d37c8e73d37886c69",
+      "uncompressedBytes": 9284
+    },
+    "attribution-profile-14/phase-attribution.json": {
+      "originalSHA256": "40c0c2b8b48bbb524c89da0d10e5d64fdab1abec7e02cc7aabbe9b37e556e63e",
+      "uncompressedBytes": 173519
+    },
+    "attribution-profile-14/install-1.cpuprofile.gz": {
+      "originalSHA256": "33e5b784cd06244bb216c05b8d18eea07fa2763d0b8c9d1b1dd4c174acc8421a",
+      "uncompressedBytes": 402932
+    },
+    "attribution-profile-14/observations.jsonl.gz": {
+      "originalSHA256": "1029df3ecd4105989fc72906ac712a7daf0838bc59387f58620c7587765c15cc",
+      "uncompressedBytes": 3632394
+    },
+    "attribution-profile-14/adopt-3.cpuprofile.gz": {
+      "originalSHA256": "daa926fba2a28f62c985424b97f504f83bd6d70fba36519be7d432d45af53320",
+      "uncompressedBytes": 278553
+    },
+    "attribution-profile-14/install-4.cpuprofile.gz": {
+      "originalSHA256": "3c9d3389a15fb4da9077c0561ef9f317578ca8fea1e5608b3c09dcacb3ca7e2b",
+      "uncompressedBytes": 1031842
+    },
+    "attribution-profile-14/maintenance-2.cpuprofile": {
+      "originalSHA256": "5028336f789754fcb0544c5d0c0a318f4ca021de495c61258c7389f081e48fb4",
+      "uncompressedBytes": 61708
+    },
+    "attribution-profile-14/seal-3.cpuprofile": {
+      "originalSHA256": "b61795bcf73239f11fa88e3af21647caa862fed1e8da5222beab4d577d2223a0",
+      "uncompressedBytes": 148400
+    },
+    "attribution-profile-14/seal-4.cpuprofile.gz": {
+      "originalSHA256": "8b314c59666a79a7d8035d6b972536bac43bccacac0ae6c615b8928501ff1def",
+      "uncompressedBytes": 200493
+    },
+    "attribution-profile-14/install-3.cpuprofile.gz": {
+      "originalSHA256": "1967a8e119c3ee3d344c2c47b684c58d5223a9d71fc3e99f5c16f557f73b3eb8",
+      "uncompressedBytes": 493330
+    },
+    "attribution-profile-14/adopt-4.cpuprofile.gz": {
+      "originalSHA256": "2d70af7aee444e08d2fa1e61e8dea83a69c0c22bff71e1e5788b4458d6ba02ab",
+      "uncompressedBytes": 339081
+    },
+    "attribution-profile-14/adopt-1.cpuprofile.gz": {
+      "originalSHA256": "a527c6f6cffa4895716e2324752d33255ec6f2094364f3083bfe53606f002ad9",
+      "uncompressedBytes": 269736
+    },
+    "attribution-profile-14/seal-1.cpuprofile": {
+      "originalSHA256": "a8b2858075ae853860c84ed01c55250ed4721eb7722aeae77a4fe503b2666454",
+      "uncompressedBytes": 122645
+    },
+    "attribution-profile-14/adopt-2.cpuprofile.gz": {
+      "originalSHA256": "3dfd448efbc4adf21374a24e03aa22e6696c8dbcaf4699a74e3a5f0e1d24ba4c",
+      "uncompressedBytes": 219045
+    },
+    "attribution-profile-14/maintenance-3.cpuprofile.gz": {
+      "originalSHA256": "3a51cc9dd685d51087bf5d99a1b90badbf95a4ac3c90ecf3678023bb2b569b50",
+      "uncompressedBytes": 477785
+    },
+    "attribution-profile-14/seal-2.cpuprofile": {
+      "originalSHA256": "ba178f3bbd3eaca4e17a6f40fb55000de0c8decd02ca256e1aa3ad52fdfea843",
+      "uncompressedBytes": 131796
+    },
+    "attribution-profile-14/continued-play.jsonl.gz": {
+      "originalSHA256": "4141222a7ee0e33e89957ae775cfde4c87fbcf56cc851771a1b517e6713f715d",
+      "uncompressedBytes": 1237945
+    },
+    "attribution-profile-14/source.diff": {
+      "originalSHA256": "b6a1df1bfe44bb7b7eca37de486bb6292627d4f0b090115bf7ba660b041a60c0",
+      "uncompressedBytes": 10207
+    },
+    "attribution-profile-14/maintenance-1.cpuprofile": {
+      "originalSHA256": "b213e0f235a05b7d09cdb180f833aee16350e753c74342e6eab8991955396314",
+      "uncompressedBytes": 59112
+    },
+    "attribution-profile-14/maintenance-4.cpuprofile.gz": {
+      "originalSHA256": "ff4b638d92378231b158d0e28aec527c34f52589b7342e5cec82ed2529c8e7d8",
+      "uncompressedBytes": 1522319
+    },
+    "attribution-profile-14/install-2.cpuprofile.gz": {
+      "originalSHA256": "8f14efed3fa9d68fd6d51e60b24a8376055415a0b69f6e3a1fb6775422d97efd",
+      "uncompressedBytes": 421042
+    }
+  }
+}

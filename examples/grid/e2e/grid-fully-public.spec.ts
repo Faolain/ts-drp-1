@@ -1,11 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
 import { appendFileSync } from "node:fs";
 
-// Fully-public browser convergence — two browsers converge a grid using ONLY public
-// infrastructure, no DRP-operated infra at all: discovery via real public Nostr relays,
-// connectivity candidates via real public delegated routing (delegated-ipfs.dev
-// `/routing/v1/dht/closest/peers`, which surfaces browser-usable AutoTLS relays). OPT-IN and
-// flaky by nature (live third-party relays + ephemeral AutoTLS relays); run via
+// Fully-public browser readiness — two browsers reserve and discover using ONLY public
+// infrastructure: real public Nostr relays and delegated routing (delegated-ipfs.dev
+// `/routing/v1/dht/closest/peers`, which surfaces browser-usable AutoTLS relays). Room-level
+// dialing/convergence moves to T1. OPT-IN and flaky by nature; run via
 // `pnpm e2e-test:fully-public`. Every hop's evidence (routing trace, relay-policy attempts,
 // reservations, the `rendezvous-registration` reason, browser console) is logged to stdout so a
 // failed hop is pinpointed, not guessed; set FULLY_PUBLIC_LOG=<path> to also tee it to a file.
@@ -27,6 +26,7 @@ interface Snapshot {
 		readonly outcome?: string;
 		readonly [k: string]: unknown;
 	}[];
+	readonly controlPlaneEventsDropped: number;
 	readonly peerId: string;
 	readonly relayPolicy?: {
 		readonly attempts: readonly Record<string, unknown>[];
@@ -46,7 +46,7 @@ test.beforeEach(({}, testInfo) => {
 	test.skip(testInfo.config.metadata.gridNetworkMode !== "fully-public", "requires the fully-public harness");
 });
 
-test("two browsers converge using only public infrastructure", async ({ browser }, testInfo) => {
+test("two browsers establish public relay and rendezvous readiness", async ({ browser }, testInfo) => {
 	log(`===== RUN START (${testInfo.project.name}) =====`);
 	const creatorContext = await browser.newContext();
 	const joinerContext = await browser.newContext();
@@ -90,7 +90,9 @@ test("two browsers converge using only public infrastructure", async ({ browser 
 		if (!creatorPublished) {
 			const s = await readSnapshot(creatorPage);
 			const regEvents = s.controlPlaneEvents.filter((e) => e.kind === "rendezvous-registration");
-			log(`[creator] registration events (${regEvents.length}): ${JSON.stringify(regEvents.slice(-8))}`);
+			log(
+				`[creator] registration events (${regEvents.length} retained, ${s.controlPlaneEventsDropped} events dropped): ${JSON.stringify(regEvents.slice(-8))}`
+			);
 			log(`[creator] rendezvous trace: ${JSON.stringify(s.rendezvous ?? {}).slice(0, 2000)}`);
 		}
 		expect(creatorPublished, "creator registered on public Nostr").toBe(true);
@@ -122,39 +124,6 @@ test("two browsers converge using only public infrastructure", async ({ browser 
 		);
 		log(`joiner Nostr discovery succeeded=${joinerDiscovered}`);
 		expect(joinerDiscovered, "joiner discovered via public Nostr").toBe(true);
-
-		// HOP 4: create grid, join, converge THROUGH public relay.
-		await creatorPage.click("#createGrid");
-		await expect(creatorPage.locator("#gridId")).not.toBeEmpty();
-		const gridId = (await creatorPage.locator("#gridId").textContent())?.trim();
-		if (gridId === undefined || gridId === "") throw new Error("creator did not expose a grid ID");
-		log(`gridId=${gridId}; joiner joining`);
-		await joinerPage.fill("#gridInput", gridId);
-		await joinerPage.click("#joinGrid");
-
-		const mutual = await pollFor(
-			joinerPage,
-			"mutual peer presence",
-			async () => {
-				const c = await creatorPage.locator("#objectPeers").textContent();
-				const j = await joinerPage.locator("#objectPeers").textContent();
-				return (c ?? "").includes(joinerStart.peerId) && (j ?? "").includes(creatorStart.peerId);
-			},
-			120_000
-		);
-		log(`mutual presence=${mutual}`);
-		if (!mutual) {
-			await dumpConnections(creatorPage, "creator");
-			await dumpConnections(joinerPage, "joiner");
-		}
-		expect(mutual, "browsers found each other").toBe(true);
-
-		const creatorDot = joinerPage.locator(`[data-glowing-peer-id="${creatorStart.peerId}"]`);
-		await expect(creatorDot).toBeVisible({ timeout: 60_000 });
-		const beforeMove = await creatorDot.getAttribute("style");
-		await creatorPage.keyboard.press("w");
-		await expect.poll(async () => creatorDot.getAttribute("style"), { timeout: 30_000 }).not.toBe(beforeMove);
-		log("CONVERGED: creator movement visible on joiner");
 
 		await dumpConnections(creatorPage, "creator");
 		await dumpConnections(joinerPage, "joiner");
@@ -189,7 +158,10 @@ async function openGrid(page: Page, label: string): Promise<void> {
 			/* ignore */
 		}
 	});
-	await page.goto("/");
+	// Grid hosts its zone in a room worker by default; this suite drives the main-thread zone it was
+	// written against (its synchronous snapshot and the page's own node), so it opts out with
+	// `?mainThread`. The worker default is covered by tests/room-worker-grid.pw.ts and the FPS gate.
+	await page.goto("/?mainThread");
 	await page.waitForFunction(
 		() => Boolean((window as typeof window & { __TS_DRP_GRID_SESSION__?: unknown }).__TS_DRP_GRID_SESSION__),
 		undefined,
@@ -251,7 +223,9 @@ async function dumpRelayEvidence(page: Page, label: string): Promise<void> {
 		log(`[${label}] relay-reservation event: ${JSON.stringify(event)}`);
 	}
 	const admissionEvents = s.controlPlaneEvents.filter((e) => e.kind === "address-admission");
-	log(`[${label}] address-admission events: ${admissionEvents.length} total`);
+	log(
+		`[${label}] address-admission events: ${admissionEvents.length} retained (${s.controlPlaneEventsDropped} control-plane events dropped)`
+	);
 	for (const event of admissionEvents.slice(-25)) {
 		log(`[${label}] address-admission: ${JSON.stringify(event)}`);
 	}

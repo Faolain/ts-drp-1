@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname);
+const frozen=JSON.parse(fs.readFileSync(path.join(out,'retained-runtime-roster.json'))),row=frozen.roster[40],report=JSON.parse(fs.readFileSync(path.join(out,'retained-41/result.json')));
+const expected=frozen.collection.filter(e=>row.files.includes(path.relative(root,e.file))).map(e=>e.file+'\0'+e.name).sort();
+const active=report.testResults.flatMap(s=>s.assertionResults.filter(a=>a.status==='passed').map(a=>s.name+'\0'+[...a.ancestorTitles,a.title].join(' > '))).sort();
+const skipped=report.testResults.flatMap(s=>s.assertionResults.filter(a=>a.status==='skipped'));
+const valid=JSON.stringify(active)===JSON.stringify(expected)&&active.length===18&&skipped.length===2&&skipped.every(a=>a.ancestorTitles.join(' > ')==='D.93.34 p4-b genuine Node SIGKILL roster'&&a.failureMessages.length===0)&&report.success===true&&report.numFailedTests===0&&report.testResults.length===1&&report.testResults.every(s=>!s.message&&!s.testExecError);
+const result={valid,selectedActivePass:active.length,fullReporterTotal:report.numTotalTests,failed:report.numFailedTests,skipped,activeNames:active,disposition:'Existing optional long SIGKILL cases are intentionally disabled by unchanged environment gate. No campaign ran, no flag changed, no recollection/rerun. Exact18 frozen bounded cases pass;2skipped are separately recorded, never passes.'};
+fs.writeFileSync(path.join(out,'retained-41-conditional-skip-validation.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({valid,total:report.numTotalTests,activePass:active.length,skipped:skipped.length}));if(!valid)process.exitCode=1;

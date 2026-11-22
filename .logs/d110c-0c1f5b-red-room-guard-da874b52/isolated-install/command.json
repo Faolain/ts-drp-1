@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-ueW92K/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-06T02:28:31.776Z"
+}

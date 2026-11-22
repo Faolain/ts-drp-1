@@ -1,0 +1,249 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+f2066512 feat(node): complete D.110c-b hot epoch adoption
+90147e3c test: capture d110c-b hot adoption red
+7c1e71d2 docs: confirm d110c-b lifecycle plan
+4b357a37 docs: correct d110c-b lifecycle plan
+aa002e78 docs: plan d110c-b hot rollover
+---
+90147e3c test: capture d110c-b hot adoption red
+7c1e71d2 docs: confirm d110c-b lifecycle plan
+4b357a37 docs: correct d110c-b lifecycle plan
+---
+7c1e71d2 docs: confirm d110c-b lifecycle plan
+4b357a37 docs: correct d110c-b lifecycle plan
+aa002e78 docs: plan d110c-b hot rollover
+---
+plan->RED ancestor OK
+RED->GREEN ancestor OK
+commit f2066512f0311a56863be0d769531c6b783d9fef
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 14:04:12 2026 -0400
+
+    feat(node): complete D.110c-b hot epoch adoption
+
+ .../production-hardening-tdd-plan-v2.md            | 137 +++++++++
+ examples/v3-room/src/index.ts                      | 102 +++++--
+ packages/node/src/creator-adoption-activate.ts     | 230 +++++++++++++--
+ packages/node/src/creator-adoption-commit.ts       |  30 +-
+ packages/node/src/creator-adoption.ts              |  53 +++-
+ packages/node/src/v3-live.ts                       |  46 ++-
+ .../tests/phase-5e-creator-live-close.pw.ts        |   4 +-
+ .../tests/phase-6a-creator-successor-product.pw.ts | 108 +++++--
+ .../phase-6b-d110c-a/repeat-close-contract.ts      | 317 +++++++++++++++++++--
+ .../phase-6b-d110c-b/hot-adoption-contract.ts      |  74 ++++-
+ tests/fixtures/phase-6b-d110c-b/source-shape.mjs   |  99 ++++---
+ .../phase-6b/runtime-reclamation-contract.ts       |   2 +
+ tests/phase-6b-d110c-b-hot-adoption.test.ts        |  83 +++++-
+ 13 files changed, 1108 insertions(+), 177 deletions(-)
+commit 90147e3c7af4fe008a7d973372f28678cc7e2400
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 13:00:17 2026 -0400
+
+    test: capture d110c-b hot adoption red
+
+ .../d110c-b-red-7c1e71d2/affected-typecheck.status |   1 +
+ .logs/d110c-b-red-7c1e71d2/eslint-corrected.status |   1 +
+ .logs/d110c-b-red-7c1e71d2/eslint-corrected.stderr |   0
+ .logs/d110c-b-red-7c1e71d2/eslint-corrected.stdout |   0
+ .logs/d110c-b-red-7c1e71d2/eslint.status           |   1 +
+ .logs/d110c-b-red-7c1e71d2/eslint.stderr           |   0
+ .logs/d110c-b-red-7c1e71d2/eslint.stdout           |   7 +
+ .logs/d110c-b-red-7c1e71d2/final-diff-check.status |   1 +
+ .logs/d110c-b-red-7c1e71d2/final-diff-check.stderr |   0
+ .logs/d110c-b-red-7c1e71d2/final-diff-check.stdout |   0
+ .../final-manifest-validation-v2.status            |   1 +
+ .../final-manifest-validation-v2.stderr            |   0
+ .../final-manifest-validation-v2.stdout            |  79 +++++++++++
+ .../final-manifest-validation.status               |   1 +
+ .../final-manifest-validation.stderr               |   0
+ .../final-manifest-validation.stdout               |  70 +++++++++
+ .../final-prettier-corrected.status                |   1 +
+ .../final-prettier-corrected.stderr                |   0
+ .../final-prettier-corrected.stdout                |   2 +
+ .logs/d110c-b-red-7c1e71d2/final-prettier.status   |   1 +
+ .logs/d110c-b-red-7c1e71d2/final-prettier.stderr   |  51 +++++++
+ .logs/d110c-b-red-7c1e71d2/final-prettier.stdout   |   3 +
+ .logs/d110c-b-red-7c1e71d2/fixed-ports.lsof-status |   1 +
+ .logs/d110c-b-red-7c1e71d2/fixed-ports.stderr      |   0
+ .logs/d110c-b-red-7c1e71d2/fixed-ports.txt         |   0
+ .../manifest-validation.status                     |   1 +
+ .../manifest-validation.stderr                     |   0
+ .../manifest-validation.stdout                     |  70 +++++++++
+ .logs/d110c-b-red-7c1e71d2/manifest.sha256         |  79 +++++++++++
+ .../node-build-typecheck.status                    |   1 +
+ .../node-build-typecheck.stderr                    |   0
+ .../node-build-typecheck.stdout                    |   0
+ .../playwright-artifacts/.last-run.json            |   4 +
+ .../playwright-json-post-relocation.sha256         |   1 +
+===
+commit 90147e3c7af4fe008a7d973372f28678cc7e2400
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 13:00:17 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 13:00:17 2026 -0400
+
+    test: capture d110c-b hot adoption red
+===
+commit f2066512f0311a56863be0d769531c6b783d9fef
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 14:04:12 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 14:04:12 2026 -0400
+
+    feat(node): complete D.110c-b hot epoch adoption
+f2066512f0311a56863be0d769531c6b783d9fef
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+?? .logs/d108e4ab-campaign/
+?? .logs/d108e4ab-freeze/
+?? .logs/d108e4ab-plan-review/
+?? .logs/d108e4ac-green-review-correction/
+?? .logs/d108e4ac-green-review/
+?? .logs/d108e4ac-green/
+?? .logs/d108e4ac-plan-review/
+?? .logs/d108e4ac-red-review/
+?? .logs/d108e4ac-red/
+?? .logs/d108e4ad-campaign/
+ .../node-build-typecheck.stdout                    |   0
+ .../playwright-artifacts/.last-run.json            |   4 +
+ .../playwright-json-post-relocation.sha256         |   1 +
+ .../playwright-json-pre-relocation.sha256          |   1 +
+ .../playwright-list-all.status                     |   1 +
+ .../playwright-list-all.stderr                     |   0
+ .../playwright-list-all.stdout                     |  12 ++
+ .../playwright-list-corrected.status               |   1 +
+ .../playwright-list-corrected.stderr               |   0
+ .../playwright-list-corrected.stdout               |   3 +
+ .logs/d110c-b-red-7c1e71d2/playwright-list.status  |   1 +
+ .logs/d110c-b-red-7c1e71d2/playwright-list.stderr  |   2 +
+ .logs/d110c-b-red-7c1e71d2/playwright-list.stdout  |   2 +
+ .logs/d110c-b-red-7c1e71d2/playwright.json         | 156 +++++++++++++++++++++
+ .logs/d110c-b-red-7c1e71d2/playwright.status       |   1 +
+ .logs/d110c-b-red-7c1e71d2/playwright.stderr       |   2 +
+ .logs/d110c-b-red-7c1e71d2/playwright.stdout       |  10 ++
+ .../d110c-b-red-7c1e71d2/prettier-corrected.status |   1 +
+ .../d110c-b-red-7c1e71d2/prettier-corrected.stderr |   0
+ .../d110c-b-red-7c1e71d2/prettier-corrected.stdout |   2 +
+ .logs/d110c-b-red-7c1e71d2/prettier.status         |   1 +
+ .logs/d110c-b-red-7c1e71d2/prettier.stderr         |   0
+ .logs/d110c-b-red-7c1e71d2/prettier.stdout         |   2 +
+ .logs/d110c-b-red-7c1e71d2/red-ledger.md           |  51 +++++++
+ .../runtime-identity-corrected.json                |   1 +
+ .../runtime-identity-corrected.status              |   1 +
+ .../runtime-identity-corrected.stderr              |   2 +
+ .logs/d110c-b-red-7c1e71d2/runtime-identity.json   |   0
+ .logs/d110c-b-red-7c1e71d2/runtime-identity.status |   1 +
+ .logs/d110c-b-red-7c1e71d2/runtime-identity.stderr |  10 ++
+ .../runtime-owner-hashes.sha256                    |   2 +
+ .logs/d110c-b-red-7c1e71d2/source-shape.json       |  19 +++
+ .logs/d110c-b-red-7c1e71d2/source-shape.status     |   1 +
+ .logs/d110c-b-red-7c1e71d2/source-shape.stderr     |   0
+ .logs/d110c-b-red-7c1e71d2/state-audit.txt         | 119 ++++++++++++++++
+ .../storage-browser-build-typecheck.status         |   1 +
+ .../storage-browser-build-typecheck.stderr         |   0
+ .../storage-browser-build-typecheck.stdout         |   0
+ .../storage-browser-typecheck.status               |   1 +
+ .../storage-browser-typecheck.stderr               |   0
+ .../storage-browser-typecheck.stdout               | 151 ++++++++++++++++++++
+ .../ts-drp-processes.rg-status                     |   1 +
+ .logs/d110c-b-red-7c1e71d2/ts-drp-processes.txt    |   0
+ .logs/d110c-b-red-7c1e71d2/typecheck.status        |   1 +
+ .logs/d110c-b-red-7c1e71d2/typecheck.stderr        |   0
+ .logs/d110c-b-red-7c1e71d2/typecheck.stdout        | 114 +++++++++++++++
+ .../d110c-b-red-7c1e71d2/v3-room-typecheck.status  |   1 +
+ .../d110c-b-red-7c1e71d2/v3-room-typecheck.stderr  |   0
+ .../d110c-b-red-7c1e71d2/v3-room-typecheck.stdout  |   4 +
+ .logs/d110c-b-red-7c1e71d2/vitest.json             |   1 +
+ .logs/d110c-b-red-7c1e71d2/vitest.status           |   1 +
+ .logs/d110c-b-red-7c1e71d2/vitest.stderr           |   2 +
+ .logs/d110c-b-red-7c1e71d2/vitest.stdout           |   2 +
+ .../production-hardening-tdd-plan-v2.md            |  42 ++++++
+ .../tests/phase-6a-creator-successor-product.pw.ts |  43 ++++++
+ .../phase-6b-d110c-a/repeat-close-contract.ts      |  28 +++-
+ .../phase-6b-d110c-b/hot-adoption-contract.ts      |  47 +++++++
+ tests/fixtures/phase-6b-d110c-b/source-shape.mjs   |  79 +++++++++++
+ tests/phase-6b-d110c-b-hot-adoption.test.ts        |  35 +++++
+ 90 files changed, 1335 insertions(+), 1 deletion(-)
+batch1-vitest-complete.json
+batch1-vitest-corrected.json
+batch1-vitest-final.json
+batch1-vitest-green.json
+batch1-vitest-isolated.json
+batch1-vitest.json
+batch2-chromium.json
+green-ledger.md
+manifest.sha256
+retained-activation-browser.json
+retained-live-close-browser.json
+retained-node.json
+retained-ordering-focused-corrected.json
+retained-ordering-focused.json
+retained-product-browser-corrected.json
+retained-product-browser-final.json
+retained-product-browser-green.json
+retained-product-browser.json
+---
+5dadc749185265d332f1a5588133b230b23b8a616e8321ad67e4e2833448cc7c  .logs/d110c-b-green-90147e3c/green-ledger.md
+91849:D.110c-0a, D.110c-a, and D.110c-b GREEN, after D.110c-0b0b design acceptance,
+91902:D.110c-a GREEN; D.110c-b GREEN; executable D.110c-0b1 RED/GREEN;
+92015:   Deadline: before D.110c-b RED.
+92016:6. **D.110c-b — general hot adoption, activation, and product custody.** Owner:
+93139:Node consumers. Its design freezes before D.110c-a or D.110c-b production RED;
+93755:  product close-handle rebinding remain D.110c-b, so D.110c-a does not edit
+93784:The D.110c-b plan must name the still epoch-pinned adoption owners at
+93788:D.110c-b also owns replacing the tests-only literal epoch-0 result mirror in
+93831:configurations are not overstated; and D.110c-b owns the decoupled browser
+93909:epoch-2 call into the still epoch-pinned D.110c-b adoption verifier; every
+94047:rerun, D.110c-b product rebind, 0b1 bounded-proof implementation, or Phase-7
+94048:archive work occurs in D.110c-a. Deadline: GREEN before D.110c-b RED.
+94050:##### D.110c-b bounded general hot adoption, activation, and product-custody plan
+94086:The public compatibility boundary is exact. D.110c-b widens only the existing
+94100:accept epoch 2. The new D.110c-b browser title instead receives one separate
+94126:   `D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and
+94145:with `--project=chromium`, the exact D.110c-b title, `--reporter=json`, and
+94310:join. D.110c-b neither reopens D.110c-a nor relabels a hot 0->1->2 proof as
+94345:authority oracles remain exact beside a separate expected-epoch D.110c-b
+94369:P0=0/P1=0/P2=2. The blocking union is empty and D.110c-b RED may proceed.
+94383:The deterministic D.110c-b RED executed from reviewed signed/pushed base
+94409:branded fixture-ID debt outside every D.110c-b changed file; their complete
+ce501e519d7bb726d896938ada4443540c9dfecfe9e1299ba9202a37be4dc469  .logs/d110c-b-green-90147e3c/manifest.sha256
+---
+609d705eda6b62b7f6d605f01eff3d5293dcc73338b0e667486809a0d8d88281  .logs/d110c-b-green-90147e3c/batch1-vitest-complete.json
+d44e5d0e0e580442eacceffca9545ec1d8ebd92d8760a84c4ef8342e5c61411b  .logs/d110c-b-green-90147e3c/batch1-vitest-corrected.json
+0cb96efe5346ba011f61591e1332cc068c93ff7a2f8a416ebf123d546fb7082b  .logs/d110c-b-green-90147e3c/batch1-vitest-final.json
+78c581738d833b25f9c65a1a3bab466ddf49c53a5436293fbda5ce82ce20782a  .logs/d110c-b-green-90147e3c/batch1-vitest-green.json
+074cd3f1ea137fdc12e5979eebff833b93eaa6964f54d63e0261a88ebb1bd01a  .logs/d110c-b-green-90147e3c/batch1-vitest-isolated.json
+5cba8ca4177a8feab8b2a976beceb72f005e93e4f1eab535b155e51c96a30153  .logs/d110c-b-green-90147e3c/batch1-vitest.json
+1bb347103583e9cebd61d25f2a246079633369b462af11229e2ac6ba0eed11e1  .logs/d110c-b-green-90147e3c/batch2-chromium.json
+5dadc749185265d332f1a5588133b230b23b8a616e8321ad67e4e2833448cc7c  .logs/d110c-b-green-90147e3c/green-ledger.md
+c6e0de6a64d4c4e5e59c16afe07d96e075987b2694085f3bc49d59eeff3d01d3  .logs/d110c-b-green-90147e3c/retained-activation-browser.json
+ae50623de6d9343bb37b99575bc11ec7b186c0df2945d51b67c58394be9d3cf3  .logs/d110c-b-green-90147e3c/retained-live-close-browser.json
+f57a642126b1da3193bb1349f5a7b18c53e77ea8628c35461badade26b19c41d  .logs/d110c-b-green-90147e3c/retained-node.json
+f565cb771f0d89fe39324b0199b1575be53ef8a383b6a883b94baa34c3c9d16e  .logs/d110c-b-green-90147e3c/retained-ordering-focused-corrected.json
+86c4a34162b4de19de20ef9a2a8ca6c65c7eb333304e2c743e348a5431c0344a  .logs/d110c-b-green-90147e3c/retained-ordering-focused.json
+f2ce92e6ac8ef4166d939983264ea387405249e2665d658b2fbb8bdc254635b8  .logs/d110c-b-green-90147e3c/retained-product-browser-corrected.json
+e527ad349ecc0b29ed45e0587bd286b87315e3fbbd1eb3cd61d6efb33ee9b8cd  .logs/d110c-b-green-90147e3c/retained-product-browser-final.json
+bb8b59585a0fc4ed30481ca479f5a8b0699aca651da33b3e6a29f292e196664e  .logs/d110c-b-green-90147e3c/retained-product-browser-green.json
+007ea8cfc27a3481913cb53cb7d691de60d4eff97a6a4ce123e3620fd64fbb47  .logs/d110c-b-green-90147e3c/retained-product-browser.json
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-complete.json: No such file or directory
+.logs/d110c-b-green-90147e3c/batch1-vitest-complete.json: FAILED open or read
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-corrected.json: No such file or directory
+.logs/d110c-b-green-90147e3c/batch1-vitest-corrected.json: FAILED open or read
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-final.json: No such file or directory
+.logs/d110c-b-green-90147e3c/batch1-vitest-final.json: FAILED open or read
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-green.json: No such file or directory
+.logs/d110c-b-green-90147e3c/batch1-vitest-green.json: FAILED open or read
+shasum: .logs/d110c-b-green-90147e3c/batch1-vitest-isolated.json: No such file or directory
+.logs/d110c-b-green-90147e3c/batch1-vitest-isolated.json: FAILED open or read
+exit=0
+      17 manifest.sha256
+0
+non-OK count above (0 expected)

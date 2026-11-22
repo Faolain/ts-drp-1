@@ -1,0 +1,38 @@
+{
+  "focusedGreen": true,
+  "parentClosed": false,
+  "sourceHead": "09aa220919babdf4d869effcfee6ccdacb49c4a1",
+  "sourceSha256": "1bbc6ea643867d0ed890d1cef4ca2cf9edb3e9b2bbc7f5cc9462ba99e13c450e",
+  "total": 24,
+  "passed": 1,
+  "failed": 0,
+  "filtered": 23,
+  "selectedDurationMs": 69154.209667,
+  "reporterSha256": "240e70ef87f1dc827494483dce9f4e9b904ed0de4f59984ecfa3223277732988",
+  "runtimeValidationSha256": "aca3552ff95a407db66dfb2fc06651bcac36f3ff0fd962ba24b0eb4fd92fee33",
+  "runtimeStatusSha256": "7747380e986df7cffa8ba089dbc9123b879969b6b64181b18bfa1391802d6713",
+  "rosterSha256": "2bbd6fc635156c879cbf50bb49523e1a76f43df0536f79e3df66d62f4660a4a3",
+  "capturedStatuses": 18,
+  "nonzero": [
+    {
+      "file": "typecheck/status.json",
+      "status": 1
+    }
+  ],
+  "soleFocusedInvocation": true,
+  "noDiagnosticRecords": true,
+  "noProfiling": true,
+  "noCombinedOrIsolatedRun": true,
+  "wholeProgramStaticPass": false,
+  "externalSnapshotDiagnostics": 3,
+  "gridAndFourRegistryW0FailuresRemainOpen": true,
+  "custody": "custody-final.json",
+  "effectiveHashes": 85,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "ownedRuntimePidsAbsent": [
+    64554,
+    64803
+  ]
+}

@@ -1,0 +1,1014 @@
+{
+  "provenance": "Recovered Claude Track J runs, 2026-10-22 through 2026-10-23. Original uncommitted model based on 0171994d; original model source hashes below. Verdicts are individual bounded instances, not an unbounded production proof. Interrupted runs are never successes. Final candidate adds C9 to the induction hypothesis only; previous indContract results cover C1-C8, not C9.",
+  "sourceSha256": {
+    "packages/protocol-v3/formal/settlement-replacement-retirement.qnt": "31e3dbdac5cd710a2042a582371d6bff0ad0f7187a8bc8e832fd9ce09598dea5",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-instances.qnt": "23f1dd79ccee38822201cf1edf9edb4903c156a02c23e83b9096ac2d0cff3dca",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-proofs.qnt": "afbc1bb00bd1a825ff586b0dbf4f43e9decea9aef67c3f94dc8d095547454f9f",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-exhaustive.qnt": "75dc47740cb3b66082bad82fa7bc9ea60535dfd76b53276ccd50ca048ffb6bcc",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a1-partial-cut-receipt.qnt": "8de48826b8aed28dbc24cf217f79f9154a326e8bac6e973988a86e5ad02af2d3",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a2-expired-outside.qnt": "99953d7fce7d1e57e554f69f8c07d1ad5ed4233492930da1dbdb22c4a18ef5b3",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a2-instead-of-b2.qnt": "4e254735c2f2c1f3588cfefa0d357ce46c8174e4e64a214f86eee5c6d7b72d2b",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/carrier-without-minus-own.qnt": "c66423e181992a3fc85d03a510e7169c36fadb76b3539e35e99067570290db77",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-cross-store-crash.qnt": "128baa8c265fac29eee7db436ba69f64924ae1441dc1084758f1107db1fe794b",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-early-plan-drop.qnt": "7d3153bb5640e233d8c45367fd6574a24aae3d54b537d5268b836cd589524ee3",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-either-drop-review.qnt": "283d29df02fc2343d8f1028f553690c6e32875898a2118e432f428fe258195e6",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-fence-runs-beyond-max-scopes.qnt": "7f35c97611561ab31b89827fb6cf857c22cda9b576f39bc79d7ea0b41d41ad32",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-guard-one-pass.qnt": "43a2c8d74d2f8e01fdca91a7f01d8ba5b7f2ef3fe5b7913a4f1bfb7f67fe4028",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-no-old-incarnation.qnt": "e9d6643a3096a2f975030fadb441444e474304e942dbefa6ae1bf77a748a4692",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-proof-handoff.qnt": "20995d8bf467d702c457ca5eeaf2f62d75bfaff11dc8c06f719f7092dd1123e4",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-readmit-abandon.qnt": "d750d1b16f3462ee2156b11925f26d75f33ade9a19041888cde91fc571f68a8d",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-seq-identity.qnt": "e2ec66037863a195f44fc95d483576318befe2de0b05bd0f10118b8352f571f5",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-settled-without-t.qnt": "edefffb258d0417245452f14917baebb1831a93d2116ca6a5b2899664f1d3844",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-t-without-settled.qnt": "84b5c0e1161bac846aacf90b72b81795ef8e593e79ae4d6ef2486b3bf790492b",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-under-decided-truth.qnt": "f874437bb8b08f222795e111980b4cfa66c251a22bac2e35539f367357035dcc",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-volatile-authority.qnt": "1a9c0cb166c457c19733b0b0c1c02e1e8f8e26db430997fd91d0a368d84947b9",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-without-expire-settled.qnt": "499448cb6c16141035c113a5e45ff4c5fa5fc1f65f44f6a7421249e9a3386a41",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-without-f1.qnt": "8eb74c0fb5a6f763e709ff2b41ea5a82d208efff912fac8588264afb2092bc50",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/fence-in-cut-control.qnt": "e518783c04021377b1969acfdcb8fb7175cb32b69ca1e5c25b8aa2f72817b676",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/fence-runs-beyond-max-scopes.qnt": "800367f2c9d267ddbbf4728f19077e50be3c56d0a24c6c635e53a3e15ce9d716",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/no-r7.qnt": "c2dbd729e6bc8163f376b065d28e1ac355fa63ed743174ad99655dfd08264998",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/pre-r5.qnt": "ce6b6354a8b42281c487c97fa99e6df736f66413ca21e1233745dce3c59dda91",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r5-without-chain.qnt": "bf56269fcffb1f20920dd7c75d2ff6393ac293aa27c06c62073e7131fa443b58",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r5-without-r5b.qnt": "f11c6fbfdce6975efdee608643a8bcf9acc0b4c939cb5e64e3e0f5126df55caa",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r6-absent.qnt": "9df8eeb2d3e149febc7fbf9c46120f5b89533bec5fb50e6997377f142a390ffb",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/today-window.qnt": "b22df6499d643134e9e7e958bdb197478e2fa572cc00a7f6ecb44ddd5023aa5d",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/track-j.sh": "67fd95769e369e56a4bc3816253d293c5edb7c29f461a216b8f2da3ea6ab10e1",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/w1-misses-beyond-max-scopes.qnt": "5dec3303798a3168c037366866cefbd90f4bdafd701a6960dc00347ff45cf2a5"
+  },
+  "checks": [
+    {
+      "log": "apd-base-proofSafetyAnyDelayA.log.gz",
+      "sha256": "8527b9e91cd74ef6947812f23f2798495ce732843d089f7b0dc084952349477f",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (102383ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=133s max-steps=0 init=init step=step main=proofSafetyAnyDelayA invariants=indSafety"
+      ]
+    },
+    {
+      "log": "apd-base-proofSmallA.log.gz",
+      "sha256": "51363cff7ff5602cafd87bd082dfedc01f4d8309cd29bc2df37f64af3e5153d2",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (98164ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=119s max-steps=0 init=init step=step main=proofSmallA invariants=indInv"
+      ]
+    },
+    {
+      "log": "apd-base-proofSmallBA.log.gz",
+      "sha256": "30787f8bcf6566387f9151bbfcf16756d149d4177eeb944c724b170188799fec",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (101118ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=133s max-steps=0 init=init step=step main=proofSmallBA invariants=indInv"
+      ]
+    },
+    {
+      "log": "apd-mut-a1.log.gz",
+      "sha256": "fe5b21d8b492a2d079816c2ccf3a192e62bbd0c4818ed7a33614abb756bd84aa",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (397376ms).",
+        "error: found a counterexample",
+        "exit=1 wall=414s max-steps=3 init=init step=stepMacro main=mutationPartialReceiptTodayApalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-a2.log.gz",
+      "sha256": "8d8aaaa97ed465edd2b6092c10520bb38be6d21a22cee57e6296b013e6230c59",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (968869ms).",
+        "error: found a counterexample",
+        "exit=1 wall=996s max-steps=5 init=init step=stepMacro main=mutationExpiredOutsideTodayApalache invariants=noCensusRefusal"
+      ]
+    },
+    {
+      "log": "apd-mut-a2b2.log.gz",
+      "sha256": "7de130f4cbd90da5fb9647bc106a1e716de7e6500077023b5b279f592099f7b8",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (4752974ms).",
+        "error: found a counterexample",
+        "exit=1 wall=4763s max-steps=7 init=init step=stepMacro main=mutationA2InsteadOfB2Apalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-carrier.log.gz",
+      "sha256": "5a4edad6786e22855e49c16886085cac6f00060a9c1f599e9eecc4c6aa24667e",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (2618257ms).",
+        "error: found a counterexample",
+        "exit=1 wall=2771s max-steps=5 init=init step=stepMacro main=mutationCarrierWithoutMinusOwnApalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-chain.log.gz",
+      "sha256": "1e943d75e791139b5d987ea668079ba8e3d5fcb5e7e871a08e7419eec6baa7a2",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1760827ms).",
+        "error: found a counterexample",
+        "exit=1 wall=1781s max-steps=5 init=init step=stepMacro main=mutationR5WithoutChainApalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-fencerun.log.gz",
+      "sha256": "e5b4d0d3b5e073d584925d5a9325d2dae4075f50228e12f88673dcabeeba7083",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (2026038ms).",
+        "error: found a counterexample",
+        "exit=1 wall=2050s max-steps=5 init=init step=stepMacro main=limitR7NoPacingApalache invariants=withinMaxScopes"
+      ]
+    },
+    {
+      "log": "apd-mut-no-r7.log.gz",
+      "sha256": "89d7e6f023343d7be5de5a8bb9a8b9734fba3d06da014587b7283657a74288f7",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (489975ms).",
+        "error: found a counterexample",
+        "exit=1 wall=510s max-steps=4 init=init step=stepMacro main=mutationNoR7Apalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-pre-r5.log.gz",
+      "sha256": "1c120dd1fd71c0e907ab4b3dac8696aa4e2a681c96d25230aa5fbe6591063113",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1135689ms).",
+        "error: found a counterexample",
+        "exit=1 wall=1177s max-steps=5 init=init step=stepMacro main=mutationPreR5Apalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-r5b.log.gz",
+      "sha256": "93a18cac3ddd3571fb572ccd7fe78d7c65389adeb360fddd465d43593c19c9c0",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (6290902ms).",
+        "error: found a counterexample",
+        "exit=1 wall=6302s max-steps=6 init=init step=stepMacro main=mutationR5WithoutR5bApalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-r6-absent.log.gz",
+      "sha256": "81efa8e42c73fbabfe8adc336ead2682e2ba8e5630c60d8bf9d9220aa9be76c2",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (429293ms).",
+        "error: found a counterexample",
+        "exit=1 wall=452s max-steps=4 init=init step=stepMacro main=mutationR6AbsentApalache invariants=noCensusRefusal"
+      ]
+    },
+    {
+      "log": "apd-mut-today.log.gz",
+      "sha256": "18bbafaf2dde4188fce467775100055abed63d6f9ae16afd2c1c43d7a31d809a",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (3193240ms).",
+        "error: found a counterexample",
+        "exit=1 wall=3207s max-steps=6 init=init step=stepMacro main=mutationTodayWindowApalache invariants=g1NoLeak"
+      ]
+    },
+    {
+      "log": "apd-mut-w1miss.log.gz",
+      "sha256": "d360a8bee40cfb5b42bc6b4ca70bd9b7612e06b7cc0f60db242c939de1e084cd",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (12882736ms).",
+        "error: found a counterexample",
+        "exit=1 wall=12897s max-steps=6 init=init step=stepMacro main=limitW1MissesBeyondMaxScopesApalache invariants=withinMaxScopes"
+      ]
+    },
+    {
+      "log": "apd-nonvac-proofSmallA.log.gz",
+      "sha256": "fcb398fea49797f9a6ca1ecfff8c1e097821c48c8848cbe35f5f8e40513f292a",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (131202ms).",
+        "error: found a counterexample",
+        "exit=1 wall=162s max-steps=0 init=indInit step=step main=proofSmallA invariants=indRichStateAbsent"
+      ]
+    },
+    {
+      "log": "apd-step-proofSafetyAnyDelayA.log.gz",
+      "sha256": "8350a7628c72eada11d264dd2b3dcaf9ca7ea41dfa7770bd7b6557ec3a0ff8b2",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (478326ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=506s max-steps=1 init=indInitSafety step=step main=proofSafetyAnyDelayA invariants=indSafety"
+      ]
+    },
+    {
+      "log": "apd-step-proofSmallA.log.gz",
+      "sha256": "86bd35800f8c8dbd0107c31e3f2a8dc4873469442262d6884076712c07421ad2",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (1044378ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=1085s max-steps=1 init=indInit step=step main=proofSmallA invariants=indInv"
+      ]
+    },
+    {
+      "log": "apd-step-proofSmallBA.log.gz",
+      "sha256": "43b74e13a76d4c6bf4bb1647a96d6b721bf081d55c7f85b37ba5f4c02321bd90",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (1263776ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=1291s max-steps=1 init=indInit step=step main=proofSmallBA invariants=indInv"
+      ]
+    },
+    {
+      "log": "apr-base-proofContractSafetyReducedA.log.gz",
+      "sha256": "44b0b6e206abc952071df9534aaf533f34e53543ed56f16595c80cec828e75a5",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (81880ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=99s max-steps=0 init=init step=step main=proofContractSafetyReducedA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/apalache.json"
+      ]
+    },
+    {
+      "log": "apr-stepInstall-proofContractSafetyReducedA.log.gz",
+      "sha256": "8fd6af2689f8e27c42e79b18f9bfae6b25729ba3dda4c7fa54b3cefe777e9b1a",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (20632065ms).",
+        "error: found a counterexample",
+        "exit=1 wall=20692s max-steps=1 init=indInitContract step=stepInstall main=proofContractSafetyReducedA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/apalache-nodiscard.json"
+      ]
+    },
+    {
+      "log": "apr-stepMove-proofContractSafetyReducedA.log.gz",
+      "sha256": "f6493098f072501d82a395a53c32d77db3c2409e6d02d040d65b6784fd75e7e5",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (83032ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=101s max-steps=1 init=indInitContract step=stepMove main=proofContractSafetyReducedA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/apalache-nodiscard.json"
+      ]
+    },
+    {
+      "log": "apr-stepOther-proofContractSafetyReducedA.log.gz",
+      "sha256": "3ecc401fb4d8a311c4f6db1b14cf34b1278c5599656ab2ef31c7a7fa831044f7",
+      "verdict": "incomplete",
+      "lastLines": [
+        "State 1: state invariant 34 holds.                                I@12:16:44.514",
+        "State 1: state invariant 35 holds.                                I@12:29:23.506",
+        "State 1: state invariant 36 holds.                                I@12:31:15.476",
+        "State 1: state invariant 37 holds.                                I@12:38:26.584"
+      ]
+    },
+    {
+      "log": "apr-stepRejoin-proofContractSafetyReducedA.log.gz",
+      "sha256": "d01a1e4d3e31edc090763a4899086f8b27346e7279e8b4d46acf78a54fe5fb56",
+      "verdict": "incomplete",
+      "lastLines": [
+        "State 1: state invariant 60 holds.                                I@00:38:33.800",
+        "State 1: state invariant 61 holds.                                I@01:05:40.559",
+        "State 1: state invariant 62 holds.                                I@01:21:11.660",
+        "State 1: state invariant 63 holds.                                I@01:24:17.581"
+      ]
+    },
+    {
+      "log": "apr-stepSeal-proofContractSafetyReducedA.log.gz",
+      "sha256": "adb4cadd532511831bb61dc1cd5de80be858ff90a7188e53e67703934c995fd5",
+      "verdict": "ok",
+      "lastLines": [
+        "[ok] No violation found (71921ms).",
+        "You may increase --max-steps.",
+        "Use --verbosity to produce more (or less) output.",
+        "exit=0 wall=95s max-steps=1 init=indInitContract step=stepSeal main=proofContractSafetyReducedA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/apalache-nodiscard.json"
+      ]
+    },
+    {
+      "log": "formal-r5.out.gz",
+      "sha256": "62494cbfa7af5ec6885b47002272807b3d673fc3d6746df2d031e5a707935591",
+      "verdict": "incomplete",
+      "lastLines": [
+        "ok   mutation mutationContractRetireFirst violates noPlanRefusal (35 s)",
+        "ok   mutation mutationContractPlanFirst violates iNoLeak (34 s)",
+        "track-j formal: every job passed (1389 s)",
+        "rc=0 wall=1390s load=177.59 173.14 181.48"
+      ]
+    },
+    {
+      "log": "tlc-AnyDelayA-indContract.log.gz",
+      "sha256": "c78c3dc4767e24cd5d454fa3a42d88080acd42f7ab6d15a62e53252ba2b5caec",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 16s at (2026-10-22 10:26:18)",
+        "",
+        "[ok] No violation found (16682ms).",
+        "exit=0 wall=43s backend=tlc init=init step=step main=proofContractSafetyAnyDelayA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc.json"
+      ],
+      "states": {
+        "generated": 720254,
+        "distinct": 217244,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-ExpireA-indContract.log.gz",
+      "sha256": "4d404df7d317420d380d0e9ca143db0ca839e5438f419b12b63f0a331e9c0480",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 16s at (2026-10-22 10:33:09)",
+        "",
+        "[ok] No violation found (17001ms).",
+        "exit=0 wall=44s backend=tlc init=init step=step main=proofContractSafetyAnyDelayExpireA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc.json"
+      ],
+      "states": {
+        "generated": 742288,
+        "distinct": 224181,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-ReducedA-indContract.log.gz",
+      "sha256": "bdb016336f05072511b0dadb9278eaaeeb59830e2031aeb9effb8b28224f31c4",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 01s at (2026-10-22 10:36:12)",
+        "",
+        "[ok] No violation found (2193ms).",
+        "exit=0 wall=32s backend=tlc init=init step=step main=proofContractSafetyReducedA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc.json"
+      ],
+      "states": {
+        "generated": 22765,
+        "distinct": 6764,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-ReviewA-indContract.log.gz",
+      "sha256": "961cd83f31dc44ea0f00a834294a0c81df4b460258f92cde23339c0985f7df14",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 04min 09s at (2026-10-22 10:32:25)",
+        "",
+        "[ok] No violation found (249954ms).",
+        "exit=0 wall=277s backend=tlc init=init step=step main=proofContractSafetyAnyDelayReviewA invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc.json"
+      ],
+      "states": {
+        "generated": 10307920,
+        "distinct": 2832790,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-SmallA-all.log.gz",
+      "sha256": "0465df1fea14a8d01a1cbf7baf0ff2d90f6ff62c0a9faa5849a23215314830c2",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 17s at (2026-10-22 10:34:06)",
+        "",
+        "[ok] No violation found (18385ms).",
+        "exit=0 wall=44s backend=tlc init=init step=step main=proofContractSmallA invariants=allInvariants contractInvariants indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc.json"
+      ],
+      "states": {
+        "generated": 658033,
+        "distinct": 198931,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-exhContractProgressA5.log.gz",
+      "sha256": "fd7b18ac2c915ef31d66d01585c0fbc757709707a6f46ba56285b7f40a355c5c",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 29min 16s at (2026-10-22 13:36:40)",
+        "",
+        "[ok] No violation found (1757823ms).",
+        "exit=0 wall=1897s backend=tlc init=init step=step main=exhContractProgressA5 invariants=allInvariants contractInvariants indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 7079328,
+        "distinct": 2166963,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-exhContractSafetyA5.log.gz",
+      "sha256": "af2ab077c13cb98ce24fa5a7b962efa667d2b59cad1706172e9ab6f98e0f046f",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 23min 09s at (2026-10-22 13:05:02)",
+        "",
+        "[ok] No violation found (1392050ms).",
+        "exit=0 wall=1442s backend=tlc init=init step=step main=exhContractSafetyA5 invariants=indContract config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 8132289,
+        "distinct": 2483501,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlc-exhContractSafetyA6.log.gz",
+      "sha256": "5bcd9f40a022bd3fc61cd8848911236f29a29b07cd12060fc42ef01e8410c826",
+      "verdict": "incomplete",
+      "lastLines": [
+        "Progress(16) at 2026-10-22 12:36:46: 30,171,464 states generated (554,449 s/min), 12,715,195 distinct states found (178,355 ds/min), 5,663,409 states left on queue.",
+        "Progress(16) at 2026-10-22 12:37:46: 30,637,641 states generated (466,177 s/min), 12,868,145 distinct states found (152,950 ds/min), 5,696,623 states left on queue.",
+        "Progress(16) at 2026-10-22 12:38:46: 30,995,795 states generated (358,154 s/min), 12,982,976 distinct states found (114,831 ds/min), 5,716,717 states left on queue.",
+        "Progress(16) at 2026-10-22 12:39:46: 31,276,079 states generated (280,284 s/min), 13,088,000 distinct states found (105,024 ds/min), 5,756,498 states left on queue."
+      ],
+      "states": {
+        "generated": 31276079,
+        "distinct": 13088000,
+        "queued": 5756498
+      }
+    },
+    {
+      "log": "tlc-exhContractSafetyAB.log.gz",
+      "sha256": "a730eae8c3b6718f72ed073ed14cf6358d27b5c54644d20893f326e215d5e726",
+      "verdict": "incomplete",
+      "lastLines": [
+        "Progress(14) at 2026-10-23 01:47:11: 439,817,567 states generated (335,807 s/min), 75,343,220 distinct states found (25,736 ds/min), 23,981,407 states left on queue.",
+        "Progress(14) at 2026-10-23 01:48:11: 440,131,215 states generated (313,648 s/min), 75,362,150 distinct states found (18,930 ds/min), 23,939,228 states left on queue.",
+        "Progress(14) at 2026-10-23 01:49:11: 440,320,374 states generated (189,159 s/min), 75,381,626 distinct states found (19,476 ds/min), 23,930,387 states left on queue.",
+        "Progress(14) at 2026-10-23 01:50:11: 440,641,039 states generated (320,665 s/min), 75,405,902 distinct states found (24,276 ds/min), 23,896,535 states left on queue."
+      ],
+      "states": {
+        "generated": 440641039,
+        "distinct": 75405902,
+        "queued": 23896535
+      }
+    },
+    {
+      "log": "tlcd-proofSmallA.log.gz",
+      "sha256": "7abb41e2eff4cf9c09b852ec3e5e6160f12d1a938d6c09aba550ccbfb45a6655",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 03s at (2026-10-22 12:11:31)",
+        "",
+        "[ok] No violation found (4044ms).",
+        "exit=0 wall=54s backend=tlc init=init step=step main=proofSmallA invariants=indInv safety g1Count g1NoLeak planSound noPlanRefusal noCensusRefusal withinMaxScopes noProtectedHole config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 12938,
+        "distinct": 6706,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlcd-proofSmallBA.log.gz",
+      "sha256": "9d3d2ed475d67f73698d0aa2eccd05c9ddee8c5f1640a3dd92a7044e428bbe8e",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 03s at (2026-10-22 12:12:21)",
+        "",
+        "[ok] No violation found (3684ms).",
+        "exit=0 wall=51s backend=tlc init=init step=step main=proofSmallBA invariants=indInv safety g1Count g1NoLeak planSound noPlanRefusal noCensusRefusal withinMaxScopes noProtectedHole config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 12938,
+        "distinct": 6706,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlcd-proofSmallBAB.log.gz",
+      "sha256": "e8308392fa4b63744725674c8e2eeb1390df3dead838e6540bfe8984c6f779e3",
+      "verdict": "incomplete",
+      "lastLines": [
+        "Progress(15) at 2026-10-23 01:47:37: 152,803,249 states generated (110,578 s/min), 51,155,798 distinct states found (29,829 ds/min), 20,191,832 states left on queue.",
+        "Progress(15) at 2026-10-23 01:48:37: 152,870,786 states generated (67,537 s/min), 51,174,349 distinct states found (18,551 ds/min), 20,193,138 states left on queue.",
+        "Progress(15) at 2026-10-23 01:49:37: 152,931,424 states generated (60,638 s/min), 51,189,930 distinct states found (15,581 ds/min), 20,191,005 states left on queue.",
+        "Progress(15) at 2026-10-23 01:50:37: 153,075,105 states generated (143,681 s/min), 51,223,450 distinct states found (33,520 ds/min), 20,182,427 states left on queue."
+      ],
+      "states": {
+        "generated": 153075105,
+        "distinct": 51223450,
+        "queued": 20182427
+      }
+    },
+    {
+      "log": "tlcd2-proofSafetyAnyDelayA.log.gz",
+      "sha256": "4888387b3663f814c9ca07c5392c107b4710c7a81bf4f6edb25a5b1fc8444879",
+      "verdict": "ok",
+      "lastLines": [
+        "Finished in 40s at (2026-10-22 12:43:32)",
+        "",
+        "[ok] No violation found (40791ms).",
+        "exit=0 wall=151s backend=tlc init=init step=step main=proofSafetyAnyDelayA invariants=indSafety config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 136782,
+        "distinct": 62802,
+        "queued": 0
+      }
+    },
+    {
+      "log": "tlcdm-a1.log.gz",
+      "sha256": "aafd11e89f45ee684c09c8a36555a64ee1b1490f983a3b3d58ccbc05bd477065",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (5797ms).",
+        "error: found a counterexample",
+        "exit=1 wall=164s backend=tlc init=init step=step main=mutationPartialReceiptTodayApalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 700,
+        "distinct": 588,
+        "queued": 354
+      }
+    },
+    {
+      "log": "tlcdm-a2.log.gz",
+      "sha256": "795734a2b1514ef26ce953b8313e732c7684208ed29c4c6e5fd8ec149c9e53f7",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (7651ms).",
+        "error: found a counterexample",
+        "exit=1 wall=163s backend=tlc init=init step=step main=mutationExpiredOutsideTodayApalache invariants=noCensusRefusal config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 472,
+        "distinct": 398,
+        "queued": 224
+      }
+    },
+    {
+      "log": "tlcdm-a2b2.log.gz",
+      "sha256": "de62e956f42b1c3cb280afb4f9553a59b1809e9a4916f16a8aa9b76a84b3cfc4",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (29165ms).",
+        "error: found a counterexample",
+        "exit=1 wall=167s backend=tlc init=init step=step main=mutationA2InsteadOfB2Apalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 20952,
+        "distinct": 12274,
+        "queued": 9811
+      }
+    },
+    {
+      "log": "tlcdm-carrier.log.gz",
+      "sha256": "1bf56967367d5967bd5ab6f43663a6df5091f158c5078e585553190e16f4ea06",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (4606ms).",
+        "error: found a counterexample",
+        "exit=1 wall=124s backend=tlc init=init step=step main=mutationCarrierWithoutMinusOwnApalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 505,
+        "distinct": 431,
+        "queued": 245
+      }
+    },
+    {
+      "log": "tlcdm-chain.log.gz",
+      "sha256": "83b1ac994865730a105b669e2c24f66e66d6ced73870ef9b0a325bec6b1102fa",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (3855ms).",
+        "error: found a counterexample",
+        "exit=1 wall=128s backend=tlc init=init step=step main=mutationR5WithoutChainApalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 505,
+        "distinct": 431,
+        "queued": 245
+      }
+    },
+    {
+      "log": "tlcdm-fencerun.log.gz",
+      "sha256": "fc27e3ca4a4ccfb241eef56dca6478e4c60c7ad28d8420947e76fff52875c6bd",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (6018ms).",
+        "error: found a counterexample",
+        "exit=1 wall=166s backend=tlc init=init step=step main=limitR7NoPacingApalache invariants=withinMaxScopes config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 4265,
+        "distinct": 3150,
+        "queued": 1226
+      }
+    },
+    {
+      "log": "tlcdm-no-r7.log.gz",
+      "sha256": "4b7ffb6f26ceaed7a0641dbf261b50f2a83e68af4e834da568a9c5dd5b9b9673",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (3411ms).",
+        "error: found a counterexample",
+        "exit=1 wall=61s backend=tlc init=init step=step main=mutationNoR7Apalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 1307,
+        "distinct": 958,
+        "queued": 415
+      }
+    },
+    {
+      "log": "tlcdm-pre-r5.log.gz",
+      "sha256": "6b4aa942d136f7f23fb2658507149c49473af90f7fe686a86fe2717d780a16f2",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (8604ms).",
+        "error: found a counterexample",
+        "exit=1 wall=109s backend=tlc init=init step=step main=mutationPreR5Apalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 505,
+        "distinct": 431,
+        "queued": 245
+      }
+    },
+    {
+      "log": "tlcdm-r5b.log.gz",
+      "sha256": "d782350cc49b0cbe22050bc8a293f6f0d567a5a76be35545fe10cd8766d85606",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (27302ms).",
+        "error: found a counterexample",
+        "exit=1 wall=131s backend=tlc init=init step=step main=mutationR5WithoutR5bApalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 20952,
+        "distinct": 12274,
+        "queued": 9811
+      }
+    },
+    {
+      "log": "tlcdm-r6-absent.log.gz",
+      "sha256": "6df682b98b3e74e1496c9cce6e2722832ed1334ac54498e6753c603daa5950d6",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (5688ms).",
+        "error: found a counterexample",
+        "exit=1 wall=139s backend=tlc init=init step=step main=mutationR6AbsentApalache invariants=noCensusRefusal config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 80,
+        "distinct": 71,
+        "queued": 44
+      }
+    },
+    {
+      "log": "tlcdm-today.log.gz",
+      "sha256": "296f260471994b00074f17a0a82252a5739bd7a7d829240ff1f2d7fada6f82a7",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (16447ms).",
+        "error: found a counterexample",
+        "exit=1 wall=234s backend=tlc init=init step=step main=mutationTodayWindowApalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 1328,
+        "distinct": 1095,
+        "queued": 508
+      }
+    },
+    {
+      "log": "tlcdm-w1miss.log.gz",
+      "sha256": "6f1574cfc7233fe2beaca16093befc54e906ae01a64300ff0844f91c5be75b2c",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (15056ms).",
+        "error: found a counterexample",
+        "exit=1 wall=264s backend=tlc init=init step=step main=limitW1MissesBeyondMaxScopesApalache invariants=withinMaxScopes config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc1.json"
+      ],
+      "states": {
+        "generated": 2551,
+        "distinct": 2040,
+        "queued": 1046
+      }
+    },
+    {
+      "log": "tlcm-early-plan-drop.log.gz",
+      "sha256": "5de06e3e1a9c18240d9c91478663abc2cdaed8b03f1e577890d80c7a704451c5",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1161ms).",
+        "error: found a counterexample",
+        "exit=1 wall=27s backend=tlc init=init step=step main=mutationContractEarlyPlanDropApalache invariants=noCensusRefusal config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 96,
+        "distinct": 73,
+        "queued": 42
+      }
+    },
+    {
+      "log": "tlcm-either-drop.log.gz",
+      "sha256": "662089a1d3e4a2514e10507ca7b9755169c0807cd5fb92fa069564a8c3a0f7f1",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (23379ms).",
+        "error: found a counterexample",
+        "exit=1 wall=47s backend=tlc init=init step=step main=contractEitherDropLeakSmall invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 673122,
+        "distinct": 325678,
+        "queued": 184342
+      }
+    },
+    {
+      "log": "tlcm-guard-one-pass.log.gz",
+      "sha256": "2818248aa5cc8e62784622e490ab016f67e9c72462f340e4432d76d2d8d1fade",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (180444ms).",
+        "error: found a counterexample",
+        "exit=1 wall=207s backend=tlc init=init step=step main=mutationGuardOnePassSmall invariants=iNoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 5745049,
+        "distinct": 2775417,
+        "queued": 1558931
+      }
+    },
+    {
+      "log": "tlcm-no-old-incarnation.log.gz",
+      "sha256": "e84f81cfce17c917031ce98bf52c4945057ba64f3120c66ae36207fb27b105e3",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (2670ms).",
+        "error: found a counterexample",
+        "exit=1 wall=31s backend=tlc init=init step=step main=mutationContractNoOldIncarnationApalache invariants=tMonotone config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 3332,
+        "distinct": 1998,
+        "queued": 1132
+      }
+    },
+    {
+      "log": "tlcm-no-pacing.log.gz",
+      "sha256": "3e24fd4418dc80e8380c6d3de2a4c553330840ddda9f51be8642e88fbfe1b713",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1655ms).",
+        "error: found a counterexample",
+        "exit=1 wall=24s backend=tlc init=init step=step main=limitContractNoPacingApalache invariants=withinMaxScopes config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 3685,
+        "distinct": 2357,
+        "queued": 788
+      }
+    },
+    {
+      "log": "tlcm-pace-at-max-scopes.log.gz",
+      "sha256": "71e018e19d46c159034ce78f39fc856fb29e9d6dde4b037b5a91b53a24143ba8",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (2271ms).",
+        "error: found a counterexample",
+        "exit=1 wall=36s backend=tlc init=init step=step main=limitContractPaceAtMaxScopesApalache invariants=withinMaxScopes config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 1573,
+        "distinct": 1188,
+        "queued": 592
+      }
+    },
+    {
+      "log": "tlcm-plan-first.log.gz",
+      "sha256": "406ec205bbc570b35107dd4518583f6a25fab299e4aa4d6903e9090e2737f46a",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1775ms).",
+        "error: found a counterexample",
+        "exit=1 wall=33s backend=tlc init=init step=step main=mutationContractPlanFirstApalache invariants=iNoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 1799,
+        "distinct": 1264,
+        "queued": 515
+      }
+    },
+    {
+      "log": "tlcm-proof-with-scope.log.gz",
+      "sha256": "ee6d5867d2e2214049f3d0a77e207c32be77fe4d4f329d01e721e1038d1ca4ea",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1821ms).",
+        "error: found a counterexample",
+        "exit=1 wall=36s backend=tlc init=init step=step main=mutationContractProofWithScopeApalache invariants=proofHeld config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 562,
+        "distinct": 398,
+        "queued": 195
+      }
+    },
+    {
+      "log": "tlcm-readmit-abandon.log.gz",
+      "sha256": "b1a0926b4c9ba7bd0855a0fa4d298d68da3853c3eeb5d2bf2f6b140926d48707",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1714ms).",
+        "error: found a counterexample",
+        "exit=1 wall=20s backend=tlc init=init step=step main=mutationReadmitAbandonApalache invariants=noIntentLoss config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 51,
+        "distinct": 39,
+        "queued": 26
+      }
+    },
+    {
+      "log": "tlcm-retire-first.log.gz",
+      "sha256": "8e401616c514faeb075c1a45016a7610a8fa0260df3aa1e04b12e2ef4c77c8b0",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (2010ms).",
+        "error: found a counterexample",
+        "exit=1 wall=38s backend=tlc init=init step=step main=mutationContractRetireFirstApalache invariants=noPlanRefusal config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 1627,
+        "distinct": 1198,
+        "queued": 556
+      }
+    },
+    {
+      "log": "tlcm-seq-identity.log.gz",
+      "sha256": "b9aa778cbb7944993e369316666d12b82a75a6372a96505b40536ca09f2d4f69",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (3273ms).",
+        "error: found a counterexample",
+        "exit=1 wall=29s backend=tlc init=init step=step main=mutationContractSeqIdentityApalache invariants=safety config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 25898,
+        "distinct": 14458,
+        "queued": 6434
+      }
+    },
+    {
+      "log": "tlcm-settled-without-t.log.gz",
+      "sha256": "13d0f96a9556b1b98c92cc465dbe09f2ea3811158474a08ca905be655b77c0e3",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1639ms).",
+        "error: found a counterexample",
+        "exit=1 wall=31s backend=tlc init=init step=step main=mutationContractSettledWithoutTApalache invariants=safety config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 275,
+        "distinct": 203,
+        "queued": 102
+      }
+    },
+    {
+      "log": "tlcm-source-drop.log.gz",
+      "sha256": "56d2f0c27c63f3e0c87145faff6840ae2a474cbddb8a16451eb6a9d5a4eefe14",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (9063ms).",
+        "error: found a counterexample",
+        "exit=1 wall=49s backend=tlc init=init step=step main=candidateSourceDropSmall invariants=noPlanRefusal config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 101363,
+        "distinct": 48874,
+        "queued": 27666
+      }
+    },
+    {
+      "log": "tlcm-t-without-settled.log.gz",
+      "sha256": "37c1e9fd29c21d5eac184ed2e1639b1e3419e52ffe315511ce6c87eceb9342af",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1566ms).",
+        "error: found a counterexample",
+        "exit=1 wall=24s backend=tlc init=init step=step main=mutationContractTWithoutSettledApalache invariants=safety config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 328,
+        "distinct": 219,
+        "queued": 122
+      }
+    },
+    {
+      "log": "tlcm-under-decided-truth.log.gz",
+      "sha256": "041f74cc4a742eb78e9266baf92468589a33da7134b39e86345ebc0dad49a312",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1769ms).",
+        "error: found a counterexample",
+        "exit=1 wall=21s backend=tlc init=init step=step main=contractUnderDecidedTruthApalache invariants=safety config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 297,
+        "distinct": 217,
+        "queued": 110
+      }
+    },
+    {
+      "log": "tlcm-volatile-authority.log.gz",
+      "sha256": "08c8099eaff53d12af6e209fa273609dae585bf890eb85cf314b3b219da52074",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1837ms).",
+        "error: found a counterexample",
+        "exit=1 wall=23s backend=tlc init=init step=step main=mutationContractVolatileAuthorityApalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 1150,
+        "distinct": 904,
+        "queued": 439
+      }
+    },
+    {
+      "log": "tlcm-without-expire-settled.log.gz",
+      "sha256": "83458928be5a432fb65465f580aa758b1037a2819cc43ed7e30364ec24f2d222",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1471ms).",
+        "error: found a counterexample",
+        "exit=1 wall=21s backend=tlc init=init step=step main=mutationContractWithoutExpireSettledApalache invariants=noCensusRefusal config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 365,
+        "distinct": 258,
+        "queued": 119
+      }
+    },
+    {
+      "log": "tlcm-without-f1.log.gz",
+      "sha256": "e39b82a1231db6c7a175aeed154615401c47fd3223c2bfb91061c71e231abe78",
+      "verdict": "violation",
+      "lastLines": [
+        "",
+        "[violation] Found an issue (1564ms).",
+        "error: found a counterexample",
+        "exit=1 wall=21s backend=tlc init=init step=step main=mutationContractWithoutF1Apalache invariants=g1NoLeak config=/private/tmp/claude-501/-Users-aristotle-Documents-Projects-ts-drp-1/62160344-dffd-4919-a00c-b5b5da90e416/scratchpad/track-j/bin/tlc2.json"
+      ],
+      "states": {
+        "generated": 789,
+        "distinct": 555,
+        "queued": 308
+      }
+    }
+  ]
+}

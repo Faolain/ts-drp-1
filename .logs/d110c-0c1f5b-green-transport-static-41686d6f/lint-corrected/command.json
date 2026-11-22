@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/phase-3a1b-p3-live-transport-red.test.ts"
+  ],
+  "start": "2026-09-06T04:41:29.602Z"
+}

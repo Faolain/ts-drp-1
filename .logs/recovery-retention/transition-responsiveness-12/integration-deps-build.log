@@ -1,0 +1,5 @@
+Scope: 2 of 47 workspace projects
+packages/live-journal build$ tsc -b tsconfig.build.json
+packages/issuance-store build$ tsc -b tsconfig.build.json
+packages/live-journal build: Done
+packages/issuance-store build: Done

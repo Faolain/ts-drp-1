@@ -1,0 +1,93 @@
+syntax = "proto3";
+package drp.node.v2;
+
+// Trusted startup selects applications, storage, identity and head acquisition.
+// Wire inputs never supply executable code, native paths or local capabilities.
+service V3RoomService {
+  rpc OpenRoom(OpenRoomRequest) returns (OpenRoomResponse);
+  rpc UnsubscribeRoom(UnsubscribeRoomRequest) returns (UnsubscribeRoomResponse);
+  rpc QueryRetainedHashes(QueryRetainedHashesRequest) returns (QueryRetainedHashesResponse);
+  rpc RequestRetainedRepair(RequestRetainedRepairRequest) returns (RequestRetainedRepairResponse);
+  rpc AddCustomGroup(AddCustomGroupRequest) returns (NetworkCompletionResponse);
+  rpc SendGroupMessage(SendGroupMessageRequest) returns (NetworkCompletionResponse);
+  rpc SendCustomMessage(SendCustomMessageRequest) returns (NetworkCompletionResponse);
+}
+
+message AddCustomGroupRequest { string group = 1; }
+message SendGroupMessageRequest { string group = 1; bytes data = 2; }
+message SendCustomMessageRequest { string peer_id = 1; bytes data = 2; }
+// Completion of the existing local Node API, not remote receipt or delivery.
+message NetworkCompletionResponse { string kind = 1; }
+
+message OpenRoomRequest {
+  string application_id = 1;
+  string creator_invite = 2;
+}
+
+message OpenRoomResponse {
+  // Local lifetime handle only; not portable room or write authority.
+  string subscription_id = 1;
+  string application_id = 2;
+  string object_id = 3;
+  bool receive_only = 4;
+}
+
+message UnsubscribeRoomRequest {
+  string subscription_id = 1;
+}
+
+// Success acknowledges joined release, never deletion of durable state.
+message UnsubscribeRoomResponse {}
+
+// Position metadata only: the native owner independently checks scope/currency.
+message RetainedHashCursor {
+  string object_id = 1;
+  uint64 epoch = 2;
+  string anchor_digest = 3;
+  string snapshot_digest = 4;
+  uint64 graph_version = 5;
+  uint64 after_sequence = 6;
+}
+
+message QueryRetainedHashesRequest {
+  string subscription_id = 1;
+  uint32 limit = 2;
+  // Message presence distinguishes the first page from a real zero-valued cursor.
+  RetainedHashCursor cursor = 3;
+}
+
+message RetainedJournalScope {
+  string object_id = 1;
+  uint64 epoch = 2;
+  string anchor_digest = 3;
+}
+
+message RetainedHashEntry {
+  uint64 journal_sequence = 1;
+  string vertex_digest = 2;
+}
+
+message QueryRetainedHashesResponse {
+  RetainedJournalScope scope = 1;
+  // Current-epoch retained accepted window; never an all-history/archive claim.
+  string coverage = 2;
+  uint64 retained_row_count = 3;
+  string snapshot_digest = 4;
+  repeated RetainedHashEntry entries = 5;
+  // Absent means end of this exact retained window, not an unbounded scan.
+  RetainedHashCursor continuation = 6;
+}
+
+message RetainedRepairTarget {
+  string peer_id = 1;
+}
+
+message RequestRetainedRepairRequest {
+  string subscription_id = 1;
+  RetainedRepairTarget target = 2;
+}
+
+message RequestRetainedRepairResponse {
+  // "scheduled" acknowledges a real request/publication, not convergence.
+  string kind = 1;
+}

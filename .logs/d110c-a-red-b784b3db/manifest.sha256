@@ -1,0 +1,6 @@
+e68b21acbe627d2e457c823903720b73549fe3d9b9c8677d5431468cd00b09cc  ./.logs/d110c-a-red-b784b3db/custody.txt
+01d249d6e39d6218a66d6e4cec81b2cfc3a6bcefebcdb514c02de1ceb8e5e753  ./.logs/d110c-a-red-b784b3db/red-ledger.md
+8efa5e1c8b625b950b2972d97b801172c29410d0bd99147cafb99e4aca9806e4  ./.logs/d110c-a-red-b784b3db/runtime-vitest.json
+ac826f1b3e450a37f52595787f4914e4de9ac8e9b6e701e35bc6d25b045a3028  ./.logs/d110c-a-red-b784b3db/source-shape.txt
+5fbbbcd85ba10ca61539c6a2f7006f26eb9887b538c12cc2ecccf1b20cad17ad  ./.logs/d110c-a-red-b784b3db/typecheck-invalid-config.txt
+66e91f6adf7608fefcf32117509013acd07f8daf2bc34b349a421acb1fe415d6  ./.logs/d110c-a-red-b784b3db/typecheck-red.txt

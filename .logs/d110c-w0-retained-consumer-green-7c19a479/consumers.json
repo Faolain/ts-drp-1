@@ -1,0 +1,200 @@
+{
+  "seeds": [
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+  ],
+  "tests": [
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+    "tests/phase-6a-creator-successor-infrastructure-red.test.ts",
+    "tests/phase-6a-creator-successor-local-author-red.test.ts",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+    "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+    "tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts",
+    "tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts",
+    "tests/phase-6b-d110c-a-repeat-close-red.test.ts",
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts",
+    "tests/protocol-v3-creator-author-issuance-frontiers.test.ts"
+  ],
+  "supplemental": [
+    "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts"
+  ],
+  "sourceInspectionEdges": [
+    {
+      "file": "tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "source": "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "reason": "exact repository-relative source path literal"
+    },
+    {
+      "file": "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+      "source": "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "reason": "exact repository-relative source path literal"
+    }
+  ],
+  "affected": [
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+    "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+    "tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts",
+    "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+    "tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts",
+    "tests/phase-6a-creator-successor-infrastructure-red.test.ts",
+    "tests/phase-6a-creator-successor-local-author-red.test.ts",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+    "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+    "tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts",
+    "tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts",
+    "tests/phase-6b-d110c-a-repeat-close-red.test.ts",
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts",
+    "tests/protocol-v3-creator-author-issuance-frontiers.test.ts"
+  ],
+  "dependencies": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": [
+      "packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs"
+    ],
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts": [
+      "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts"
+    ],
+    "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts": [
+      "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "tests/fixtures/shared/workspace-package-subprocess.mjs"
+    ],
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": [
+      "packages/control-plane/src/creator-trust-advance.ts",
+      "packages/control-plane/src/creator-trust-checkpoint-advance.ts",
+      "packages/node/src/internal/creator-transition-advance.ts",
+      "packages/protocol-v3/src/anchor-trust-singleton.ts",
+      "packages/protocol-v3/src/creator-checkpoint.ts",
+      "packages/protocol-v3/src/creator-close.ts",
+      "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+    ],
+    "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts": [
+      "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+    ],
+    "tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts": [
+      "packages/protocol-v3/src/creator-author-issuance-frontiers.ts",
+      "packages/protocol-v3/src/creator-close.ts",
+      "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts"
+    ],
+    "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts": [
+      "packages/node/src/v3-live.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+      "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+    ],
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": [
+      "packages/node/src/creator-adoption-activate.ts",
+      "packages/node/src/creator-close.ts",
+      "packages/node/src/internal/creator-adoption-intent.ts",
+      "packages/node/src/internal/creator-successor-live.ts",
+      "packages/node/src/v3-live.ts",
+      "packages/protocol-v3/src/index.ts",
+      "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "tests/fixtures/phase-6b/runtime-reclamation-contract.ts"
+    ],
+    "tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts": [
+      "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+    ],
+    "tests/phase-6a-creator-successor-infrastructure-red.test.ts": [
+      "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+      "tests/fixtures/shared/workspace-package-export-file.mjs",
+      "tests/fixtures/shared/workspace-package-subprocess.mjs"
+    ],
+    "tests/phase-6a-creator-successor-local-author-red.test.ts": [
+      "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts": [
+      "packages/control-plane/src/creator-trust-checkpoint-advance.ts",
+      "packages/node/src/internal/creator-transition-advance.ts",
+      "packages/protocol-v3/src/creator-author-issuance-frontiers.ts",
+      "packages/protocol-v3/src/creator-checkpoint.ts",
+      "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts": [
+      "packages/control-plane/src/creator-trust-checkpoint-advance.ts",
+      "packages/protocol-v3/src/creator-checkpoint.ts",
+      "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts": [
+      "packages/keychain/src/finality.ts",
+      "packages/node/src/internal/creator-issuance-retirement-boundary.ts",
+      "packages/node/src/internal/creator-transition-advance.ts",
+      "packages/protocol-v3/src/creator-author-issuance-frontiers.ts",
+      "packages/protocol-v3/src/creator-checkpoint.ts",
+      "packages/protocol-v3/src/creator-issuance-retirement.ts",
+      "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+      "tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts": [
+      "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts": [
+      "tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts": [
+      "tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts"
+    ],
+    "tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts": [
+      "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts"
+    ],
+    "tests/phase-6b-d110c-a-repeat-close-red.test.ts": [
+      "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+    ],
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts": [
+      "tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts"
+    ],
+    "tests/protocol-v3-creator-author-issuance-frontiers.test.ts": [
+      "packages/keychain/src/finality.ts",
+      "packages/protocol-v3/src/creator-author-issuance-frontiers.ts",
+      "packages/protocol-v3/src/creator-close.ts",
+      "tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts",
+      "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts"
+    ]
+  },
+  "hashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts": "f3d177abf638aa1711c4f63ebfe37e5196f98c5aefda6a59041e5c802e1d5de9",
+    "tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts": "4d7c3f599654233e0f03646d691bd3b8fae830c291f66d0c78ad666344163d6b",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "02d0c5db72f6796cd21c43759d74eea17ca2b2876291523ed9c34e0d90d06ea7",
+    "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts": "8f8d59395a48b339ebbf129bfde28396335e397c48f590270c7a3af6e32857a8",
+    "tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts": "b93e5043fe8003553b435abb021c5d91e4884926ed4d889a0b97e3df49159c32",
+    "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts": "ff965e4672b3cbdc6334cf0b588aead9af486398cf161957421b64474fa2d245",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b",
+    "tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts": "1decc8777ef6e36ea00ed4a064398cb4475d37129947e9689f32f2234d974319",
+    "tests/phase-6a-creator-successor-infrastructure-red.test.ts": "cdcbaa6a759ea7f1e0572f07a4eb43dc3d34c98af402d86e503d9038801b532e",
+    "tests/phase-6a-creator-successor-local-author-red.test.ts": "4d8eca966de54fe030d2c704548da1bdd2de730defe6c922e408ed174590c658",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts": "5f0803176121ef6af6d3bf250fb992ab6bca3801b0e770cc2aa04b53b59be266",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts": "5f7db7d9539acabefcdbd842f5833f5e41f790349f56c5045aa785b0ffdac1de",
+    "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts": "98d66a26b56eb6084b15c00067bd7c98132bc04deee53e0212da7ba4ca6f95f3",
+    "tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts": "150b3d01e56131c30d4697bfbe7cb9a9191d0a344b079605c3a053152e5e5ff5",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts": "05e2ebad780760a4b0afbd8a3cb270dd97b0b62b34d821c267f7b4a2dac4f4da",
+    "tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts": "99aaa7480b00da4765f52a6791499aa3d9259b14f79b2374a6336948db3313d6",
+    "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts": "1b3233c84954b9c24116110b4b44d8e4d26e73980dc5a248890a46c683a5e5a6",
+    "tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts": "862d574d299e9055714dfd59b2b6082c15a203ce362240994c8ec767c2a3fce2",
+    "tests/phase-6b-d110c-a-repeat-close-red.test.ts": "4049a87f2a556150189e0e10ee80737c4254c40f6d17644da8dc7a87d1b1f883",
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts": "0725933bab799af6629a1b9a49f7667c5a80bc4fd39183d8f07123a339397bf5",
+    "tests/protocol-v3-creator-author-issuance-frontiers.test.ts": "75709cc5da499dba0cf7c620902aea5271b687b5e916e88016056faf76f2842f"
+  },
+  "refinement": "The prior eight-file/19-case proposal omitted the unchanged 11-case child-source inspection suite; this is a prospective dependency refinement, not a historic roster replacement."
+}

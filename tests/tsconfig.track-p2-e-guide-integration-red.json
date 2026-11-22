@@ -1,0 +1,11 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true
+	},
+	"include": ["track-p2-e-guide-integration-red.test.ts"]
+}

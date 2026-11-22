@@ -1,0 +1,6 @@
+tests/fixtures/phase-3a1b-p3/live-fixture.ts
+tests/fixtures/phase-3g/rebase-outbox-fixture.ts
+tests/fixtures/phase-4b-v3/live-snapshot.ts
+tests/fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.ts
+tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts
+

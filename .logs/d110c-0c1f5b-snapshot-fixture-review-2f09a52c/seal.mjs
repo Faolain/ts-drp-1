@@ -1,0 +1,36 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+const root = '/Users/aristotle/Documents/Projects/ts-drp-1';
+const out = path.dirname(new URL(import.meta.url).pathname);
+const relative = path.relative(root, out);
+const hash = b => crypto.createHash('sha256').update(b).digest('hex');
+const write = (f, v) => fs.writeFileSync(path.join(out, f), JSON.stringify(v, null, 2) + '\n', { flag: 'wx' });
+const validation = JSON.parse(fs.readFileSync(path.join(out, 'validation.json')));
+if (!validation.valid || validation.blockingUnion.length || !validation.batchReady || validation.parentReady) throw Error('Review acceptance');
+const diff = spawnSync('git', ['-C', root, 'diff', '--cached', '--check'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+const expected = [163840, 163846].map(line => `${relative}/grok/review.diff:${line}: trailing whitespace.\n+ \n`).join('');
+if (diff.status !== 2 || diff.stderr || diff.stdout !== expected) throw Error('Unexpected staged whitespace');
+const clean = spawnSync('git', ['-C', root, 'diff', '--cached', '--check', '--', '.', ':(exclude)' + relative + '/grok/review.diff'], { encoding: 'utf8' });
+if (clean.status !== 0 || clean.stdout || clean.stderr) throw Error('Authored staged diff');
+write('whitespace.json', { fullStatus: diff.status, fullStdout: diff.stdout, fullStderr: diff.stderr, exactRawException: relative + '/grok/review.diff', rawLines: [163840, 163846], excludedStatus: clean.status, bytesPreserved: true });
+const ports = [4174, 4175, 51000, 51002].map(port => {
+  const r = spawnSync('lsof', ['-nP', '-i:' + port, '-t'], { encoding: 'utf8' });
+  if (![0, 1].includes(r.status) || r.stdout.trim()) throw Error('Fixed port');
+  return { port, clear: true };
+});
+const ps = spawnSync('ps', ['-axo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8' });
+if (ps.status !== 0) throw Error('Numeric process query');
+const rows = ps.stdout.trim().split('\n').map(l => l.trim().split(/\s+/u));
+const reviewerPids = ['sol', 'grok-runner', 'fable'].map(n => JSON.parse(fs.readFileSync(path.join(out, n, 'launch.json'))).pid);
+if (rows.some(r => reviewerPids.includes(Number(r[0])) || reviewerPids.includes(Number(r[1])))) throw Error('Reviewer process remains');
+write('seal-custody.json', { sealedAt: new Date().toISOString(), ports, reviewerPids, reviewersQuiescent: true, numericOnly: true, noRuntimeExecuted: true, validationSha256: hash(fs.readFileSync(path.join(out, 'validation.json'))) });
+const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.relative(out, path.join(dir, e.name))]);
+if (fs.existsSync(path.join(out, 'manifest.sha256'))) throw Error('Already sealed');
+const files = walk(out).sort();
+const manifest = files.map(f => hash(fs.readFileSync(path.join(out, f))) + '  ' + f + '\n').join('');
+fs.writeFileSync(path.join(out, 'manifest.sha256'), manifest, { flag: 'wx' });
+for (const line of manifest.trimEnd().split('\n')) { const [, h, f] = line.match(/^([a-f0-9]{64})  (.+)$/u); if (hash(fs.readFileSync(path.join(out, f))) !== h) throw Error('Hash'); }
+if (walk(out).length !== files.length + 1) throw Error('Inventory');
+console.log(JSON.stringify({ entries: files.length, manifestSha256: hash(manifest), complete: true, blockingUnion: [], p2: 1 }));

@@ -1,0 +1,1 @@
+I'll inspect the corrected plan, first-review findings, source seams, and the listed owners at the signed commit before judging whether causal RED is authorized.The correction is isolated to the plan; next I’ll read the full D.110c-0c/0c1f slices, first-review findings, and the named source owners.

@@ -1,0 +1,51 @@
+{
+	"schemaVersion": 1,
+	"kind": "ts-drp-track-p2-e-integration-contract",
+	"guidePath": "docs/blueprints/authoring.md",
+	"workflowPath": ".github/workflows/track-p2-blueprint-catalog.yml",
+	"releaseWorkflowPath": ".github/workflows/release.yml",
+	"shippingManifestPath": "shipping-targets.json",
+	"secondFixtureDirectory": "tests/fixtures/track-p2-e/message-register",
+	"secondFixtureGoldens": ["artifact.mjs", "package.bin", "lint.bin", "receipt.bin"],
+	"ownedGateCommands": {
+		"type": "pnpm exec tsc -p tests/tsconfig.track-p2-e-guide-integration-red.json --noEmit",
+		"build": "pnpm --filter @ts-drp/blueprint-catalog build && pnpm --filter @ts-drp/blueprint-toolchain build",
+		"test": "pnpm exec vitest run tests/track-p2-e-guide-integration-red.test.ts --coverage.enabled=false",
+		"lint": "pnpm exec eslint tests/track-p2-e-guide-integration-red.test.ts tests/fixtures/track-p2-e/message-register/blueprint.ts",
+		"format": "pnpm exec prettier --check eslint.config.mjs tests/fixtures/track-p2-e tests/track-p2-e-guide-integration-red.test.ts tests/tsconfig.track-p2-e-guide-integration-red.json",
+		"freeze": "git diff --exit-code -- tests/fixtures/track-p2-e/message-register/artifact.mjs tests/fixtures/track-p2-e/message-register/package.bin tests/fixtures/track-p2-e/message-register/lint.bin tests/fixtures/track-p2-e/message-register/receipt.bin"
+	},
+	"prTests": [
+		"tests/track-p2-a-authoring-emitter-lint-red.test.ts",
+		"tests/track-p2-a-opus-corrective-red.test.ts",
+		"tests/track-p2-a-string-comment-corrective-red.test.ts",
+		"tests/track-p2-ab-operation-abi-corrective-red.test.ts",
+		"tests/track-p2-b-package-binding-red.test.ts",
+		"tests/track-p2-c-control-selection-corrective-red.test.ts",
+		"tests/track-p2-d-catalog-red.test.ts",
+		"tests/track-p2-e-guide-integration-red.test.ts"
+	],
+	"nightlyTests": ["tests/track-p2-c-generic-conformance-red.test.ts"],
+	"catalogPackageFiles": ["src", "dist", "!dist/test", "!**/*.tsbuildinfo"],
+	"catalogPackageDependencies": {
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/errors": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
+		"es-module-lexer": "1.6.0"
+	},
+	"catalogDeclarationExports": [
+		"BlueprintCatalogError",
+		"ResolvedBlueprintBytes",
+		"TrustedBlueprintCatalog",
+		"TrustedBlueprintCatalogOptions",
+		"openTrustedBlueprintCatalog"
+	],
+	"catalogRuntimeExports": ["BlueprintCatalogError", "openTrustedBlueprintCatalog"],
+	"catalogPackedFiles": [
+		"package/dist/src/index.d.ts",
+		"package/dist/src/index.d.ts.map",
+		"package/dist/src/index.js",
+		"package/package.json",
+		"package/src/index.ts"
+	]
+}

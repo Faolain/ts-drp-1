@@ -1,0 +1,64 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED aligns 31/64/65 writer-only and 41 full-shape ACLs under the legacy 8,192-byte ceiling",
+      "status": "passed",
+      "title": "aligns 31/64/65 writer-only and 41 full-shape ACLs under the legacy 8,192-byte ceiling",
+      "duration": 20.532291999999984,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED rejects each oversized recognized creator-close record loudly instead of omitting it from either scan",
+      "status": "passed",
+      "title": "rejects each oversized recognized creator-close record loudly instead of omitting it from either scan",
+      "duration": 0.9876250000000937,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED uses one opened-snapshot O(1) membership index without changing 8,192 accept/reject decisions in either mode",
+      "status": "passed",
+      "title": "uses one opened-snapshot O(1) membership index without changing 8,192 accept/reject decisions in either mode",
+      "duration": 23.66862500000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1k W0 writer-capacity RED"
+      ],
+      "fullName": "D.110c-0c1k W0 writer-capacity RED accounts an author-specific default-4 epoch share at every ingress/local capacity gate while preserving global close capacity",
+      "status": "passed",
+      "title": "accounts an author-specific default-4 epoch share at every ingress/local capacity gate while preserving global close capacity",
+      "duration": 112.39129200000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

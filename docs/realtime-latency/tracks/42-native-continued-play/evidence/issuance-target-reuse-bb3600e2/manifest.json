@@ -1,0 +1,261 @@
+{
+  "purpose": "Same-call reuse of a fully validated issuance-retirement target; independent native before-BEGIN and in-writer captures remain separate.",
+  "reviewBase": "1d16ad33b6f585800587ef74bae57aaa2dd03f77",
+  "reviewedSourceCommit": "b2fa7e0e986cd5ea94aa566bd90b0a19d1570d8c",
+  "integrationParent": "697e0401d727a22e606651e371e4b595eb713bac",
+  "integratedSource": "bb3600e231981ac501c0b655a95a809b8ab08ed3",
+  "sourceFilesAtIntegration": {
+    "packages/issuance-store/src/retirement.ts": "b69fe0a2fdf01d8b66dd4bf05eed11eb12a9e6f28fd614da48a3f0627971bff4",
+    "packages/issuance-store/tests/retirement-plan-rewrite.test.ts": "d3d5f7698b2bda75c2f7d5a64ef3c3b2153a5c10f5d845f0ce3b56b6a14e6acf",
+    "packages/storage-node/tests/issuance-retirement-plan-rewrite.test.ts": "2c5eb92da6c21bcd39e3243a68f03465f5c381b5f120a155646e5cc37165294e"
+  },
+  "patchSHA256": "cebb6a51212ed12568c8ca23151225bc298f3fde9af3c803724420c39903e857",
+  "review": {
+    "command": "codex review --uncommitted > /private/tmp/ts-drp-membership-point-review.log 2>&1 < /dev/null",
+    "workingDirectory": "/private/tmp/ts-drp-issuance-retirement-projection",
+    "exitCode": 0,
+    "result": "No actionable regression. Reviewer reran all 20 focused tests and issuance-store typecheck. Extra broader run: 70 passed and 3 journal tests failed; baseline below independently reproduces all three."
+  },
+  "validation": {
+    "unit": {
+      "exitCode": 0,
+      "passed": 14,
+      "log": "unit.log.gz",
+      "command": "pnpm exec vitest run packages/issuance-store/tests/retirement-plan-rewrite.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1"
+    },
+    "native": {
+      "exitCode": 0,
+      "passed": 6,
+      "log": "native.log.gz",
+      "scope": "SQLite plus fake-indexeddb parity, including five real SIGKILL transaction edges; not a browser-engine claim.",
+      "command": "pnpm exec vitest run packages/storage-node/tests/issuance-retirement-plan-rewrite.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1"
+    },
+    "packageBuild": {
+      "exitCode": 0,
+      "log": "package-build.log.gz",
+      "command": "pnpm exec tsc -b packages/issuance-store/tsconfig.build.json packages/storage-node/tsconfig.build.json packages/storage-browser/tsconfig.build.json"
+    },
+    "changedTestTypes": {
+      "exitCode": 0,
+      "log": "test-types.log.gz",
+      "command": "pnpm exec tsc -p /private/tmp/issuance-projection-tests.tsconfig.json"
+    },
+    "baseline": {
+      "source": "697e0401d727a22e606651e371e4b595eb713bac",
+      "trackedDiff": "",
+      "exitCode": 1,
+      "failed": 3,
+      "skipped": 40,
+      "files": 1,
+      "workers": 1,
+      "durationSeconds": 4.36,
+      "log": "baseline.log.gz",
+      "classifications": [
+        {
+          "test": "journal native source image distinguishes byte ceilings from malformed rows",
+          "failure": "Stale fixed ceiling expectation: 786432 expected, 2097152 actual."
+        },
+        {
+          "test": "journal retirement exposes exact bounded native rows with joined one-use custody",
+          "failure": "SQL SELECT * expected canonical scope frames include closed_membership_bytes:null. Actual canonical native frames omit that absent optional field. The immediately preceding image equality passes."
+        },
+        {
+          "test": "journal physical eight-header image is complete while role and resource bounds remain distinct",
+          "failure": "Stale fixed bounds: expected maxRows 8192 / maxImageBytes 262144; actual 24576 / 2097152; maxScopes remains 7."
+        }
+      ]
+    },
+    "preservedSetupFailures": "First external workspace selected no tests because its project root was not explicit; log and exact original config/fingerprints retained. Earlier native collection lacked built dependencies; first stale-writer fixture mutated only a redundant revision column and created a malformed native record; corrected fixture changes the complete valid native plan. Dependency aggregate build exposed the existing node/storage build order, resolved by node build followed by the successful targeted build.",
+    "firstIntegratedSuperseded": {
+      "exitCode": 0,
+      "passed": 20,
+      "files": 2,
+      "workers": 1,
+      "durationSeconds": 6.14,
+      "log": "integrated.log.gz",
+      "command": "pnpm exec vitest run --workspace /private/tmp/issuance-projection-integrated.workspace.mts --root /Users/aristotle/Documents/Projects/ts-drp-1 --coverage.enabled=false --maxWorkers=1 --minWorkers=1",
+      "status": "Mixed-source / superseded: direct unit imports used the modified source, but native package exports loaded stale root dist. This pass is not a runtime-owner receipt."
+    },
+    "integrated": {
+      "exitCode": 0,
+      "passed": 20,
+      "files": 2,
+      "workers": 1,
+      "durationSeconds": 4.06,
+      "log": "integrated-02.log.gz",
+      "config": "integrated-02.config.mts",
+      "command": "pnpm exec vitest run --workspace /private/tmp/issuance-projection-integrated.workspace.mts --root /Users/aristotle/Documents/Projects/ts-drp-1 --coverage.enabled=false --maxWorkers=1 --minWorkers=1",
+      "provenance": "root-runtime-resolution.jsonl records actual Vitest imports from both SQLite and IndexedDB native adapters through dist/src/maintenance.js into dist/src/retirement.js. root-runtime-provenance.json records actual Node export, loaded transition calling checked helper, source/dist SHA256, and byte identity with the independently reviewed isolated runtime."
+    },
+    "rootRuntimeBuild": {
+      "exitCode": 0,
+      "log": "root-runtime-build.log.gz",
+      "command": "pnpm exec tsc -b packages/issuance-store/tsconfig.build.json",
+      "scope": "Only the modified issuance-store runtime package; no broader rebuild or review."
+    }
+  },
+  "claims": {
+    "newLatencyMeasurement": false,
+    "capacityCampaign": false,
+    "cpuSpeedupClaim": false,
+    "browserEngineClaim": false,
+    "nextGate": "Reviewed completion/expiry composition, then 512 native-record offer with refusal no-write, accepted-work completion and fresh admission."
+  },
+  "files": {
+    "review.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-codex-review-01.log",
+      "originalSHA256": "becf30ba33fe5f16f002dc20a965dc4f4b6653d2e8c5e27c4b9be72a675945dc",
+      "uncompressedBytes": 207771,
+      "archivedSHA256": "953287210c6e19b257d38b91ecfbe93b7886225f4030cf4299c6be0a4996d8f2"
+    },
+    "test-types.config.json": {
+      "originalPath": "/private/tmp/issuance-projection-tests.tsconfig.json",
+      "originalSHA256": "38d526989d23fd224868d01cf8d92011ac33b58f756e6ac07af67da94962f63a",
+      "uncompressedBytes": 516,
+      "archivedSHA256": "38d526989d23fd224868d01cf8d92011ac33b58f756e6ac07af67da94962f63a"
+    },
+    "integrated.config.mts": {
+      "originalPath": "/private/tmp/issuance-projection-integrated.config.mts",
+      "originalSHA256": "1cbbd9caaeba3c8f811ec9608fc3fa0e4625e969580feb3d564d32d8b969f284",
+      "uncompressedBytes": 398,
+      "archivedSHA256": "1cbbd9caaeba3c8f811ec9608fc3fa0e4625e969580feb3d564d32d8b969f284"
+    },
+    "integrated.workspace.mts": {
+      "originalPath": "/private/tmp/issuance-projection-integrated.workspace.mts",
+      "originalSHA256": "af21a8d825983aef072d669028a8fc1e34f1c922e25a8fcdc4e8e2b18e12a174",
+      "uncompressedBytes": 75,
+      "archivedSHA256": "af21a8d825983aef072d669028a8fc1e34f1c922e25a8fcdc4e8e2b18e12a174"
+    },
+    "baseline-source-manifest.json": {
+      "originalPath": "/private/tmp/issuance-projection-journal-baseline-697-02-manifest.json",
+      "originalSHA256": "06915762bc5582fb8879dd63130f3f6d956d3a4ffa3ba61eac5baedfaa000418",
+      "uncompressedBytes": 1155,
+      "archivedSHA256": "06915762bc5582fb8879dd63130f3f6d956d3a4ffa3ba61eac5baedfaa000418"
+    },
+    "baseline.config.mts": {
+      "originalPath": "/private/tmp/issuance-projection-journal-baseline.config.mts",
+      "originalSHA256": "0fc3730854121c919baadb17ef9a1f48667a97976a10a2e3f30465f26c0db043",
+      "uncompressedBytes": 1103,
+      "archivedSHA256": "0fc3730854121c919baadb17ef9a1f48667a97976a10a2e3f30465f26c0db043"
+    },
+    "baseline.workspace.mts": {
+      "originalPath": "/private/tmp/issuance-projection-journal-baseline.workspace.mts",
+      "originalSHA256": "e31bef1025877b53e0f74c7e0b6238d1aa4d910949cecc9ab3cf418cd442b182",
+      "uncompressedBytes": 81,
+      "archivedSHA256": "e31bef1025877b53e0f74c7e0b6238d1aa4d910949cecc9ab3cf418cd442b182"
+    },
+    "setup-failure.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-journal-baseline-697.log",
+      "originalSHA256": "93dc9d028fa7eebeb6cf78299928d2073822eaf67cab1fd6bbaad59a42daf93a",
+      "uncompressedBytes": 207714,
+      "archivedSHA256": "a8a2eadef3558fa6f7a88a4b81a94f8327faf17100cd4b26c8dd22bc6af0a451"
+    },
+    "setup-failure-source-manifest.json": {
+      "originalPath": "/private/tmp/issuance-projection-journal-baseline-697-manifest.json",
+      "originalSHA256": "0c76b2e97898f7aa81674606ed641fc7f6328a90e7bac5ff1cc78e5c528de61a",
+      "uncompressedBytes": 1103,
+      "archivedSHA256": "0c76b2e97898f7aa81674606ed641fc7f6328a90e7bac5ff1cc78e5c528de61a"
+    },
+    "setup-failure.config.mts": {
+      "originalSHA256": "4d81fe7a0e6857be714a8b62d04b27cb2df79b67a46089f4a65725d9540735b3",
+      "uncompressedBytes": 788,
+      "archivedSHA256": "4d81fe7a0e6857be714a8b62d04b27cb2df79b67a46089f4a65725d9540735b3",
+      "note": "Exact first-attempt content, recovered and checked against the pre-run fingerprint."
+    },
+    "integrated-02.config.mts": {
+      "originalPath": "/private/tmp/issuance-projection-integrated.config.mts",
+      "originalSHA256": "0d963d3d422213bc86ce475e9be42a8400203da10f302afb59dddca3e35e8b6c",
+      "uncompressedBytes": 974,
+      "archivedSHA256": "0d963d3d422213bc86ce475e9be42a8400203da10f302afb59dddca3e35e8b6c"
+    },
+    "root-runtime-resolution.jsonl": {
+      "originalPath": "/private/tmp/issuance-projection-root-runtime-resolution.jsonl",
+      "originalSHA256": "6094bcc546eb811e60ccf6d4befd73fffea784b5e9d500672a82b8212475b382",
+      "uncompressedBytes": 2607,
+      "archivedSHA256": "6094bcc546eb811e60ccf6d4befd73fffea784b5e9d500672a82b8212475b382"
+    },
+    "root-runtime-provenance.json": {
+      "originalPath": "/private/tmp/issuance-projection-root-runtime-provenance.json",
+      "originalSHA256": "c71c05997ef1d5ff58d80fa8b40799d984298424431160233484b80929faf42c",
+      "uncompressedBytes": 1593,
+      "archivedSHA256": "c71c05997ef1d5ff58d80fa8b40799d984298424431160233484b80929faf42c"
+    },
+    "unit.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-unit-01.log",
+      "originalSHA256": "de19e5f7d3a0e3dc718bf1c2c5a11dd11bd9c9bb6214f0dbee586121d0d943fe",
+      "uncompressedBytes": 335,
+      "archivedSHA256": "2a578b454833494f065f22d9123800dfe13aecad4f23ac5474b5ecc8d4e0f97e"
+    },
+    "native.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-native-03.log",
+      "originalSHA256": "5ad269109c2db1ae21363de9845c559ccc1d36b79558e05fe6469e4d31727674",
+      "uncompressedBytes": 617,
+      "archivedSHA256": "063b32c1254a70f58679a3af95bfac9bda6544fb97d2e337483b99dd09cb8935"
+    },
+    "package-build.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-targeted-build-02.log",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0,
+      "archivedSHA256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837"
+    },
+    "test-types.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-test-types-01.log",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0,
+      "archivedSHA256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837"
+    },
+    "native-collection-failure.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-native-01.log",
+      "originalSHA256": "8cef1ac49fdd34075a2d9a89bab5a7cf5fcdf5b7ec3b8b32eb4308a0fecd5f48",
+      "uncompressedBytes": 2670,
+      "archivedSHA256": "a800d2fa02d4e5511aacaa34b18bb942037effa0adbd80a21cc8c4d8be59190d"
+    },
+    "native-fixture-failure.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-native-02.log",
+      "originalSHA256": "0c3040195f98e5f8341ea4500462ae2348a8eabdf0eb67b77808536ac6f3a94b",
+      "uncompressedBytes": 2278,
+      "archivedSHA256": "49aea332fc93968447527309639bb513c1c28dc9720f10ebfa608d1c99b32106"
+    },
+    "dependency-build-failure.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-dependency-build-01.log",
+      "originalSHA256": "be898cbf5bfe217109ee0f69e3eb78da9fdbbf17ebdd2fe9c15d48417abf562a",
+      "uncompressedBytes": 5652,
+      "archivedSHA256": "8ca05af25e48899231f1f20b308dd8b52a763adada65cc1ceadd03925fa9281d"
+    },
+    "node-build.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-node-build-01.log",
+      "originalSHA256": "cc99cd1e238e86fe9e00015b91649603185b70cedb822daf9b6c08c7163e348e",
+      "uncompressedBytes": 353,
+      "archivedSHA256": "a0f4ad580162bdd8be0a62a4a061caf4477de708c6fbc8e07e38f9289e98935c"
+    },
+    "integrated.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-integrated-bb3600e2.log",
+      "originalSHA256": "afd3363c7553a2d1e7d2338f44c3d18f8a1fdb5de9774492aebd3bc2f20e689f",
+      "uncompressedBytes": 764,
+      "archivedSHA256": "7179a1a1f89471b1af6860c4af47f9415a2afba1c018ba320b33a4708963a478"
+    },
+    "baseline.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-journal-baseline-697-02.log",
+      "originalSHA256": "85d3cda0e35bd900a41f792a189d446f1828b7f2da6d76254ed529a591518791",
+      "uncompressedBytes": 8593,
+      "archivedSHA256": "9fa2a7fa76052de0fc024b3a36a8ed1980287b36c59a01e22f3fd2e799d02d4a"
+    },
+    "projection.patch.gz": {
+      "originalSHA256": "cebb6a51212ed12568c8ca23151225bc298f3fde9af3c803724420c39903e857",
+      "uncompressedBytes": 12996,
+      "archivedSHA256": "a98788af660be83f336671ce81a34def1df8787662de5b59ac185e0b0711ec0d"
+    },
+    "integrated-02.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-integrated-bb3600e2-02.log",
+      "originalSHA256": "7134d42e4c3931dc40ecfa9b46a8151f2deb72194b30f90fc092c922477cad83",
+      "uncompressedBytes": 763,
+      "archivedSHA256": "710482c999c10f5e72c76bb84014832d960cf6dbc6110bfc99fbbe3f0fc907e4"
+    },
+    "root-runtime-build.log.gz": {
+      "originalPath": "/private/tmp/issuance-projection-root-runtime-build.log",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0,
+      "archivedSHA256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "playwright",
+    "test",
+    "--config",
+    "packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts",
+    "--fail-on-flaky-tests"
+  ],
+  "start": "2026-09-05T20:01:57.056Z"
+}

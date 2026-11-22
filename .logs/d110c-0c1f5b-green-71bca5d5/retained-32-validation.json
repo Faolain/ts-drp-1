@@ -1,0 +1,175 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-32/result.json",
+  "baselineSha256": "78c430079bc3e1c02552e4276983c6994e2b0f41af8e8eefcb1fcda141101a73",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED freezes the exact six RED and exact twenty-four GREEN owner rosters",
+      "status": "passed",
+      "title": "freezes the exact six RED and exact twenty-four GREEN owner rosters",
+      "duration": 3.7460419999999885,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED keeps the inherited schema-v2 voter as an executable pre-readiness control",
+      "status": "passed",
+      "title": "keeps the inherited schema-v2 voter as an executable pre-readiness control",
+      "duration": 5.340041000000042,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED defines one additive v3 store while preserving the frozen four-store vote transaction",
+      "status": "passed",
+      "title": "defines one additive v3 store while preserving the frozen four-store vote transaction",
+      "duration": 0.2743330000000128,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED closes the causal crash and mutation catalog without adding authority",
+      "status": "passed",
+      "title": "closes the causal crash and mutation catalog without adding authority",
+      "duration": 0.4535410000000297,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED [RED readiness] requires the complete creator actor and evidence graph",
+      "status": "passed",
+      "title": "[RED readiness] requires the complete creator actor and evidence graph",
+      "duration": 0.1738330000000019,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED keeps the actor, evidence, and finality subpaths closed",
+      "status": "passed",
+      "title": "keeps the actor, evidence, and finality subpaths closed",
+      "duration": 1139.7492080000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED persists the close candidate before either durable vote and releases only finalized evidence",
+      "status": "passed",
+      "title": "persists the close candidate before either durable vote and releases only finalized evidence",
+      "duration": 174.5590830000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED re-verifies complete durable QC bytes before reopening signing authority",
+      "status": "passed",
+      "title": "re-verifies complete durable QC bytes before reopening signing authority",
+      "duration": 118.61441599999989,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry",
+      "status": "passed",
+      "title": "ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry",
+      "duration": 113.987167,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED reopens exact finalized custody and rejects a conflicting close without rewriting bytes",
+      "status": "passed",
+      "title": "reopens exact finalized custody and rejects a conflicting close without rewriting bytes",
+      "duration": 109.64633299999991,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED rejects raw-digest signing and a copied actor capability causally",
+      "status": "passed",
+      "title": "rejects raw-digest signing and a copied actor capability causally",
+      "duration": 9.11566700000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-5e-creator-actor-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5e durable creator actor RED"
+      ],
+      "fullName": "Phase 5e durable creator actor RED copies all close carriers before awaiting storage and fences effects after stop",
+      "status": "passed",
+      "title": "copies all close carriers before awaiting storage and fences effects after stop",
+      "duration": 34.687541999999894,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "c31a526dac3a80e77dec2c55ac236288b14e97ea009eaa7d6353e6680db60863",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

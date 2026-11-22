@@ -1,0 +1,2 @@
+packages/node/src/v3-room.ts(4378,7): error TS2353: Object literal may only specify known properties, and 'signal' does not exist in type 'Pick<CreatorClosedRollbackDataInput, "pinnedGenesisAnchorDigest" | "catalog" | "exactCanonicalPinnedGenesisTrustStateRecordBytes" | "roomHeadAuthority">'.
+packages/node/src/v3-room.ts(6992,4): error TS2353: Object literal may only specify known properties, and 'signal' does not exist in type 'CreatorRecipientRecoveryContext'.

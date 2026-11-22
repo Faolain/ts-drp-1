@@ -1,0 +1,77 @@
+{
+  "status": "Readiness only; all runtime gates await separate root release artifacts",
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "runtimeRosterSha256": "e7eddba484ad9aa2a659d2e3fafa2f8f4e0da7429351d14d6b292cdb91a114c4",
+  "counts": {
+    "files": 36,
+    "total": 232,
+    "historicalW0": 7,
+    "historicalRetained": 220,
+    "newClosure": 2,
+    "actualRetained": 222,
+    "bootstrapSupplement": 3
+  },
+  "inputCount": 988,
+  "compilerRoots": 40,
+  "compilerSources": 978,
+  "importEdges": 971,
+  "custody": {
+    "dirty": 11,
+    "built": 7,
+    "stashes": 27,
+    "protectedPaths": 86522,
+    "sealedRoots": 43,
+    "sealedEntries": 4973
+  },
+  "gates": [
+    {
+      "label": "runtime-w0",
+      "files": 1,
+      "cases": 7,
+      "budgetMs": 300000,
+      "releaseFile": "root-runtime-w0-release.json",
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime.mjs",
+        "runtime-w0"
+      ]
+    },
+    {
+      "label": "runtime-retained",
+      "files": 34,
+      "cases": 222,
+      "budgetMs": 360000,
+      "releaseFile": "root-runtime-retained-release.json",
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime.mjs",
+        "runtime-retained"
+      ]
+    },
+    {
+      "label": "runtime-bootstrap-supplement",
+      "files": 1,
+      "cases": 3,
+      "budgetMs": 60000,
+      "releaseFile": "root-runtime-bootstrap-supplement-release.json",
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime.mjs",
+        "runtime-bootstrap-supplement"
+      ]
+    }
+  ],
+  "requiredReleaseFields": [
+    "gate",
+    "baseline",
+    "runtimeRosterSha256",
+    "sourcePatchSha256",
+    "maxInvocations:1"
+  ],
+  "sourceEdits": 0,
+  "testsExecuted": 0,
+  "builds": 0,
+  "reviews": 0,
+  "noRetryAuthority": true,
+  "browserFreshSourceReviewsRemainRootOwned": true
+}

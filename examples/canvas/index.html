@@ -19,18 +19,34 @@
 					aria-describedby="copyCanvasStatus"
 					disabled
 				>
-					<span class="visually-hidden">Copy canvas ID: </span>
+					<span class="visually-hidden">Copy canvas invite: </span>
 					<code id="canvasId"></code>
 					<span class="canvas-identity__action" aria-hidden="true">Copy</span>
 				</button>
+				<label class="canvas-identity__label" for="canvasInvite">Authenticated invite · manual copy</label>
+				<textarea id="canvasInvite" class="canvas-identity__invite" rows="2" readonly></textarea>
 			</div>
-			<p id="copyCanvasStatus" class="canvas-identity__status" role="status" aria-live="polite"></p>
+			<p
+				id="copyCanvasStatus"
+				class="canvas-identity__status"
+				role="status"
+				aria-label="Canvas copy status"
+				aria-live="polite"
+			></p>
 			<p>peers: <span id="peers"></span></p>
 			<p>discovery_peers: <span id="discovery_peers"></span></p>
 			<p>object_peers: <span id="object_peers"></span></p>
-			<input id="canvasIdInput" type="text" placeholder="Insert canvas ID" />
+			<label class="visually-hidden" for="canvasIdInput">Canvas invite</label>
+			<input id="canvasIdInput" type="text" placeholder="Insert authenticated canvas invite" />
 			<button id="connect" disabled>Connect</button>
 			<button id="create" disabled>Create Canvas</button>
+			<p
+				id="canvasConnectionStatus"
+				class="canvas-connection-status"
+				role="status"
+				aria-label="Canvas connection status"
+				aria-live="polite"
+			></p>
 		</div>
 		<section
 			id="canvasEmptyState"
@@ -41,17 +57,10 @@
 			<span class="canvas-empty-state__marker" aria-hidden="true">+</span>
 			<div>
 				<h1 id="canvasEmptyStateTitle">Create or join a canvas</h1>
-				<p>Start a new shared field or enter an existing canvas ID above.</p>
-				<p id="canvasConnectionStatus" class="canvas-connection-status" role="status" aria-live="polite"></p>
+				<p>Start a new shared field or enter an authenticated canvas invite above.</p>
 			</div>
 		</section>
-		<section
-			id="canvasStage"
-			class="canvas-stage"
-			data-testid="canvas-stage"
-			aria-labelledby="canvasStageTitle"
-			hidden
-		>
+		<section id="canvasStage" class="canvas-stage" data-testid="canvas-stage" aria-labelledby="canvasStageTitle" hidden>
 			<header class="canvas-stage__header">
 				<h1 id="canvasStageTitle">Shared canvas</h1>
 				<span id="canvasDimensions"></span>

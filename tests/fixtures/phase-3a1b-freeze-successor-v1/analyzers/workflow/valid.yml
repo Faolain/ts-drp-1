@@ -1,0 +1,33 @@
+name: Protocol v3 blueprint operation budget freeze
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  protocol-v3-blueprint-operation-budget:
+    name: Require immutable protocol-v3 operation budget enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - run: pnpm install --frozen-lockfile
+      - name: Run the freeze successor
+        env:
+          PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT: "${{ github.workspace }}"
+          UPSTREAM_SHA: ${{ github.event.pull_request.base.sha }}
+          SUCCESSOR: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+        run: |
+          mapfile -t MERGE_BASES < <(git merge-base --all "$UPSTREAM_SHA" HEAD)
+          if [ "${#MERGE_BASES[@]}" -ne 1 ]; then exit 1; fi
+          MERGE_BASE="${MERGE_BASES[0]}"
+          if git cat-file -e "$MERGE_BASE:$SUCCESSOR"; then
+            git show "$MERGE_BASE:$SUCCESSOR" > "$RUNNER_TEMP/base-freeze-successor.mjs"
+            node "$RUNNER_TEMP/base-freeze-successor.mjs" "$UPSTREAM_SHA"
+          fi
+          echo "data only: node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs"
+          node "$SUCCESSOR" "$UPSTREAM_SHA"
+      - run: pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts

@@ -1,0 +1,10 @@
+{
+  "gate": "runtime-retained",
+  "files": 34,
+  "passed": 222,
+  "elapsedMs": 169288,
+  "exactRoster": true,
+  "inputHashesVerified": 988,
+  "preparationArtifactsExact": true,
+  "postCustodyReportedExact": true
+}

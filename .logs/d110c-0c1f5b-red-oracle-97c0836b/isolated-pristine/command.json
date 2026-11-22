@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-oracle-red-DlOSng/checkout",
+  "command": "git",
+  "args": [
+    "status",
+    "--short",
+    "--untracked-files=no"
+  ],
+  "start": "2026-09-05T17:44:08.081Z"
+}

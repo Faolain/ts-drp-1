@@ -1,0 +1,23 @@
+{
+  "status": "CAUSAL_SOURCE_ONLY_RED",
+  "commit": "e8e7b027629a647a068d51395f88b51e8391c2eb",
+  "signature": "G",
+  "pushedRef": "e8e7b027629a647a068d51395f88b51e8391c2eb",
+  "selectedFiles": 1,
+  "failedTests": 1,
+  "filteredTests": 1,
+  "completeSoftFailures": [
+    "AssertionError: NODE_CALLBACK_REJECTION_GUIDANCE_IS_SURFACE_SPECIFIC: expected { Object (exactSurfaceGuidance, noBlanketSessionClosureClaim) } to deeply equal { Object (exactSurfaceGuidance, noBlanketSessionClosureClaim) }"
+  ],
+  "passingControls": [
+    "room rejection wording",
+    "common replay and digest guidance",
+    "room signature",
+    "Node function type"
+  ],
+  "stashCount": 27,
+  "protectedEntries": 81,
+  "productionChanges": 0,
+  "productRuntimeExecuted": false,
+  "validatedAt": "2026-09-05T08:25:27.906Z"
+}

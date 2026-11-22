@@ -1,0 +1,43 @@
+```json
+{
+  "verdict": "APPROVED",
+  "summary": "Signed correction 5aa26cd4 closes the first-review P1 union against GREEN f2066512: exact seven-key isD110cBSuccessorAuthority plus independently decoded raw AHE at epochs 1 and 2; native Chromium navigator.locks.query proving 0→1→1→2→1 lock custody; behavioral bindCreatorLiveClose STORE_UNAVAILABLE injection after genuine adoption with D110C_B_CLOSE_REBIND_FAILED, retained epoch-1 replacement, stalled/unavailable close, refused second close, and no predecessor revival; current-owner guarded lock release; terminal predecessorClose.stop() on rebind failure; D.110c counters isolated in d110cBSnapshot(); 138-entry self-excluding manifest plus original GREEN root now tracked. Scope, API, wire/schema, dependencies, thresholds, workload, and long-horizon claims are unchanged. Remaining P2s stay D.110c-c-owned.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Post-transfer alias-cleanup mutant remains deferred",
+      "path": "tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts",
+      "line": 80,
+      "evidence": "runD110cBPostTransferMutants() still covers only terminalize and in-flight retirement/CAS-loss; the first-review alias-cleanup mutant is not added. Plan 94626-94632 already assigns this to D.110c-c.",
+      "required_action": "Keep the existing D.110c-c ownership; no D.110c-b receremony."
+    },
+    {
+      "severity": "P2",
+      "title": "Retained stall title still conflates pre-verification and terminal stall tokens",
+      "path": "packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+      "line": 1009,
+      "evidence": "D108E2B_BROWSER_BEHAVIORS still includes 'concurrent adoption shares one real verification failure' while the unsealed path throws D110C_B_ACTIVATION_STALLED with verificationCount 0. Hygiene only; fail-closed semantics unchanged.",
+      "required_action": "Retitle or split stall tokens in D.110c-c; do not reopen D.110c-b."
+    },
+    {
+      "severity": "P2",
+      "title": "Durable-head assertion remains inequality-only",
+      "path": "tests/phase-6b-d110c-b-hot-adoption.test.ts",
+      "line": 67,
+      "evidence": "expect(evidence.durableHeadAfterVerification).not.toEqual(evidence.durableHeadBeforeVerification) still would pass a wrong-head write. Plan already assigns exact tuple precision to D.110c-c.",
+      "required_action": "Assert the exact epoch-2 durable-head tuple in D.110c-c; no D.110c-b receremony."
+    },
+    {
+      "severity": "P2",
+      "title": "Third-adoption and one-displaced-generation bound remain outside this slice",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94626,
+      "evidence": "Correction plan explicitly keeps the disclosed one-displaced-generation filter and any third adoption behind authenticated pruning/catch-up. No D.110c-b result is relabelled as cold reopen or long-horizon proof.",
+      "required_action": "Prove the third adoption only in D.110c-c after pruning/catch-up exists."
+    }
+  ],
+  "blocking_union_closed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true
+}
+```

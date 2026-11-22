@@ -1,0 +1,10 @@
+{
+  "disposition": "PRECOMMIT_AUTHORING_LINT_DIAGNOSTIC_NO_FOCUSED_EXECUTION",
+  "focusedRunCount": 0,
+  "commitCreated": false,
+  "error": "import/no-unresolved for root test value import @ts-drp/storage-browser/issuance",
+  "typecheck": { "baseline": 3, "current": 3, "added": 0 },
+  "sourceChecksPassed": true,
+  "authority": "Parent clarified that the immutable stop/no-fix/no-rerun rule governs the pre-frozen focused execution. Correct the uncommitted import to the existing tests' relative public source entry and rerun preflight without consuming the sole focused run.",
+  "continuation": ".logs/d110c-0c1f5b0w-red-final-import-corrected-56a264ce"
+}

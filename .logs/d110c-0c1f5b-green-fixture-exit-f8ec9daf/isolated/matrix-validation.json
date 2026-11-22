@@ -1,0 +1,27 @@
+{
+  "valid": true,
+  "compilerExit": 1,
+  "wholeProgramTypecheckPassed": false,
+  "fixtureDiagnosticsRemoved": 9,
+  "remainingDiagnostics": [
+    {
+      "file": "examples/grid/src/v3-zone.ts",
+      "code": 2345,
+      "line": 638,
+      "character": 55,
+      "start": 26654,
+      "length": 2327,
+      "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'.",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 622
+      },
+      "sourceLine": "\t\t\topened = await createV3RoomSession<ZoneProjection>({",
+      "token": "{\n\t\t\t\tapplication,\n\t\t\t\tauthor: localAuthor,\n\t\t\t\tcreatorInvite,\n\t\t\t\tcreateOperationAdmissionPolicy: (context) =>\n\t\t\t\t\tcreateOutcomeCommitAdmissionPolicy({ ...context, maxEntries: PARAMETERS.maxEpochVertices }),\n\t\t\t\tdatabaseName: `ts-drp-v3-zone--${digest(\"ts-drp/d9346-zone-database/v1\", new TextEncoder().encode(zoneId))}`,\n\t\t\t\tinitialLogicalTime: 3,\n\t\t\t\tissuanceDatabaseName: `ts-drp-v3-zone--${digest(\"ts-drp/d9346-zone-database/v1\", new TextEncoder().encode(zoneId))}`,\n\t\t\t\tmigrationDatabaseNamespace: `${localAuthor}:${zoneId}`,\n\t\t\t\tobjectId: zoneId,\n\t\t\t\tonAcceptedVertex: () => undefined,\n\t\t\t\tonMigrationTarget: (target, targetObjectId): void => {\n\t\t\t\t\tredirectedDuringOpen = target;\n\t\t\t\t\tif (sourceRoom !== undefined) retainedSourceBridges.add(sourceRoom);\n\t\t\t\t\troom = target;\n\t\t\t\t\tzoneId = targetObjectId;\n\t\t\t\t\ttradeIntent = undefined;\n\t\t\t\t\trecoveredTradeIntent = false;\n\t\t\t\t\tephemeral?.close();\n\t\t\t\t\tclearAoiProjection();\n\t\t\t\t\tconst redirectedEphemeral = target.openEphemeral(ZONE_EPHEMERAL_OPTIONS);\n\t\t\t\t\tsubscribeEphemeral(redirectedEphemeral);\n\t\t\t\t\tephemeral = redirectedEphemeral;\n\t\t\t\t},\n\t\t\t\tonProjection: (value): void => {\n\t\t\t\t\tprojection = value;\n\t\t\t\t\tconst latestOutcome = value.outcomes.at(-1);\n\t\t\t\t\tif (latestOutcome !== undefined) {\n\t\t\t\t\t\tconst preparedOutcome = preparedOutcomeCarrier(latestOutcome);\n\t\t\t\t\t\tif (\n\t\t\t\t\t\t\tpreparedOutcome.intent.counterparties.includes(localAuthor) &&\n\t\t\t\t\t\t\ttradeIntent?.intentDigest !== preparedOutcome.intentDigest\n\t\t\t\t\t\t) {\n\t\t\t\t\t\t\ttradeIntent = tradeIntentView(preparedOutcome, \"accepted\", 2);\n\t\t\t\t\t\t\trecoveredTradeIntent = room === undefined;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tconst selectedRoom = room;\n\t\t\t\t\tconst selectedEphemeral = ephemeral;\n\t\t\t\t\tif (selectedRoom !== undefined && selectedEphemeral !== undefined) {\n\t\t\t\t\t\tqueueMicrotask((): void => {\n\t\t\t\t\t\t\tif (room !== selectedRoom || ephemeral !== selectedEphemeral) return;\n\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\tselectedRoom.openEphemeral(ZONE_EPHEMERAL_OPTIONS);\n\t\t\t\t\t\t\t} catch {\n\t\t\t\t\t\t\t\t// Optional raw reconciliation cannot terminalize an accepted durable projection.\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t\temit();\n\t\t\t\t},\n\t\t\t\topenTransport: (openedObjectId) => node.openRoomNetwork(openedObjectId),\n\t\t\t\tpublicKeyBytes: bytes(localAuthor),\n\t\t\t\tsignRegisteredVertexDigest: (registeredDigest) => node.keychain.signWithLocalAuthor(registeredDigest),\n\t\t\t}"
+    }
+  ],
+  "exactSameGridDiagnostic": true,
+  "exactSameRootsAndOptions": true,
+  "redDiagnosticCount": 10,
+  "originalRedMatrixFailurePreserved": true
+}

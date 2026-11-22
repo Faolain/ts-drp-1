@@ -1,0 +1,174 @@
+[
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > retains checkpoint-terminal open progress through cold recovery across three transitions",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 12 scans the largest valid fence without burning another author space",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 12 ignores a stale fence at or below the authenticated terminal boundary",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 23 freezes only the equivocating author below a fence",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > cases 4 15 16 preserve unpublished-fence custody",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > cases 4 15 16 preserve delayed-replacement custody",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > cases 4 15 16 preserve delayed-fence custody",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 17 closes an authenticated null-boundary member without a fence or slot zero",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > cases 19-21 retain displaced control and sole plan completion ownership",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 24a rejects a stale local head without regressing the authenticated floor",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 25 accounts exact surviving fence publication with committed=false",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 25 accounts exact surviving fence publication with committed=true",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 25 accounts exact surviving replacement publication with committed=false",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 25 accounts exact surviving replacement publication with committed=true",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 13 prunes only beyond the fully retained authenticated rollback window",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > case 17 retains the exact legacy v1 reentry guard source custody",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b parent genuine settlement composition > keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > parent f5b P2 closed-session precedence is consistent for issue",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > parent f5b P2 closed-session precedence is consistent for rehearse",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > parent f5b P2 closed-session precedence is consistent for activate",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > refuses held issue promptly after the real durable plan write without an issuance effect",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > creator-held seal reaches the existing close owner and exact successor-codec terminus",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > no-hold creator close retains the exact existing thrown codec terminus",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses rehearsal without target import or terminal effect",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > held source refuses activation without target import or terminal effect",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > changed retained held policy remains terminal source-diff refusal rather than redisposition",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0w durable manual-review hold semantics > single-generation internal redirect pins target hold refusal and orderly source cleanup",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > transforms 2 actual source intents and persists exact real Node batch times",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > transforms 16 actual source intents and persists exact real Node batch times",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed before-commit failure onto a fresh active owner",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > recovers one genuinely signed final-unknown failure onto a fresh active owner",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > keeps a store-close cleanup failure terminal after signed recovery",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0u genuine room Node settlement composition > rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+    "file": "/private/tmp/d110c-f5b-row-red-hWOKRB/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  }
+]

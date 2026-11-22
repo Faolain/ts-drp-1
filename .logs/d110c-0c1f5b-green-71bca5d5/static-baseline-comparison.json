@@ -1,0 +1,43 @@
+{
+  "same": true,
+  "baselinePath": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-checkpoint-link-f83764c5/typecheck.json",
+  "baselineSha256": "b8c87d19c176d0a1c07c31844cecd42be95153f8577944aedbc855d6b032e0ad",
+  "current": {
+    "targetDiagnostics": [],
+    "externalDiagnostics": [
+      {
+        "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+        "code": 2741,
+        "line": 85,
+        "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ appendAccepted: Mock<(input: any) => Promise<Readonly<{ idempotent: true; journalSequence: number; ok: true; scope: LiveJournalScope; sourceKind: \"received\" | \"local-issued\"; vertexDigest: string; }>> | Promise<...>>; close: Mock<...>; installGenesis: Mock<...>; readiness: Mock<...>; readPage: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+      },
+      {
+        "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+        "code": 7006,
+        "line": 277,
+        "message": "Parameter 'entry' implicitly has an 'any' type."
+      },
+      {
+        "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+        "code": 2322,
+        "line": 284,
+        "message": "Type 'Readonly<{ store: Readonly<{ close: Mock<() => Promise<void>>; compareAndMarkOutboxPublished: Mock<(input: any) => Promise<void>>; readIssued: Mock<(selectedScope: any, sequence: any) => Promise<...>>; ... 4 more ...; transactWriteSettlementPlan: Mock<...>; }>; vertexDigest: string; }>' is not assignable to type 'Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string; }>'.\n  The types returned by 'store.transactWriteSettlementPlan(...)' are incompatible between these types.\n    Type 'Promise<SettlementPlan | null>' is not assignable to type 'Promise<SettlementPlan>'.\n      Type 'SettlementPlan | null' is not assignable to type 'SettlementPlan'.\n        Type 'null' is not assignable to type 'SettlementPlan'."
+      }
+    ]
+  },
+  "compilerExit": 1,
+  "wholeProgramPass": false,
+  "scope": "Existing selected-two-test program only; does not import grid",
+  "gridSourceInProgram": false,
+  "gridDebt": "Separate unchanged grid TS2345 proven by accepted four-root compiler; remains open, not omitted or declared repaired",
+  "old41ComparisonObsolete": true,
+  "sourceBuildCredit": {
+    "source": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-replay-budget-1809157e/isolated/custody-after.json",
+    "sha256": "0b9c8e7b10e2862cf26b8ac09dc4ee0daa017105ed1bb44d7fa697fc82aa2a60",
+    "exactEightSourcesAndSevenEmits": true,
+    "noMainRebuild": true,
+    "notFinalSignedProductionIsolation": true
+  },
+  "lintWarnings": "Four existing duplicate/missing-description input.settlement JSDoc warnings retained",
+  "diagnosticMistake": "Tool-only read first looked for unexecuted green89/typecheck.json; absent output then resolved to actual signed RED baseline, no compiler repetition"
+}

@@ -1,0 +1,64 @@
+{
+  "stopped": true,
+  "diagnosticValid": true,
+  "profilesAvailable": true,
+  "semanticPass": false,
+  "parentClosed": false,
+  "head": "ae67fe3f483751bc26461767661b8fab5210d4d8",
+  "total": 24,
+  "passed": 0,
+  "failed": 1,
+  "filtered": 23,
+  "reporterSha256": "21dbeac1b5495ca0ce33e8fa3323d640efcc9720ce67dd09c934dc66b2d9ecda",
+  "records": 3151,
+  "fulfilledOrdinaryIssues": 192,
+  "callbackSettled": false,
+  "cleanupCompleted": true,
+  "unmatched": 129,
+  "profiles": [
+    {
+      "file": "profiles/CPU.20260906.033407.40665.0.001.cpuprofile",
+      "sha256": "35c134d64ff802985a426ddf840d064dab2005bad2f1f1648888657b5707529f",
+      "pid": 40665,
+      "role": "parent-vitest",
+      "sampleCount": 52866,
+      "timeDeltaSumMicros": 74423666
+    },
+    {
+      "file": "profiles/CPU.20260906.033408.40795.0.001.cpuprofile",
+      "sha256": "790358b92eb83f412dfbf1c951cbcf7eeb320e8b061a520246847916accebe57",
+      "pid": 40795,
+      "role": "owned-worker",
+      "sampleCount": 51864,
+      "timeDeltaSumMicros": 73091667
+    }
+  ],
+  "rootAnalysisSha256": "25cc64890d80db5f8166998297cc9e321562b1eafb79d5b35ddbe6bde85707c8",
+  "capturedStatuses": 7,
+  "nonzero": [
+    {
+      "file": "diagnostic-runtime/status.json",
+      "status": 1
+    },
+    {
+      "file": "wide-only/status.json",
+      "status": 1
+    }
+  ],
+  "noRetry": true,
+  "noSourceChanges": true,
+  "priorStaticCreditedAtIdenticalBytes": true,
+  "wholeProgramStaticPass": false,
+  "knownExternalSnapshotDiagnostics": 3,
+  "gridAndFourRegistryW0FailuresRemainOpen": true,
+  "custody": "custody-final.json",
+  "effectiveHashes": 85,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "ownedRuntimePidsAbsent": [
+    40447,
+    40665,
+    40795
+  ]
+}

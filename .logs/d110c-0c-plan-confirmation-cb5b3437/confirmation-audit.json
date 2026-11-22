@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "blockingUnionEmpty": true,
+    "grokApproved": true,
+    "grokOriginalClassificationPreserved": true,
+    "grokP2Count": true,
+    "grokResumeIdentity": true,
+    "kimiApproved": true,
+    "kimiP2Count": true,
+    "kimiSessionIdentity": true,
+    "opusApproved": true,
+    "opusNoSubagents": true,
+    "opusP2Count": true,
+    "opusSessionIdentity": true,
+    "planAuthorizesRed": true,
+    "planDispositionsComplete": true
+  },
+  "ok": true
+}

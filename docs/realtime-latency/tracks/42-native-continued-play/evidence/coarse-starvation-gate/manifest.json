@@ -1,0 +1,685 @@
+{
+  "schema": "coarse-starvation-receiver-gate-1",
+  "sourceHead": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+  "nativeProductionBaseline": "a847900d72252ab08fc1b48fff0724138dd5ca12",
+  "harnessSourceHashes": {
+    "tests/active-app-continued-play-native.test.ts": "d578cc907fbb3c19e67999e804ab2c49aa590decbb6b73a453788ec4ca0b60e8",
+    "tests/active-app-continued-play-observations.test.ts": "eaab4d0256dc9bb07d1447b50dfd77ae3ed436099f87c9594be149a3d5017a8b",
+    "tests/fixtures/active-endurance/continued-play-observations.ts": "e6411486f40a0fecddab911fc2f57da75a64d01ebe17563131718462745adab0"
+  },
+  "alarm": {
+    "budgetMs": 1000,
+    "meaning": "Coarse starvation regression alarm, not smooth game-loop or real-time completion. Includes actual observed timer gap and outstanding timer age at baseline/epoch gates.",
+    "receiverRequirement": "More than25 codec-accepted frames per receiver in each existing post-convergence baseline. Local channel observations compared only to themselves; public genesis/successor and ACL scope compared across peers.",
+    "percentiles": "HDR histogram at microsecond scale and three significant figures; maxima preserve original double precision. Window gaps include both boundaries."
+  },
+  "runs": {
+    "harness-genesis-failure-13": {
+      "sourceHead": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+      "sourceDiffSha256": "d9ab4cdcc1d55614b3d2ffb7b493553a247522b7c44e827f3ffd7c2c01e83c8f",
+      "faultControl": null,
+      "sourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "host": {
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "load": [
+          8.73046875,
+          7.7685546875,
+          8.60693359375
+        ]
+      },
+      "status": "failed",
+      "failure": [
+        {
+          "kind": "failure",
+          "phase": "startup-repair-settle",
+          "completedEpochs": 0,
+          "error": "TypeError: TRACK_M_REQUIRED_FIXTURE_VALUE"
+        }
+      ],
+      "completedEpochs": 0,
+      "acceptedIssues": 32,
+      "timerMaxGapMs": 89.80674999999974,
+      "timerGapDistribution": {
+        "count": 1412,
+        "maxMs": 89.80674999999974,
+        "p95Ms": 12.503,
+        "p99Ms": 57.215
+      },
+      "validAuthorityReceiveGapsIncludingWindowBoundariesByPeer": [
+        {
+          "count": 0,
+          "maxMs": 0,
+          "p95Ms": null,
+          "p99Ms": null
+        },
+        {
+          "count": 0,
+          "maxMs": 0,
+          "p95Ms": null,
+          "p99Ms": null
+        }
+      ],
+      "receiverWindows": []
+    },
+    "harness-snapshot-comparison-failure-14": {
+      "sourceHead": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+      "sourceDiffSha256": "92b70908c81d5f647c32ba3dc95a2939cc2516a08e22a8036782aa57408a953f",
+      "faultControl": null,
+      "sourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "host": {
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "load": [
+          9.0185546875,
+          8.7197265625,
+          8.853515625
+        ]
+      },
+      "status": "failed",
+      "failure": [
+        {
+          "kind": "failure",
+          "phase": "baseline-start",
+          "completedEpochs": 0,
+          "error": "AssertionError: stable authority during baseline-start: expected true to be false // Object.is equality"
+        }
+      ],
+      "completedEpochs": 0,
+      "acceptedIssues": 32,
+      "timerMaxGapMs": 119.93449999999939,
+      "timerGapDistribution": {
+        "count": 1583,
+        "maxMs": 119.93449999999939,
+        "p95Ms": 12.583,
+        "p99Ms": 54.623
+      },
+      "validAuthorityReceiveGapsIncludingWindowBoundariesByPeer": [
+        {
+          "count": 175,
+          "maxMs": 12.565582999999606,
+          "p95Ms": 12.375,
+          "p99Ms": 12.463
+        },
+        {
+          "count": 175,
+          "maxMs": 12.556375000000116,
+          "p95Ms": 12.367,
+          "p99Ms": 12.423
+        }
+      ],
+      "receiverWindows": [
+        {
+          "phase": "baseline-start",
+          "receivedByPeer": [
+            174,
+            174
+          ],
+          "authorityChanged": true,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 175,
+              "maxMs": 12.565582999999606,
+              "p95Ms": 12.375,
+              "p99Ms": 12.463
+            },
+            {
+              "count": 175,
+              "maxMs": 12.556375000000116,
+              "p95Ms": 12.367,
+              "p99Ms": 12.423
+            }
+          ]
+        }
+      ]
+    },
+    "positive-15": {
+      "sourceHead": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+      "sourceDiffSha256": "606c9f742113ae0728bea08aa3a5948e9015150d88a39a7f59f6e5b66ae74d5d",
+      "faultControl": null,
+      "sourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "host": {
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "load": [
+          6.45263671875,
+          7.96044921875,
+          8.54248046875
+        ]
+      },
+      "status": "passed",
+      "failure": [],
+      "completedEpochs": 3,
+      "acceptedIssues": 51,
+      "timerMaxGapMs": 133.58458400000382,
+      "timerGapDistribution": {
+        "count": 4461,
+        "maxMs": 133.58458400000382,
+        "p95Ms": 12.775,
+        "p99Ms": 49.983
+      },
+      "validAuthorityReceiveGapsIncludingWindowBoundariesByPeer": [
+        {
+          "count": 781,
+          "maxMs": 21.474458000004233,
+          "p95Ms": 12.767,
+          "p99Ms": 13.991
+        },
+        {
+          "count": 781,
+          "maxMs": 21.442125000001397,
+          "p95Ms": 12.735,
+          "p99Ms": 13.479
+        }
+      ],
+      "receiverWindows": [
+        {
+          "phase": "baseline-start",
+          "receivedByPeer": [
+            175,
+            175
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 176,
+              "maxMs": 15.01366699999926,
+              "p95Ms": 12.671,
+              "p99Ms": 12.743
+            },
+            {
+              "count": 176,
+              "maxMs": 14.960917000000336,
+              "p95Ms": 12.639,
+              "p99Ms": 12.751
+            }
+          ]
+        },
+        {
+          "phase": "baseline-before-1",
+          "receivedByPeer": [
+            85,
+            85
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 86,
+              "maxMs": 18.213833000001614,
+              "p95Ms": 12.679,
+              "p99Ms": 12.783
+            },
+            {
+              "count": 86,
+              "maxMs": 18.22020799999882,
+              "p95Ms": 12.631,
+              "p99Ms": 12.703
+            }
+          ]
+        },
+        {
+          "phase": "baseline-after-1",
+          "receivedByPeer": [
+            85,
+            85
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 86,
+              "maxMs": 12.787583000004815,
+              "p95Ms": 12.599,
+              "p99Ms": 12.767
+            },
+            {
+              "count": 86,
+              "maxMs": 12.764416999998502,
+              "p95Ms": 12.599,
+              "p99Ms": 12.727
+            }
+          ]
+        },
+        {
+          "phase": "baseline-reopened-1",
+          "receivedByPeer": [
+            86,
+            86
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 87,
+              "maxMs": 21.474458000004233,
+              "p95Ms": 12.671,
+              "p99Ms": 16.255
+            },
+            {
+              "count": 87,
+              "maxMs": 21.442125000001397,
+              "p95Ms": 12.679,
+              "p99Ms": 16.247
+            }
+          ]
+        },
+        {
+          "phase": "baseline-before-2",
+          "receivedByPeer": [
+            86,
+            86
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 87,
+              "maxMs": 19.576459000003524,
+              "p95Ms": 13.143,
+              "p99Ms": 13.591
+            },
+            {
+              "count": 87,
+              "maxMs": 13.073790999995254,
+              "p95Ms": 12.855,
+              "p99Ms": 13.071
+            }
+          ]
+        },
+        {
+          "phase": "baseline-after-2",
+          "receivedByPeer": [
+            86,
+            86
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 87,
+              "maxMs": 13.40616599999339,
+              "p95Ms": 12.759,
+              "p99Ms": 12.967
+            },
+            {
+              "count": 87,
+              "maxMs": 13.162750000003143,
+              "p95Ms": 12.759,
+              "p99Ms": 12.791
+            }
+          ]
+        },
+        {
+          "phase": "baseline-before-3",
+          "receivedByPeer": [
+            84,
+            84
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 85,
+              "maxMs": 16.371500000001106,
+              "p95Ms": 13.479,
+              "p99Ms": 14.023
+            },
+            {
+              "count": 85,
+              "maxMs": 16.097084000000905,
+              "p95Ms": 13.399,
+              "p99Ms": 14.015
+            }
+          ]
+        },
+        {
+          "phase": "baseline-after-3",
+          "receivedByPeer": [
+            86,
+            86
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 87,
+              "maxMs": 13.18329100000119,
+              "p95Ms": 12.815,
+              "p99Ms": 13.143
+            },
+            {
+              "count": 87,
+              "maxMs": 13.142707999999402,
+              "p95Ms": 12.783,
+              "p99Ms": 13.087
+            }
+          ]
+        }
+      ]
+    },
+    "timer-block-negative-16": {
+      "sourceHead": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+      "sourceDiffSha256": "606c9f742113ae0728bea08aa3a5948e9015150d88a39a7f59f6e5b66ae74d5d",
+      "faultControl": "timer-block",
+      "sourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "host": {
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "load": [
+          12.44384765625,
+          9.244140625,
+          8.9365234375
+        ]
+      },
+      "status": "failed",
+      "failure": [
+        {
+          "kind": "failure",
+          "phase": "baseline-start",
+          "completedEpochs": 0,
+          "error": "AssertionError: coarse starvation regression alarm (1000 ms; not smoothness): expected 1215.2458750000005 to be less than or equal to 1000"
+        }
+      ],
+      "completedEpochs": 0,
+      "acceptedIssues": 32,
+      "timerMaxGapMs": 1215.2458750000005,
+      "timerGapDistribution": {
+        "count": 1562,
+        "maxMs": 1215.2458750000005,
+        "p95Ms": 14.383,
+        "p99Ms": 59.263
+      },
+      "validAuthorityReceiveGapsIncludingWindowBoundariesByPeer": [
+        {
+          "count": 174,
+          "maxMs": 1214.5939169999983,
+          "p95Ms": 12.743,
+          "p99Ms": 12.847
+        },
+        {
+          "count": 174,
+          "maxMs": 1214.0789589999986,
+          "p95Ms": 12.735,
+          "p99Ms": 12.855
+        }
+      ],
+      "receiverWindows": [
+        {
+          "phase": "baseline-start",
+          "receivedByPeer": [
+            173,
+            173
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 174,
+              "maxMs": 1214.5939169999983,
+              "p95Ms": 12.743,
+              "p99Ms": 12.847
+            },
+            {
+              "count": 174,
+              "maxMs": 1214.0789589999986,
+              "p95Ms": 12.735,
+              "p99Ms": 12.855
+            }
+          ]
+        }
+      ]
+    },
+    "one-way-loss-negative-17": {
+      "sourceHead": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+      "sourceDiffSha256": "b0d761b136dd833fd548d208e2ddbbe7b96565bfe4f09f2eb60172d4f65ce3c9",
+      "faultControl": "one-receiver",
+      "sourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "host": {
+        "cpu": "Apple M1 Max",
+        "cores": 10,
+        "load": [
+          12.044921875,
+          10.31982421875,
+          9.40966796875
+        ]
+      },
+      "status": "failed",
+      "failure": [
+        {
+          "kind": "failure",
+          "phase": "baseline-start",
+          "completedEpochs": 0,
+          "error": "AssertionError: receiver 1 during baseline-start: expected 0 to be greater than 25"
+        }
+      ],
+      "completedEpochs": 0,
+      "acceptedIssues": 32,
+      "timerMaxGapMs": 120.48637500000041,
+      "timerGapDistribution": {
+        "count": 1574,
+        "maxMs": 120.48637500000041,
+        "p95Ms": 12.647,
+        "p99Ms": 51.103
+      },
+      "validAuthorityReceiveGapsIncludingWindowBoundariesByPeer": [
+        {
+          "count": 176,
+          "maxMs": 12.875707999999577,
+          "p95Ms": 12.583,
+          "p99Ms": 12.711
+        },
+        {
+          "count": 1,
+          "maxMs": 2002.6645420000023,
+          "p95Ms": 2002.943,
+          "p99Ms": 2002.943
+        }
+      ],
+      "receiverWindows": [
+        {
+          "phase": "baseline-start",
+          "receivedByPeer": [
+            175,
+            0
+          ],
+          "authorityChanged": false,
+          "gapsIncludingWindowBoundariesByPeer": [
+            {
+              "count": 176,
+              "maxMs": 12.875707999999577,
+              "p95Ms": 12.583,
+              "p99Ms": 12.711
+            },
+            {
+              "count": 1,
+              "maxMs": 2002.6645420000023,
+              "p95Ms": 2002.943,
+              "p99Ms": 2002.943
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "verification": {
+    "focusedTypeScriptExit": 0,
+    "focusedESLintExit": 0,
+    "observationControlsPassed": 4,
+    "reviewExit": 0,
+    "reviewFinding": "P1 genesis successor authority may be null; corrected with public genesis/successor scope and separate local observations; positive15 verifies.",
+    "negativeTimerExpectedExit": 1,
+    "negativeReceiverExpectedExit": 1,
+    "allOwnedChildrenReaped": true
+  },
+  "limits": [
+    "No browser/WebRTC/rendering/FPS claim.",
+    "Per-phase raw counts remain observations; a phase has no forced callback/delivery requirement.",
+    "No final300run or WAL plateau conclusion; remaining production/composition reviews still gate it.",
+    "All failed runs retained;13/14 are harness errors before the first epoch, not production regressions."
+  ],
+  "artifacts": {
+    "harness-genesis-failure-13/source.diff.gz": {
+      "bytes": 4429,
+      "sha256": "74a80370473851ddea29262ebd282e5e6da393deb2ae6cc0776e00d34ddec8d0",
+      "decodedSha256": "d9ab4cdcc1d55614b3d2ffb7b493553a247522b7c44e827f3ffd7c2c01e83c8f"
+    },
+    "harness-genesis-failure-13/continued-play.jsonl.gz": {
+      "bytes": 10861,
+      "sha256": "0b40115aea6cb5b96c707e5ad6d691b12a75a0be4642f0e4ed6fe52692ba1a69",
+      "decodedSha256": "e3512b5a39c62f315a4fb7debbd22d1821b6c385507db3b86557fef015c205b1"
+    },
+    "harness-genesis-failure-13/observations.jsonl.gz": {
+      "bytes": 144496,
+      "sha256": "37114ce33688287ff69f590837ae22cd4f5e1a56d030b227fd0e21d9cdfb62e0",
+      "decodedSha256": "c9c20ad19e05379173a41f052c8689ade364c8e5271c27d767fdf3afd7ffd2dd"
+    },
+    "harness-genesis-failure-13/summary.json.gz": {
+      "bytes": 1603,
+      "sha256": "f42b4a5cebefd1286b56c63e721d94f5089450a8e39b8cab093c4aa3287b1a47",
+      "decodedSha256": "ecd7dde5fcff8767cb7bb7eef07c1f4587a796a8995ec0f7af1d7dd2eed3a775"
+    },
+    "harness-genesis-failure-13/run.log.gz": {
+      "bytes": 782,
+      "sha256": "49aeddc20b5c0f3f5eb0efb2995e6dc0c2b78205add1ea5931e2546099c2dde8",
+      "decodedSha256": "9cbee86822e653d176c9e96c830aa7c86cfe8d9e2643cb245c568776c1967e3d"
+    },
+    "harness-snapshot-comparison-failure-14/source.diff.gz": {
+      "bytes": 4738,
+      "sha256": "80a0da07842fb22a233f9ef6eb33612eae34b6ed59e08979c5ab8734626f1e6c",
+      "decodedSha256": "92b70908c81d5f647c32ba3dc95a2939cc2516a08e22a8036782aa57408a953f"
+    },
+    "harness-snapshot-comparison-failure-14/continued-play.jsonl.gz": {
+      "bytes": 15236,
+      "sha256": "d70dde1486aac89e45bd6679ec04a5b52a98e939c6801b9baf396efc20766dcb",
+      "decodedSha256": "d0a6856a063895082db4a8f7e03cdfb97db35996cab950ffffb3a61730a29c56"
+    },
+    "harness-snapshot-comparison-failure-14/observations.jsonl.gz": {
+      "bytes": 162315,
+      "sha256": "58eb1e78507b20c50f3c7a40b3c53dae99e3f2ac95fda81964cb352f7a42121f",
+      "decodedSha256": "dbf24c1b59bc247206eb50ec015886b21fe0d142e932bab776fadc258286932c"
+    },
+    "harness-snapshot-comparison-failure-14/summary.json.gz": {
+      "bytes": 1623,
+      "sha256": "fa4c19ee1dafaa896c33588bfa8ef31ce68fca3d6560fd0602c4b9d6296201c2",
+      "decodedSha256": "e1dfa21b2f5403f14d05fa798947e7f4538c6da1909e1d7a5132c7783198195a"
+    },
+    "harness-snapshot-comparison-failure-14/run.log.gz": {
+      "bytes": 774,
+      "sha256": "b3bd8b8d15342c0e4b026a44104c341dc85344f25a1dc5de8f336acf4179dfbd",
+      "decodedSha256": "7c3d2e877d38aed4a939c394cb5e79e6a7d6ca136e1ac928adc121692406e7b8"
+    },
+    "positive-15/source.diff.gz": {
+      "bytes": 4903,
+      "sha256": "d52637ed1d701d9d59dffabf1aa13cabaa8f9e1044f99ecdf9f1e316423f63c5",
+      "decodedSha256": "606c9f742113ae0728bea08aa3a5948e9015150d88a39a7f59f6e5b66ae74d5d"
+    },
+    "positive-15/continued-play.jsonl.gz": {
+      "bytes": 65316,
+      "sha256": "dc21f62eea936c9ed065d8150e3b47345b0f757f5858586e2b14c011ea97d6a7",
+      "decodedSha256": "d7844044c98f0e114040988d54f43f194c9b0020f604d12b0cb9c230d4982c42"
+    },
+    "positive-15/observations.jsonl.gz": {
+      "bytes": 442857,
+      "sha256": "dc17ec4632ceddf92f44c10b39b32f80137b466e409f45c2ce400827c853081d",
+      "decodedSha256": "3db43f606e4cf8bdf92a213b6e2953ed381d2ff8445697aea3ffc9f3dc7bee06"
+    },
+    "positive-15/summary.json.gz": {
+      "bytes": 1821,
+      "sha256": "8155ba6238e5b54e36088778e65e163a3bf96f43b4acc6d14211eb7e553cc730",
+      "decodedSha256": "a800fd05d0f45550dbf5f6845d89ae1824798e9c6cfef9a17652fdda1cdb1a99"
+    },
+    "positive-15/run.log.gz": {
+      "bytes": 497,
+      "sha256": "6e3b71bb14ddc5c02683f3e3ef0dab5086901fa033757638b0de9cfa67c9ee3d",
+      "decodedSha256": "a3e9e6eb038a90cafc3e0ea5f143660491c7bdbf714d74b92ae12b4bda1ce047"
+    },
+    "timer-block-negative-16/source.diff.gz": {
+      "bytes": 4903,
+      "sha256": "d52637ed1d701d9d59dffabf1aa13cabaa8f9e1044f99ecdf9f1e316423f63c5",
+      "decodedSha256": "606c9f742113ae0728bea08aa3a5948e9015150d88a39a7f59f6e5b66ae74d5d"
+    },
+    "timer-block-negative-16/continued-play.jsonl.gz": {
+      "bytes": 15591,
+      "sha256": "5d71eeae1b090fac978003726f772bfd8dc4c6f2566e2f62e381d8eaa6d8ed84",
+      "decodedSha256": "a32f9c44ef5bc85c4dedafe237631826ce496ea6e8a24b78137a6768f5716113"
+    },
+    "timer-block-negative-16/observations.jsonl.gz": {
+      "bytes": 162383,
+      "sha256": "60c87b597585830baa5205477538c87aa4a26407fc3155f85b5a368f2915ff7e",
+      "decodedSha256": "e4e260ebaca8197b421b7367bd4d4b7016d087a90c04655561138efc5de9daea"
+    },
+    "timer-block-negative-16/summary.json.gz": {
+      "bytes": 1619,
+      "sha256": "c7682e211a6a13c120fbfb832cc00c7db26260429b112bf227c9db7fb1ea2ebb",
+      "decodedSha256": "a70ea79fc6b0fc3783e43f230d31434fb3a7725c7fea2bb7c34e52259ec15401"
+    },
+    "timer-block-negative-16/run.log.gz": {
+      "bytes": 781,
+      "sha256": "acde47665dd59c2aaade6c8b607ea164186974b639f9e3b7cacc7036eaff43fa",
+      "decodedSha256": "1c32e5164bd5cfece6630f7e4ad8cea07eef39e25b12f135ec07cf74e32c3c53"
+    },
+    "one-way-loss-negative-17/source.diff.gz": {
+      "bytes": 8603,
+      "sha256": "7e8ceca6fc6eb2d723071720f9c90ef943321dd7e0fd67db3cccb8326d560b7b",
+      "decodedSha256": "b0d761b136dd833fd548d208e2ddbbe7b96565bfe4f09f2eb60172d4f65ce3c9"
+    },
+    "one-way-loss-negative-17/continued-play.jsonl.gz": {
+      "bytes": 15572,
+      "sha256": "caf053d0acf9dd4cb47656bd32e60b6b05f8f44b1c20482a5182582e44229128",
+      "decodedSha256": "7703051b9ac41aa7cf2f00b7229286b6eee86bbfa401881eee00f4c4b2d8a923"
+    },
+    "one-way-loss-negative-17/observations.jsonl.gz": {
+      "bytes": 157578,
+      "sha256": "b2111b7be3d5a65f628172efc8b636fe555a5f493fa30de1bd9e299bed187d1f",
+      "decodedSha256": "0cb397dbe9000bd6b88059ffa31cb6b7649756c1f53f10b3a30225ecea9f04a3"
+    },
+    "one-way-loss-negative-17/summary.json.gz": {
+      "bytes": 1647,
+      "sha256": "6673ab7c6a3de302abaa50565a06d401a3ad174a054b5cbca60982b3ac2170b8",
+      "decodedSha256": "cdca2d2e877698c91318b38ce755f67c3c1b6e2fa96ac476b5ea0eb2ff7e9dde"
+    },
+    "one-way-loss-negative-17/run.log.gz": {
+      "bytes": 734,
+      "sha256": "12c42e9dac402403979c5a51f15c66627f16fb0361acd84dd65a72cbc0f20fe0",
+      "decodedSha256": "c33916ab10e54008d7f30bfb480a9465c7bf187aae442c6cbafc4b40b7c2974f"
+    },
+    "review/codex.log.gz": {
+      "bytes": 33271,
+      "sha256": "2d57add7ee24a8fc8ceb6de950b15dc711d28a76dbf07f0489354af197e00550",
+      "decodedSha256": "863e26c0040170b9a9554755f2d76e08cf8186a27d53c79ef62c20514f2b9bd6"
+    },
+    "verification/controls.log.gz": {
+      "bytes": 241,
+      "sha256": "e1ed555d3e5c13c393fcb080f9cf6fecdb7e5d8046fbf14e4e956dff9037a073",
+      "decodedSha256": "15950e7f1963b8d6055ca370c54a28e982472888522c21fce66eb8b846133beb"
+    },
+    "verification/lint.log.gz": {
+      "bytes": 20,
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "verification/typecheck.log.gz": {
+      "bytes": 20,
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "verification/tsconfig.json.gz": {
+      "bytes": 566,
+      "sha256": "7fd9a945a47b2b02a3c594c25282ce0906631f233ae380d35cbefbded6b053ef",
+      "decodedSha256": "7b7eb802f2a4b21afb131b7d06d68cf7a74065cd35ca245db97762ac7fe895db"
+    },
+    "negative/config.mts.gz": {
+      "bytes": 855,
+      "sha256": "79201676f3d5723c0ac9a7d1a7e556dfb03762adaf035daf332466a595fca300",
+      "decodedSha256": "54cebf015508304785b3a9bc8067b5d996064d90f17696a204374b122f28fccb"
+    },
+    "negative/workspace.mjs.gz": {
+      "bytes": 95,
+      "sha256": "892a25e2c08fa7890dffd5182bdf75efcef7916b8e547f864af7bba0af9895ef",
+      "decodedSha256": "626d72bb92ec00ec6e91d6da40102928e280fcf6bf809c21acd61617ce398760"
+    },
+    "harness-source.tar.gz": {
+      "bytes": 12402,
+      "sha256": "966d2d587ff88285782028c51683e9d577c7a425f2c4d705081ffaf12b3937ce",
+      "decodedSha256": "9995cdec9f0e82cf55062bd22a2c8015df3c9d418b0ba85ddeb3b25c05f38c87"
+    },
+    "runtime-owner-inventory.json.gz": {
+      "bytes": 20725,
+      "sha256": "1f94b8590cd5e4f454b2891dffe4fbe1daa55387bc8ccd789e82f9a9fbdbc278",
+      "decodedSha256": "d59ba5b2f1793782b9a2625912877bb1833ca3525127e952540b5c87c6d40300"
+    }
+  }
+}

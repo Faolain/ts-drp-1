@@ -1,0 +1,35 @@
+{
+  "head": "f8ec9daf82c230b48ef615073979dcab7b14f149",
+  "changedPaths": [
+    "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+    "tests/genesis-profile.test.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts"
+  ],
+  "sourceHashes": {
+    "tests/genesis-profile.test.ts": "b0b62272dd8d1768152433fff658ce55b4de7e58cffeb8ba57a343511b88cfd5",
+    "tests/phase-5a-c-seal-safety-red.test.ts": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+    "tests/phase-5d-pacemaker-red.test.ts": "cf0ec7df87e6ac58c2e03d139d25078d372bb6e4ccc9005ab621744444f288db",
+    "tests/phase-3g-v3-room-rebase-red.test.ts": "862a039ecd4dfe02a220b42eb8eb8c5f89123886282f35eaebf7c1da8ba19259",
+    "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts": "96db123a0d3bb05f5616c2f1c1cbec3c323eea6579e075964b8a269658a87a16",
+    "tests/fixtures/phase-5d-v3/pacemaker-fixture.ts": "12add1a4d285ba0c66368d6c34fd5a5a20356873ec0bf8aff17463a17fd3e3bf"
+  },
+  "fixturePatchSha256": "2e92d30960020a6959d4469907ebcd2f56f04c2642f1b9d36425729cae8bbccb",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "custodyBaseline": "custody-after.json",
+  "effectiveTestHashes": 85,
+  "compilerExit": 1,
+  "remainingDiagnostic": "exact unchanged grid authority composition TS2345",
+  "matrixValid": true,
+  "runtimeValid": true,
+  "runtime": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "rawSha256": "e1aff50cad1e9daf31537ab39ccfa8f1286992b54a0a9b4fc2164ca2779a8a91"
+  },
+  "readyForRootSourceSigning": true,
+  "isolatedPending": true,
+  "noAgentCommit": true
+}

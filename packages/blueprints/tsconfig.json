@@ -3,11 +3,6 @@
 	"compilerOptions": {
 		"outDir": "dist"
 	},
-	"include": [
-		"src/**/*.ts",
-		"tests/**/*.ts"
-	],
-	"exclude": [
-		"src/**/*.asc.ts"
-	]
+	"include": ["src/**/*.ts", "src/v3-canvas-kernel.js", "src/v3-canvas-artifact.mjs", "tests/**/*.ts"],
+	"exclude": ["src/**/*.asc.ts"]
 }

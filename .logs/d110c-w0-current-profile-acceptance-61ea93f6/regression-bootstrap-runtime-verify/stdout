@@ -1,0 +1,10 @@
+{
+  "gate": "runtime-bootstrap-supplement",
+  "files": 1,
+  "passed": 3,
+  "elapsedMs": 3966,
+  "exactRoster": true,
+  "inputHashesVerified": 988,
+  "preparationArtifactsExact": true,
+  "postCustodyReportedExact": true
+}

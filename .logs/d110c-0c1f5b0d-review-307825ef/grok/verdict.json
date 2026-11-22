@@ -1,0 +1,33 @@
+{
+	"verdict": "BLOCK",
+	"summary": "Store-level authenticated prune, plan gate, identity binding, recovery 3x bound, legacy prunePublishedPrefix, and gate evidence are in place, but the only production call is a post-hoc replay of a legacy prunePublishedPrefix receipt. planClosedEpochCleanup is a comment, the kernel requires deletedAuthorSequenceRange === null, and incomplete plans can still lose rows before the new gate runs. Mixed-epoch pending/published reclamation is not production-reachable.",
+	"p0_count": 1,
+	"p1_count": 1,
+	"p2_count": 1,
+	"findings": [
+		{
+			"severity": "P0",
+			"title": "Authenticated prune is a replay after legacy deletion, not the production mutation after planClosedEpochCleanup",
+			"evidence": "packages/node/src/v3-live.ts:3181-3212 calls maintenance.pruneAuthenticatedSettledPrefix only after an already-supplied issuanceReceipt and fails closed unless replay.deletedAuthorSequenceRange === null, so this owner cannot be the first deletion. planClosedEpochCleanup( is only in the comment at :3192-3193; the sole production definition remains packages/node/src/internal/closed-epoch-cleanup.ts:442 and is invoked from tests/fixtures/phase-6b/runtime-reclamation-contract.ts:508, whose receipts are still produced by prunePublishedPrefix at :337-338 and :468-469. Legacy prunePublishedPrefix keeps the range-local unlinked-entry gate (conformance.ts:404-413, browser-issuance-store.ts:766-778, node-issuance-store.ts:835-845) and still deletes on an absent/incomplete plan, other-epoch row, or pending row. Kernel catch at v3-live.ts:3210-3211 maps a later plan-gate throw to D109D_RUNTIME_NOT_READY after rows are already gone. Design TDD item 5 / RED case 13 and the crash-matrix row 'prune with an unlinked plan entry | refused' are therefore not met on the production path; mixed-epoch pending/published authenticated reclamation is reachable only via direct store tests.",
+			"required_action": "Make pruneAuthenticatedSettledPrefix the compare-and-delete mutation that runs after a real planClosedEpochCleanup result (verified adoption, two rollback generations, availability, complete outbox classification, expected-head). Do not accept a prunePublishedPrefix receipt as deletion proof. Prove an incomplete plan cannot lose issued or outbox rows, and that mixed-epoch pending/published authenticated reclamation is reachable through that owner. Keep legacy prunePublishedPrefix unchanged for creator-trusted-v1.",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P1",
+			"title": "Production-invocation GREEN is source-containment of a comment, not a behavioral cleanup-path proof",
+			"evidence": "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts:300-304 only asserts v3-live.ts contains '.pruneAuthenticatedSettledPrefix(' and 'planClosedEpochCleanup('. GREEN 21/21, isolated 21/21, and retained 124/124 all pass that test because of the comment at v3-live.ts:3192-3193 plus the replay call at :3194. No focused or retained case drives reclaimInstalledV3Runtime under creator-trusted-settlement-v1 with an incomplete plan or mixed-epoch pending/published prefix. That is not evidence that item 4 / RED case 13 closed.",
+			"required_action": "Replace the source-shape production test with a behavioral owner test: settlement-profile cleanup after planClosedEpochCleanup must refuse deletion while any plan entry is unlinked and must actually delete a complete mixed-epoch pending/published prefix through pruneAuthenticatedSettledPrefix.",
+			"owner": "f5b0d"
+		},
+		{
+			"severity": "P2",
+			"title": "Same-realm code can pre-bind the Symbol.for maintenance registry before first install",
+			"evidence": "packages/issuance-store/src/maintenance.ts:46-77 uses Symbol.for('@ts-drp/issuance-store/pruning-maintenance-v1') on globalThis and adopts any pre-installed registry (`maintenanceGlobal[MAINTENANCE_REGISTRY] ?? create`). After this module wins, the property is non-configurable/non-writable and bind() rejects a second owner for an exact facade; filtered recovery aliases the already-bound backing capability (v3-live.ts:5203-5206). A same-realm preload can still substitute resolve/bind and capture or replace pruneAuthenticatedSettledPrefix. This is the inherited D.109b registry shape, not a new public 8-method mutation.",
+			"required_action": "Disposition: inherited D.109b identity model; do not reslice f5b0d for it. First-bind-wins after install is preserved. Reopen only if a later identity review requires a non-Symbol.for owner table.",
+			"owner": "inherited"
+		}
+	],
+	"causal_red_confirmed": true,
+	"scope_preserved": true,
+	"evidence_sufficient": true
+}

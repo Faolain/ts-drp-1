@@ -15,6 +15,7 @@ import type { ControlPlaneEvent, DRPNetworkNode, DRPNodeConfig } from "@ts-drp/t
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
+import type { NodeRoomNetworkPort } from "../src/room-network.js";
 
 const NAMESPACE = `drp-network:v1:${"r".repeat(43)}`;
 const ENDPOINTS = ["http://127.0.0.1:18101/room-presence-a", "http://127.0.0.1:18102/room-presence-b"] as const;
@@ -54,10 +55,11 @@ describe("room presence rendezvous publishing", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("publishes a room record alongside the main record after createObject", async () => {
+	it("publishes a room record alongside the main record after opening the current room network", async () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
-		const object = await fixture.node.createObject({ id: "created-room" });
+		const id = "created-room";
+		openRoom(fixture.node, id);
 
 		const cycle = await fixture.runCycle();
 		const roomRecord = cycle.find(({ record }) => record.namespace.startsWith(ROOM_NAMESPACE_PREFIX))?.record;
@@ -65,22 +67,22 @@ describe("room presence rendezvous publishing", () => {
 		expect(cycle.map(({ record }) => record.namespace)).toContain(NAMESPACE);
 		expect(roomRecord, "the next registration cycle must advertise the created room").toBeDefined();
 		expect(roomRecord).toMatchObject({
-			namespace: roomNamespace(object.id),
+			namespace: roomNamespace(id),
 			peerId: fixture.node.networkNode.peerId,
 		});
 	});
 
-	it("publishes room presence after connectObject subscribes the joining replica", async () => {
+	it("publishes room presence after opening the current joining room network", async () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
 		const id = "joined-room";
-		const connecting = fixture.node.connectObject({ id });
+		const connecting = Promise.resolve(openRoom(fixture.node, id));
 		pending.push(connecting);
 		await flushMicrotasks();
 
 		const cycle = await fixture.runCycle();
 		const roomRecord = cycle.find(({ record }) => record.namespace.startsWith(ROOM_NAMESPACE_PREFIX))?.record;
-		fixture.node.unsubscribeObject(id);
+		closeRoom(fixture.node, id);
 		await connecting;
 
 		expect(roomRecord, "a joining replica must advertise its subscribed room").toBeDefined();
@@ -94,7 +96,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true, max_rooms: 2 });
 		nodes.push(fixture.node);
 		const ids = ["capped-room-a", "capped-room-b", "capped-room-c"];
-		await expect(Promise.all(ids.map((id) => fixture.node.createObject({ id })))).resolves.toHaveLength(3);
+		await expect(Promise.all(ids.map((id) => openRoom(fixture.node, id)))).resolves.toHaveLength(3);
 
 		const cycle = await fixture.runCycle();
 		const roomNamespaces = [
@@ -111,7 +113,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
 		const ids = Array.from({ length: 8 }, (_, index) => `default-capped-room-${index}`);
-		await Promise.all(ids.map((id) => fixture.node.createObject({ id })));
+		await Promise.all(ids.map((id) => openRoom(fixture.node, id)));
 
 		const cycle = await fixture.runCycle();
 		const roomNamespaces = new Set(
@@ -126,14 +128,14 @@ describe("room presence rendezvous publishing", () => {
 		nodes.push(fixture.node);
 		const firstId = "backfill-room-a";
 		const waitingId = "backfill-room-b";
-		await fixture.node.createObject({ id: firstId });
-		await fixture.node.createObject({ id: waitingId });
+		openRoom(fixture.node, firstId);
+		openRoom(fixture.node, waitingId);
 
 		const cappedCycle = await fixture.runCycle();
 		expect(cappedCycle.map(({ record }) => record.namespace)).toContain(roomNamespace(firstId));
 		expect(cappedCycle.map(({ record }) => record.namespace)).not.toContain(roomNamespace(waitingId));
 
-		fixture.node.unsubscribeObject(firstId);
+		closeRoom(fixture.node, firstId);
 		const backfilledCycle = await fixture.runCycle();
 
 		expect(backfilledCycle.map(({ record }) => record.namespace)).toContain(roomNamespace(waitingId));
@@ -148,7 +150,7 @@ describe("room presence rendezvous publishing", () => {
 		);
 		nodes.push(fixture.node);
 		const ids = ["slow-room-a", "fast-room-b"];
-		await Promise.all(ids.map((id) => fixture.node.createObject({ id })));
+		await Promise.all(ids.map((id) => openRoom(fixture.node, id)));
 
 		const startedAtMs = performance.now();
 		const cycle = await fixture.runCycle();
@@ -173,7 +175,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
 		const id = "unsubscribed-room";
-		await fixture.node.createObject({ id });
+		openRoom(fixture.node, id);
 
 		const subscribedCycle = await fixture.runCycle();
 		const advertisedRecord = subscribedCycle.find(({ record }) =>
@@ -184,7 +186,7 @@ describe("room presence rendezvous publishing", () => {
 
 		const retiredAtMs = Date.now();
 		const retirementStartIndex = fixture.registrations.length;
-		fixture.node.unsubscribeObject(id);
+		closeRoom(fixture.node, id);
 		await vi.waitFor(() =>
 			expect(
 				fixture.registrations
@@ -216,9 +218,9 @@ describe("room presence rendezvous publishing", () => {
 		const absent = await publishingHarness(undefined);
 		nodes.push(enabled.node, disabled.node, absent.node);
 
-		await enabled.node.createObject({ id: "enabled-control-room" });
-		await disabled.node.createObject({ id: "disabled-room" });
-		await absent.node.createObject({ id: "absent-room" });
+		openRoom(enabled.node, "enabled-control-room");
+		openRoom(disabled.node, "disabled-room");
+		openRoom(absent.node, "absent-room");
 
 		const [enabledCycle, disabledCycle, absentCycle] = await Promise.all([
 			enabled.runCycle(),
@@ -237,7 +239,7 @@ describe("room presence rendezvous publishing", () => {
 	it("treats disabled room presence with max_rooms zero as inert configuration", async () => {
 		const fixture = await publishingHarness({ enabled: false, max_rooms: 0 });
 		nodes.push(fixture.node);
-		await fixture.node.createObject({ id: "disabled-zero-room" });
+		openRoom(fixture.node, "disabled-zero-room");
 
 		const cycle = await fixture.runCycle();
 
@@ -249,16 +251,16 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true, max_rooms: 1 }, () => false, installRealRegistryTransport);
 		nodes.push(fixture.node);
 		const id = "rejoined-room";
-		const object = await fixture.node.createObject({ id });
+		openRoom(fixture.node, id);
 
 		const firstCycle = await fixture.runCycle();
 		const firstRoom = firstCycle.find(({ record }) => record.namespace === roomNamespace(id));
 		if (firstRoom === undefined) throw new Error("first room registration was not captured");
 		expect(firstRoom).toMatchObject({ accepted: true });
 
-		fixture.node.unsubscribeObject(id);
+		closeRoom(fixture.node, id);
 		await new Promise((resolve) => setTimeout(resolve, 2));
-		fixture.node.subscribeObject(object);
+		openRoom(fixture.node, id);
 		const rejoinedCycle = await fixture.runCycle();
 		const rejoinedRoom = rejoinedCycle.find(({ record }) => record.namespace === roomNamespace(id));
 
@@ -274,8 +276,8 @@ describe("room presence rendezvous publishing", () => {
 			record.namespace.startsWith(ROOM_NAMESPACE_PREFIX)
 		);
 		nodes.push(fixture.node);
-		await fixture.node.createObject({ id: failedId });
-		await fixture.node.createObject({ id: healthyId });
+		openRoom(fixture.node, failedId);
+		openRoom(fixture.node, healthyId);
 
 		const cycle = await fixture.runCycle();
 		const attemptedNamespaces = cycle.map(({ record }) => record.namespace);
@@ -394,6 +396,8 @@ function fakeNetwork(): DRPNetworkNode {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn((): Promise<void> => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn((): Promise<void> => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((): void => undefined),
@@ -538,4 +542,25 @@ function jsonResponse(body: unknown): Response {
 
 async function flushMicrotasks(): Promise<void> {
 	for (let index = 0; index < 5; index += 1) await Promise.resolve();
+}
+
+// Presence records are routing advertisements, not portable app authority.
+// Keep every original quota law with the current room transport lifecycle.
+const currentRoomPorts = new WeakMap<DRPNode, Map<string, NodeRoomNetworkPort>>();
+
+function openRoom(node: DRPNode, id: string): NodeRoomNetworkPort {
+	let rooms = currentRoomPorts.get(node);
+	if (rooms === undefined) {
+		rooms = new Map();
+		currentRoomPorts.set(node, rooms);
+	}
+	const port = node.openRoomNetwork(id);
+	rooms.set(id, port);
+	return port;
+}
+
+function closeRoom(node: DRPNode, id: string): void {
+	const rooms = currentRoomPorts.get(node);
+	rooms?.get(id)?.close();
+	rooms?.delete(id);
 }

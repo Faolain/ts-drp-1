@@ -1,0 +1,6 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": { "composite": false, "noEmit": true, "rootDir": "../../.." },
+	"files": ["../../cold-discovery-room-callsite.test.ts", "vitest.workspace.ts", "vitest.config.mts"],
+	"include": []
+}

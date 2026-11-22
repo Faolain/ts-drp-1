@@ -1,0 +1,13 @@
+record=D.110c-0c1f5b0b
+checkpoint=corrective-GREEN
+parent=449b95a3c93f163cd640535f3632c6095cffc6e1
+production=e07f8a94d5e2449289bebd7aa89f1dcdbd4d9536
+production_tree=09fd3541cf96259ee5e2edd7d3f999f826739a38
+production_signature=G
+remote_branch=codex/phase3a1b-p6-golden-path
+remote_after_production=e07f8a94d5e2449289bebd7aa89f1dcdbd4d9536
+changed_path_count=1
+stash_count=27
+stash_listing_sha256=4d9c869056a52e1cc9f27b51455ddd10063c0ad9e8f0b653667678ccb0be9537
+protected_untracked_paths=preserved
+captured_utc=2026-09-04T10:51:57Z

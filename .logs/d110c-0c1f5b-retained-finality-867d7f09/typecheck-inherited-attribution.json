@@ -1,0 +1,81 @@
+{
+  "base": "15c66947ea8ece4eb5bf0a9bc0e7632e749b209c",
+  "current": {
+    "targetDiagnostics": [
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 300,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 355,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 488,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 532,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      }
+    ],
+    "externalDiagnostics": []
+  },
+  "baseline": {
+    "targetDiagnostics": [
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 300,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 355,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 488,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      },
+      {
+        "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+        "code": 2345,
+        "line": 532,
+        "message": "Argument of type 'Readonly<Record<string, unknown>>' is not assignable to parameter of type 'InstallCertifiedAnchorTrustRootInput'.\n  Type 'Readonly<Record<string, unknown>>' is missing the following properties from type 'InstallCertifiedAnchorTrustRootInput': exactCanonicalCertifiedGenesisCertificateBytes, exactCanonicalGenesisAnchorPreimageBytes, exactCanonicalProfileBytes, exactCanonicalSignerSetBytes, pinnedGenesisAnchorDigest"
+      }
+    ],
+    "externalDiagnostics": []
+  },
+  "identical": true,
+  "sourceAttribution": [
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "sha256": "3f849d43e92056e19e94d89619a792b6bbd962ae4ee9165c0e88fbaf141991bb",
+      "byteIdenticalToSignedBase": true
+    },
+    {
+      "file": "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+      "sha256": "0dee33e6f09e81fed931f842f70311109bebf7ea56adc2a07a670132a1f031e2",
+      "byteIdenticalToSignedBase": true
+    },
+    {
+      "file": "packages/protocol-v3/src/index.ts",
+      "sha256": "54b8bcbc5cee28daba0e831d40a9dad31bdceb440d364dd337c09553648766ca",
+      "byteIdenticalToSignedBase": true
+    }
+  ],
+  "virtualBaselineMethod": "CompilerHost substitutes only original three list-owner files from signed baseline; no source writes or runtime execution.",
+  "editedFileDiagnostics": []
+}

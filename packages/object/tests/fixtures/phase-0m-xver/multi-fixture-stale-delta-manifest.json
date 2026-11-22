@@ -1,0 +1,20 @@
+{
+	"schemaVersion": "phase-0m-xver-delta-v1",
+	"referenceSha": "1d40885ffb2ab666ffb2817a99fe69a42af83e77",
+	"deltas": [
+		{
+			"fixtureId": "fixed-three-vertex-noncanonical-cut",
+			"schedule": "documented-singles",
+			"surface": "drp-state",
+			"current": "never-produced-current-a",
+			"reference": "never-produced-reference-a"
+		},
+		{
+			"fixtureId": "fixed-critical-2-transitive-join-with-two-children",
+			"schedule": "last-two-batched",
+			"surface": "admission",
+			"current": "never-produced-current-b",
+			"reference": "never-produced-reference-b"
+		}
+	]
+}

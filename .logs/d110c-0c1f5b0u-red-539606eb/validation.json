@@ -1,0 +1,1236 @@
+{
+  "testCommit": "539606ebe5f87f9f20e200df9025983c4a2433a1",
+  "signature": "G",
+  "pushedRef": "539606ebe5f87f9f20e200df9025983c4a2433a1",
+  "layers": [
+    {
+      "layer": "clean",
+      "total": 67,
+      "passed": 20,
+      "failed": 47,
+      "skipped": 0,
+      "unexpected": 0,
+      "classified": [
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries treats a compatible pre-sign race as durable truth without reusing the unclassified handle",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "TypeError: v3 room settlement issue outcome is unknown: issuance-rejected\n    at issueSettlement (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:2936:10)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at drainSettlementOutbox (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:3011:4)\n    at drainRebaseOutbox (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:3047:4)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:3215:6"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale message progress before the missing fence",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:565:90\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale transform-me progress before the missing fence",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:565:90\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries does not interpret an absent legacy entry as a durable replacement link",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-sequence ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses unchanged-revision ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses surplus-revision ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses skipped-range ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses duplicate-range ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses incompatible-prefix ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-final-scalar ambiguous progress readback",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected [ { kind: 'replacement', …(1) } ] to have a length of 3 but got 1\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1166:20)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:705:24\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected [] to match object [ { fromIntent: +0, …(3) }, …(1) ]\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:706:33\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(4) } ], …(3) } to match object { entries: [ { …(3) } ], …(1) }\n(38 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:710:27\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected TypeError: v3 room settlement issue faile… to be undefined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:729:29\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0T_SPLIT_DID_NOT_ALLOCATE_AFTER_COMPLETION: expected 21 to be 24 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:732:93\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected { kind: 'replacement', …(1) } to match object { fromIntent: 2, throughIntent: 3 }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:767:59\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected [ { operations: [ { …(2) } ], …(2) } ] to deeply equal []\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:799:29\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected [ { kind: 'replacement', …(1) }, …(1) ] to match object [ { fromIntent: 2, …(2) }, …(1) ]\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:841:19\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] keeps manual-review durable and holds public issue before any fence or replacement",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] rebases a published displaced source without requiring in-memory target-map presence",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] surfaces an ACL source into a durable manual-review entry before any fence",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0T_PROGRESS_VECTOR_0_REJECTED: expected undefined to be defined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:115:76\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)",
+            "AssertionError: D110C_0C1F5B0T_PROGRESS_VECTOR_1_REJECTED: expected undefined to be defined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:115:76\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)",
+            "AssertionError: D110C_0C1F5B0T_PROGRESS_VECTOR_2_REJECTED: expected undefined to be defined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:115:76\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected undefined to be defined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:128:81\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED accepts only the exact five-key progress effect and copies its digest",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0T_PROGRESS_EFFECT_REJECTED: expected undefined to deeply equal { fromIntent: +0, …(4) }\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:166:71\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)\n    at runSuite (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1491:8)"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED validates a progress effect as a closed commit instead of failing on a future export",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected [Function] to not throw an error but 'DurableIssuanceError: commit fields d…' was thrown\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:181:85\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:103:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:26\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:877:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:850:10)\n    at runTest (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:1345:12)"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:191:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at BrowserIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:486:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:1365:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:191:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at NodeIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:600:15)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:1333:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:191:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:241:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at BrowserIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:486:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:1365:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:241:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at NodeIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:600:15)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:1333:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:241:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:267:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at BrowserIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:486:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:1365:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:267:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at NodeIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:600:15)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:1333:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:267:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:297:10\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at BrowserIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:486:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:1365:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:320:11\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser reopens before/after partial and final chunks without losing exact progress",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at BrowserIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:486:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:1365:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:350:10\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node reopens before/after partial and final chunks without losing exact progress",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at NodeIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:600:15)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:1333:68)\n    at install (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:66:15)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:350:10\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t Node pre-reservation and split RED keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split",
+          "status": "passed",
+          "owner": "retained or negative control; no f5b0u causality claimed",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t Node pre-reservation and split RED refuses malformed and stale progress before signing, while a valid exact prefix issues",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected { …(3) } to match object { Object (kind, ok) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:409:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { …(3) } to match object { Object (kind, ok) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:409:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { …(3) } to match object { Object (kind, ok) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:409:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { …(3) } to match object { Object (kind, ok) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:409:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { …(3) } to match object { Object (kind, ok) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:409:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { …(3) } to match object { Object (kind, ok) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:951:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:409:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { …(3) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:420:18\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t Node pre-reservation and split RED pins the progress owners without confusing a source-shape diagnostic with runtime proof",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0T_TYPE_OWNER_SettlementReplacementChunk_MISSING: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:439:85\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0T_TYPE_OWNER_SettlementReplacementProgress_MISSING: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:439:85\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0T_TYPE_OWNER_SETTLEMENT_REPLACEMENT_MAX_INTENTS_MISSING: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:439:85\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0T_TYPE_OWNER_SETTLEMENT_REPLACEMENT_DIGEST_LIMITS_MISSING: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:439:85\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:441:57\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:442:53\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:443:47\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:444:44\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:449:60\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:450:61\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:451:74\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:453:56\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts:454:60\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 2 actual source intents and persists exact real Node batch times",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "Error: promise rejected \"TypeError: v3 room settlement issue faile…\" instead of resolving\n    at Assertion.__VITEST_RESOLVES__ (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1488:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:322:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 16 actual source intents and persists exact real Node batch times",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "Error: promise rejected \"TypeError: v3 room settlement issue faile…\" instead of resolving\n    at Assertion.__VITEST_RESOLVES__ (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1488:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:322:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed before-commit failure onto a fresh active owner",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_SIGNED_FAULT_NOT_REACHED: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:359:78\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:360:84\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:361:88\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_OLD_OWNER_STILL_ACTIVE: expected { …(5) } to be undefined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:364:6\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_SIGNED_FAULT_NOT_REACHED: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:359:78\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:360:84\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:361:88\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_OLD_OWNER_STILL_ACTIVE: expected { …(5) } to be undefined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:364:6\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed final-unknown failure onto a fresh active owner",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_SIGNED_FAULT_NOT_REACHED: expected false to be true // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:359:78\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:360:84\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:361:88\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_OLD_OWNER_STILL_ACTIVE: expected { …(5) } to be undefined\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:364:6\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "TypeError: v3 room settlement issue failed: split-required\n    at issueSettlement (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:2936:10)\n    at drainSettlementOutbox (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:3011:4)\n    at drainRebaseOutbox (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:3047:4)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/examples/v3-room/src/index.ts:3215:6"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition keeps a store-close cleanup failure terminal after signed recovery",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_RECOVERY_BEFORE_CLEANUP_FAILED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:419:82\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "Error: promise rejected \"TypeError: v3 room settlement issue faile…\" instead of resolving\n    at Assertion.__VITEST_RESOLVES__ (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1488:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:440:76\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_REBIND_TERMINAL_CODE_MISSING: expected [Function] to throw error including 'D110C_B_CLOSE_REBIND_FAILED' but got 'v3 room settlement issue failed: spli…'\n    at Assertion.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Assertion.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Assertion.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1550:20\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:435:5\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner pins a real Node-assembled sixteen-entry progress chunk to its final child logical time",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: expected { …(3) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:99:19\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner ordinary entries fields do not impersonate an application batch",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:130:17\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:129:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner ordinary batch.entries fields do not impersonate an application batch",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:130:17\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:129:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner genuine nested applicationBatch derives the final child rather than outer time",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:147:16\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:146:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects negative child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:161:16\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects non-integer child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:161:16\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects duplicate child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:161:16\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects regressed child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:161:16\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner refuses a structurally batch-shaped carrier beyond the canonical operation ceiling",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:174:16\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:9)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:173:3\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u zero-chunk origination ownership memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS: expected 'ISSUANCE_INVALID_ARGUMENT' to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:216:7\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/contract.ts:399:10)\n    at EphemeralDurableIssuanceStore.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:259:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/src/conformance.ts:483:58)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:227:17\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:221:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u zero-chunk origination ownership browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS: expected 'ISSUANCE_INVALID_ARGUMENT' to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:216:7\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at BrowserIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:486:20)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-browser/src/internal/browser-issuance-store.ts:1365:68)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:227:17\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:221:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u zero-chunk origination ownership node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+          "status": "failed",
+          "owner": "inherited absent f5b0t progress/split prerequisite; no f5b0u causality claimed",
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS: expected 'ISSUANCE_INVALID_ARGUMENT' to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:216:7\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "DurableIssuanceTypeError: settlement plan must be valid and carry the next revision\n    at captureSettlementPlanWriteInput (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/issuance-store/dist/src/contract.js:339:19)\n    at NodeIssuanceImplementation.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:600:15)\n    at Object.transactWriteSettlementPlan (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/packages/storage-node/src/internal/node-issuance-store.ts:1333:68)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:227:17\n    at withStore (/private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:221:4\n    at file:///private/tmp/d110c-f5b0u-red-GnZ3bK/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        }
+      ]
+    },
+    {
+      "layer": "overlay",
+      "total": 67,
+      "passed": 39,
+      "failed": 28,
+      "skipped": 0,
+      "unexpected": 0,
+      "classified": [
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries treats a compatible pre-sign race as durable truth without reusing the unclassified handle",
+          "status": "failed",
+          "owner": "unclassified handle reused after compatible durable truth",
+          "token": "D110C_0C1F5B0U_COMPATIBLE_PLAN_REUSED_UNCLASSIFIED_HANDLE",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_COMPATIBLE_PLAN_REUSED_UNCLASSIFIED_HANDLE: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:540:95\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale message progress before the missing fence",
+          "status": "failed",
+          "owner": "fence signed and lineage/plan mutated before stale digest refusal",
+          "token": "D110C_0C1F5B0U_STALE_INTENT_SIGNED_FENCE",
+          "softFailures": 3,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_STALE_INTENT_SIGNED_FENCE: expected [ { operations: [ { …(2) } ], …(1) } ] to deeply equal []\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:568:79\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected 21 to be 20 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:569:36\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:570:28\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries rejects stale transform-me progress before the missing fence",
+          "status": "failed",
+          "owner": "fence signed and lineage/plan mutated before stale digest refusal",
+          "token": "D110C_0C1F5B0U_STALE_INTENT_SIGNED_FENCE",
+          "softFailures": 3,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_STALE_INTENT_SIGNED_FENCE: expected [ { operations: [ { …(2) } ], …(1) } ] to deeply equal []\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:568:79\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected 21 to be 20 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:569:36\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:570:28\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries does not interpret an absent legacy entry as a durable replacement link",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:590:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-sequence ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses unchanged-revision ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses surplus-revision ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses skipped-range ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses duplicate-range ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses incompatible-prefix ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0u room reconciliation boundaries refuses wrong-final-scalar ambiguous progress readback",
+          "status": "failed",
+          "owner": "absent or inexact readback falsely accepted",
+          "token": "promise resolved \"undefined\" instead of rejecting",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise resolved \"undefined\" instead of rejecting\n    at Assertion.__VITEST_REJECTS__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1521:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts:661:4\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] upgrades only after a nonmutating legal split and drains a 1:1 transform as two exact chunks",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] resumes a durable partial prefix with strict logical-time continuity and no replay",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] fails closed on rederived digest mismatch without issuing or downgrading open progress",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0t RED] keeps the original prefix monotonic while re-sourcing a displaced replacement chunk after close",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] durably builds the plan before a fence, then links rebase/transform replacements while expire issues nothing",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] keeps manual-review durable and holds public issue before any fence or replacement",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] preserves linked entries across same-epoch reopen and plans a displaced linked replacement as a new source",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] clears a displaced fence and drops terminal plan rows before issuing one larger fence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] rebases a published displaced source without requiring in-memory target-map presence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] surfaces an ACL source into a durable manual-review entry before any fence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] covers reserved empty-intent rows with a settlement fence and never calls the legacy completion owner",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED [RED] reads back an ambiguous atomic replacement link and never reissues it after reopen",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+          "title": "D.110c-0c1f5b0c room settlement orchestration RED keeps creator-trusted-v1 on the retained completion path with no settlement plan or fence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED pins 16 as accepted and 17 as rejected without treating 17 as a settlement source",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED accepts only the exact five-key progress effect and copies its digest",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress codec RED validates a progress effect as a closed commit instead of failing on a future export",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED memory atomically records a partial chunk, then only the final chunk projects replacementSequence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser atomically records a partial chunk, then only the final chunk projects replacementSequence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node atomically records a partial chunk, then only the final chunk projects replacementSequence",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED uses exact error ownership for malformed commits, stale progress and corrupt stored values",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED round-trips nested progress through browser structured clone and Node JSON without changing schemas",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED browser reopens before/after partial and final chunks without losing exact progress",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t settlement progress store RED node reopens before/after partial and final chunks without losing exact progress",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t Node pre-reservation and split RED keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t Node pre-reservation and split RED refuses malformed and stale progress before signing, while a valid exact prefix issues",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "title": "D.110c-0c1f5b0t Node pre-reservation and split RED pins the progress owners without confusing a source-shape diagnostic with runtime proof",
+          "status": "passed",
+          "owner": "retained f5b0t control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 2 actual source intents and persists exact real Node batch times",
+          "status": "passed",
+          "owner": "genuine grammar/split/signed-row equality control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 16 actual source intents and persists exact real Node batch times",
+          "status": "passed",
+          "owner": "genuine grammar/split/signed-row equality control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed before-commit failure onto a fresh active owner",
+          "status": "failed",
+          "owner": "signed issue fault fired; no fresh activation and old owner remains",
+          "token": "D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED",
+          "softFailures": 3,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:360:84\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:361:88\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_OLD_OWNER_STILL_ACTIVE: expected { …(5) } to be undefined\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:364:6\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+          "status": "failed",
+          "owner": "signed issue fault fired; no fresh activation and old owner remains",
+          "token": "D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED",
+          "softFailures": 3,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:360:84\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:361:88\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_OLD_OWNER_STILL_ACTIVE: expected { …(5) } to be undefined\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:364:6\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed final-unknown failure onto a fresh active owner",
+          "status": "failed",
+          "owner": "signed issue fault fired; no fresh activation and old owner remains",
+          "token": "D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED",
+          "softFailures": 3,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_HALTED_HANDLE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:360:84\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_FRESH_ACTIVATION_MISSING: expected 1 to be 2 // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:361:88\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_OLD_OWNER_STILL_ACTIVE: expected { …(5) } to be undefined\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:364:6\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+          "status": "failed",
+          "owner": "actual fault reached; startup recovery absent, queued work rejects",
+          "token": "D110C_0C1F5B0U_QUEUED_ISSUE_NOT_RECOVERED",
+          "softFailures": 2,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_QUEUED_ISSUE_NOT_RECOVERED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:406:80\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: D110C_0C1F5B0U_MIGRATION_DID_NOT_RESUME: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:407:78\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition keeps a store-close cleanup failure terminal after signed recovery",
+          "status": "failed",
+          "owner": "signed recovery prerequisite absent; terminal cleanup controls pass",
+          "token": "D110C_0C1F5B0U_RECOVERY_BEFORE_CLEANUP_FAILED",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_RECOVERY_BEFORE_CLEANUP_FAILED: expected 'rejected' to be 'fulfilled' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:419:82\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+          "status": "failed",
+          "owner": "missing recovery prevents fresh close binding and required terminal rebind code",
+          "token": "promise rejected",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "Error: promise rejected \"TypeError: v3 room settlement issue faile…\" instead of resolving\n    at Assertion.__VITEST_RESOLVES__ (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1488:17)\n    at Assertion.propertyGetter (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1486:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1577:22)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:440:76\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+          "title": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+          "status": "failed",
+          "owner": "missing recovery prevents fresh close binding and required terminal rebind code",
+          "token": "D110C_0C1F5B0U_REBIND_TERMINAL_CODE_MISSING",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_REBIND_TERMINAL_CODE_MISSING: expected [Function] to throw error including 'D110C_B_CLOSE_REBIND_FAILED' but got 'v3 room settlement issue failed: admi…'\n    at Assertion.<anonymous> (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Assertion.<anonymous> (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Assertion.methodWrapper (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1550:20\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:435:5\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner pins a real Node-assembled sixteen-entry progress chunk to its final child logical time",
+          "status": "passed",
+          "owner": "genuine grammar/split/signed-row equality control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner ordinary entries fields do not impersonate an application batch",
+          "status": "failed",
+          "owner": "field-name heuristic chooses child-like value for ordinary operation",
+          "token": "D110C_0C1F5B0U_ORDINARY_FIELD_FLOOR_COLLISION",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_ORDINARY_FIELD_FLOOR_COLLISION: expected { entries: [ { …(5) } ], …(3) } to match object { entries: [ { …(1) } ] }\n(14 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:141:7\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:129:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner ordinary batch.entries fields do not impersonate an application batch",
+          "status": "failed",
+          "owner": "field-name heuristic chooses child-like value for ordinary operation",
+          "token": "D110C_0C1F5B0U_ORDINARY_FIELD_FLOOR_COLLISION",
+          "softFailures": 1,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_ORDINARY_FIELD_FLOOR_COLLISION: expected { entries: [ { …(5) } ], …(3) } to match object { entries: [ { …(1) } ] }\n(14 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10)\n    at Proxy.<anonymous> (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:141:7\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:129:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner genuine nested applicationBatch derives the final child rather than outer time",
+          "status": "passed",
+          "owner": "genuine grammar/split/signed-row equality control",
+          "completeFailureMessages": []
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects negative child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "invalid child time committed instead of ISSUANCE_COMMIT_INVALID; durable state changed",
+          "token": "D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED",
+          "softFailures": 4,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED: expected undefined to be 'ISSUANCE_COMMIT_INVALID' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:166:78\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:167:74\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { exhausted: false, next: 1 } to deeply equal { exhausted: false, next: +0 }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:168:57\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { authorSequence: +0, …(4) } to be null\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:169:59\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects non-integer child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "invalid child time committed instead of ISSUANCE_COMMIT_INVALID; durable state changed",
+          "token": "D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED",
+          "softFailures": 4,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED: expected undefined to be 'ISSUANCE_COMMIT_INVALID' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:166:78\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:167:74\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { exhausted: false, next: 1 } to deeply equal { exhausted: false, next: +0 }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:168:57\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { authorSequence: +0, …(4) } to be null\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:169:59\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects duplicate child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "invalid child time committed instead of ISSUANCE_COMMIT_INVALID; durable state changed",
+          "token": "D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED",
+          "softFailures": 4,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED: expected undefined to be 'ISSUANCE_COMMIT_INVALID' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:166:78\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:167:74\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { exhausted: false, next: 1 } to deeply equal { exhausted: false, next: +0 }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:168:57\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { authorSequence: +0, …(4) } to be null\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:169:59\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner rejects regressed child time without publishing a durable chunk",
+          "status": "failed",
+          "owner": "invalid child time committed instead of ISSUANCE_COMMIT_INVALID; durable state changed",
+          "token": "D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED",
+          "softFailures": 4,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_INVALID_CHILD_TIME_ACCEPTED: expected undefined to be 'ISSUANCE_COMMIT_INVALID' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:166:78\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:167:74\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { exhausted: false, next: 1 } to deeply equal { exhausted: false, next: +0 }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:168:57\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { authorSequence: +0, …(4) } to be null\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:169:59\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:160:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u exact store logical-time owner refuses a structurally batch-shaped carrier beyond the canonical operation ceiling",
+          "status": "failed",
+          "owner": "oversize batch committed instead of ISSUANCE_COMMIT_INVALID",
+          "token": "D110C_0C1F5B0U_BATCH_CEILING_BYPASSED",
+          "softFailures": 3,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_BATCH_CEILING_BYPASSED: expected undefined to be 'ISSUANCE_COMMIT_INVALID' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:189:73\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:173:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(5) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:190:74\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:173:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { exhausted: false, next: 1 } to deeply equal { exhausted: false, next: +0 }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:191:57\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:173:3\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u zero-chunk origination ownership memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+          "status": "failed",
+          "owner": "legacy CAS originated nonempty chunks instead of ISSUANCE_RETRY_REQUIRED",
+          "token": "D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS",
+          "softFailures": 2,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:216:7\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(4) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:217:75\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u zero-chunk origination ownership browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+          "status": "failed",
+          "owner": "legacy CAS originated nonempty chunks instead of ISSUANCE_RETRY_REQUIRED",
+          "token": "D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS",
+          "softFailures": 2,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:216:7\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(4) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:217:75\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        },
+        {
+          "file": "phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "title": "D.110c-0c1f5b0u zero-chunk origination ownership node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append",
+          "status": "failed",
+          "owner": "legacy CAS originated nonempty chunks instead of ISSUANCE_RETRY_REQUIRED",
+          "token": "D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS",
+          "softFailures": 2,
+          "completeFailureMessages": [
+            "AssertionError: D110C_0C1F5B0U_NONEMPTY_PROGRESS_ORIGINATED_BY_CAS: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:216:7\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20",
+            "AssertionError: expected { entries: [ { …(5) } ], …(3) } to deeply equal { entries: [ { …(4) } ], …(3) }\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:217:75\n    at withStore (/private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:39:3)\n    at /private/tmp/d110c-f5b0u-red-vaDX0i/checkout/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts:200:4\n    at file:///private/tmp/d110c-f5b0u-red-vaDX0i/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+          ]
+        }
+      ]
+    }
+  ],
+  "acceptance": "CAUSAL_RED_NOT_GREEN"
+}

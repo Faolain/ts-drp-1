@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),file='tests/phase-3a1b-p3-live-transport-red.test.ts',hash=b=>crypto.createHash('sha256').update(b).digest('hex'),json=f=>JSON.parse(fs.readFileSync(path.join(out,f)));
+const patch=execFileSync('git',['diff','--binary','--full-index','--',file],{cwd:root}),source=fs.readFileSync(path.join(root,file)),custody=json('custody-after.json');
+if(hash(source)!==json('equivalence.json').afterSha256||hash(source)!==custody.testHashes[file]||!json('main-24/validation.json').valid)throw Error('Main handoff identity');
+fs.writeFileSync(path.join(out,'transport-only.patch'),patch,{flag:'wx'});
+fs.writeFileSync(path.join(out,'main-handoff.json'),JSON.stringify({readyForRootSourceSigning:true,head:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),changedPaths:[file],testSha256:hash(source),testPatchSha256:hash(patch),parentPatchSha256:custody.patchSha256,sourceSnapshot:path.basename(file)+'.after',custodyBaseline:'custody-after.json',effectiveTestHashCount:Object.keys(custody.testHashes).length,mainReporterSha256:json('main-24/validation.json').reporterSha256,isolatedStagePending:true,noAgentCommit:true},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({ready:true,testSha256:hash(source),patchSha256:hash(patch),mainCases:24,isolatedPending:true}));

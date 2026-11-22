@@ -1,0 +1,8 @@
+exit: 1 (expected causal RED)
+selected: 1 test in 1 file
+test: D.110c-0c1f2 compact multi-author issuance-frontier RED > requires a bounded authenticated frontier for every admitted successor writer
+terminal error: D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED
+evidence: {"aggregateCarrierCount":0,"closeSetCount":3,"creator":"abf3b213db1a0e37cf3f0f1b7a00be503dec3650080f5c3536678e9887d7be1d","legacyCarrierCount":1,"secondWriter":"332dc74a0b2687513b0fb05c73568882cac57a02594569d1bb266be8074bb136","secondWriterAdmittedRows":1,"successorEpoch":1,"writerCount":2}
+unexpected errors: 0
+flaky tests: 0
+retries: 0

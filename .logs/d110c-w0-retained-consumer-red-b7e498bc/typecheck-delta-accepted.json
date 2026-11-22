@@ -1,0 +1,329 @@
+{
+  "classification": "baseline-equivalent typecheck, not whole-program pass",
+  "retainedDiagnostics": 26,
+  "selectedRootDiagnostics": 10,
+  "externalDiagnostics": 16,
+  "externalDiagnosticsByteEquivalent": true,
+  "newDiagnostics": 0,
+  "diagnostics": [
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; evidence: Readonly<{ activeCensus: readonly D110c0b1ClosureEntry[]; boundedInput: Readonly<{ current: Readonly<{ candidates: readonly Readonly<{ readonly bytes: Uint8Array<ArrayBufferLike>; readonly ref: GenerationRef; }>[]; closure: readonly GenerationRef[]; }>; proofRefs: rea...' is not assignable to type 'D110c0b1RedFixture'.\n  The types of 'evidence.currentOpenReasons' are incompatible between these types.\n    Type 'readonly OpenCurrentAnchorTrustFailureReason[]' is not assignable to type 'readonly [string, string]'.\n      Target requires 2 element(s) but source may have fewer.",
+      "beforeLine": 160,
+      "afterLine": 161,
+      "sourceAnchor": "return Object.freeze({",
+      "sameAnchor": true,
+      "ownedRedFile": true
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "code": 2345,
+      "message": "Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.\n  Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+      "beforeLine": 334,
+      "afterLine": 351,
+      "sourceAnchor": "const beforeDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);",
+      "sameAnchor": true,
+      "ownedRedFile": true
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "code": 2345,
+      "message": "Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.\n  Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+      "beforeLine": 357,
+      "afterLine": 374,
+      "sourceAnchor": "const afterDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);",
+      "sameAnchor": true,
+      "ownedRedFile": true
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: () => Promise<void>; readIssued: (_scope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: () => Promise<...>; readOutboxPage: () => Promise<...>; transactIssue: () => Promise<...>; }>' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "beforeLine": 53,
+      "afterLine": 53,
+      "sourceAnchor": "return Object.freeze({",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 7006,
+      "message": "Parameter '_scope' implicitly has an 'any' type.",
+      "beforeLine": 56,
+      "afterLine": 56,
+      "sourceAnchor": "readIssued: (_scope, authorSequence) => Promise.resolve(input.issued.get(authorSequence) ?? null),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "beforeLine": 56,
+      "afterLine": 56,
+      "sourceAnchor": "readIssued: (_scope, authorSequence) => Promise.resolve(input.issued.get(authorSequence) ?? null),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "beforeLine": 501,
+      "afterLine": 501,
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "beforeLine": 501,
+      "afterLine": 501,
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "beforeLine": 561,
+      "afterLine": 561,
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ readonly byteLength: number; readonly digest: string; }>' is not assignable to type 'GenerationRef'.\n  Types of property 'digest' are incompatible.\n    Type 'string' is not assignable to type 'BlobDigest'.\n      Type 'string' is not assignable to type '{ readonly [blobDigestBrand]: true; }'.",
+      "beforeLine": 561,
+      "afterLine": 561,
+      "sourceAnchor": "proofRefs: [proposedCut.ref, proposedQc.ref],",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 138,
+      "afterLine": 138,
+      "sourceAnchor": "appendAccepted: async (input) => {",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 146,
+      "afterLine": 146,
+      "sourceAnchor": "installEpochAnchor: (input) => store.installEpochAnchor(input),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 147,
+      "afterLine": 147,
+      "sourceAnchor": "installGenesis: (input) => store.installGenesis(input),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 148,
+      "afterLine": 148,
+      "sourceAnchor": "readiness: (input) => store.readiness(input),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 149,
+      "afterLine": 149,
+      "sourceAnchor": "readPage: (input) => store.readPage(input),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 2739,
+      "message": "Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, authorSequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: ...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan",
+      "beforeLine": 279,
+      "afterLine": 279,
+      "sourceAnchor": "Object.freeze({",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 281,
+      "afterLine": 281,
+      "sourceAnchor": "compareAndMarkOutboxPublished: (input) => store.compareAndMarkOutboxPublished(input),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "beforeLine": 282,
+      "afterLine": 282,
+      "sourceAnchor": "readIssued: (scope, authorSequence) => store.readIssued(scope, authorSequence),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'authorSequence' implicitly has an 'any' type.",
+      "beforeLine": 282,
+      "afterLine": 282,
+      "sourceAnchor": "readIssued: (scope, authorSequence) => store.readIssued(scope, authorSequence),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "beforeLine": 283,
+      "afterLine": 283,
+      "sourceAnchor": "readLineage: (scope) => store.readLineage(scope),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'input' implicitly has an 'any' type.",
+      "beforeLine": 284,
+      "afterLine": 284,
+      "sourceAnchor": "readOutboxPage: (input) => store.readOutboxPage(input),",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'scope' implicitly has an 'any' type.",
+      "beforeLine": 285,
+      "afterLine": 285,
+      "sourceAnchor": "transactIssue: async (scope, buildAndSign) => {",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts",
+      "code": 7006,
+      "message": "Parameter 'buildAndSign' implicitly has an 'any' type.",
+      "beforeLine": 285,
+      "afterLine": 285,
+      "sourceAnchor": "transactIssue: async (scope, buildAndSign) => {",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+      "code": 7031,
+      "message": "Binding element 'firstLogicalTime' implicitly has an 'any' type.",
+      "beforeLine": 133,
+      "afterLine": 133,
+      "sourceAnchor": "beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+      "code": 7031,
+      "message": "Binding element 'plane' implicitly has an 'any' type.",
+      "beforeLine": 133,
+      "afterLine": 133,
+      "sourceAnchor": "beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts",
+      "code": 7031,
+      "message": "Binding element 'signRegisteredVertexDigest' implicitly has an 'any' type.",
+      "beforeLine": 133,
+      "afterLine": 133,
+      "sourceAnchor": "beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {",
+      "sameAnchor": true,
+      "ownedRedFile": false
+    }
+  ],
+  "ownedDiagnosticInventory": [
+    {
+      "file": "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "diagnostics": []
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+      "diagnostics": []
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+      "diagnostics": [
+        {
+          "file": "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+          "code": 2322,
+          "message": "Type 'Readonly<{ close: () => Promise<void>; evidence: Readonly<{ activeCensus: readonly D110c0b1ClosureEntry[]; boundedInput: Readonly<{ current: Readonly<{ candidates: readonly Readonly<{ readonly bytes: Uint8Array<ArrayBufferLike>; readonly ref: GenerationRef; }>[]; closure: readonly GenerationRef[]; }>; proofRefs: rea...' is not assignable to type 'D110c0b1RedFixture'.\n  The types of 'evidence.currentOpenReasons' are incompatible between these types.\n    Type 'readonly OpenCurrentAnchorTrustFailureReason[]' is not assignable to type 'readonly [string, string]'.\n      Target requires 2 element(s) but source may have fewer.",
+          "beforeLine": 160,
+          "afterLine": 161,
+          "sourceAnchor": "return Object.freeze({",
+          "sameAnchor": true,
+          "ownedRedFile": true
+        }
+      ]
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+      "diagnostics": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+      "diagnostics": []
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "diagnostics": [
+        {
+          "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+          "code": 2345,
+          "message": "Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.\n  Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+          "beforeLine": 334,
+          "afterLine": 351,
+          "sourceAnchor": "const beforeDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);",
+          "sameAnchor": true,
+          "ownedRedFile": true
+        },
+        {
+          "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+          "code": 2345,
+          "message": "Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.\n  Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.",
+          "beforeLine": 357,
+          "afterLine": 374,
+          "sourceAnchor": "const afterDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);",
+          "sameAnchor": true,
+          "ownedRedFile": true
+        }
+      ]
+    }
+  ],
+  "testExecutions": 0
+}

@@ -1,0 +1,18 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+    "test",
+    "--config",
+    "packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts",
+    "--list",
+    "--reporter=json"
+  ],
+  "budgetMs": 60000,
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ]
+}

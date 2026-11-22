@@ -1,0 +1,15 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-replay-performance
+
+(node:15277) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/track-z-retained-publication-successor.test.ts (12 tests | 8 skipped) 32778ms
+   ✓ successor native preparation joins concurrent creator replay reads  9439ms
+   ✓ successor native preparation joins concurrent recipient replay reads  7580ms
+   ✓ a malformed successor offer leaves ordinary retained publication available  6897ms
+   ✓ physical retained sends share one egress bound across multiple hot handoffs  8861ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 8 skipped (12)
+   Start at  06:08:20
+   Duration  35.81s (transform 2.08s, setup 0ms, collect 2.82s, tests 32.78s, environment 0ms, prepare 43ms)

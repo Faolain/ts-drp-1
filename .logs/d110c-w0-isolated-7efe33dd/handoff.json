@@ -1,0 +1,119 @@
+{
+  "status": "Independent source-built W0 acceptance READY; no isolated runtime test executed; all three gates require separate root releases",
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "isolatedRoot": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "runtimeRosterSha256": "74032e771abc2b90c42ffaf16628152d4960fd7f0c523946833b0a7537820a6d",
+  "counts": {
+    "files": 36,
+    "total": 232,
+    "historicalW0": 7,
+    "historicalRetained": 220,
+    "newClosure": 2,
+    "actualRetained": 222,
+    "bootstrapSupplement": 3
+  },
+  "inputCount": 1626,
+  "isolation": {
+    "independentInstallCount": 1,
+    "independentNativeDownloadCount": 1,
+    "independentBuildCount": 1,
+    "dependenciesInsideCheckout": true,
+    "sourceAndBuildsNotCopiedFromMain": true,
+    "freshBuiltFiles": 1085,
+    "dependencyLinks": 5106,
+    "actualCommonRuntimeInputs": 607,
+    "environmentOnlyOmissions": 381,
+    "proof": "source-isolation.json"
+  },
+  "compiler": {
+    "mainRoots": 40,
+    "mainSources": 978,
+    "mainEdges": 971,
+    "isolatedRoots": 40,
+    "isolatedSources": 597,
+    "isolatedEdges": 971,
+    "actualDerivedEnvironmentOnlyDelta": 381,
+    "allCommonHashesExact": true,
+    "optionsOnlyRootRemapped": true,
+    "noAmbientInjection": true,
+    "disposition": "Fresh forty-root current-source baseline-equivalent strict compilation; not whole-program pass",
+    "mainCurrentBaselineDiagnostics": 92,
+    "isolatedDiagnostics": 92,
+    "targetedDiagnostics": 3,
+    "newDiagnostics": 0,
+    "wholeProgramPass": false
+  },
+  "static": {
+    "lintErrors": 0,
+    "lintWarnings": 1,
+    "warningDisposition": "One inherited W0 JSDoc missing shape parameter declaration; untouched source and same prior warning",
+    "format": "pass",
+    "diff": "pass",
+    "exactCollection": true,
+    "typeDebtRepaired": false
+  },
+  "custody": {
+    "mainDirty": 11,
+    "protectedSources": 14,
+    "mainBuilt": 7,
+    "stashes": 27,
+    "protectedPaths": 86522,
+    "sealedRoots": 45,
+    "sealedEntries": 5050,
+    "mainPreserved": true,
+    "isolatedExactOverlay": true
+  },
+  "gates": [
+    {
+      "label": "runtime-w0",
+      "files": 1,
+      "cases": 7,
+      "budgetMs": 300000,
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/runtime.mjs",
+        "runtime-w0"
+      ],
+      "releaseFile": "root-runtime-w0-release.json"
+    },
+    {
+      "label": "runtime-retained",
+      "files": 34,
+      "cases": 222,
+      "budgetMs": 360000,
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/runtime.mjs",
+        "runtime-retained"
+      ],
+      "releaseFile": "root-runtime-retained-release.json"
+    },
+    {
+      "label": "runtime-bootstrap-supplement",
+      "files": 1,
+      "cases": 3,
+      "budgetMs": 60000,
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/runtime.mjs",
+        "runtime-bootstrap-supplement"
+      ],
+      "releaseFile": "root-runtime-bootstrap-supplement-release.json"
+    }
+  ],
+  "requiredReleaseFields": [
+    "gate",
+    "baseline",
+    "runtimeRosterSha256",
+    "sourcePatchSha256",
+    "maxInvocations:1"
+  ],
+  "sourceEdits": 0,
+  "testExecutions": 0,
+  "runtimeTestsReleased": false,
+  "commits": 0,
+  "reviewers": 0,
+  "noRetries": true,
+  "browserRerunRequested": false
+}

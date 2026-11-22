@@ -1,0 +1,38 @@
+{
+  "baseline": [
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ appendAccepted: Mock<(input: any) => Promise<Readonly<{ idempotent: true; journalSequence: number; ok: true; scope: LiveJournalScope; sourceKind: \"received\" | \"local-issued\"; vertexDigest: string; }>> | Promise<...>>; close: Mock<...>; installGenesis: Mock<...>; readiness: Mock<...>; readPage: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 7006,
+      "message": "Parameter 'entry' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ store: Readonly<{ close: Mock<() => Promise<void>>; compareAndMarkOutboxPublished: Mock<(input: any) => Promise<void>>; readIssued: Mock<(selectedScope: any, sequence: any) => Promise<...>>; ... 4 more ...; transactWriteSettlementPlan: Mock<...>; }>; vertexDigest: string; }>' is not assignable to type 'Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string; }>'.\n  The types returned by 'store.transactWriteSettlementPlan(...)' are incompatible between these types.\n    Type 'Promise<SettlementPlan | null>' is not assignable to type 'Promise<SettlementPlan>'.\n      Type 'SettlementPlan | null' is not assignable to type 'SettlementPlan'.\n        Type 'null' is not assignable to type 'SettlementPlan'."
+    }
+  ],
+  "current": [
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2741,
+      "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ appendAccepted: Mock<(input: any) => Promise<Readonly<{ idempotent: true; journalSequence: number; ok: true; scope: LiveJournalScope; sourceKind: \"received\" | \"local-issued\"; vertexDigest: string; }>> | Promise<...>>; close: Mock<...>; installGenesis: Mock<...>; readiness: Mock<...>; readPage: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 7006,
+      "message": "Parameter 'entry' implicitly has an 'any' type."
+    },
+    {
+      "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+      "code": 2322,
+      "message": "Type 'Readonly<{ store: Readonly<{ close: Mock<() => Promise<void>>; compareAndMarkOutboxPublished: Mock<(input: any) => Promise<void>>; readIssued: Mock<(selectedScope: any, sequence: any) => Promise<...>>; ... 4 more ...; transactWriteSettlementPlan: Mock<...>; }>; vertexDigest: string; }>' is not assignable to type 'Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string; }>'.\n  The types returned by 'store.transactWriteSettlementPlan(...)' are incompatible between these types.\n    Type 'Promise<SettlementPlan | null>' is not assignable to type 'Promise<SettlementPlan>'.\n      Type 'SettlementPlan | null' is not assignable to type 'SettlementPlan'.\n        Type 'null' is not assignable to type 'SettlementPlan'."
+    }
+  ],
+  "added": [],
+  "pass": true
+}

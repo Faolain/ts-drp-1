@@ -1,0 +1,642 @@
+[
+  {
+    "file": "custody-after/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:30:04.008Z",
+    "finish": "2026-09-06T06:30:05.991Z",
+    "pid": 62137
+  },
+  {
+    "file": "custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:17:00.573Z",
+    "finish": "2026-09-06T06:17:02.803Z",
+    "pid": 46617
+  },
+  {
+    "file": "freeze-retained/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:18:39.848Z",
+    "finish": "2026-09-06T06:18:40.107Z",
+    "pid": 48186
+  },
+  {
+    "file": "retained-01/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:21:47.423Z",
+    "finish": "2026-09-06T06:21:50.015Z",
+    "pid": 51500
+  },
+  {
+    "file": "retained-02/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:21:50.205Z",
+    "finish": "2026-09-06T06:21:51.930Z",
+    "pid": 51585
+  },
+  {
+    "file": "retained-03/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:21:52.113Z",
+    "finish": "2026-09-06T06:21:56.179Z",
+    "pid": 51709
+  },
+  {
+    "file": "retained-04/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:21:56.354Z",
+    "finish": "2026-09-06T06:21:58.025Z",
+    "pid": 51802
+  },
+  {
+    "file": "retained-05/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:21:58.199Z",
+    "finish": "2026-09-06T06:22:02.809Z",
+    "pid": 51866
+  },
+  {
+    "file": "retained-06/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:22:02.973Z",
+    "finish": "2026-09-06T06:22:06.976Z",
+    "pid": 51950
+  },
+  {
+    "file": "retained-07/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:22:07.137Z",
+    "finish": "2026-09-06T06:22:09.116Z",
+    "pid": 52056
+  },
+  {
+    "file": "retained-08/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:22:09.284Z",
+    "finish": "2026-09-06T06:22:10.654Z",
+    "pid": 52123
+  },
+  {
+    "file": "retained-09/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:22:10.818Z",
+    "finish": "2026-09-06T06:23:04.992Z",
+    "pid": 52188
+  },
+  {
+    "file": "retained-10/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:05.173Z",
+    "finish": "2026-09-06T06:23:09.715Z",
+    "pid": 53073
+  },
+  {
+    "file": "retained-11/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:09.885Z",
+    "finish": "2026-09-06T06:23:22.965Z",
+    "pid": 53155
+  },
+  {
+    "file": "retained-12/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:23.177Z",
+    "finish": "2026-09-06T06:23:24.717Z",
+    "pid": 53304
+  },
+  {
+    "file": "retained-13/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:24.886Z",
+    "finish": "2026-09-06T06:23:38.274Z",
+    "pid": 53368
+  },
+  {
+    "file": "retained-14/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:38.461Z",
+    "finish": "2026-09-06T06:23:41.270Z",
+    "pid": 53559
+  },
+  {
+    "file": "retained-15/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:41.443Z",
+    "finish": "2026-09-06T06:23:46.392Z",
+    "pid": 53623
+  },
+  {
+    "file": "retained-16/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:46.570Z",
+    "finish": "2026-09-06T06:23:51.193Z",
+    "pid": 53704
+  },
+  {
+    "file": "retained-17/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:23:51.381Z",
+    "finish": "2026-09-06T06:24:03.170Z",
+    "pid": 53810
+  },
+  {
+    "file": "retained-18/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:03.350Z",
+    "finish": "2026-09-06T06:24:04.786Z",
+    "pid": 54015
+  },
+  {
+    "file": "retained-19/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:04.968Z",
+    "finish": "2026-09-06T06:24:08.134Z",
+    "pid": 54079
+  },
+  {
+    "file": "retained-20/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:08.326Z",
+    "finish": "2026-09-06T06:24:11.973Z",
+    "pid": 54186
+  },
+  {
+    "file": "retained-21/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:12.160Z",
+    "finish": "2026-09-06T06:24:15.039Z",
+    "pid": 54251
+  },
+  {
+    "file": "retained-22/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:15.213Z",
+    "finish": "2026-09-06T06:24:18.841Z",
+    "pid": 54414
+  },
+  {
+    "file": "retained-23/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:19.005Z",
+    "finish": "2026-09-06T06:24:25.723Z",
+    "pid": 54500
+  },
+  {
+    "file": "retained-24/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:25.909Z",
+    "finish": "2026-09-06T06:24:28.690Z",
+    "pid": 54603
+  },
+  {
+    "file": "retained-25/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:28.870Z",
+    "finish": "2026-09-06T06:24:30.252Z",
+    "pid": 54691
+  },
+  {
+    "file": "retained-26/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:30.426Z",
+    "finish": "2026-09-06T06:24:32.657Z",
+    "pid": 54738
+  },
+  {
+    "file": "retained-27/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:32.834Z",
+    "finish": "2026-09-06T06:24:34.105Z",
+    "pid": 54810
+  },
+  {
+    "file": "retained-28/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:34.279Z",
+    "finish": "2026-09-06T06:24:35.709Z",
+    "pid": 54875
+  },
+  {
+    "file": "retained-29/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:35.877Z",
+    "finish": "2026-09-06T06:24:40.329Z",
+    "pid": 54941
+  },
+  {
+    "file": "retained-30/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T06:24:40.493Z",
+    "finish": "2026-09-06T06:24:41.730Z",
+    "pid": 55046
+  },
+  {
+    "file": "retained-31/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:41.898Z",
+    "finish": "2026-09-06T06:24:48.371Z",
+    "pid": 55112
+  },
+  {
+    "file": "retained-32/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:48.549Z",
+    "finish": "2026-09-06T06:24:51.826Z",
+    "pid": 55257
+  },
+  {
+    "file": "retained-33/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:51.996Z",
+    "finish": "2026-09-06T06:24:54.058Z",
+    "pid": 55345
+  },
+  {
+    "file": "retained-34/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:54.226Z",
+    "finish": "2026-09-06T06:24:56.406Z",
+    "pid": 55409
+  },
+  {
+    "file": "retained-35/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:56.570Z",
+    "finish": "2026-09-06T06:24:59.444Z",
+    "pid": 55473
+  },
+  {
+    "file": "retained-36/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:24:59.607Z",
+    "finish": "2026-09-06T06:25:07.337Z",
+    "pid": 55538
+  },
+  {
+    "file": "retained-37/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:07.500Z",
+    "finish": "2026-09-06T06:25:10.710Z",
+    "pid": 55655
+  },
+  {
+    "file": "retained-38/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:10.880Z",
+    "finish": "2026-09-06T06:25:13.325Z",
+    "pid": 55781
+  },
+  {
+    "file": "retained-39/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:13.497Z",
+    "finish": "2026-09-06T06:25:16.856Z",
+    "pid": 55849
+  },
+  {
+    "file": "retained-40/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T06:25:17.028Z",
+    "finish": "2026-09-06T06:25:35.581Z",
+    "pid": 55931
+  },
+  {
+    "file": "retained-41/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:35.751Z",
+    "finish": "2026-09-06T06:25:37.462Z",
+    "pid": 56268
+  },
+  {
+    "file": "retained-42/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:37.622Z",
+    "finish": "2026-09-06T06:25:39.850Z",
+    "pid": 56333
+  },
+  {
+    "file": "retained-43/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:40.007Z",
+    "finish": "2026-09-06T06:25:41.183Z",
+    "pid": 56400
+  },
+  {
+    "file": "retained-44/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:41.344Z",
+    "finish": "2026-09-06T06:25:48.609Z",
+    "pid": 56464
+  },
+  {
+    "file": "retained-45/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:48.772Z",
+    "finish": "2026-09-06T06:25:52.131Z",
+    "pid": 56613
+  },
+  {
+    "file": "retained-46/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:52.302Z",
+    "finish": "2026-09-06T06:25:55.597Z",
+    "pid": 56697
+  },
+  {
+    "file": "retained-47/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:55.759Z",
+    "finish": "2026-09-06T06:25:56.887Z",
+    "pid": 56771
+  },
+  {
+    "file": "retained-48/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:25:57.051Z",
+    "finish": "2026-09-06T06:26:01.304Z",
+    "pid": 56836
+  },
+  {
+    "file": "retained-49/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:01.461Z",
+    "finish": "2026-09-06T06:26:05.350Z",
+    "pid": 56928
+  },
+  {
+    "file": "retained-50/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:05.522Z",
+    "finish": "2026-09-06T06:26:08.380Z",
+    "pid": 57010
+  },
+  {
+    "file": "retained-51/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:08.550Z",
+    "finish": "2026-09-06T06:26:11.156Z",
+    "pid": 57093
+  },
+  {
+    "file": "retained-52/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:11.322Z",
+    "finish": "2026-09-06T06:26:13.449Z",
+    "pid": 57157
+  },
+  {
+    "file": "retained-53/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:13.619Z",
+    "finish": "2026-09-06T06:26:25.338Z",
+    "pid": 57221
+  },
+  {
+    "file": "retained-54/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:25.497Z",
+    "finish": "2026-09-06T06:26:29.256Z",
+    "pid": 57371
+  },
+  {
+    "file": "retained-55/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:29.418Z",
+    "finish": "2026-09-06T06:26:30.821Z",
+    "pid": 57452
+  },
+  {
+    "file": "retained-56/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:30.983Z",
+    "finish": "2026-09-06T06:26:32.531Z",
+    "pid": 57523
+  },
+  {
+    "file": "retained-57/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:32.690Z",
+    "finish": "2026-09-06T06:26:34.358Z",
+    "pid": 57587
+  },
+  {
+    "file": "retained-58/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T06:26:34.524Z",
+    "finish": "2026-09-06T06:26:54.984Z",
+    "pid": 57651
+  },
+  {
+    "file": "retained-59/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:55.152Z",
+    "finish": "2026-09-06T06:26:57.875Z",
+    "pid": 58024
+  },
+  {
+    "file": "retained-60/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:26:58.053Z",
+    "finish": "2026-09-06T06:27:00.510Z",
+    "pid": 58089
+  },
+  {
+    "file": "retained-61/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:00.687Z",
+    "finish": "2026-09-06T06:27:03.114Z",
+    "pid": 58206
+  },
+  {
+    "file": "retained-62/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:03.293Z",
+    "finish": "2026-09-06T06:27:08.009Z",
+    "pid": 58340
+  },
+  {
+    "file": "retained-63/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:08.174Z",
+    "finish": "2026-09-06T06:27:10.734Z",
+    "pid": 58476
+  },
+  {
+    "file": "retained-64/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:10.897Z",
+    "finish": "2026-09-06T06:27:12.340Z",
+    "pid": 58593
+  },
+  {
+    "file": "retained-65/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:12.513Z",
+    "finish": "2026-09-06T06:27:14.471Z",
+    "pid": 58712
+  },
+  {
+    "file": "retained-66/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:14.636Z",
+    "finish": "2026-09-06T06:27:16.927Z",
+    "pid": 58780
+  },
+  {
+    "file": "retained-67/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:17.084Z",
+    "finish": "2026-09-06T06:27:18.601Z",
+    "pid": 58897
+  },
+  {
+    "file": "retained-68/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:18.767Z",
+    "finish": "2026-09-06T06:27:22.159Z",
+    "pid": 59014
+  },
+  {
+    "file": "retained-69/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:22.328Z",
+    "finish": "2026-09-06T06:27:27.401Z",
+    "pid": 59148
+  },
+  {
+    "file": "retained-70/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:27:27.706Z",
+    "finish": "2026-09-06T06:27:49.847Z",
+    "pid": 59470
+  },
+  {
+    "file": "retained-71/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T06:27:50.068Z",
+    "finish": "2026-09-06T06:29:32.722Z",
+    "pid": 60385
+  },
+  {
+    "file": "source-diff-check/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:17:24.147Z",
+    "finish": "2026-09-06T06:17:24.273Z",
+    "pid": 47214
+  },
+  {
+    "file": "source-format/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:17:22.843Z",
+    "finish": "2026-09-06T06:17:24.906Z",
+    "pid": 47146
+  },
+  {
+    "file": "source-lint/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:17:21.629Z",
+    "finish": "2026-09-06T06:17:49.396Z",
+    "pid": 47102
+  },
+  {
+    "file": "static-disposition/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:20:09.650Z",
+    "finish": "2026-09-06T06:20:10.468Z",
+    "pid": 49147
+  },
+  {
+    "file": "summarize/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T06:30:03.704Z",
+    "finish": "2026-09-06T06:30:03.909Z",
+    "pid": 62099
+  },
+  {
+    "file": "typecheck/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T06:17:11.183Z",
+    "finish": "2026-09-06T06:17:18.260Z",
+    "pid": 46953
+  }
+]

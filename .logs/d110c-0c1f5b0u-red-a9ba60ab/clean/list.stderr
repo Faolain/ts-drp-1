@@ -1,0 +1,17 @@
+(node:72200) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72202) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Error: [vitest] There was an error when mocking a module. If you are using "vi.mock" factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock
+ ❯ tests/fixtures/phase-4b-v3/live-snapshot.ts:18:1
+     16| import { vi } from "vitest";
+     17| 
+     18| import { type PreparedV3Live, type RecoveredV3Live, recoverV3LiveRepli…
+       | ^
+     19| import { type GenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-f…
+     20| 
+
+Caused by: TypeError: v3 creator close registration resolver is unavailable
+ ❯ packages/node/src/v3-live.ts:2753:8
+ ❯ tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts:110:17
+

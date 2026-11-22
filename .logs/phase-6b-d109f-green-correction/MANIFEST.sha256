@@ -1,0 +1,16 @@
+a4ba29da105a63faa82502b3b6fbce25471eb911662819d461ea9d3cc64740e6  .logs/phase-6b-d109f-green-correction/browser-d109f.json
+c52a35010caa8d274b174d343a3d8740c8aba1128c64523dae52d32f86f3cb07  .logs/phase-6b-d109f-green-correction/browser-phase6a.json
+107c2d7a7c90ecf2c44de10afd8b2955f0bd0945555dfc6341d4874ec9531a70  .logs/phase-6b-d109f-green-correction/correction-summary.md
+1ffc311fc7ee10adb79317d327a63a73609d200671bfebe361ab8af6d15173e7  .logs/phase-6b-d109f-green-correction/focused.json
+7c764fd1aa59f4f2d87b57d4d40563815ad85225b5c9eb61749921fe5a05c90f  .logs/phase-6b-d109f-green-correction/retained-vitest.json
+a2c431e6c3aeb906c7f8586cbf18dc41136f024d6e4302e452903c8640154e92  .logs/phase-6b-d109f-final-review/README.md
+4d9469d55e8fed7f291f003aac942b0b7270108fbcfcb8df1ed8fc98252b1796  .logs/phase-6b-d109f-final-review/grok-resumed-terminal.md
+143e3d880dde026e583b9f5fcc6dc6f3732c9e85144d45399b6c6b4be776b800  docs/production-hardening/production-hardening-tdd-plan-v2.md
+bf54e93e97899cbf89c17ec46c368baddafd439327fb71795541b288804bc4dc  packages/storage-node/tests/phase-6b-differential-exit-red.test.ts
+4998783aee4425ea55033c8e9e3d532d587eba00c31b7ef37d75a56d25e1e1df  specs/phase-6b-bounded-pruning/README.md
+36b0b90c234cebba620d86877bd8aa8327fb3b3b4bc2e57ad9ba772f10d18043  specs/phase-6b-bounded-pruning/slices/05-differential-exit.md
+92d1f7af45fdeb82171f65e189fb0a16f12dc9d49b57e4910e789d6509e8a811  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+0c324bed4fb4b6a5429ab06490f6da1f493cc4bf79d54d9960522eb54268005b  tests/fixtures/phase-6b/differential-exit-contract.ts
+146ec273255d3df8f1b67c294e4b76169d102f25a0001c9d4d61a612a29e22f7  tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+422192ec9663d56ddb054eb3694e78476f8cf33aa4e0864b9fc8ee42792f4368  tests/phase-6b-differential-exit-red.test.ts
+3ae9c3ac1758b3b7b256e5149ff98fd73accdb28be7297caaaecd773e613d3b1  tests/phase-6b-runtime-reclamation-red.test.ts

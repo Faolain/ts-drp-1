@@ -1,0 +1,46 @@
+{
+  "scope": "Startup observation-boundary correction; readiness for one fixed 64-writer, 30-transition capture only",
+  "productLeakConfirmed": false,
+  "reviews": {
+    "sol": { "directory": "startup-review-sol", "verdict": "PASS", "exitCode": 0, "sourceCustodyExact": true, "findings": [] },
+    "fable": { "directory": "startup-review-fable", "verdict": "PASS", "exitCode": 0, "sourceCustodyExact": true, "conditionsDispositionedBelow": true },
+    "grok": { "directory": "startup-review-grok-readonly", "verdict": "PASS", "classification": "TERMINAL_RESPONSE", "exitCode": 0, "blockingFindings": [] }
+  },
+  "preservedNoVerdicts": [
+    { "directory": "startup-review-grok", "reason": "One-turn budget exhausted; no verdict" },
+    { "directory": "startup-review-grok-retry", "reason": "Four-turn budget exhausted; no verdict; empty tools argument did not disable source reads" }
+  ],
+  "futureGrokMinimumTurns": 100,
+  "dispositions": [
+    {
+      "finding": "Fable P1-1: prepare never tested after creator restart; snapshots coincide with restarts",
+      "resolution": "Dismissed incorrect ordinal assumption. Runner increments transitions then restarts when epoch % 10 === 1, hence transitions 2/12/22, not 10/20/30. Integrated prefix passes prepare and fresh owner assertions at transition 2 before throwing its exact sentinel. It does not run census at transition 2; full capture still must verify later censuses.",
+      "evidence": ["tests/fixtures/grid-transition-workload.ts:381", "tests/grid-memory-boundary-prefix.test.ts:76", "boundary-prefix-integrated/status.json"]
+    },
+    {
+      "finding": "Fable P1-2: room and grid source hashes missing from worker-local sourceHashes",
+      "resolution": "Closed by external provenance, as explicitly allowed by reviewer. All run command.json manifests contain examples/v3-room/src/index.ts and examples/grid/src/v3-zone.ts; status sourceCustodyExact compares complete before/after inventories. Keep entire run directory with snapshots, not detached worker telemetry alone.",
+      "roomSha256": "9cad9265a43b6b2c800a6020173d0b643014505a4ab8bffac3be7529f835f754",
+      "gridSha256": "bac3cb3dc3581be49f0808c945a7123b5dbe6a7fa4b9fdc2100033bb3a64e75f",
+      "evidence": ["boundary-prefix-integrated/command.json", "startup-review-fable/command.json"]
+    },
+    {
+      "finding": "Fable P2-1 redirect scope; P2-3 current map cardinality cannot prove retired registrations absent; Grok P2 fence identity check is stronger only in prefix",
+      "resolution": "Accepted limitations, no speculative owner changes. Export already documents original startup recovery, not later queue quiescence. Actual current runtime guards fail closed; scalar counts cannot prove retired-owner reachability. Use heap paths for retired owners. Full workload retains its signed identity assertions. No generic queue-idle or redirected-session API claimed. networkRegistrations is already captured as telemetry."
+    },
+    {
+      "finding": "Fable P2-2 ephemeron retainer artifacts; Sol/Grok additional live waiter closure",
+      "resolution": "Attribute bounded current-session waiter closures to instrumentation. Do not infer an independent strong root from a WeakMap table edge; validate live-key ephemeron semantics and strong paths. Existing analyzer control covers live/dead keys, weak references, and shared retained payloads; no overlapping retained-size sums."
+    },
+    {
+      "finding": "Fable P2-4 prepare failure recorded outside profiler; P2-6 waiter timeout",
+      "resolution": "Accepted: command stdout/stderr, incomplete profiler close, process status and partial files remain together. Existing test and process ceilings bound waits. Do not suppress failure or treat partial capture as complete."
+    },
+    {
+      "finding": "Fable P2-5 sampling phase and Grok later boundary coverage",
+      "resolution": "Profile preparation and GC differ from unprofiled measurements. Snapshots are at 10/20/30; actual restarts are 2/12/22. Prefix success is not full capture success. No timing acceptance, memory acceptance, or leak attribution is inferred from review."
+    }
+  ],
+  "verification": ["boundary-prefix-integrated", "startup-final-static", "startup-final-types", "startup-final-format"],
+  "nextAction": "Run capture30-startup-settled with unchanged workload, seed, assertions, retention policy and default heap; preserve all partial failures"
+}

@@ -1,0 +1,10 @@
+
+Running 1 test using 1 worker
+
+
+
+[1/1] [chromium] › packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2071:1 › D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody
+[chromium] › packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:2071:1 › D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody
+D110C_B_CLOSE_NOT_REBOUND
+
+  1 passed (3.2s)

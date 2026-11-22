@@ -13,6 +13,7 @@ import type { DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
+import type { NodeRoomNetworkPort } from "../src/room-network.js";
 
 const NOW = 1_750_000_000_000;
 const NAMESPACE = `drp-network:v1:${"q".repeat(43)}`;
@@ -55,7 +56,7 @@ describe("room presence retirement", () => {
 		runner.stop();
 
 		const retiredRoomId = "quota-room-a";
-		await node.createObject({ id: retiredRoomId });
+		openRoom(node, retiredRoomId);
 		const firstCycleStart = registrations.length;
 		await runner.fn();
 		const firstRoom = registrations
@@ -63,12 +64,12 @@ describe("room presence retirement", () => {
 			.find(({ endpoint, record }) => endpoint === ENDPOINTS[0] && record.namespace === roomNamespace(retiredRoomId));
 		expect(firstRoom).toMatchObject({ accepted: true });
 
-		node.unsubscribeObject(retiredRoomId);
+		closeRoom(node, retiredRoomId);
 		await flushMicrotasks();
 		await vi.advanceTimersByTimeAsync(5_500);
 
 		const replacementRoomId = "quota-room-b";
-		await node.createObject({ id: replacementRoomId });
+		openRoom(node, replacementRoomId);
 		const replacementCycleStart = registrations.length;
 		await runner.fn();
 		const replacementRoom = registrations
@@ -188,6 +189,8 @@ function fakeNetwork(): DRPNetworkNode {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn((): Promise<void> => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn((): Promise<void> => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((): void => undefined),
@@ -220,4 +223,25 @@ async function flushMicrotasks(): Promise<void> {
 
 function signal(): AbortSignal {
 	return new AbortController().signal;
+}
+
+// Presence records are routing advertisements, not portable app authority.
+// Keep every original quota law with the current room transport lifecycle.
+const currentRoomPorts = new WeakMap<DRPNode, Map<string, NodeRoomNetworkPort>>();
+
+function openRoom(node: DRPNode, id: string): NodeRoomNetworkPort {
+	let rooms = currentRoomPorts.get(node);
+	if (rooms === undefined) {
+		rooms = new Map();
+		currentRoomPorts.set(node, rooms);
+	}
+	const port = node.openRoomNetwork(id);
+	rooms.set(id, port);
+	return port;
+}
+
+function closeRoom(node: DRPNode, id: string): void {
+	const rooms = currentRoomPorts.get(node);
+	rooms?.get(id)?.close();
+	rooms?.delete(id);
 }

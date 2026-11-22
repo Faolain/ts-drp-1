@@ -1,0 +1,9 @@
+{
+  "result": "No actionable defects found",
+  "validation": "Independently reproduced54 directed test declarations and6 selected TLC checks; audited archived source/log hashes. Initial default-PATH Java failure was corrected before successful TLC rerun.",
+  "log": "independent-review.log.gz",
+  "sha256": "33b451cd1830a1fc9db4c60f29226996e234a959703534e6d1341b4997f30e4d",
+  "gzipSha256": "1b6a74ba4bcf1489914ef8de5863522197a911cda7a053596970a9554a690243",
+  "sourceChangesRequired": false,
+  "cleanup": "Reviewer deletion of generated _apalache-out was blocked; output is preserved outside the worktree, no deletion required."
+}

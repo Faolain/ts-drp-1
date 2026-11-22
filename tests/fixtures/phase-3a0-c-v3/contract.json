@@ -1,0 +1,32 @@
+{
+	"combinedGenerationId": "3333333333333333333333333333333333333333333333333333333333333333",
+	"combinedRetryGenerationId": "4444444444444444444444444444444444444444444444444444444444444444",
+	"creatorInstallOperations": [
+		"beginGeneration",
+		"putCachedBlob",
+		"promoteReference",
+		"completeGeneration",
+		"swapHead"
+	],
+	"creatorInitialGenerationId": "1111111111111111111111111111111111111111111111111111111111111111",
+	"creatorRetryGenerationId": "2222222222222222222222222222222222222222222222222222222222222222",
+	"fastRepetitions": 1,
+	"kind": "phase-3a0-c-storage-node-process-death-contract",
+	"longRepetitions": 5,
+	"requiredClaims": [
+		"storage-node-sigkill-old-or-exact-new",
+		"strict-durable-backend-only",
+		"fresh-generation-id-on-retry",
+		"authoritative-state-no-mix",
+		"reopen-authority-exact"
+	],
+	"version": 1,
+	"withheldClaims": [
+		"browser-process-death",
+		"browser-reload-parity",
+		"physical-debris-absence",
+		"live-state-construction",
+		"trust-advancement",
+		"certified-profile-or-qc"
+	]
+}

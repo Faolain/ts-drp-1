@@ -248,7 +248,7 @@ export class NodeRouting {
 	 */
 	async connect(address: string, signal?: AbortSignal): Promise<void> {
 		return this.#measure("connect", new TextEncoder().encode(address).byteLength, signal, async (boundedSignal) => {
-			await this.#host.dial(multiaddr(address), { signal: boundedSignal });
+			await this.#networkNode.safeDial(multiaddr(address), this.#host, boundedSignal);
 		});
 	}
 

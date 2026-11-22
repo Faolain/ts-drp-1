@@ -6,10 +6,11 @@ services:
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./shadow-soak-alerts.yml:/etc/prometheus/shadow-soak-alerts.yml
     ports:
       - "9090:9090"
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
+      - "--config.file=/etc/prometheus/prometheus.yml"
 
   pushgateway:
     image: prom/pushgateway:latest
@@ -18,6 +19,37 @@ services:
       - "9091:9091"
     depends_on:
       - prometheus
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    environment:
+      SHADOW_ALERT_WEBHOOK_URL: ${SHADOW_ALERT_WEBHOOK_URL:?SHADOW_ALERT_WEBHOOK_URL is required}
+    volumes:
+      - ./alertmanager.yml.tmpl:/etc/alertmanager/alertmanager.yml.tmpl:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        sed "s|__SHADOW_ALERT_WEBHOOK_URL__|$${SHADOW_ALERT_WEBHOOK_URL}|g"
+        /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml &&
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
+    ports:
+      - "9093:9093"
+
+  shadow-soak:
+    build:
+      context: ../..
+      dockerfile: scripts/production-hardening/Dockerfile.shadow-soak
+    container_name: shadow-soak
+    restart: unless-stopped
+    environment:
+      SHADOW_INSTANCE: ${SHADOW_INSTANCE:-shadow-soak-1}
+      SHADOW_OTLP_EXPORTER_URL: ${SHADOW_OTLP_EXPORTER_URL:-}
+      SHADOW_PUSHGATEWAY_URL: http://pushgateway:9091
+      SHADOW_SHA: ${SHADOW_SHA:?SHADOW_SHA is required}
+    depends_on:
+      - alertmanager
+      - pushgateway
 
   grafana:
     image: grafana/grafana:latest

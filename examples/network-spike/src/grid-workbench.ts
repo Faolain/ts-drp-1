@@ -1,9 +1,97 @@
+import { acquireBrowserIdentity } from "@ts-drp/example-browser-network";
 import {
-	createGridBrowserPeer,
+	type GridBrowserPeerPreparation,
 	type GridBrowserPeerSession,
 	type GridBrowserScenario,
 	type GridBrowserTrace,
+	type GridFixtureApplication,
+	prepareGridBrowserPeer,
 } from "@ts-drp/network-spike/grid/fixture";
+import type { DRPNode } from "@ts-drp/node";
+
+import { createV3ZoneApi, type V3ZoneRoomHeadAuthorityForOpen, type ZoneSnapshot } from "../../grid/src/v3-zone.js";
+
+declare global {
+	interface Window {
+		__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: V3ZoneRoomHeadAuthorityForOpen;
+		__TS_DRP_GRID_PREPARATION__?: {
+			readonly enrollment: string;
+			start(input: Parameters<GridBrowserPeerPreparation["start"]>[0]): Promise<void>;
+		};
+	}
+}
+
+function application(
+	node: DRPNode,
+	role: "creator" | "joiner",
+	movements: GridBrowserTrace["movements"][number][]
+): GridFixtureApplication {
+	const observed = new Map<string, { x: number; y: number }>();
+	let snapshot: ZoneSnapshot;
+	const rolePeer = (actor: string): string | undefined => {
+		const creatorPeer = role === "creator" ? node.networkNode.peerId : snapshot.zoneId.split(":")[0];
+		return actor === "creator"
+			? creatorPeer
+			: snapshot.transportPeerAuthors.find(({ peerId }) => peerId !== creatorPeer)?.peerId;
+	};
+	const zone = createV3ZoneApi(
+		node,
+		(next) => {
+			snapshot = next;
+			for (const actor of ["creator", "joiner"] as const) {
+				const peer = rolePeer(actor),
+					position = peer === undefined ? undefined : next.transientPositions[peer];
+				if (position === undefined) continue;
+				const before = observed.get(actor) ?? { x: 0, y: 0 };
+				if (before.x !== position.x || before.y !== position.y) {
+					const direction =
+						position.x > before.x ? "R" : position.x < before.x ? "L" : position.y > before.y ? "U" : "D";
+					movements.push({ actor, direction, ...position });
+				}
+				observed.set(actor, { ...position });
+			}
+		},
+		(context) => {
+			const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
+			if (typeof factory !== "function") throw new Error("genuine Grid room-head host acquisition is required");
+			return factory(context);
+		}
+	);
+	snapshot = zone.snapshot();
+	return {
+		get enrollment(): string {
+			return zone.snapshot().enrollment;
+		},
+		get invite(): string {
+			return zone.snapshot().invite;
+		},
+		async create(enrollment): Promise<string> {
+			await zone.create(enrollment);
+			zone.move(0, 0);
+			return zone.snapshot().zoneId;
+		},
+		async join(invite): Promise<string> {
+			await zone.join(invite);
+			const deadline = performance.now() + 5_000;
+			while (zone.snapshot().rawTransport.links.length === 0) {
+				if (performance.now() >= deadline) throw new Error("v3 Grid authenticated movement link is unavailable");
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			zone.move(0, 0);
+			return zone.snapshot().zoneId;
+		},
+		moveUser(actor, direction): void {
+			if (actor !== role) throw new Error("Grid movement may only use its authenticated local author");
+			zone.move(direction === "R" ? 1 : direction === "L" ? -1 : 0, direction === "U" ? 1 : direction === "D" ? -1 : 0);
+		},
+		position(actor): { readonly x: number; readonly y: number } | undefined {
+			return observed.get(actor);
+		},
+		close(): Promise<void> {
+			return zone.close();
+		},
+	};
+}
 
 /**
  * @param app - Application root to replace with the grid workbench.
@@ -15,34 +103,55 @@ export async function renderGridWorkbench(app: HTMLElement, parameters: URLSearc
 	const run = Number.parseInt(parameters.get("run") ?? "1", 10);
 	const objectId = parameters.get("object") ?? undefined;
 	const namespace = parameters.get("namespace") ?? undefined;
-	const session = await createGridBrowserPeer({
+	const identity = await acquireBrowserIdentity({
+		lockPrefix: "ts-drp:network-spike:grid:identity-slot",
+		seedKey: "ts-drp:network-spike:grid:identity-seed",
+	});
+	const prepared = await prepareGridBrowserPeer({
+		privateKeySeed: identity.seed,
+		application: (node, movements) => application(node, role, movements),
 		...(objectId === undefined ? {} : { objectId }),
 		...(namespace === undefined ? {} : { namespace }),
 		role,
 		run: Number.isSafeInteger(run) ? run : 1,
 		scenario,
 	});
-	const trace = session.snapshot();
-	render(app, trace);
-	enableGridControls(session);
-	updateLiveTrace(session.snapshot());
-	const refresh = window.setInterval(() => updateLiveTrace(session.snapshot()), 100);
-	const target = window as typeof window & { __TS_DRP_GRID_SESSION__?: GridBrowserPeerSession };
-	target.__TS_DRP_GRID_SESSION__ = session;
+	app.innerHTML =
+		"<section data-grid-prepared>Authenticated Grid enrollment prepared; select the enrolled recipient before creation.</section>";
+	window.__TS_DRP_GRID_PREPARATION__ = {
+		enrollment: prepared.enrollment,
+		async start(input): Promise<void> {
+			const session = await prepared.start(input);
+			const trace = session.snapshot();
+			render(app, trace);
+			enableGridControls(session);
+			updateLiveTrace(session.snapshot());
+			const refresh = window.setInterval(() => updateLiveTrace(session.snapshot()), 100);
+			const target = window as typeof window & { __TS_DRP_GRID_SESSION__?: GridBrowserPeerSession };
+			target.__TS_DRP_GRID_SESSION__ = session;
+			window.addEventListener(
+				"beforeunload",
+				() => {
+					window.clearInterval(refresh);
+					void session.stop();
+				},
+				{ once: true }
+			);
+			window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: trace }));
+		},
+	};
 	window.addEventListener(
 		"beforeunload",
 		() => {
-			window.clearInterval(refresh);
-			void session.stop();
+			void prepared.stop().finally(() => identity.release());
 		},
 		{ once: true }
 	);
-	window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: trace }));
 }
 
 function render(app: HTMLElement, trace: GridBrowserTrace): void {
 	const run = Number.parseInt(trace.traceId.split("-").at(-1) ?? "1", 10);
-	const joinUrl = `/grid/joiner?scenario=${trace.scenario}&run=${Number.isSafeInteger(run) ? run : 1}&namespace=${encodeURIComponent(trace.namespace)}&object=${encodeURIComponent(trace.objectId)}`;
+	const joinUrl = `/grid/joiner?scenario=${trace.scenario}&run=${Number.isSafeInteger(run) ? run : 1}&namespace=${encodeURIComponent(trace.namespace)}&object=${encodeURIComponent(trace.objectId)}&invite=${encodeURIComponent(trace.invite)}`;
 	const direct = trace.direct;
 	app.innerHTML = `
 		<section class="grid-demo" data-grid-ready data-role="${trace.role}" data-scenario="${trace.scenario}" data-terminal="${trace.terminal}">

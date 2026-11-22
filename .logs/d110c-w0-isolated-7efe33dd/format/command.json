@@ -1,0 +1,23 @@
+{
+  "label": "format",
+  "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+  "budgetMs": 120000,
+  "command": [
+    "pnpm",
+    "exec",
+    "prettier",
+    "--check",
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts",
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "testsExecuted": 0
+}

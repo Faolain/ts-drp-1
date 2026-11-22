@@ -1,0 +1,12 @@
+(node:66174) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[chromium] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:144:1 › pins the complete browser behavior inventory
+(node:66174) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:66511) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[firefox] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:144:1 › pins the complete browser behavior inventory
+(node:66511) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:67775) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[webkit] › packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts:144:1 › pins the complete browser behavior inventory
+(node:67775) ExperimentalWarning: SQLite is an experimental feature and might change at any time

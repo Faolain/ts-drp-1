@@ -1,0 +1,11 @@
+Grok initial:
+python3 /Users/aristotle/.codex/skills/grok/scripts/run_grok.py --mode review --cwd /Users/aristotle/Documents/Projects/ts-drp-1 --prompt-file /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1a-plan-review-fc384d1f/prompt.md --output-dir /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1a-plan-review-fc384d1f/grok --model grok-4.6 --reasoning-effort high --timeout-seconds 720 --max-turns 24
+
+Grok exact-session resume:
+grok --resume 01a0649a-9cee-7dd1-8241-41f673464078 --cwd /Users/aristotle/Documents/Projects/ts-drp-1 --model grok-4.6 --reasoning-effort high --disable-web-search --no-subagents --no-plan --max-turns 24 --output-format streaming-json --verbatim --prompt-file /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1a-plan-review-fc384d1f/grok/resume-prompt.md --permission-mode dontAsk --tools read_file,grep,list_dir
+
+Kimi:
+KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi --model kimi-code/k3 --prompt <prompt.md> --output-format stream-json
+
+Opus:
+CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude -p --model opus --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob --disallowedTools Bash,Write,Edit,NotebookEdit,Agent,WebFetch,WebSearch --output-format json --json-schema <schema.json> <prompt.md

@@ -1,0 +1,30 @@
+{
+	"extends": "./tsconfig.api.json",
+	"files": [
+		"under-test.d.ts",
+		"producer.ts",
+		"proof.ts",
+		"integrity.ts",
+		"proof-faults.ts",
+		"node-port.ts",
+		"browser-port.ts",
+		"recovery.ts",
+		"node-entry.ts",
+		"node-recovery.ts",
+		"node-metadata.ts",
+		"browser-setup.ts",
+		"browser-recovery.ts",
+		"browser-cleanup.ts",
+		"build.ts",
+		"instrument.ts",
+		"assertions.ts",
+		"scenarios.ts",
+		"ownership.ts",
+		"browser-server.ts",
+		"browser-red.pw.ts",
+		"playwright.config.ts",
+		"vitest.config.ts",
+		"../../rollback-data-observation-node-red.test.ts"
+	],
+	"include": []
+}

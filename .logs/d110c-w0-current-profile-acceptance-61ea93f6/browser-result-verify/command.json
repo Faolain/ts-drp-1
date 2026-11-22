@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "-e",
+    "const f=require(\"fs\"),a=require(\"assert/strict\"),p=\".logs/d110c-w0-browser-7efe33dd/\",r=JSON.parse(f.readFileSync(p+\"runtime/result.json\")),s=JSON.parse(f.readFileSync(p+\"runtime/status.json\")),expected=JSON.parse(f.readFileSync(p+\"runtime-roster.json\")).entries;const walk=suites=>suites.flatMap(q=>[...(q.specs||[]).flatMap(q=>q.tests.map(t=>({file:q.file,title:q.title,project:t.projectName,status:t.status,expected:t.expectedStatus,results:t.results}))),...walk(q.suites||[])]),actual=walk(r.suites),k=x=>JSON.stringify([x.file,x.title,x.project]);a.deepEqual(actual.map(k).sort(),expected.map(k).sort());a.equal(actual.length,24);a.equal(new Set(actual.map(k)).size,24);a.deepEqual(r.errors,[]);a.equal(r.stats.expected,24);a.equal(r.stats.unexpected+r.stats.flaky+r.stats.skipped,0);for(const t of actual){a.equal(t.expected,\"passed\");a.equal(t.status,\"expected\");a.equal(t.results.length,1);a.equal(t.results[0].status,\"passed\");}a.equal(s.code,0);a.equal(s.timedOut,false);a.equal(s.quiescent,true);a.deepEqual(s.cleanup,[]);console.log(JSON.stringify({passed:24,exactRoster:true,projects:[...new Set(actual.map(x=>x.project))],status:s}));"
+  ],
+  "start": "2026-09-06T11:43:40.661Z"
+}

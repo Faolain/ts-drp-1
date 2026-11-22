@@ -1,0 +1,220 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+      "--project=chromium",
+      "--grep",
+      "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen|D.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
+      "--reporter=json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "rootDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-successor-product.pw.ts",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 1560,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- fulfilled\u001b[39m\n\u001b[31m+ page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: issuance-rejected\u001b[39m\n\u001b[31m+     at createV3RoomSessionOwned (http://127.0.0.1:57755/entry.js:44041:15)\u001b[39m\n\u001b[31m+     at async joinRoom (http://127.0.0.1:57755/entry.js:54632:16)\u001b[39m\n\u001b[31m+     at async Object.join (http://127.0.0.1:57755/entry.js:54734:18)\u001b[39m\n\u001b[31m+     at async <anonymous>:337:30\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- fulfilled\u001b[39m\n\u001b[31m+ page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: issuance-rejected\u001b[39m\n\u001b[31m+     at createV3RoomSessionOwned (http://127.0.0.1:57755/entry.js:44041:15)\u001b[39m\n\u001b[31m+     at async joinRoom (http://127.0.0.1:57755/entry.js:54632:16)\u001b[39m\n\u001b[31m+     at async Object.join (http://127.0.0.1:57755/entry.js:54734:18)\u001b[39m\n\u001b[31m+     at async <anonymous>:337:30\u001b[39m\n    at /private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3169:25",
+                    "location": {
+                      "file": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 25,
+                      "line": 3169
+                    },
+                    "snippet": "  3167 | \t\t\treopen(treatmentPage, treatmentDatabase),\n  3168 | \t\t]);\n> 3169 | \t\texpect(controlDetail).toBe(\"fulfilled\");\n       | \t\t                      ^\n  3170 | \t\texpect(treatmentDetail).toBe(\"fulfilled\");\n  3171 | \t\tconst [control, treatment] = await Promise.all([\n  3172 | \t\t\tcontrolPage.evaluate("
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 25,
+                        "line": 3169
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- fulfilled\u001b[39m\n\u001b[31m+ page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: issuance-rejected\u001b[39m\n\u001b[31m+     at createV3RoomSessionOwned (http://127.0.0.1:57755/entry.js:44041:15)\u001b[39m\n\u001b[31m+     at async joinRoom (http://127.0.0.1:57755/entry.js:54632:16)\u001b[39m\n\u001b[31m+     at async Object.join (http://127.0.0.1:57755/entry.js:54734:18)\u001b[39m\n\u001b[31m+     at async <anonymous>:337:30\u001b[39m\n\n  3167 | \t\t\treopen(treatmentPage, treatmentDatabase),\n  3168 | \t\t]);\n> 3169 | \t\texpect(controlDetail).toBe(\"fulfilled\");\n       | \t\t                      ^\n  3170 | \t\texpect(treatmentDetail).toBe(\"fulfilled\");\n  3171 | \t\tconst [control, treatment] = await Promise.all([\n  3172 | \t\t\tcontrolPage.evaluate(\n    at /private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3169:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T18:03:31.439Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results/phase-6a-creator-successor-b300d-ired-on-epoch-N-cold-reopen-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results/phase-6a-creator-successor-b300d-ired-on-epoch-N-cold-reopen-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 25,
+                    "line": 3169
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-38a08726d8f148169a3d",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 3036,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T18:03:34.110Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-0b643455daa45fd96b4e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 3226,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-03T18:03:30.675Z",
+    "duration": 3447.7920000000004,
+    "expected": 0,
+    "skipped": 1,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

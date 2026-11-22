@@ -1,0 +1,45 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "label": "runtime-bootstrap-supplement",
+  "files": [
+    "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts"
+  ],
+  "entries": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > accepts only the four frozen recovery key combinations"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > rejects malformed bounded policy bytes before consuming the prepared capability"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > freezes the one shared exact predicate and its custody boundaries"
+    }
+  ],
+  "budgetMs": 60000,
+  "budgetRationale": "Three existing pure bootstrap controls were included in the repaired51 pass; separate60000ms process ceiling, no test timer change.",
+  "maxInvocations": 1,
+  "released": false,
+  "command": [
+    "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+    "run",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime-bootstrap-supplement/result.json"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "environmentSet": {},
+  "unchangedTestAndChildTimers": true,
+  "stopOnFailureNoRetryOrNextGate": true,
+  "runtimeRosterSha256": "e7eddba484ad9aa2a659d2e3fafa2f8f4e0da7429351d14d6b292cdb91a114c4"
+}

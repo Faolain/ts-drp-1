@@ -1,0 +1,1 @@
+cd packages/storage-browser && PLAYWRIGHT_JSON_OUTPUT_FILE=../../.logs/d110c-0c-red-causal-2cb28a1a/playwright.json pnpm exec playwright test --config=playwright.d110c-0c-red.config.ts --reporter=json

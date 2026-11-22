@@ -1,0 +1,8 @@
+
+> @ts-drp/node@0.11.0 prebuild /private/tmp/ts-drp-transition-responsiveness/packages/node
+> node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+
+
+> @ts-drp/node@0.11.0 build /private/tmp/ts-drp-transition-responsiveness/packages/node
+> tsc -b tsconfig.build.json && node build.mjs
+

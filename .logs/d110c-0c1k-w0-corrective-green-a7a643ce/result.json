@@ -1,0 +1,18 @@
+{
+  "record": "D.110c-0c1k-W0",
+  "checkpoint": "corrective-GREEN",
+  "commit": "a7a643ceb70ce5c6551de9920c01d2bc96edd464",
+  "focusedFiles": 2,
+  "focusedTests": 10,
+  "focusedPassed": 10,
+  "directAclFiles": 1,
+  "directAclTests": 7,
+  "directAclPassed": 7,
+  "retainedFiles": 5,
+  "retainedTests": 49,
+  "retainedPassed": 49,
+  "legacyMaxBytes": 8192,
+  "legacyMaxItems": 2048,
+  "maxEpochVerticesChanged": false,
+  "success": true
+}

@@ -1,0 +1,8 @@
+.logs/d110c-0c-red-8d2d729e/command.txt: OK
+.logs/d110c-0c-red-8d2d729e/playwright.json: OK
+.logs/d110c-0c-red-8d2d729e/playwright.status: OK
+.logs/d110c-0c-red-8d2d729e/rejected-ledger.md: OK
+.logs/d110c-0c-red-8d2d729e/scope-audit.command: OK
+.logs/d110c-0c-red-8d2d729e/scope-audit.json: OK
+.logs/d110c-0c-red-8d2d729e/scope-audit.mjs: OK
+.logs/d110c-0c-red-8d2d729e/scope-audit.status: OK

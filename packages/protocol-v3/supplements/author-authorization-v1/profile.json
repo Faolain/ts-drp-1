@@ -1,0 +1,24 @@
+{
+	"profileId": "creator-author-authorization-v1",
+	"carrierKind": "drp-author-authorization",
+	"protocolMajor": 3,
+	"version": 1,
+	"digestDomain": "ts-drp/author-authorization/v3",
+	"maximumCanonicalBytes": 8192,
+	"authors": {
+		"identity": "lowercase-hex-raw-ed25519-public-key",
+		"minimum": 1,
+		"maximum": 64,
+		"ordering": "strict-ascending-unsigned-ascii",
+		"completeSnapshot": true
+	},
+	"claims": {
+		"roles": false,
+		"delegation": false,
+		"implicitCreator": false,
+		"operatorMapAuthority": false,
+		"signerSetAuthority": false,
+		"runtimeSubpath": "@ts-drp/protocol-v3/author-authorization",
+		"supplementRuntimeExport": false
+	}
+}

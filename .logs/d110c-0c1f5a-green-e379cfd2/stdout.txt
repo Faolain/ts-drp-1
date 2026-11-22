@@ -1,0 +1,453 @@
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5a-green-e379cfd2/focused.json
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   19.99 |    47.19 |   64.16 |   19.99 |                   
+ ...nt-catalog/src |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-702             
+ blueprints/src    |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-3               
+ ...nts/src/AddMul |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-73              
+ ...prints/src/Map |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-147             
+ ...prints/src/Set |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-51              
+ canonical/src     |   14.04 |    31.57 |   85.71 |   14.04 |                   
+  ...ash-stream.ts |   81.37 |    33.33 |     100 |   81.37 | ...02-103,111-112 
+  index.ts         |       0 |        0 |       0 |       0 | 1-566             
+ compaction/src    |   22.65 |    54.48 |   55.38 |   22.65 |                   
+  ...print-fold.ts |      84 |     62.5 |   92.85 |      84 | ...16-217,222-223 
+  ...t-snapshot.ts |    47.8 |    68.42 |   71.42 |    47.8 | ...70-171,198-268 
+  ct-merkle.ts     |       0 |        0 |       0 |       0 | 1-451             
+  ...te-carrier.ts |   80.95 |    33.33 |     100 |   80.95 | ...56,58-59,64-66 
+  ...commitment.ts |       0 |        0 |       0 |       0 | 1-507             
+  index.ts         |       0 |        0 |       0 |       0 | 1-14              
+  linearize.ts     |   32.84 |    53.93 |   35.71 |   32.84 | ...48-741,749-767 
+  ...ne-receipt.ts |       0 |        0 |       0 |       0 | 1-232             
+  ...hot-stream.ts |       0 |        0 |       0 |       0 | 1-303             
+  state.ts         |       0 |        0 |       0 |       0 | 1-14              
+  types.ts         |       0 |        0 |       0 |       0 |                   
+ control-plane/src |   40.94 |    36.88 |   59.25 |   40.94 |                   
+  anchor-trust.ts  |   88.88 |    32.41 |      90 |   88.88 | ...99-700,703-704 
+  ...st-advance.ts |   88.28 |    45.23 |    90.9 |   88.28 | ...78-179,184-185 
+  ...nt-advance.ts |    88.1 |    44.23 |   91.66 |    88.1 | ...14-215,226-227 
+  index.ts         |    1.41 |       25 |       0 |    1.41 | ...7-312,405-1083 
+  ...ed-disable.ts |    10.4 |        0 |       0 |    10.4 | 140-450           
+ ephemeral/src     |       0 |        0 |       0 |       0 |                   
+  aoi-delta.ts     |       0 |        0 |       0 |       0 | 1-156             
+  ...projection.ts |       0 |        0 |       0 |       0 | 1-513             
+  index.ts         |       0 |        0 |       0 |       0 | 1-926             
+ errors/src        |   94.48 |      100 |      50 |   94.48 |                   
+  index.ts         |   94.48 |      100 |      50 |   94.48 | 147-153           
+ ...gin-ts-drp/src |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 3-930             
+ ...-discovery/src |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-273             
+ ...-reconnect/src |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-86              
+ ...val-runner/src |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-144             
+ ...ance-store/src |       0 |        0 |       0 |       0 |                   
+  conformance.ts   |       0 |        0 |       0 |       0 | 1-430             
+  contract.ts      |       0 |        0 |       0 |       0 | 1-341             
+  index.ts         |       0 |        0 |       0 |       0 | 1-3               
+  maintenance.ts   |       0 |        0 |       0 |       0 | 1-247             
+  terminal.ts      |       0 |        0 |       0 |       0 | 1-183             
+  types.ts         |       0 |        0 |       0 |       0 | 1-19              
+ keychain/src      |   30.02 |    22.22 |      75 |   30.02 |                   
+  finality.ts      |   83.73 |       24 |     100 |   83.73 | ...81-182,187-188 
+  index.ts         |       0 |        0 |       0 |       0 | 1                 
+  keychain.ts      |       0 |        0 |       0 |       0 | 1-302             
+ live-journal/src  |       0 |        0 |       0 |       0 |                   
+  contract.ts      |       0 |        0 |       0 |       0 | 1-1034            
+  index.ts         |       0 |        0 |       0 |       0 | 1-7               
+  types.ts         |       0 |        0 |       0 |       0 | 1-23              
+ logger/src        |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 2-42              
+ membership/src    |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 35-109            
+ message-queue/src |       0 |        0 |       0 |       0 |                   
+  channel.ts       |       0 |        0 |       0 |       0 | 1-163             
+  index.ts         |       0 |        0 |       0 |       0 | 1-3               
+  ...ue-manager.ts |       0 |        0 |       0 |       0 | 1-128             
+  message-queue.ts |       0 |        0 |       0 |       0 | 1-135             
+ network-spike/src |       0 |       30 |      30 |       0 |                   
+  ...ixture-cli.ts |       0 |        0 |       0 |       0 | 1-81              
+  campaign-plan.ts |       0 |      100 |     100 |       0 | 4-20              
+  ...primitives.ts |       0 |      100 |     100 |       0 | 4-102             
+  cli.ts           |       0 |        0 |       0 |       0 | 1-13              
+  contract.ts      |       0 |      100 |     100 |       0 | 4-112             
+  evidence.ts      |       0 |        0 |       0 |       0 | 1-653             
+  ...mpaign-cli.ts |       0 |        0 |       0 |       0 | 1-33              
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-103             
+  ...ixture-cli.ts |       0 |        0 |       0 |       0 | 1-76              
+  index.ts         |       0 |        0 |       0 |       0 | 1-56              
+  ...outing-cli.ts |       0 |        0 |       0 |       0 | 1-129             
+  probe-cli.ts     |       0 |        0 |       0 |       0 | 1-24              
+  ...mpaign-cli.ts |       0 |      100 |     100 |       0 | 3-86              
+  ...astructure.ts |       0 |      100 |     100 |       0 | 2                 
+  ...c-only-cli.ts |       0 |      100 |     100 |       0 | 3-36              
+  record-cli.ts    |       0 |        0 |       0 |       0 | 1-20              
+  redaction.ts     |       0 |        0 |       0 |       0 | 1-142             
+  registry-cli.ts  |       0 |        0 |       0 |       0 | 1-9               
+  relay-cli.ts     |       0 |        0 |       0 |       0 | 1-14              
+  schemas.ts       |       0 |        0 |       0 |       0 | 1-433             
+ ...rc/browser-dht |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-446             
+ ...ilure-campaign |       0 |        0 |       0 |       0 |                   
+  ...int-driver.ts |       0 |        0 |       0 |       0 | 1-454             
+  index.ts         |       0 |        0 |       0 |       0 | 1-1784            
+ ...spike/src/grid |       0 |    66.66 |   66.66 |       0 |                   
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-1013            
+  ...-directory.ts |       0 |      100 |     100 |       0 | 10-64             
+  index.ts         |       0 |      100 |     100 |       0 | 12-462            
+ ...c/node-routing |       0 |       50 |      50 |       0 |                   
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-230             
+  ...c-evidence.ts |       0 |      100 |     100 |       0 | 2-277             
+ ...pike/src/probe |       0 |       40 |      40 |       0 |                   
+  events.ts        |       0 |        0 |       0 |       0 | 1-271             
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-132             
+  index.ts         |       0 |        0 |       0 |       0 | 1-32              
+  kernel.ts        |       0 |      100 |     100 |       0 | 3-591             
+  manual-clock.ts  |       0 |      100 |     100 |       0 | 10-104            
+ ...ublic-campaign |       0 |    16.66 |   16.66 |       0 |                   
+  config.ts        |       0 |        0 |       0 |       0 | 1-343             
+  ...tor-module.ts |       0 |        0 |       0 |       0 | 1-17              
+  index.ts         |       0 |        0 |       0 |       0 | 1-24              
+  report.ts        |       0 |        0 |       0 |       0 | 1-349             
+  ...wed-driver.ts |       0 |      100 |     100 |       0 | 18-119            
+  runner.ts        |       0 |        0 |       0 |       0 | 1-862             
+ ...rc/public-only |       0 |     37.5 |    37.5 |       0 |                   
+  ...er-fixture.ts |       0 |      100 |     100 |       0 | 2-188             
+  browser-peer.ts  |       0 |      100 |     100 |       0 | 2-77              
+  browser.ts       |       0 |        0 |       0 |       0 | 1-6               
+  contract.ts      |       0 |        0 |       0 |       0 | 1-413             
+  index.ts         |       0 |        0 |       0 |       0 | 1                 
+  ...-publisher.ts |       0 |      100 |     100 |       0 | 2-201             
+  node.ts          |       0 |        0 |       0 |       0 | 1                 
+  ...er-locator.ts |       0 |        0 |       0 |       0 | 1-81              
+ ...ike/src/record |       0 |        0 |       0 |       0 |                   
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-180             
+ ...e/src/registry |       0 |        0 |       0 |       0 |                   
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-352             
+ ...pike/src/relay |       0 |        0 |       0 |       0 |                   
+  fixture.ts       |       0 |        0 |       0 |       0 | 1-325             
+ network/src       |       0 |    55.55 |   55.55 |       0 |                   
+  ...ion-budget.ts |       0 |      100 |     100 |       0 | 8-1079            
+  index.ts         |       0 |        0 |       0 |       0 | 1-2               
+  node.ts          |       0 |        0 |       0 |       0 | 1-3027            
+  peer-selector.ts |       0 |        0 |       0 |       0 | 1-311             
+  seal.ts          |       0 |      100 |     100 |       0 | 3-30              
+  ...t-transfer.ts |       0 |      100 |     100 |       0 | 3-36              
+  stream.ts        |       0 |      100 |     100 |       0 | 22-123            
+  sync.ts          |       0 |        0 |       0 |       0 | 1-201             
+  ...ble-webrtc.ts |       0 |      100 |     100 |       0 | 2-1909            
+ ...rk/src/metrics |       0 |      100 |     100 |       0 |                   
+  prometheus.ts    |       0 |      100 |     100 |       0 | 18-279            
+ node              |       0 |        0 |       0 |       0 |                   
+  ...old.config.ts |       0 |        0 |       0 |       0 | 1-16              
+ node/src          |   43.22 |    50.21 |   73.31 |   43.22 |                   
+  ...ig.browser.ts |       0 |        0 |       0 |       0 |                   
+  config.ts        |       0 |      100 |     100 |       0 | 2-75              
+  ...n-activate.ts |   64.07 |    71.73 |   73.07 |   64.07 | ...18-425,457-505 
+  ...ion-commit.ts |    72.4 |    56.02 |   82.14 |    72.4 | ...40-741,743-744 
+  ...on-recover.ts |       0 |        0 |       0 |       0 | 1-59              
+  ...tion-stage.ts |       0 |        0 |       0 |       0 | 1-21              
+  ...r-adoption.ts |   43.21 |    51.29 |   67.56 |   43.21 | ...1592,1594-1595 
+  creator-close.ts |   90.08 |    69.49 |     100 |   90.08 | ...1152,1163-1164 
+  creator-seal.ts  |       0 |        0 |       0 |       0 | 1-297             
+  ephemeral.ts     |       0 |        0 |       0 |       0 | 1-377             
+  handlers.ts      |       0 |        0 |       0 |       0 | 1-921             
+  index.ts         |       0 |        0 |       0 |       0 | 1-1971            
+  interval-sync.ts |       0 |        0 |       0 |       0 | 1-182             
+  logger.ts        |       0 |      100 |     100 |       0 | 4-10              
+  operations.ts    |       0 |        0 |       0 |       0 | 1-92              
+  ...cache.node.ts |       0 |      100 |     100 |       0 | 4-24              
+  room-network.ts  |       0 |        0 |       0 |       0 | 1-291             
+  run.browser.ts   |       0 |        0 |       0 |       0 |                   
+  run.ts           |       0 |      100 |     100 |       0 | 3-21              
+  runtime.ts       |       0 |        0 |       0 |       0 | 1-231             
+  ...t-transfer.ts |       0 |        0 |       0 |       0 | 1-782             
+  sync-codec.ts    |       0 |        0 |       0 |       0 | 1-230             
+  sync-state.ts    |       0 |        0 |       0 |       0 | 1-535             
+  ...lope-scope.ts |   88.07 |    41.93 |     100 |   88.07 | ...,96-97,139-140 
+  ...-authority.ts |   48.78 |    42.85 |      50 |   48.78 | ...36,40-50,54-55 
+  v3-live.ts       |   61.63 |     44.3 |   72.93 |   61.63 | ...8058,8067-8080 
+  vertex-egress.ts |       0 |      100 |     100 |       0 | 4-26              
+ node/src/cli      |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-9               
+ node/src/internal |   54.12 |    63.63 |   79.66 |   54.12 |                   
+  ...ch-cleanup.ts |       0 |        0 |       0 |       0 | 1-508             
+  ...ion-intent.ts |   75.71 |     62.5 |   83.33 |   75.71 | ...05-220,229-242 
+  ...on-recover.ts |   36.84 |       50 |      50 |   36.84 | 59-70             
+  ...tion-stage.ts |   41.17 |       50 |      50 |   41.17 | 35-44,52-61       
+  ...t-boundary.ts |   90.81 |    57.14 |     100 |   90.81 | ...23,127,131-132 
+  ...-room-head.ts |   86.36 |    78.94 |     100 |   86.36 | 18-19,37-38,45-46 
+  ...essor-live.ts |   70.17 |    54.54 |   85.71 |   70.17 | ...61-162,182-193 
+  ...on-advance.ts |   87.08 |    65.35 |   94.44 |   87.08 | ...02-503,539-540 
+  ...eclamation.ts |   30.55 |       50 |   33.33 |   30.55 | ...40-145,153-165 
+  v3-topic.ts      |     100 |       50 |     100 |     100 | 20,25             
+ node/src/rpc      |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-191             
+ node/src/store    |       0 |       50 |      50 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1                 
+  object.ts        |       0 |      100 |     100 |       0 | 4-110             
+ object/src        |       0 |       50 |      50 |       0 |                   
+  ...t-registry.ts |       0 |      100 |     100 |       0 | 3-25              
+  ...ted-commit.ts |       0 |      100 |     100 |       0 | 3-13              
+  ...provenance.ts |       0 |      100 |     100 |       0 | 3-31              
+  ...provenance.ts |       0 |        0 |       0 |       0 | 1                 
+  drp-applier.ts   |       0 |        0 |       0 |       0 | 1-1807            
+  errors.ts        |       0 |        0 |       0 |       0 | 1-50              
+  index.ts         |       0 |        0 |       0 |       0 | 1-780             
+  operation.ts     |       0 |      100 |     100 |       0 | 4                 
+  proxy.ts         |       0 |      100 |     100 |       0 | 2-1690            
+  ...aterialize.ts |       0 |        0 |       0 |       0 | 1-252             
+  state-payload.ts |       0 |      100 |     100 |       0 | 14-701            
+  state-store.ts   |       0 |      100 |     100 |       0 | 4-117             
+  state.ts         |       0 |        0 |       0 |       0 | 1                 
+  ...entication.ts |       0 |        0 |       0 |       0 | 1-187             
+ object/src/acl    |       0 |        0 |       0 |       0 |                   
+  errors.ts        |       0 |        0 |       0 |       0 | 1-30              
+  index.ts         |       0 |        0 |       0 |       0 | 1-237             
+ ...t/src/finality |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-345             
+ .../src/hashgraph |       0 |       50 |      50 |       0 |                   
+  bitset.ts        |       0 |      100 |     100 |       0 | 8-155             
+  index.ts         |       0 |        0 |       0 |       0 | 1-779             
+ .../src/linearize |       0 |    33.33 |   33.33 |       0 |                   
+  ...yCausality.ts |       0 |      100 |     100 |       0 | 10-78             
+  ...eSemantics.ts |       0 |        0 |       0 |       0 | 1-113             
+  pairSemantics.ts |       0 |        0 |       0 |       0 | 1-74              
+ ...t/src/pipeline |       0 |       25 |      25 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1                 
+  pipeline.ts      |       0 |        0 |       0 |       0 | 1-57              
+  step.ts          |       0 |        0 |       0 |       0 | 1-54              
+  types.ts         |       0 |        0 |       0 |       0 |                   
+ ...rc/publication |       0 |      100 |     100 |       0 |                   
+  ...capability.ts |       0 |      100 |     100 |       0 | 2-255             
+  publisher.ts     |       0 |      100 |     100 |       0 | 4-720             
+ ...ome-commit/src |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-750             
+ protocol-v2/src   |       0 |     12.5 |    12.5 |       0 |                   
+  admission.ts     |       0 |      100 |     100 |       0 | 3-566             
+  canonical.ts     |       0 |        0 |       0 |       0 | 1                 
+  crypto-suite.ts  |       0 |        0 |       0 |       0 | 1-100             
+  hash.ts          |       0 |        0 |       0 |       0 | 1-14              
+  index.ts         |       0 |        0 |       0 |       0 | 1-55              
+  protocol.ts      |       0 |        0 |       0 |       0 | 1-257             
+  registry.ts      |       0 |        0 |       0 |       0 | 1-623             
+  signature.ts     |       0 |        0 |       0 |       0 | 1-102             
+ protocol-v3/src   |   58.63 |    42.62 |   70.38 |   58.63 |                   
+  ...-singleton.ts |     100 |      100 |     100 |     100 |                   
+  ...horization.ts |     100 |      100 |     100 |     100 |                   
+  ...pplication.ts |     100 |      100 |     100 |     100 |                   
+  ...-frontiers.ts |   89.91 |    53.57 |   93.75 |   89.91 | ...19-420,425-426 
+  ...checkpoint.ts |    13.3 |      100 |       0 |    13.3 | 87-191,199-319    
+  creator-close.ts |   88.58 |    23.59 |   93.33 |   88.58 | ...36-637,641-642 
+  ...retirement.ts |   88.63 |    51.21 |   92.85 |   88.63 | ...83-384,389-390 
+  index.ts         |   47.88 |    45.64 |    62.9 |   47.88 | ...4912,4914-4915 
+  latched-acl.ts   |   80.55 |    45.34 |   89.47 |   80.55 | ...51,474,479-480 
+  public.ts        |     100 |      100 |     100 |     100 |                   
+  seal.ts          |   57.14 |    39.16 |   71.42 |   57.14 | ...18-688,704-822 
+  ...t-transfer.ts |   78.19 |    32.72 |    92.3 |   78.19 | ...06-407,411-412 
+ ...3/src/internal |   89.47 |    58.33 |   93.33 |   89.47 |                   
+  ...ng-request.ts |     100 |      100 |     100 |     100 |                   
+  ...ng-request.ts |     100 |       50 |     100 |     100 | 27-29             
+  ...ty-custody.ts |   83.56 |    63.63 |    87.5 |   83.56 | 86-87,129-138     
+  ...y-identity.ts |     100 |       50 |     100 |     100 | 25-27             
+  ...ng-request.ts |     100 |       50 |     100 |     100 | 24-26             
+ relay-policy/src  |       0 |       75 |      75 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 2-2068            
+  libp2p-client.ts |       0 |      100 |     100 |       0 | 2-479             
+  protocol.ts      |       0 |        0 |       0 |       0 | 1-12              
+  types.ts         |       0 |        0 |       0 |       0 |                   
+ rendezvous/src    |       0 |    36.84 |   36.84 |       0 |                   
+  ...ess-policy.ts |       0 |        0 |       0 |       0 | 1-350             
+  ...-directory.ts |       0 |      100 |     100 |       0 | 2-88              
+  dns-resolver.ts  |       0 |        0 |       0 |       0 | 1-62              
+  ensemble.ts      |       0 |      100 |     100 |       0 | 3-533             
+  http-registry.ts |       0 |      100 |     100 |       0 | 10-190            
+  index.ts         |       0 |        0 |       0 |       0 | 1-16              
+  invite.ts        |       0 |        0 |       0 |       0 | 1-400             
+  ...peer-cache.ts |       0 |      100 |     100 |       0 | 16-84             
+  namespace.ts     |       0 |        0 |       0 |       0 | 1-73              
+  node.ts          |       0 |        0 |       0 |       0 | 1-53              
+  ...-transport.ts |       0 |      100 |     100 |       0 | 9-419             
+  nostr.ts         |       0 |        0 |       0 |       0 | 1-570             
+  peer-cache.ts    |       0 |        0 |       0 |       0 | 1-322             
+  ...nciliation.ts |       0 |      100 |     100 |       0 | 9-57              
+  ...d-producer.ts |       0 |        0 |       0 |       0 | 1-141             
+  record.ts        |       0 |        0 |       0 |       0 | 1-523             
+  registry.ts      |       0 |        0 |       0 |       0 | 1-1134            
+  ...est-budget.ts |       0 |      100 |     100 |       0 | 2-40              
+  service.ts       |       0 |        0 |       0 |       0 | 1-233             
+ ...ng-browser/src |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-748             
+ routing-node/src  |       0 |       50 |      50 |       0 |                   
+  constants.ts     |       0 |      100 |     100 |       0 | 12-20             
+  index.ts         |       0 |        0 |       0 |       0 | 1-919             
+ seal/src          |   51.06 |    32.22 |   84.37 |   51.06 |                   
+  creator.ts       |   74.49 |    26.21 |   88.88 |   74.49 | ...70-504,542-543 
+  index.ts         |   66.66 |    40.78 |   84.61 |   66.66 | ...72-474,490-491 
+  pacemaker.ts     |       0 |        0 |       0 |       0 | 1-415             
+  storage-port.ts  |     100 |      100 |     100 |     100 |                   
+ seal/src/internal |   81.45 |       68 |   81.25 |   81.45 |                   
+  ...ose-intent.ts |     100 |    85.71 |     100 |     100 | 85                
+  ...ote-intent.ts |   75.78 |    61.11 |      75 |   75.78 | ...39,175,210-211 
+ storage-browser   |       0 |        0 |       0 |       0 |                   
+  ...red.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...red.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...een.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...red.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...ema.config.ts |       0 |        0 |       0 |       0 | 1-24              
+  ...ter.config.ts |       0 |        0 |       0 |       0 | 1-30              
+  ...ure.config.ts |       0 |        0 |       0 |       0 | 1-24              
+  ...ory.config.ts |       0 |        0 |       0 |       0 | 1-25              
+  ...ath.config.ts |       0 |        0 |       0 |       0 | 1-20              
+  ...ent.config.ts |       0 |        0 |       0 |       0 | 1-14              
+  ...ity.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...nce.config.ts |       0 |        0 |       0 |       0 | 1-14              
+  ...ult.config.ts |       0 |        0 |       0 |       0 | 1-20              
+  ...ity.config.ts |       0 |        0 |       0 |       0 | 1-14              
+  ...ust.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...ion.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...ath.config.ts |       0 |        0 |       0 |       0 | 1-19              
+  ...nal.config.ts |       0 |        0 |       0 |       0 | 1-19              
+  ...ine.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...fer.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...ote.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...nge.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...tor.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...ose.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...arn.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...mit.config.ts |       0 |        0 |       0 |       0 | 1-19              
+  ...ion.config.ts |       0 |        0 |       0 |       0 | 1-19              
+  ...uct.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...och.config.ts |       0 |        0 |       0 |       0 | 1-18              
+  ...ion.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...ing.config.ts |       0 |        0 |       0 |       0 | 1-19              
+  ...xit.config.ts |       0 |        0 |       0 |       0 | 1-19              
+  ...ion.config.ts |       0 |        0 |       0 |       0 | 1-15              
+  ...ert.config.ts |       0 |        0 |       0 |       0 | 1-10              
+  ...-v2.config.ts |       0 |        0 |       0 |       0 | 1-40              
+ ...ge-browser/src |   36.59 |    59.57 |   77.14 |   36.59 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 2-30              
+  ...aintenance.ts |       0 |      100 |     100 |       0 | 4-15              
+  issuance.ts      |       0 |      100 |     100 |       0 | 3-18              
+  live-journal.ts  |       0 |        0 |       0 |       0 | 1-881             
+  maintenance.ts   |       0 |      100 |     100 |       0 | 4-13              
+  seal-evidence.ts |   47.61 |       80 |   57.14 |   47.61 | 40-41,45-75       
+  seal-vote.ts     |   80.39 |    55.55 |   83.33 |   80.39 | ...38,42-46,50,56 
+  ...t-transfer.ts |   80.19 |    58.19 |   78.84 |   80.19 | ...75-681,703-712 
+ ...r/src/internal |   19.14 |    60.08 |   54.66 |   19.14 |                   
+  ...eclamation.ts |       0 |        0 |       0 |       0 | 1-336             
+  ...ance-store.ts |       0 |        0 |       0 |       0 | 1-1156            
+  idb-adapter.ts   |       0 |        0 |       0 |       0 | 1-975             
+  ...st-control.ts |       0 |        0 |       0 |       0 | 1-112             
+  ...y-dispatch.ts |       0 |      100 |     100 |       0 | 9-56              
+  schema-idb.ts    |   63.63 |    65.71 |      55 |   63.63 | ...50-367,375-418 
+  ...ence-store.ts |   43.09 |     72.3 |   59.09 |   43.09 | ...96-399,405-420 
+  ...e-dispatch.ts |       0 |        0 |       0 |       0 | 1-102             
+  ...vote-store.ts |   52.68 |    55.31 |   61.53 |   52.68 | ...68-869,900-901 
+  ...st-control.ts |       0 |        0 |       0 |       0 | 1-502             
+ storage-node/src  |   44.63 |    47.09 |   95.55 |   44.63 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 3-16              
+  ...aintenance.ts |     100 |      100 |     100 |     100 |                   
+  issuance.ts      |     100 |      100 |     100 |     100 |                   
+  live-journal.ts  |    77.7 |    45.18 |   94.87 |    77.7 | ...81,883-884,908 
+  maintenance.ts   |       0 |      100 |     100 |       0 | 4-13              
+  ...t-transfer.ts |       0 |      100 |     100 |       0 | 3-679             
+  ...umentation.ts |       0 |      100 |     100 |       0 | 4-64              
+ ...e/src/internal |   32.86 |    39.77 |   73.77 |   32.86 |                   
+  ...eclamation.ts |       0 |        0 |       0 |       0 | 1-259             
+  ...e-scaffold.ts |       0 |        0 |       0 |       0 | 1-870             
+  ...ance-store.ts |   61.72 |    40.22 |   76.27 |   61.72 | ...1099,1123-1135 
+ storage/src       |       0 |       10 |      10 |       0 |                   
+  adapter.ts       |       0 |        0 |       0 |       0 | 1-878             
+  capacity.ts      |       0 |        0 |       0 |       0 | 1-416             
+  codecs.ts        |       0 |        0 |       0 |       0 | 1-127             
+  contract.ts      |       0 |        0 |       0 |       0 | 1-441             
+  index.ts         |       0 |        0 |       0 |       0 | 1-47              
+  maintenance.ts   |       0 |        0 |       0 |       0 | 1-577             
+  memory.ts        |       0 |        0 |       0 |       0 | 1-248             
+  ...t-transfer.ts |       0 |        0 |       0 |       0 | 1                 
+  types.ts         |       0 |        0 |       0 |       0 |                   
+  values.ts        |       0 |        0 |       0 |       0 | 1-110             
+ ...e/src/internal |       0 |    66.66 |   66.66 |       0 |                   
+  ...e-verifier.ts |       0 |        0 |       0 |       0 | 1-156             
+  transition.ts    |       0 |      100 |     100 |       0 | 13-715            
+  validation.ts    |       0 |      100 |     100 |       0 | 12-313            
+ test-utils/src    |       0 |    28.57 |   28.57 |       0 |                   
+  ...-generator.ts |       0 |        0 |       0 |       0 | 1-55              
+  ...te-machine.ts |       0 |        0 |       0 |       0 | 1-58              
+  index.ts         |       0 |        0 |       0 |       0 | 1-3               
+  ...ty-harness.ts |       0 |      100 |     100 |       0 | 12-505            
+  ...comparison.ts |       0 |        0 |       0 |       0 | 1-271             
+  shadow-runner.ts |       0 |        0 |       0 |       0 | 1-326             
+  ...-telemetry.ts |       0 |      100 |     100 |       0 | 4-307             
+ tracer/src        |       0 |        0 |       0 |       0 |                   
+  ...er.browser.ts |       0 |        0 |       0 |       0 | 1-11              
+  ...xt-manager.ts |       0 |        0 |       0 |       0 | 1-12              
+  index.ts         |       0 |        0 |       0 |       0 | 1-276             
+ types/src         |       0 |    89.47 |   89.47 |       0 |                   
+  acl.ts           |       0 |      100 |     100 |       0 | 3-26              
+  bitset.ts        |       0 |        0 |       0 |       0 |                   
+  constants.ts     |       0 |        0 |       0 |       0 | 1-2               
+  ...-discovery.ts |       0 |        0 |       0 |       0 |                   
+  ...-reconnect.ts |       0 |        0 |       0 |       0 |                   
+  drp.ts           |       0 |      100 |     100 |       0 | 11-19             
+  enum.ts          |       0 |        0 |       0 |       0 | 1-14              
+  finality.ts      |       0 |        0 |       0 |       0 |                   
+  hashgraph.ts     |       0 |      100 |     100 |       0 | 9-43              
+  index.ts         |       0 |      100 |     100 |       0 | 5-40              
+  ...val-runner.ts |       0 |        0 |       0 |       0 |                   
+  keychain.ts      |       0 |        0 |       0 |       0 |                   
+  logger.ts        |       0 |        0 |       0 |       0 |                   
+  message-queue.ts |       0 |        0 |       0 |       0 |                   
+  metrics.ts       |       0 |        0 |       0 |       0 |                   
+  network.ts       |       0 |        0 |       0 |       0 |                   
+  node.ts          |       0 |        0 |       0 |       0 |                   
+  object.ts        |       0 |        0 |       0 |       0 |                   
+  ...te-machine.ts |       0 |        0 |       0 |       0 |                   
+ utils/src         |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 14-172            
+ utils/src/debug   |       0 |       50 |      50 |       0 |                   
+  ...visualizer.ts |       0 |      100 |     100 |       0 | 33-298            
+  index.ts         |       0 |        0 |       0 |       0 | 1                 
+ utils/src/hash    |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 1-17              
+ ...mory-benchmark |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 6-94              
+ ...omise/deferred |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 5-19              
+ ...romise/timeout |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 23-28             
+ .../serialization |       0 |        0 |       0 |       0 |                   
+  equality.ts      |       0 |        0 |       0 |       0 | 1-595             
+  index.ts         |       0 |        0 |       0 |       0 | 1-73              
+ utils/src/set     |       0 |      100 |     100 |       0 |                   
+  index.ts         |       0 |      100 |     100 |       0 | 8-22              
+ validation/src    |       0 |    33.33 |   33.33 |       0 |                   
+  errors.ts        |       0 |        0 |       0 |       0 | 1-69              
+  index.ts         |       0 |        0 |       0 |       0 | 1-3               
+  vertex.ts        |       0 |      100 |     100 |       0 | 2-126             
+ ...on/src/schemas |       0 |        0 |       0 |       0 |                   
+  message.ts       |       0 |        0 |       0 |       0 | 1-10              
+  object.ts        |       0 |        0 |       0 |       0 | 1-45              
+ worker-host       |       0 |        0 |       0 |       0 |                   
+  ...ake.config.ts |       0 |        0 |       0 |       0 | 1-17              
+  ...oad.config.ts |       0 |        0 |       0 |       0 | 1-14              
+ worker-host/src   |       0 |    22.22 |   22.22 |       0 |                   
+  error.ts         |       0 |        0 |       0 |       0 | 1-85              
+  executor.ts      |       0 |        0 |       0 |       0 | 1-348             
+  host.ts          |       0 |        0 |       0 |       0 | 1-593             
+  index.ts         |       0 |        0 |       0 |       0 | 1-12              
+  metrics.ts       |       0 |        0 |       0 |       0 | 1-149             
+  ...oad.worker.ts |       0 |        0 |       0 |       0 | 1-78              
+  ring-buffer.ts   |       0 |      100 |     100 |       0 | 6-142             
+  wire.ts          |       0 |      100 |     100 |       0 | 2-208             
+  worker.ts        |       0 |        0 |       0 |       0 | 1-254             
+-------------------|---------|----------|---------|---------|-------------------

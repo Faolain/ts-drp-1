@@ -1,0 +1,15 @@
+{
+  "label": "build",
+  "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+  "budgetMs": 300000,
+  "command": [
+    "pnpm",
+    "build:packages"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "testsExecuted": 0
+}

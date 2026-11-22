@@ -1,16 +1,10 @@
-import {
-	ActionType,
-	DrpType,
-	type Hash,
-	type IHashGraph,
-	type LowestCommonAncestorResult,
-	Operation,
-	SemanticsType,
-	Vertex,
-} from "@ts-drp/types";
+import { ActionType, DrpType, type Hash, type IHashGraph, Operation, SemanticsType, Vertex } from "@ts-drp/types";
 import { beforeEach, describe, expect, test } from "vitest";
 
 import { HashGraphVisualizer } from "../src/debug/hashgraph-visualizer.js";
+
+// @ts-drp/types no longer re-exports the legacy object module; derive the LCA shape from the hash graph.
+type LowestCommonAncestorResult = ReturnType<IHashGraph["getLCA"]>;
 
 class MockHashGraph implements IHashGraph {
 	peerId: string;

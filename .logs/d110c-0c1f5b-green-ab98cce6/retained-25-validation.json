@@ -1,0 +1,86 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 6,
+  "passed": 6,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-2l-c-node-issuance-corrective-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED latches paging corruption when lineage is absent",
+      "status": "passed",
+      "title": "latches paging corruption when lineage is absent",
+      "duration": 61.093583000000024,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED latches paging corruption when lineage is present at the child ordinal",
+      "status": "passed",
+      "title": "latches paging corruption when lineage is present at the child ordinal",
+      "duration": 7.1008750000000305,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED latches paging corruption when lineage is lagging behind the child ordinal",
+      "status": "passed",
+      "title": "latches paging corruption when lineage is lagging behind the child ordinal",
+      "duration": 5.7173329999999964,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED returns a complete pending after ordinary advance closure",
+      "status": "passed",
+      "title": "returns a complete pending after ordinary advance closure",
+      "duration": 7.5402500000000146,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 2l-c corrective lineage closure RED"
+      ],
+      "fullName": "Phase 2l-c corrective lineage closure RED returns a complete published at exhausted maximum closure",
+      "status": "passed",
+      "title": "returns a complete published at exhausted maximum closure",
+      "duration": 13.404166000000032,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 2l-c independent SQLite structure oracles"
+      ],
+      "fullName": "Phase 2l-c independent SQLite structure oracles proves exact columns, no foreign keys, and only inherent primary-key indexes",
+      "status": "passed",
+      "title": "proves exact columns, no foreign keys, and only inherent primary-key indexes",
+      "duration": 1.5867920000000026,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

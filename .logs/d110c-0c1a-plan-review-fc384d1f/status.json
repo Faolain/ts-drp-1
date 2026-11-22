@@ -1,0 +1,24 @@
+{
+	"baseCommit": "fc384d1fe3d503bb9e3706e97bf62bea39fe8a7c",
+	"baseTree": "96b29a8f366b2c7ec3243c2fa5627610b28acd5e",
+	"blockingUnionClosedInCorrection": true,
+	"confirmationRequired": true,
+	"grok": {
+		"initial": "NO_VERDICT",
+		"initialStopReason": "cancelled",
+		"resumeExit": 0,
+		"sessionId": "01a0649a-9cee-7dd1-8241-41f673464078",
+		"terminalVerdict": "CHANGES_REQUIRED"
+	},
+	"kimi": {
+		"exit": 0,
+		"terminalShape": "expanded-json",
+		"terminalVerdict": "CHANGES_REQUIRED"
+	},
+	"opus": {
+		"exit": 0,
+		"terminalShape": "schema-valid",
+		"terminalVerdict": "CHANGES_REQUIRED"
+	},
+	"redAuthorized": false
+}

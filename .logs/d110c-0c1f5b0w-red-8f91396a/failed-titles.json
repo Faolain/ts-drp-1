@@ -1,0 +1,833 @@
+[
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts",
+    "title": "D.110c-0c1f5b0c room settlement orchestration RED [f5b0w RED] keeps manual-review durable and promptly refuses public issue before any fence or replacement",
+    "classification": "expected-superseded-room-causal-red",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_ISSUE_HANG: expected false to be true // Object.is equality"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics refuses held issue promptly after the real durable plan write without an issuance effect",
+    "classification": "rejected-pre-sentinel-counter-window",
+    "tokens": [],
+    "observations": [
+      "AssertionError: expected 1 to be +0 // Object.is equality"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics creator-held seal reaches the existing close owner and exact successor-codec terminus",
+    "classification": "rejected-pre-sentinel-counter-window",
+    "tokens": [],
+    "observations": [
+      "AssertionError: expected 1 to be +0 // Object.is equality"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+    "classification": "rejected-pre-sentinel-counter-window",
+    "tokens": [],
+    "observations": [
+      "AssertionError: expected 1 to be +0 // Object.is equality"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses rehearsal without target import or terminal effect",
+    "classification": "rejected-pre-sentinel-counter-window",
+    "tokens": [],
+    "observations": [
+      "AssertionError: expected 1 to be +0 // Object.is equality"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses activation without target import or terminal effect",
+    "classification": "rejected-pre-sentinel-counter-window",
+    "tokens": [],
+    "observations": [
+      "AssertionError: expected 1 to be +0 // Object.is equality"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics changed retained held policy remains terminal source-diff refusal rather than redisposition",
+    "classification": "rejected-fixture-policy-shape",
+    "tokens": [],
+    "observations": [
+      "TypeError: v3 room displacement policy is invalid"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "title": "D.110c-0c1f5b0w durable manual-review hold semantics single-generation internal redirect pins target hold refusal or the deferred parent frontier terminus",
+    "classification": "reachable-redirect-causal-hang-but-rejected-cleanup-timeout",
+    "tokens": [
+      "D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_MANUAL_REVIEW_REDIRECT_HANG: expected false to be true // Object.is equality",
+      "Error: STACK_TRACE_ERROR"
+    ],
+    "additionalStderr": "Error: Hook timed out in 10000ms."
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries unlinked refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed-progress refuses progress direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries refuses final expire to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries refuses final rebase to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries refuses final transform to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries legacy-linked refuses manual-review redisposition without altering its link",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed progress refuses manual-review redisposition even if progress is stripped",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries manual-review retains its exact digest",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries manual-review retains its exact disposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed progress cannot be removed while retaining its source and link",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w memory retained settlement entries completed progress freezes every chunk field and completion bounds",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries unlinked refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed-progress refuses progress direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries refuses final expire to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries refuses final rebase to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries refuses final transform to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries legacy-linked refuses manual-review redisposition without altering its link",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed progress refuses manual-review redisposition even if progress is stripped",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries manual-review retains its exact digest",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries manual-review retains its exact disposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed progress cannot be removed while retaining its source and link",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w browser retained settlement entries completed progress freezes every chunk field and completion bounds",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries unlinked refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(136) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses source-digest direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses disposition direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(304) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses link direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed-progress refuses progress direct CAS",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries refuses final expire to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries refuses final rebase to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries refuses final transform to manual-review redisposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(135) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries legacy-linked refuses manual-review redisposition without altering its link",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed progress refuses manual-review redisposition even if progress is stripped",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(140) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries manual-review retains its exact digest",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries manual-review retains its exact disposition",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(132) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(139) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed progress cannot be removed while retaining its source and link",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(133) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  },
+  {
+    "file": "tests/phase-6b-d110c-0c1f5b0w-store-red.test.ts",
+    "title": "D.110c-0c1f5b0w node retained settlement entries completed progress freezes every chunk field and completion bounds",
+    "classification": "expected-native-store-causal-red",
+    "tokens": [
+      "D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED",
+      "D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED"
+    ],
+    "observations": [
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]",
+      "AssertionError: D110C_F5B0W_RETAINED_ENTRY_MUTATION_ACCEPTED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality",
+      "AssertionError: D110C_F5B0W_RETAINED_PLAN_BYTES_CHANGED: expected Uint8Array[ 8, 4, 5, 5, 115, 99, …(362) ] to deeply equal Uint8Array[ 8, 4, 5, 5, 115, 99, …(301) ]"
+    ]
+  }
+]

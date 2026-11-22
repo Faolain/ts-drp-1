@@ -1,0 +1,964 @@
+{
+  "kind": "track-j-final-validation-1",
+  "date": "2026-10-23",
+  "base_commit": "11552c43",
+  "source_files": [
+    {
+      "path": "package.json",
+      "sha256": "e64bafbaded297aaf5b25a224d89a66649cf5933444e658a46220616bb62581f"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-exhaustive.qnt",
+      "sha256": "75dc47740cb3b66082bad82fa7bc9ea60535dfd76b53276ccd50ca048ffb6bcc"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-instances.qnt",
+      "sha256": "23f1dd79ccee38822201cf1edf9edb4903c156a02c23e83b9096ac2d0cff3dca"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-proofs.qnt",
+      "sha256": "374cd077fe0d0e2149c8cbf0160d4671046d2a18a19ce8eac0fd6a6944a20b04"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement.qnt",
+      "sha256": "de30525dcd061ec795b2c10ed2cfab09b8a39950269b092e70322e9b9a9dc07b"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a1-partial-cut-receipt.qnt",
+      "sha256": "8de48826b8aed28dbc24cf217f79f9154a326e8bac6e973988a86e5ad02af2d3"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a2-expired-outside.qnt",
+      "sha256": "99953d7fce7d1e57e554f69f8c07d1ad5ed4233492930da1dbdb22c4a18ef5b3"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/a2-instead-of-b2.qnt",
+      "sha256": "4e254735c2f2c1f3588cfefa0d357ce46c8174e4e64a214f86eee5c6d7b72d2b"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/carrier-without-minus-own.qnt",
+      "sha256": "c66423e181992a3fc85d03a510e7169c36fadb76b3539e35e99067570290db77"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/check-witnesses.mjs",
+      "sha256": "6853f3ed4521eb8b9f1046d9adb75289fec3c1cf4a6ce40e4332bdaf07f53c13"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-cross-store-crash.qnt",
+      "sha256": "128baa8c265fac29eee7db436ba69f64924ae1441dc1084758f1107db1fe794b"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-early-plan-drop.qnt",
+      "sha256": "7d3153bb5640e233d8c45367fd6574a24aae3d54b537d5268b836cd589524ee3"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-either-drop-review.qnt",
+      "sha256": "283d29df02fc2343d8f1028f553690c6e32875898a2118e432f428fe258195e6"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-fence-runs-beyond-max-scopes.qnt",
+      "sha256": "7f35c97611561ab31b89827fb6cf857c22cda9b576f39bc79d7ea0b41d41ad32"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-guard-one-pass.qnt",
+      "sha256": "43a2c8d74d2f8e01fdca91a7f01d8ba5b7f2ef3fe5b7913a4f1bfb7f67fe4028"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-no-old-incarnation.qnt",
+      "sha256": "e9d6643a3096a2f975030fadb441444e474304e942dbefa6ae1bf77a748a4692"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-proof-handoff.qnt",
+      "sha256": "20995d8bf467d702c457ca5eeaf2f62d75bfaff11dc8c06f719f7092dd1123e4"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-readmit-abandon.qnt",
+      "sha256": "d750d1b16f3462ee2156b11925f26d75f33ade9a19041888cde91fc571f68a8d"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-seq-identity.qnt",
+      "sha256": "e2ec66037863a195f44fc95d483576318befe2de0b05bd0f10118b8352f571f5"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-settled-without-t.qnt",
+      "sha256": "edefffb258d0417245452f14917baebb1831a93d2116ca6a5b2899664f1d3844"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-t-without-settled.qnt",
+      "sha256": "84b5c0e1161bac846aacf90b72b81795ef8e593e79ae4d6ef2486b3bf790492b"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-under-decided-truth.qnt",
+      "sha256": "f874437bb8b08f222795e111980b4cfa66c251a22bac2e35539f367357035dcc"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-volatile-authority.qnt",
+      "sha256": "1a9c0cb166c457c19733b0b0c1c02e1e8f8e26db430997fd91d0a368d84947b9"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-without-expire-settled.qnt",
+      "sha256": "499448cb6c16141035c113a5e45ff4c5fa5fc1f65f44f6a7421249e9a3386a41"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/contract-without-f1.qnt",
+      "sha256": "8eb74c0fb5a6f763e709ff2b41ea5a82d208efff912fac8588264afb2092bc50"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/fence-in-cut-control.qnt",
+      "sha256": "e518783c04021377b1969acfdcb8fb7175cb32b69ca1e5c25b8aa2f72817b676"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/fence-runs-beyond-max-scopes.qnt",
+      "sha256": "800367f2c9d267ddbbf4728f19077e50be3c56d0a24c6c635e53a3e15ce9d716"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/no-r7.qnt",
+      "sha256": "c2dbd729e6bc8163f376b065d28e1ac355fa63ed743174ad99655dfd08264998"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/pre-r5.qnt",
+      "sha256": "ce6b6354a8b42281c487c97fa99e6df736f66413ca21e1233745dce3c59dda91"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r5-without-chain.qnt",
+      "sha256": "bf56269fcffb1f20920dd7c75d2ff6393ac293aa27c06c62073e7131fa443b58"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r5-without-r5b.qnt",
+      "sha256": "f11c6fbfdce6975efdee608643a8bcf9acc0b4c939cb5e64e3e0f5126df55caa"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/r6-absent.qnt",
+      "sha256": "9df8eeb2d3e149febc7fbf9c46120f5b89533bec5fb50e6997377f142a390ffb"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs",
+      "sha256": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/today-window.qnt",
+      "sha256": "b22df6499d643134e9e7e958bdb197478e2fa572cc00a7f6ecb44ddd5023aa5d"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/track-j.sh",
+      "sha256": "1b87ea2ab49e689408f134f0e52a6827de1b8f759612e78843cf1782e7eec457"
+    },
+    {
+      "path": "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/w1-misses-beyond-max-scopes.qnt",
+      "sha256": "5dec3303798a3168c037366866cefbd90f4bdafd701a6960dc00347ff45cf2a5"
+    }
+  ],
+  "source_set_sha256": "abc86ff0b784ec7dc3b7d3a8ced388c2f26210c2636a40d631ab5b7f46d75f2a",
+  "formal": {
+    "verdict": "pass",
+    "jobs": 118,
+    "breakdown": {
+      "mut": 36,
+      "sim": 19,
+      "tc": 3,
+      "test": 60
+    },
+    "summary": "final/formal-summary.log.gz",
+    "logs": [
+      {
+        "path": "final/formal-mut-contractUnderDecidedTruth-212123759.log.gz",
+        "sha256_uncompressed": "e339f260916dd113071285904ffcd5e31e84ee6ccedd5ba8a4bad4c0e3f425f3",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-limitContractNoPacing-2454096.log.gz",
+        "sha256_uncompressed": "0edf7b3f16311d4ba03d1b8924333875d8bb09e707379943c0078cd7f2ca9232",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-limitPacingBeyondMaxScopes-3150315668.log.gz",
+        "sha256_uncompressed": "dd4e1e3f0e3496bac474875f1d242271770b25191fbefa3c9a7bfde16364ab6f",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-limitR7NoPacing-3204425406.log.gz",
+        "sha256_uncompressed": "7ca3ff07b6a52360ec302a3a4ec679634fc4fb8f9deb02c4a678fde365d1c7af",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-limitW1MissesBeyondMaxScopes-76867103.log.gz",
+        "sha256_uncompressed": "d44eebb71a2f21ca19ec62227e5f3232fdc385a8af7511068d17d5dd85bd5da6",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationA2InsteadOfB2-184719267.log.gz",
+        "sha256_uncompressed": "6c249d38c7a81a2e7ddcff1aeed12d7b378bc7d45b992c11ef393a7accef9f4a",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationCarrierWithoutMinusOwn-1476111642.log.gz",
+        "sha256_uncompressed": "06c3d6abf0e0aedf1fb6b217f70ec73582e7caaff5ce802f9bed9e254739ed13",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractEarlyPlanDrop-1298611113.log.gz",
+        "sha256_uncompressed": "8f8664cdd3cd0477e3063a51b2f9831c8e06870b7276680ca16cdef520fceafb",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractNoOldIncarnation-177808310.log.gz",
+        "sha256_uncompressed": "9633cd2c74a5dc1406b136c8776375678145300f0174073e9a7353f72542f1aa",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractPlanFirst-409416832.log.gz",
+        "sha256_uncompressed": "e4cde7967ffd40073a1dd4329d63929103056460e0139183862e407742b3d50c",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractProofWithScope-2682825734.log.gz",
+        "sha256_uncompressed": "0de3d5a001669b7fd1526d7ed61287627db61efe24534bd88c934106adc2cb86",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractProofWithScope-610412828.log.gz",
+        "sha256_uncompressed": "38b8a0994c561498acf0063a68d83c507c588e1e175d2b8a84fb66406122e47f",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractRetireFirst-2077723704.log.gz",
+        "sha256_uncompressed": "2cce18120dbc8ac8a739937bb649ea4158e3fd0e0d458aa99ab3d556d55a47ff",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractSeqIdentity-3117826226.log.gz",
+        "sha256_uncompressed": "fad77c65f7b358ff085e2d7b4f3543f0bd2548b29be56556f5030e43bd2aeabb",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractSettledWithoutT-1316029239.log.gz",
+        "sha256_uncompressed": "0df53ca5ffb7fabb5ae3f73a2086e761a98a8939f1c2427641909a9f9971239b",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractTWithoutSettled-1327530400.log.gz",
+        "sha256_uncompressed": "7856c467ef133ff46c053107bb153952c74bc2deafa45f794546bbd604b3c317",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractVolatileAuthority-245841503.log.gz",
+        "sha256_uncompressed": "51ca84d9bc796c6d8235b5c359518275a12070ce8a778b6200e4ab73c2313014",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractWithoutExpireSettled-2064021459.log.gz",
+        "sha256_uncompressed": "4be6774f984cf0331ff04c74a5c3e6131a5471d5823418c2893f951e4ba8eaa9",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationContractWithoutF1-1627170.log.gz",
+        "sha256_uncompressed": "39531e8aa0ac2c9c4c4d75f7252bbc8233f92a90ee4cfaebc0a5cb45e99ed021",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationExpiredOutsideToday-2831519932.log.gz",
+        "sha256_uncompressed": "dbdc0fa5c20b63c3c826fde502bf8e30dc2bd52910f7812d0c85cb0ef47ff77e",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationExpiredOutsideW1-63342194.log.gz",
+        "sha256_uncompressed": "410474bf107a372fcda0f7ef34e601c856696ae82dc785ded32a1432843008f8",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationNoR7-1041030962.log.gz",
+        "sha256_uncompressed": "36cb8d18bf4903126cc5276ac93829d9a99a4f15cc31734b6ba336d94d0ce273",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationNoR7-1738922469.log.gz",
+        "sha256_uncompressed": "369fa53649d0edaa77c54e1eb5e5b8164b6f1744050d0b60d001ce8188c680ec",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationNoR7-1810417564.log.gz",
+        "sha256_uncompressed": "04c5e3035950b7676d1e6ad70eb6c7fee9b4eaa18a0d6da4d10344ae63f2f78a",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationNoR7-2471617459.log.gz",
+        "sha256_uncompressed": "5eb01139067526662950aa3987cf1088894c76e02ecc63ae5d8b9b35168a8573",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationPartialReceiptToday-542520656.log.gz",
+        "sha256_uncompressed": "9aef694747db500efa2ee101ec40ad8bef245d434d59a71ce2dfd0ac5360c38f",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationPartialReceiptW1-3133110499.log.gz",
+        "sha256_uncompressed": "334e71f7aed621c4b41effc19612c0acbc829457085b8c20ed53291434e0666d",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationPreR5-22526947.log.gz",
+        "sha256_uncompressed": "369fa53649d0edaa77c54e1eb5e5b8164b6f1744050d0b60d001ce8188c680ec",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationR5WithoutChain-1244128043.log.gz",
+        "sha256_uncompressed": "369fa53649d0edaa77c54e1eb5e5b8164b6f1744050d0b60d001ce8188c680ec",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationR5WithoutR5b-903824968.log.gz",
+        "sha256_uncompressed": "425e5795551d8114bff505738643f59f9abd57ae0707e90236bff6c29b7c1b41",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationR6Absent-880954.log.gz",
+        "sha256_uncompressed": "41266521c7b6e7be345a6080a8dffabc97ddae6f47cb6e50eb131e3b3b5b68e5",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationReadmitAbandon-126974783.log.gz",
+        "sha256_uncompressed": "0ad8d1141fcb310cbd0396cfadfd9c3267a49a9988ff19dbdaf07ace68cf0577",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationTodayWindow-10721662.log.gz",
+        "sha256_uncompressed": "2bfe5d4a913f2c5b4dff0e4618e937bc0edc846ff231ce5c746e5ac74e70fd12",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-mutationTodayWindow-30091650.log.gz",
+        "sha256_uncompressed": "df9265b163107fcfdced4c61a66614077e2db84dbb85373b3268eb2d17a02816",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-remedyFrontierNoPacing-867213545.log.gz",
+        "sha256_uncompressed": "63d4dc755f597fa41ba550e144847ca3748e737ba1ba08e0ed98a183a7b308da",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-mut-remedyReceiptR7Truth-106255533.log.gz",
+        "sha256_uncompressed": "5f7b0e671f66110615ca0bf00ed3728acaaf8af2afe2bc4551821508251b7455",
+        "kind": "mut"
+      },
+      {
+        "path": "final/formal-sim-contractA-658026166.log.gz",
+        "sha256_uncompressed": "f5dea3c4ff27a005b287aa0b6dd9351b98b6df72dee323ce5417622b9450cb68",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractAB-3030121699.log.gz",
+        "sha256_uncompressed": "90b839a4a016f16fb04d39a40260f7dc151d74451cf3665f642b2bf438a80c43",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractExpireA-3204119304.log.gz",
+        "sha256_uncompressed": "ffb4106ea89206d1764ebd7e1db25a6c85eb314ed7ff5556614ee62fb70fb1d8",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractGuardedDropA-26339947.log.gz",
+        "sha256_uncompressed": "7da565a4d43fad45a5335dcb5b11e07478a8325303701b1d240cb5a8fbd1a22c",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractMismatchA-857227179.log.gz",
+        "sha256_uncompressed": "2a5e163102943a9cb99e598c0ccdc628c1d13318067805057e4f0357a11198eb",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractPreserveA-2645321920.log.gz",
+        "sha256_uncompressed": "f2affed02a01847acad81f461ca1b4c541b76fcfffcf510a923452b7336beaaa",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractReviewA-81079578.log.gz",
+        "sha256_uncompressed": "294abe75245b758f1dd540c50ec68327913e9dc19aa30ee13d699c6217530070",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-contractSameReplicaA-1588014229.log.gz",
+        "sha256_uncompressed": "8b8e6a3c3aa1e1a8ede5341df08072c04a39c9f21154ea8030d57eca1b770829",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-controlFenceInCut-32357288.log.gz",
+        "sha256_uncompressed": "2d35d94d3e2070f966f39d9596685f3168bb0b4df677d0abd207b83e85d3e84f",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-controlNoOldIncFreshReplica-1050611227.log.gz",
+        "sha256_uncompressed": "3cb430125c572b289caf4ccf852588f596a77fe26ebf23adf9ccbbe1169cb50b",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-controlProofHandoff-64718443.log.gz",
+        "sha256_uncompressed": "a7afe2d21d48cd01ff5f19a2be40785d739483c322437ae894f3c465aa3d121a",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-controlSeqIdentityDigest-979116132.log.gz",
+        "sha256_uncompressed": "82b0160e88a83a037fdf02be1eaf2be304822c197d764ca3e54e56029d3f7d1e",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-decidedW1A-225861244.log.gz",
+        "sha256_uncompressed": "b09f1edeb8681cb0d19235b83b3efada227ba6bb2d4db223bfc56a1d9d24b499",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-decidedW1AB-1556813669.log.gz",
+        "sha256_uncompressed": "565cbf488d45526fb08d5848c1323f412be525666ec438038527ab2f55b44a48",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-decidedW1PlanDropBA-801016357.log.gz",
+        "sha256_uncompressed": "215412f0fc974ad7b2947e1de1dc951e48f2662e9b16df3f44f66e01d594f13b",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-decidedW1PlanDropBAB-2285712591.log.gz",
+        "sha256_uncompressed": "7a61b41334403e1f9094cf6da53904eb671c6d6df0f695c876d573bf7226690d",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-proofContractSafetyAnyDelayA-3266114323.log.gz",
+        "sha256_uncompressed": "47f88bc602bebf36630f9f9334e084a4b030a335461de2524dcd74f1363fd8b0",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-proofContractSafetyAnyDelayReviewA-187427566.log.gz",
+        "sha256_uncompressed": "e6764842c91d9de8d718f6b15a9efe04ecf869f0d57e75286078e72c0787fb22",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-sim-remedyReceiptNoPacing-1535632243.log.gz",
+        "sha256_uncompressed": "39cfdd2737bde29a7f751cd76e6195d96967bb217f4b9fb04d4d229c4bdc01ea",
+        "kind": "sim"
+      },
+      {
+        "path": "final/formal-tc---1478527844.log.gz",
+        "sha256_uncompressed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "kind": "tc"
+      },
+      {
+        "path": "final/formal-tc---151727584.log.gz",
+        "sha256_uncompressed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "kind": "tc"
+      },
+      {
+        "path": "final/formal-tc---224992574.log.gz",
+        "sha256_uncompressed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "kind": "tc"
+      },
+      {
+        "path": "final/formal-test-candidateCarrierProof-3033511666.log.gz",
+        "sha256_uncompressed": "0e35d55d105085b433d5a0de8a499aea1bf44b52fd71920e7ebdf11b7c7ab219",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-candidateExpireDone-2501925628.log.gz",
+        "sha256_uncompressed": "7320104b48d0389f821b874b970aa55e9fdf0bc6a55251f61b2ef85eddb2be9d",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-candidateSourceDrop-3056826945.log.gz",
+        "sha256_uncompressed": "b750f1af006801fc505868c63ac007f80f23c5e11a43f070d5d8259482cd3867",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractA-96447352.log.gz",
+        "sha256_uncompressed": "db6bb2748e58ea40fd5bdfa5004466811be1df80a222514e592a3e7b6aeb6010",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractEitherDropLeak-74861603.log.gz",
+        "sha256_uncompressed": "b873cedcc8e901df783e9d6f80f21002ba316e3413c6b3479b7cb5eb16981c61",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractExpireA-2066731992.log.gz",
+        "sha256_uncompressed": "eaced730d6590ed1b09d946ef8290ac1f0c581252bd3d7729c8278ca2559a912",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractGuardedDropA-43865511.log.gz",
+        "sha256_uncompressed": "e89a198e18904ea45625585587c5ac77c642c280a7851c8d4d685344805249e9",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractPreserveA-2654415895.log.gz",
+        "sha256_uncompressed": "88d56fc133d51bf347d5648e3f6d6d4ff2b1720a06e67bf7d156aeb9480ab88f",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractReviewA-1117123532.log.gz",
+        "sha256_uncompressed": "25b2cb2e75bcd7ec6b4f15380e92a14300b2f7394615413b54868171b75601c9",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractSameReplicaA-246074748.log.gz",
+        "sha256_uncompressed": "8a467d874f0d3cd10c1ffb5dcb8dd4c7a35350aa9c908addc7abe6f4fb47ee1a",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-contractUnderDecidedTruth-1129425125.log.gz",
+        "sha256_uncompressed": "c4a6ef3eb2f28ef52274e0d2103b755b65dc53d56546e93febaaf143a51cd7cd",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlAtomicCommit-930417258.log.gz",
+        "sha256_uncompressed": "cf523ae077ac459ed58ca86df73e7eb693edb66f3cf516666819c881133a9c8a",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlFenceInCut-493122536.log.gz",
+        "sha256_uncompressed": "9aadd7e60a8ad29610fbd1d78213a78d836b4f1ef442d641fe9aecdd7a5bf7ca",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlGuardFixpoint-1216610595.log.gz",
+        "sha256_uncompressed": "4352902ea917fb0f22c3981f378f596a9c1bfd351d7d36915a0546ca1f020216",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlNoOldIncFreshReplica-241124467.log.gz",
+        "sha256_uncompressed": "8896cf0738a09fa0dbab8e91f4b70fc2f6ffc69cdf20173acfc372bfd1c90214",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlProofConsumers-2600712259.log.gz",
+        "sha256_uncompressed": "7734f79a675723a08f6cb979777feefc1781a0e47cd58d6e902281b98654ca6b",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlProofHandoff-905326807.log.gz",
+        "sha256_uncompressed": "a834f686041733b83f65f2dce98488910e2412f6ef3d73bc3d738521135d64e8",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-controlSeqIdentityDigest-98266099.log.gz",
+        "sha256_uncompressed": "a74286ce7239f562e5945736486774e201e937766679d7d2212ec3d08836bb92",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-decidedW1A-97984582.log.gz",
+        "sha256_uncompressed": "bca55adfc6b9bf1759f538f20d699c86306933f9b98d5922342dbc15154cbc19",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-decidedW1AB-1930926650.log.gz",
+        "sha256_uncompressed": "846f2866312c9e850c7358667c1a264a46108e1ae4076908295c7731c40300d7",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-decidedW1Mismatch-2452932423.log.gz",
+        "sha256_uncompressed": "8dbf89aa2a78580255967e5ec656db8d5e85832f630485a2105cc00784c1f9eb",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-limitContractNoPacing-171719029.log.gz",
+        "sha256_uncompressed": "5203b37736273e7da1da96bfdb78c809981bf274845b621583f8aefbf85c2f3f",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-limitContractPaceAtMaxScopes-160917699.log.gz",
+        "sha256_uncompressed": "287ca216c43c1fbb27cb94aadb48893623df1d23ae19a27022e14f03fc6e54e6",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-limitPacingBeyondMaxScopes-93984378.log.gz",
+        "sha256_uncompressed": "4475f3cf661432dfde1b7e5619dc077c61d4a69e2d21b8724ff2e64e9f083f7c",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-limitR7NoPacing-1811726258.log.gz",
+        "sha256_uncompressed": "e1abf4e4f3bef1f4550a43aabdfeedf1a9efa243dc296f17020a355beb3ade9c",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-limitW1MissesBeyondMaxScopes-2010814314.log.gz",
+        "sha256_uncompressed": "bc28550abeecc78b723ca4dd4b5934b8747d25ac48da092f593dea7e2b2c3e09",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationA2InsteadOfB2-319224931.log.gz",
+        "sha256_uncompressed": "c17519b9afca44abf7bc1d3b2ac741823a08e5c380b7e5892b80c21be35c7347",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationCarrierWithoutMinusOwn-2766611627.log.gz",
+        "sha256_uncompressed": "9d33d2a047720427882e1f89658daa9227e4a2987d66cef3e98856fbe59a26a7",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractEarlyPlanDrop-520527028.log.gz",
+        "sha256_uncompressed": "590ace4ba00fba58b80e209d7f1263e902976bd7520b5ce5ff9d7e51c11d60d3",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractNoOldIncarnation-13973505.log.gz",
+        "sha256_uncompressed": "f4775f11be9a2f0a7e92ecb254c18596b7640eaba25f3b388e5c382b6b945254",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractPlanFirst-251932005.log.gz",
+        "sha256_uncompressed": "773cac8bf48724495807dc4490dd527b890e9560a3f2e7bed051837b63fde0b7",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractProofWithScope-601715344.log.gz",
+        "sha256_uncompressed": "cce66646a07f3afd56ca69b3a7167b791a43c5b2ecb558f578d527be433aeae4",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractRetireFirst-1493010711.log.gz",
+        "sha256_uncompressed": "ef5563419fa52fcabad6a266e8696282fb6e6bf4bce4712a346994ef78c4c4ef",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractSeqIdentity-2623914581.log.gz",
+        "sha256_uncompressed": "9ca81e14efc211e25b5d8876844a33d5f182c3280cde83c14b1b4933f556cfc3",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractSettledWithoutT-205414404.log.gz",
+        "sha256_uncompressed": "b0fc99f627962007742ff463ce50720416cdadb06c1f49f20f8e11706bb1776f",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractTWithoutSettled-367710848.log.gz",
+        "sha256_uncompressed": "5fe340cd54640b4af622ffd7faf664d6c440d0ee494b375121b73c597d83ad9f",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractVolatileAuthority-638426768.log.gz",
+        "sha256_uncompressed": "dfe29e02537fdee5b894a63c8c31450f9af241d3cc3e1302d7a0d552eda9ce79",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractWithoutExpireSettled-425716654.log.gz",
+        "sha256_uncompressed": "2fde37f9df1671e566a5ca4587f9b7218ec501bc3356f7de184fe287c8b7ff2d",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationContractWithoutF1-3114832750.log.gz",
+        "sha256_uncompressed": "6a599beef4a34a9adcfa166e6c181dfddcde46a66d604165194980c6c8872999",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationExpiredOutsideToday-526231036.log.gz",
+        "sha256_uncompressed": "f993386ee6744ca8b837539b3bdf8ecb64669f5339d9e7c6c6a468b5e5790105",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationExpiredOutsideW1-2186813004.log.gz",
+        "sha256_uncompressed": "926100a7aed6281c0e9abc4abec4f6f8fde9238a2ddf982d3324bb87bcc08b1e",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationGuardOnePass-1137310407.log.gz",
+        "sha256_uncompressed": "730719bc9d63279d024bd2bf29dd35c6999fa70ca1baf52d3e191c89b3458d92",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationNoR7-100156252.log.gz",
+        "sha256_uncompressed": "51c8ff5798adf38393fb8946a31b7352c419f44fe49995c23a0ad7919cd3a9ce",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationPartialReceiptToday-100367336.log.gz",
+        "sha256_uncompressed": "e43b68aa3fa58a863fb6ad11a2f8edc03fa96a59163db26ba48765480fd8dacf",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationPartialReceiptW1-1591324008.log.gz",
+        "sha256_uncompressed": "459fc9ce8fb4094ab27cb5089168ba3e9d50ab4cdb59523e58b5e7683e9ca24e",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationPreR5-2250422818.log.gz",
+        "sha256_uncompressed": "40bdd62ff0274cc165e9a28fbf2c768eb06f6dcc85746819cd9fa57333ad4a63",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationR5WithoutChain-94913656.log.gz",
+        "sha256_uncompressed": "064a56a6b10cf981778006838944987d4e0a8cb8a995dae8ba21d40a91f02f21",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationR5WithoutR5b-2383832744.log.gz",
+        "sha256_uncompressed": "8a8a2dfc412de6832ea5f072544437457e1c22096ad35269986430901f26c22e",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationR6Absent-272413050.log.gz",
+        "sha256_uncompressed": "88f240c9f8de67dd793c400a25449ae99df91ef6941efe81213bde29da71c507",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationReadmitAbandon-325315228.log.gz",
+        "sha256_uncompressed": "74bee40e12fe4a1e379a0b887b1926599b83677413e61d10ccd401c52c0c438c",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationTodayWindow-1423130411.log.gz",
+        "sha256_uncompressed": "9002a5e2f0bed157c95440399fe7442d1be89b545a510c718e651d9f8cebd5ff",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-mutationW1VolatileAuthority-95356624.log.gz",
+        "sha256_uncompressed": "768204476ec6ce6d501cd9e718c5faf74d58c51501aaea9d6d8c7581d57a0930",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-proofContractSafetyAnyDelayExpireA-2688631902.log.gz",
+        "sha256_uncompressed": "164ee3555075bcbdd1003a5821599eca2ed21873f42659070feab8f26a0e3da3",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-proofContractSafetyAnyDelayReviewA-2259515607.log.gz",
+        "sha256_uncompressed": "dc273055bccc7c1112dfc6ff3cb580fb3cfac8f3ee2d9007f3f16514f1dbf450",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-proofContractSafetyReducedA-2646123326.log.gz",
+        "sha256_uncompressed": "56bb9935370f603e093aeda023d4aad259d5968686c64bdff2e781df895b7e3c",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-remedyFrontierNoPacing-510620850.log.gz",
+        "sha256_uncompressed": "80a46b89525aa05df9f2a1323aa9a79c0c94b12b260fc4efc34b2f3b88752f1d",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-remedyPacing-1425018539.log.gz",
+        "sha256_uncompressed": "2d7168ffa1de4fb4036700a29c53514d53c29040588e09ca47cb457ef3c308d3",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-remedyReceiptNoPacing-1032626623.log.gz",
+        "sha256_uncompressed": "4b3521b860d152619ec40ebba710fd8d9363e720947c6e55d9161ba14340ce05",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-remedyReceiptR7Truth-1711211876.log.gz",
+        "sha256_uncompressed": "ec2bed895239bde8543d5da241ff3f733f4055631c658f8bd1235c29ffa0df9b",
+        "kind": "test"
+      },
+      {
+        "path": "final/formal-test-todayPlanDropBA-3040616327.log.gz",
+        "sha256_uncompressed": "f47446b689daaee0a6d6c98b1f539b7c740dba78fe4fe51ba6fe3a1fc0a444ff",
+        "kind": "test"
+      }
+    ]
+  },
+  "exhaustive": {
+    "backend": "TLC through Quint/Apalache 0.56.1",
+    "workers": 1,
+    "heap": "2GiB",
+    "jobs": [
+      {
+        "main": "proofContractSafetyReducedA",
+        "verdict": "complete_no_violation",
+        "invariants": [
+          "indContract"
+        ],
+        "states_generated": 22893,
+        "distinct_states": 6788,
+        "queue_remaining": 0,
+        "depth": 11,
+        "elapsed_wrapper_seconds": 53,
+        "parameters": {
+          "WRITERS": "Set(\"A\")",
+          "MAX_EPOCH": "3",
+          "MAX_SCOPES": "3",
+          "G1_BOUND": "3",
+          "MAX_SEQ": "4",
+          "MAX_MOVES": "1",
+          "MAX_CRASH": "1",
+          "MAX_MISS": "9",
+          "FENCE_PACE": "9",
+          "LAG": "9",
+          "ALLOW_MISMATCH": "true",
+          "ALLOW_LEAVE": "false",
+          "FENCE_IN_CUT": "false",
+          "ALLOW_PARTIAL": "true",
+          "EXPIRE": "false",
+          "REJOIN_K": "3",
+          "ALLOW_READMIT": "true",
+          "MANUAL_REVIEW": "false",
+          "PRUNE_LAG": "true",
+          "ADJACENT_ONLY": "true",
+          "READMIT_FRESH": "true"
+        },
+        "temporal_fairness": "none; state invariants only, no eventual delivery/liveness assertion",
+        "log": "final/tlc-proofContractSafetyReducedA.log.gz",
+        "sha256_uncompressed": "fd3c696062605ca54f9e9eb32aec8bfbf45c1d8c73fe33a0b7107d045f463968"
+      },
+      {
+        "main": "proofContractSafetyAnyDelayA",
+        "verdict": "complete_no_violation",
+        "invariants": [
+          "indContract"
+        ],
+        "states_generated": 732620,
+        "distinct_states": 219652,
+        "queue_remaining": 0,
+        "depth": 15,
+        "elapsed_wrapper_seconds": 95,
+        "parameters": {
+          "WRITERS": "Set(\"A\")",
+          "MAX_EPOCH": "4",
+          "MAX_SCOPES": "3",
+          "G1_BOUND": "3",
+          "MAX_SEQ": "6",
+          "MAX_MOVES": "2",
+          "MAX_CRASH": "1",
+          "MAX_MISS": "9",
+          "FENCE_PACE": "9",
+          "LAG": "9",
+          "ALLOW_MISMATCH": "true",
+          "ALLOW_LEAVE": "false",
+          "FENCE_IN_CUT": "false",
+          "ALLOW_PARTIAL": "true",
+          "EXPIRE": "false",
+          "REJOIN_K": "3",
+          "ALLOW_READMIT": "true",
+          "MANUAL_REVIEW": "false",
+          "PRUNE_LAG": "true",
+          "ADJACENT_ONLY": "true",
+          "READMIT_FRESH": "true"
+        },
+        "temporal_fairness": "none; state invariants only, no eventual delivery/liveness assertion",
+        "log": "final/tlc-proofContractSafetyAnyDelayA.log.gz",
+        "sha256_uncompressed": "4648bcfe5c5cd754a15e77efb72614be6fa50a01325b1c2c6a0842cb77ca89bd"
+      },
+      {
+        "main": "proofContractSafetyAnyDelayExpireA",
+        "verdict": "complete_no_violation",
+        "invariants": [
+          "indContract"
+        ],
+        "states_generated": 750680,
+        "distinct_states": 226661,
+        "queue_remaining": 0,
+        "depth": 15,
+        "elapsed_wrapper_seconds": 87,
+        "parameters": {
+          "WRITERS": "Set(\"A\")",
+          "MAX_EPOCH": "4",
+          "MAX_SCOPES": "3",
+          "G1_BOUND": "3",
+          "MAX_SEQ": "6",
+          "MAX_MOVES": "2",
+          "MAX_CRASH": "1",
+          "MAX_MISS": "9",
+          "FENCE_PACE": "9",
+          "LAG": "9",
+          "ALLOW_MISMATCH": "false",
+          "ALLOW_LEAVE": "false",
+          "FENCE_IN_CUT": "false",
+          "ALLOW_PARTIAL": "true",
+          "EXPIRE": "true",
+          "REJOIN_K": "3",
+          "ALLOW_READMIT": "true",
+          "MANUAL_REVIEW": "false",
+          "PRUNE_LAG": "true",
+          "ADJACENT_ONLY": "true",
+          "READMIT_FRESH": "true"
+        },
+        "temporal_fairness": "none; state invariants only, no eventual delivery/liveness assertion",
+        "log": "final/tlc-proofContractSafetyAnyDelayExpireA.log.gz",
+        "sha256_uncompressed": "96a04172eed095f522d766f378e59c10f63a33dace0f322ce0ce152cd050dce1"
+      },
+      {
+        "main": "proofContractSafetyAnyDelayReviewA",
+        "verdict": "complete_no_violation",
+        "invariants": [
+          "indContract"
+        ],
+        "states_generated": 15012414,
+        "distinct_states": 4162986,
+        "queue_remaining": 0,
+        "depth": 18,
+        "elapsed_wrapper_seconds": 1583,
+        "parameters": {
+          "WRITERS": "Set(\"A\")",
+          "MAX_EPOCH": "4",
+          "MAX_SCOPES": "3",
+          "G1_BOUND": "3",
+          "MAX_SEQ": "6",
+          "MAX_MOVES": "2",
+          "MAX_CRASH": "1",
+          "MAX_MISS": "9",
+          "FENCE_PACE": "9",
+          "LAG": "9",
+          "ALLOW_MISMATCH": "false",
+          "ALLOW_LEAVE": "false",
+          "FENCE_IN_CUT": "false",
+          "ALLOW_PARTIAL": "true",
+          "EXPIRE": "false",
+          "REJOIN_K": "3",
+          "ALLOW_READMIT": "true",
+          "MANUAL_REVIEW": "true",
+          "PRUNE_LAG": "true",
+          "ADJACENT_ONLY": "true",
+          "READMIT_FRESH": "true"
+        },
+        "temporal_fairness": "none; state invariants only, no eventual delivery/liveness assertion",
+        "log": "final/tlc-proofContractSafetyAnyDelayReviewA.log.gz",
+        "sha256_uncompressed": "496788113759bc0e4c66a7fedea42b7ddbb10d1f71fb64a029398833d20f0a61"
+      },
+      {
+        "main": "proofContractSmallA",
+        "verdict": "complete_no_violation",
+        "invariants": [
+          "indContract",
+          "allInvariants",
+          "contractInvariants"
+        ],
+        "states_generated": 669659,
+        "distinct_states": 201180,
+        "queue_remaining": 0,
+        "depth": 15,
+        "elapsed_wrapper_seconds": 87,
+        "parameters": {
+          "WRITERS": "Set(\"A\")",
+          "MAX_EPOCH": "4",
+          "MAX_SCOPES": "3",
+          "G1_BOUND": "3",
+          "MAX_SEQ": "6",
+          "MAX_MOVES": "2",
+          "MAX_CRASH": "1",
+          "MAX_MISS": "9",
+          "FENCE_PACE": "2",
+          "LAG": "9",
+          "ALLOW_MISMATCH": "false",
+          "ALLOW_LEAVE": "false",
+          "FENCE_IN_CUT": "false",
+          "ALLOW_PARTIAL": "true",
+          "EXPIRE": "false",
+          "REJOIN_K": "3",
+          "ALLOW_READMIT": "true",
+          "MANUAL_REVIEW": "false",
+          "PRUNE_LAG": "true",
+          "ADJACENT_ONLY": "true",
+          "READMIT_FRESH": "true"
+        },
+        "temporal_fairness": "none; state invariants only, no eventual delivery/liveness assertion",
+        "log": "final/tlc-proofContractSmallA.log.gz",
+        "sha256_uncompressed": "725c6b2cc865ebfb9287fe6e137fe1cde5be381a4df68410aa55d3a7f9576856"
+      }
+    ]
+  },
+  "review": {
+    "findings": "final/review-findings.txt",
+    "resolution": "Both P2 findings corrected: actual allocated replacement count shared by transition/guard, and requested simulation witnesses now must be nonzero. Final formal and five exhaustive checks rerun after fixes."
+  },
+  "limits": [
+    "No parameterized or unbounded-epoch theorem.",
+    "Contract induction incomplete; reduced install counterexample repaired structurally but full induction not rerun.",
+    "Two-writer exhaustive checks incomplete; recorded historical evidence only.",
+    "Native persistence, browser engines, and long-room validation are separate obligations."
+  ]
+}

@@ -1,0 +1,15 @@
+RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+Coverage enabled with v8
+
+D110C_0C1A_RED_EVIDENCE={"closeSetCount":3,"closeSetRoot":"c14dfa31eaab315aa0a435cdf3e5f042a9a5994177f093c91c43e1f6cce690e2","durableReplayVerified":true,"historyRoot":"c14dfa31eaab315aa0a435cdf3e5f042a9a5994177f093c91c43e1f6cce690e2","historySize":3,"lineage":{"exhausted":false,"next":3},"publishStates":["pending","pending","pending"],"refusal":{"code":"D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE","subclass":"missing-carrier"},"retirementCandidateCount":0,"rowDigests":["67adebb144a26c955ea20ea96ee9166db32eceeaa8d9bc342c49cfe37409d42b","3c1e5fd777d9e88de22200f6b531ec3dd2640d181741c7393245e455ec6d7de6","9563b630a0c548830351f58b986176c97a82af942d84cfe4f7668a748f19dca2"],"rowKeys":[0,1,2],"successorAnchorDigest":"5e28d7e56d0af52081608a7f64b0ee2e0312cac89d0159da95751a94de403165"}
+
+FAIL tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts > D.110c-0c1a creator issuance-retirement checkpoint RED > requires one authenticated retirement carrier after a genuine dense creator close
+TypeError: D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE
+
+Test Files  1 failed (1)
+Tests       1 failed (1)
+Duration    3.41s (transform 1.45s, setup 0ms, collect 449ms, tests 548ms, environment 1ms, prepare 51ms)
+
+The complete machine-readable failure, stack, timing, and assertion identity are
+preserved in vitest.json. The CLI also emitted Node's experimental SQLite
+warning; it was non-fatal and preceded the expected causal test failure.

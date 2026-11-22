@@ -1,0 +1,14 @@
+{
+  "head": "697e0401d727a22e606651e371e4b595eb713bac",
+  "trackedDiff": "",
+  "files": {
+    "packages/storage-node/tests/retirement-image-cas.test.ts": "e968b1c0e36cce7894a928986198fe215a4f43553d353ce3e42023f3db8aeadb",
+    "packages/storage-node/src/live-journal.ts": "94d4bceb8e81c65fb6c4c3f59e4508454ddd31b81b3f474becf56d6f6d1a16a5",
+    "packages/live-journal/src/index.ts": "9d38045cb309df603ca3a16d7fdcf481aa52bbe9bf43e9093af392ed58f59c61",
+    "packages/live-journal/src/retirement.ts": "22c2fdb50050f7084cd6c96dfd7f01c40aada3f0f9c537af50dd4428666c280f",
+    "vite.config.mts": "60369abcfa17b486fd19f699ae20ab1a9b6ede2359ba3e02de4e106ac80cb6c0",
+    "/private/tmp/issuance-projection-journal-baseline.config.mts": "4d81fe7a0e6857be714a8b62d04b27cb2df79b67a46089f4a65725d9540735b3",
+    "/private/tmp/issuance-projection-journal-baseline.workspace.mts": "e31bef1025877b53e0f74c7e0b6238d1aa4d910949cecc9ab3cf418cd442b182"
+  },
+  "command": "pnpm exec vitest run --workspace /private/tmp/issuance-projection-journal-baseline.workspace.mts --coverage.enabled=false --maxWorkers=1 --minWorkers=1"
+}

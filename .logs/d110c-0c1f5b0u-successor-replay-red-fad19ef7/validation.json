@@ -1,0 +1,43 @@
+{
+  "status": "CAUSAL_CORRECTIVE_REPLAY_RED_NOT_GREEN",
+  "sourceCommit": "fad19ef785d75e0f5231e1ddc1f8c78e6da0d31d",
+  "selectedFiles": 1,
+  "selectedTests": 3,
+  "failed": 3,
+  "passed": 0,
+  "skipped": 0,
+  "invocationCount": 1,
+  "completeSoftFailureCount": 18,
+  "tokens": [
+    [
+      "REPLAY_EXACT_ORDER",
+      "REPLAY_EXACT_BYTES_SIGNATURES",
+      "REPLAY_EXACTLY_ONCE_COMMIT",
+      "REPLAY_RECOVERS_APPLICATION_STATE",
+      "REPLAY_SINK_PRESENT",
+      "REPLAY_COMMIT_AFTER_VALIDATION",
+      "REPLAY_SINK_PRESENT",
+      "REPLAY_COMMIT_AFTER_VALIDATION",
+      "REPLAY_BEFORE_PUBLIC_ISSUE",
+      "REPLAY_NO_DUPLICATE_COMMIT"
+    ],
+    [
+      "REPLAY_FAILURE_REFUSED",
+      "REPLAY_FAILURE_SEAM_REACHED",
+      "REPLAY_FAILURE_NO_ACTIVE_OWNER",
+      "REPLAY_FAILURE_TRANSPORT_RELEASED"
+    ],
+    [
+      "REPLAY_FAILURE_REFUSED",
+      "REPLAY_FAILURE_SEAM_REACHED",
+      "REPLAY_FAILURE_NO_ACTIVE_OWNER",
+      "REPLAY_FAILURE_TRANSPORT_RELEASED"
+    ]
+  ],
+  "authenticatedSnapshotProvenanceControlPassed": true,
+  "projectionRepresentationFalseFailureCount": 0,
+  "unexpectedFailureCount": 0,
+  "historicalOverlayHash": "3115b50bc0a76662194cdc052313ae2390327c6452b2dc3ccf45a3f97dae09da",
+  "preservedMainGreenHash": "23c859208425b2e93fc5f8d15b77eb1b1e7ec4b63619bf7f62b9afdd49a5bb46",
+  "stashCount": 27
+}

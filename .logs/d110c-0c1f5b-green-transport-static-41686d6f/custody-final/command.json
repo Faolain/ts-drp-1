@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-green-transport-static-41686d6f/custody-final.mjs",
+    "final"
+  ],
+  "start": "2026-09-06T04:55:44.114Z"
+}

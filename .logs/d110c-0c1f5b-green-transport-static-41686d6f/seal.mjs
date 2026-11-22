@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),json=f=>JSON.parse(fs.readFileSync(path.join(out,f))),write=(f,v)=>fs.writeFileSync(path.join(out,f),JSON.stringify(v,null,2)+'\n',{flag:'wx'});
+if(fs.existsSync(path.join(out,'manifest.sha256')))throw Error('Already sealed');
+for(const prefix of ['main-24/','isolated/']){const v=json(prefix+'validation.json'),s=json(prefix+'status.json');if(!v.valid||!v.exactNames||!v.exactFiles||v.total!==24||v.passed!==24||v.failed!==0||v.skipped!==0||s.status!==0)throw Error('Runtime gate');}
+for(const f of ['custody-final/status.json','isolated/custody-after/status.json'])if(json(f).code!==0)throw Error('Terminal custody');
+for(const pid of [json('main-24/execution-start.json').pid,json('isolated/execution-start.json').pid]){const r=spawnSync('ps',['-p',String(pid),'-o','pid=,comm='],{encoding:'utf8'});if(![0,1].includes(r.status)||r.stdout.trim())throw Error('Runtime recorder remains active');}
+const walk=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(d,e.name)):[path.join(d,e.name)]),statuses=walk(out).filter(f=>path.basename(f)==='status.json').sort().map(f=>({file:path.relative(out,f),...JSON.parse(fs.readFileSync(f))})),nonzero=statuses.filter(s=>(s.status??s.code)!==0).map(s=>({file:s.file,status:s.status??s.code}));
+if(JSON.stringify(nonzero.map(s=>s.file).sort())!==JSON.stringify(['custody-before/status.json','isolated/native-preparation/status.json','lint/status.json'].sort()))throw Error('Unexpected recorded failure family');
+write('command-status-inventory.json',statuses);write('seal-summary.json',{runtime:{main:{total:24,passed:24,failed:0,skipped:0,rawSha256:json('main-24/validation.json').reporterSha256},isolated:{total:24,passed:24,failed:0,skipped:0,rawSha256:json('isolated/validation.json').reporterSha256}},commands:statuses.length,nonzero,latestCustody:'custody-final.json',effectiveTestHashCount:Object.keys(json('custody-final.json').testHashes).length,sourceHead:'c5b5f36a3d3201633ae7bab1d9959ab52fa14526',parentPatchSha256:json('custody-final.json').patchSha256,noActiveRuntimeRecorder:true,parentClosed:false});
+const files=walk(out).sort(),manifest=files.map(f=>hash(fs.readFileSync(f))+'  '+path.relative(out,f)).join('\n')+'\n';fs.writeFileSync(path.join(out,'manifest.sha256'),manifest,{flag:'wx'});console.log(JSON.stringify({entries:files.length,manifestSha256:hash(manifest),commands:statuses.length,nonzero}));

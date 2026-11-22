@@ -1,0 +1,18 @@
+{
+  "label": "overlay",
+  "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+  "budgetMs": 30000,
+  "command": [
+    "git",
+    "-C",
+    "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+    "apply",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/source-overlay.patch"
+  ],
+  "environmentUnset": [
+    "TS_DRP_D108E4M_PROFILE",
+    "TS_DRP_F5B_WIDE_DIAGNOSTIC",
+    "D110C_0B1_EVIDENCE_PATH"
+  ],
+  "testsExecuted": 0
+}

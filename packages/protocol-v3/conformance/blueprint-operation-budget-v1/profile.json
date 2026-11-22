@@ -1,0 +1,24 @@
+{
+	"schemaVersion": "ts-drp-blueprint-operation-budget-v1",
+	"profileId": "blueprint-operation-budget-v1",
+	"protocolMajor": 3,
+	"governedManifestSchemaVersion": 2,
+	"workBudgetProfile": "blueprint-work-budget-v1",
+	"meter": {
+		"preimage": "encodeCanonical(canonicalDetachedOperation)",
+		"byteCount": "Uint8Array.byteLength",
+		"wholeExactClosedOperation": true,
+		"includesDiscriminator": true
+	},
+	"remoteOrder": ["exact-received-byte-authentication", "abi-match", "operation-byte-budget", "consumer"],
+	"localOrder": ["canonical-detach", "operation-byte-budget", "transaction-sign-record-outbox"],
+	"legacyManifestSchema1": "unbudgeted",
+	"claims": {
+		"transportFrameCap": false,
+		"reducerExecutionMeter": false,
+		"wallClockOrInstructionMeter": false,
+		"parametersRegistryChange": false,
+		"protocolV2Change": false,
+		"publicExportChange": false
+	}
+}

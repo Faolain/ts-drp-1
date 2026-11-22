@@ -1,0 +1,31 @@
+{
+  "classification": "REJECTED_MATRIX",
+  "testsCommit": "1dcff1709d040a4a37d3c73ecaef4fb2309451de",
+  "total": 2,
+  "passed": 0,
+  "failed": 2,
+  "focusedExecutionCount": 1,
+  "setupImportTopLevelErrors": 0,
+  "tests": [
+    {
+      "name": "D.110c-0c1f5b parent genuine settlement composition > retains checkpoint-terminal open progress through cold recovery, then composes 64 active writers across three transitions",
+      "status": "failed",
+      "durationMs": 390.632791,
+      "failure": "F5B_SETTLEMENT_PROFILE_SUCCESSOR_CODEC_REQUIRED: genuine settlement successor fails CERTIFIED_VALUE_MISMATCH before checkpoint production",
+      "expected": true
+    },
+    {
+      "name": "D.110c-0c1f5b parent genuine settlement composition > keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+      "status": "failed",
+      "durationMs": 1021.4504999999999,
+      "failure": "v3 room successor reopen failed: authority-unavailable: creator successor already has a conflicting active owner",
+      "expected": false,
+      "terminus": "Added v1 floor probe first noncreator reopen, test line 1728; original v1 single-peer control prefix completed"
+    }
+  ],
+  "passingWholeTestControls": [],
+  "downstreamSettlementContinuationsExecuted": false,
+  "staleFloorTokenObserved": false,
+  "action": "Stopped edits and runtime execution; read-only module-realm diagnosis; immutable rejected evidence"
+}
+

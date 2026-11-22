@@ -1,0 +1,152 @@
+{
+  "classification": "ACCEPTED_RETAINED_FINALITY_BASELINE",
+  "executionCount": 1,
+  "head": "867d7f09a78bb106cae10419b636bfa3638b11d6",
+  "runnerStatus": 0,
+  "signal": null,
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "intentionallyFiltered": 0,
+  "topLevel": [],
+  "violations": [],
+  "outcomes": [
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > executes independent registry, identity, schema and transaction controls before readiness",
+      "status": "passed",
+      "duration": 10.06145799999996,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > typechecks and executes the exact bounded n=4 Quint witness",
+      "status": "passed",
+      "duration": 2390.5595,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > [RED readiness] requires the complete four-owner atomic product graph",
+      "status": "passed",
+      "duration": 0.135834000000159,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > binds a genuine certified roster key to its independent signer ID",
+      "status": "passed",
+      "duration": 112.4435840000001,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes",
+      "status": "passed",
+      "duration": 27.75887499999999,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > releases only a detached durable carrier after the exact state-slot-outbox commit",
+      "status": "passed",
+      "duration": 14.202374999999847,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "name": "Phase 5a-c atomic seal safety RED > rejects wrong authority, stale revision and conflicting same-slot bytes without release",
+      "status": "passed",
+      "duration": 18.85129199999983,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > freezes the exact six RED and exact twenty-four GREEN owner rosters",
+      "status": "passed",
+      "duration": 2.3098329999999976,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > keeps the inherited schema-v2 voter as an executable pre-readiness control",
+      "status": "passed",
+      "duration": 5.009208000000001,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > defines one additive v3 store while preserving the frozen four-store vote transaction",
+      "status": "passed",
+      "duration": 0.26958300000001145,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > closes the causal crash and mutation catalog without adding authority",
+      "status": "passed",
+      "duration": 0.2558750000000032,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > [RED readiness] requires the complete creator actor and evidence graph",
+      "status": "passed",
+      "duration": 0.12595799999999713,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > keeps the actor, evidence, and finality subpaths closed",
+      "status": "passed",
+      "duration": 62.56329200000002,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > persists the close candidate before either durable vote and releases only finalized evidence",
+      "status": "passed",
+      "duration": 109.37625,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > re-verifies complete durable QC bytes before reopening signing authority",
+      "status": "passed",
+      "duration": 83.46695799999998,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry",
+      "status": "passed",
+      "duration": 103.04395799999998,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > reopens exact finalized custody and rejects a conflicting close without rewriting bytes",
+      "status": "passed",
+      "duration": 72.440833,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > rejects raw-digest signing and a copied actor capability causally",
+      "status": "passed",
+      "duration": 5.475624999999923,
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-5e-creator-actor-red.test.ts",
+      "name": "Phase 5e durable creator actor RED > copies all close carriers before awaiting storage and fences effects after stop",
+      "status": "passed",
+      "duration": 28.56025000000011,
+      "failureMessages": []
+    }
+  ],
+  "finishedAt": "2026-09-05T23:52:05.405Z",
+  "notNewCausalRed": true,
+  "noParentRuntimeRun": true,
+  "pendingGreenGateStillRequired": true
+}

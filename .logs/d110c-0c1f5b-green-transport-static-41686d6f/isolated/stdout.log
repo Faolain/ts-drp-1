@@ -1,0 +1,17 @@
+
+ RUN  v3.1.1 /private/tmp/d110c-f5b-green-transport-static-z5iavL/checkout
+
+ ✓ tests/phase-3a1b-p3-live-transport-red.test.ts (24 tests) 19160ms
+   ✓ Phase 3a-1B Seam 3 private live-plane RED > adds only the exact private activation, ingress, handle and error surface  570ms
+   ✓ Phase 3a-1B Seam 3 private live-plane RED > keeps wrong-scope evidence from consuming capacity needed by current-scope pending ingress  9869ms
+   ✓ Phase 3a-1B Seam 3 private live-plane RED > derives only the exact stable-genesis topic and uses it as queue and wire identity  1150ms
+   ✓ Phase 3a-1B Seam 3 private live-plane RED > keeps the Seam3 owner private and excludes protocol-v2, B effects and extra authority  1418ms
+   ✓ Phase 3a-1B Seam 3 private live-plane RED > causally compiles the mutually exact A and Seam3 private type contracts  4351ms
+   ✓ Phase 3a-1B Seam 3 private live-plane RED > retains generated and source ownership without a hand-written second envelope codec  742ms
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  00:54:39
+   Duration  20.19s (transform 1.18s, setup 0ms, collect 825ms, tests 19.16s, environment 0ms, prepare 48ms)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-transport-static-41686d6f/isolated/focused.json

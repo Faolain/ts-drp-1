@@ -1,0 +1,86 @@
+{
+  "stopped": true,
+  "main": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "selected": {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED replays every checked trace through the genuine voter, pacemaker, and fake-IDB store",
+      "status": "passed",
+      "title": "replays every checked trace through the genuine voter, pacemaker, and fake-IDB store",
+      "duration": 9039.930208000005,
+      "failureMessages": [],
+      "meta": {}
+    }
+  },
+  "isolated": {
+    "total": 49,
+    "passed": 48,
+    "failed": 1,
+    "skipped": 0,
+    "exactNames": true,
+    "exactFiles": true,
+    "selected": {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED replays every checked trace through the genuine voter, pacemaker, and fake-IDB store",
+      "status": "failed",
+      "title": "replays every checked trace through the genuine voter, pacemaker, and fake-IDB store",
+      "duration": 10927.524875000003,
+      "failureMessages": [
+        "Error: Test timed out in 10000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n    at makeTimeoutError (file:///private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:915:16)\n    at rejectTimeoutError (file:///private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:858:13)\n    at resolve (file:///private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:865:6)"
+      ],
+      "meta": {}
+    },
+    "suiteErrors": [],
+    "unhandledErrors": []
+  },
+  "unchangedFailingRegistrationSha256": "f4ee4c872501a549d7ad411fcd6225d4bc178d843d019758e7d51a1dc2dd24c2",
+  "unchangedFailingBodySha256": "f3c51b5f029dff7d496528157f04b1b5bc550b5a149dadd35aaba530675c0e41",
+  "body": "{\n\t\t\tconst modules = await loadPacemakerCandidateModules();\n\t\t\tfor (const descriptor of PRODUCT_CONTRACT.traces) {\n\t\t\t\tconst databaseName = `phase5d-product-${crypto.randomUUID()}`;\n\t\t\t\topenedDatabases.push(databaseName);\n\t\t\t\tconst trace = readTrace(descriptor.path);\n\t\t\t\tconst events = await replayCheckedTrace(trace, await createProductTraceDriver(modules, trace, databaseName));\n\t\t\t\texpect(events.length, `${descriptor.path} emitted no product facts`).toBeGreaterThan(0);\n\t\t\t\tconst generated = implementationEventsToQuintTest(events);\n\t\t\t\tconst temporary = mkdtempSync(resolve(REPOSITORY_ROOT, \".phase5d-product-events-\"));\n\t\t\t\ttry {\n\t\t\t\t\tconst generatedPath = resolve(temporary, \"implementation-replay.qnt\");\n\t\t\t\t\twriteFileSync(generatedPath, generated, \"utf8\");\n\t\t\t\t\tconst replayed = spawnSync(\n\t\t\t\t\t\t\"pnpm\",\n\t\t\t\t\t\t[\"exec\", \"quint\", \"test\", generatedPath, \"--main\", \"generatedPacemakerReplay\", \"--backend\", \"typescript\"],\n\t\t\t\t\t\t{ cwd: REPOSITORY_ROOT, encoding: \"utf8\" }\n\t\t\t\t\t);\n\t\t\t\t\texpect(replayed.status, `${descriptor.path}\\n${replayed.stdout}\\n${replayed.stderr}`).toBe(0);\n\t\t\t\t} finally {\n\t\t\t\t\trmSync(temporary, { force: true, recursive: true });\n\t\t\t\t}\n\t\t\t}\n\t\t}",
+  "sourceSha256": "cf0ec7df87e6ac58c2e03d139d25078d372bb6e4ccc9005ab621744444f288db",
+  "configurationSha256": "6c15cd76cf3197d8f08608f28909731d55b7f07a661fada577aaecbe4b81c610",
+  "configuredTestTimeoutMs": 10000,
+  "noPerTestTimeoutOverride": true,
+  "contract": {
+    "file": "tests/fixtures/phase-5d-v3/pacemaker-contract.json",
+    "sha256": "905b9a1781dee82b812b53696f86c95f2f7a2ad9c68c16291662f0a68c0669e7",
+    "traceCount": 3,
+    "traces": [
+      {
+        "path": "packages/seal/model/traces/n4-catchup.itf.json",
+        "n": 4,
+        "expectedSha256": "42a5fcb078d5b11f9d929d064623f0f0654d8f8f590a459166715348b0a180d4",
+        "mainSha256": "42a5fcb078d5b11f9d929d064623f0f0654d8f8f590a459166715348b0a180d4",
+        "isolatedSha256": "42a5fcb078d5b11f9d929d064623f0f0654d8f8f590a459166715348b0a180d4"
+      },
+      {
+        "path": "packages/seal/model/traces/n4-round-carryover.itf.json",
+        "n": 4,
+        "expectedSha256": "c9b44f5bc5971e29530300cc7bb80173ed5b4643e0aa2a0c243b22f002c69e04",
+        "mainSha256": "c9b44f5bc5971e29530300cc7bb80173ed5b4643e0aa2a0c243b22f002c69e04",
+        "isolatedSha256": "c9b44f5bc5971e29530300cc7bb80173ed5b4643e0aa2a0c243b22f002c69e04"
+      },
+      {
+        "path": "packages/seal/model/traces/n7-crash-restart.itf.json",
+        "n": 7,
+        "expectedSha256": "20d6e3619a8b363ac7f05f539a7225b8c74b1bff581587ac326777df1d3b84b4",
+        "mainSha256": "20d6e3619a8b363ac7f05f539a7225b8c74b1bff581587ac326777df1d3b84b4",
+        "isolatedSha256": "20d6e3619a8b363ac7f05f539a7225b8c74b1bff581587ac326777df1d3b84b4"
+      }
+    ]
+  },
+  "sourceSupportedCost": "One async test loops serially through every checked trace, awaits genuine product replay and synchronously launches pnpm exec quint test for each generated implementation-event replay; the unchanged global test watchdog covers the combined work.",
+  "attributionLimit": "The reporter records only the aggregate 10000ms timeout, not which trace or internal operation crossed it. No semantic assertion failure, per-trace timing, or performance-regression cause is established. Main passed near the same limit; this does not waive the isolated failure.",
+  "noRetry": true,
+  "noTimeoutChange": true,
+  "noSourceChange": true,
+  "noProfilerOrNewRuntimeProbe": true
+}

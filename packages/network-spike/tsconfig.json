@@ -9,6 +9,8 @@
 	],
 	"exclude": [
 		"dist",
-		"./*.d.ts"
+		"./*.d.ts",
+		"tests/public-convergence-live.test.ts",
+		"tests/public-only-node-publisher.test.ts"
 	]
 }

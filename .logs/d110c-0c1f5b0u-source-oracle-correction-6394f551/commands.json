@@ -1,0 +1,75 @@
+[
+  {
+    "name": "format",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "prettier",
+      "--check",
+      "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "tests/phase-6a-creator-successor-product-red.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:40:27.060Z",
+    "finishedAt": "2026-09-05T06:40:28.043Z",
+    "elapsedMs": 983
+  },
+  {
+    "name": "lint",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "eslint",
+      "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "tests/phase-6a-creator-successor-product-red.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:40:28.044Z",
+    "finishedAt": "2026-09-05T06:41:09.355Z",
+    "elapsedMs": 41311
+  },
+  {
+    "name": "list",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "list",
+      "tests/phase-6a-creator-successor-product-red.test.ts",
+      "-t",
+      "D\\.108d2 public return AST oracle|keeps node-root and chat authority closed while assigning the room as sole node consumer"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:41:09.356Z",
+    "finishedAt": "2026-09-05T06:41:12.813Z",
+    "elapsedMs": 3457
+  },
+  {
+    "name": "focused",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "run",
+      "tests/phase-6a-creator-successor-product-red.test.ts",
+      "-t",
+      "D\\.108d2 public return AST oracle|keeps node-root and chat authority closed while assigning the room as sole node consumer",
+      "--no-file-parallelism",
+      "--coverage.enabled=false",
+      "--reporter=json",
+      "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-source-oracle-correction-6394f551/reporter.json"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "startedAt": "2026-09-05T06:41:12.813Z",
+    "finishedAt": "2026-09-05T06:41:15.949Z",
+    "elapsedMs": 3136
+  }
+]

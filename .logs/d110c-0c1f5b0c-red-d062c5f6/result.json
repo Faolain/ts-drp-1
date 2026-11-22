@@ -1,0 +1,23 @@
+{
+  "record": "D.110c-0c1f5b0c",
+  "color": "RED",
+  "capturedAt": "2026-09-04T19:55:35Z",
+  "branch": "codex/phase3a1b-p6-golden-path",
+  "commit": "d062c5f64ad7255f67eb91d0eb1c8441acc147c1",
+  "signed": true,
+  "remoteMatchedAtCapture": true,
+  "selectedFiles": 1,
+  "totalTests": 9,
+  "passedTests": 1,
+  "failedTests": 8,
+  "pendingTests": 0,
+  "expectedCausalFailures": 8,
+  "unexpectedFailures": 0,
+  "productionPathsChanged": 0,
+  "planPathsChanged": 0,
+  "dependencyPathsChanged": 0,
+  "stashesPreserved": 27,
+  "focusedReporterSha256": "d3aa3ec206bc1e45fb9d79f10e5dcdb5807eb44b7f2b1f60c46468b95cfe6204",
+  "testFileSha256": "0f7229dc42a6e4537b7b725fa2aa9501ebb3e43fef8d0ddd07d58a54f4b1127c"
+}
+

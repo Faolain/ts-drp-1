@@ -1,0 +1,121 @@
+{
+  "valid": true,
+  "files": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+      "beforeSha256": "f22fb4cea00cfe305c71f731f7ec676b35061cc287bec236d8ae5d6adbaa8c19",
+      "afterSha256": "c252edbdbb66507aba291563038fbf3781cdb4ed2f16de3dec0ecdab9e33dea9",
+      "emittedBeforeSha256": "6b1331c7bc0097f25a6e1481f2f7ed32c20a66a70c85b5bae488704d8d37254c",
+      "emittedAfterSha256": "2c7f4fd72eb425e7c44176c505938dce39e4e4f54cdeb80b83b15d5aa9400f7b"
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+      "beforeSha256": "0f9717d6e38c6f22a14b8c9e7697e50df21391eabd23c238954a7504e60d3a24",
+      "afterSha256": "908a6cf72737283fdd2d11cd3eaa0901bc45a955831fa4c337b44eb49cd1e9b5",
+      "emittedBeforeSha256": "19d529c4fd95a53b1c031ad6ace3e5454f237ab52f6184c3ce724dcf9bdb8ea8",
+      "emittedAfterSha256": "f5a7c8d2ad95ca95ccce3fed5d1c18a4486b835251ff411d562d7fb3d8ebcb57"
+    }
+  ],
+  "contextArguments": [
+    "AheDurableStore",
+    "SnapshotQuarantineStore<SnapshotVerificationReceipt>",
+    "SnapshotQuarantineScope<SnapshotVerificationReceipt>",
+    "SnapshotVerificationQuarantine",
+    "SnapshotQuarantinePort",
+    "DurableIssuanceStore",
+    "DurableLiveJournalStore"
+  ],
+  "newTypeImports": [
+    "SnapshotQuarantinePort",
+    "SnapshotVerificationQuarantine"
+  ],
+  "directDelegates": [
+    {
+      "name": "readSettlementPlan",
+      "exactSource": "readSettlementPlan: (scope) => rawIssuanceStore.readSettlementPlan(scope)",
+      "originalArgumentAndReturnedCallResult": true,
+      "receiver": "rawIssuanceStore",
+      "noAddedHooks": true
+    },
+    {
+      "name": "transactWriteSettlementPlan",
+      "exactSource": "transactWriteSettlementPlan: (input) => rawIssuanceStore.transactWriteSettlementPlan(input)",
+      "originalArgumentAndReturnedCallResult": true,
+      "receiver": "rawIssuanceStore",
+      "noAddedHooks": true
+    }
+  ],
+  "localizedRevisionCases": [
+    {
+      "baseRevision": 0,
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "baseRevision": 1,
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "baseRevision": 2,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "baseRevision": 9,
+      "actual": 8,
+      "expected": 8
+    },
+    {
+      "baseRevision": 9007199254740991,
+      "actual": 9007199254740990,
+      "expected": 9007199254740990
+    }
+  ],
+  "adoptionUnaffectedEmittedTokensExact": true,
+  "productUnaffectedEmittedTokensExact": true,
+  "normalizedOnlyMalformedRevisionParentheses": 0,
+  "compilerInputCommentRelocationOnly": true,
+  "originalDeclarationLoop": {
+    "activationBoundPrecedesCopy": true,
+    "migrationInviteBoundOwnsEveryEncode": true
+  },
+  "assignmentLoop": {
+    "activationBoundPrecedesCopy": true,
+    "migrationInviteBoundOwnsEveryEncode": false
+  },
+  "existingMigrationMutants": [
+    {
+      "name": "dead-snapshot",
+      "result": {
+        "activationBoundPrecedesCopy": true,
+        "migrationInviteBoundOwnsEveryEncode": false
+      }
+    },
+    {
+      "name": "dead-rehearsal",
+      "result": {
+        "activationBoundPrecedesCopy": true,
+        "migrationInviteBoundOwnsEveryEncode": false
+      }
+    },
+    {
+      "name": "alternate-activation",
+      "result": {
+        "activationBoundPrecedesCopy": true,
+        "migrationInviteBoundOwnsEveryEncode": false
+      }
+    },
+    {
+      "name": "dead-metadata",
+      "result": {
+        "activationBoundPrecedesCopy": true,
+        "migrationInviteBoundOwnsEveryEncode": false
+      }
+    }
+  ],
+  "realExportedInspector": true,
+  "onlyImportMetaDirectorySubstitutedForCommonJsEvaluation": true,
+  "noRoomOrStoreRuntimeInvoked": true,
+  "blanketExecutableEquivalence": false
+}

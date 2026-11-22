@@ -1,0 +1,28 @@
+{
+  "duration_api_ms": 397598,
+  "stop_reason": "end_turn",
+  "session_id": "04a793cc-81de-4586-8047-f8dc9e346b1a",
+  "model": "claude-opus-5",
+  "effort": "xhigh",
+  "terminal_reason": "completed",
+  "is_error": false,
+  "verdict": "PASS",
+  "summary": "Correction 4f893654 closes the first-round blocking union without introducing a new P0/P1. D.110c-0b0a is confined to two new non-root Node subpaths plus private internal registries, while product/provider orchestration and full crash/activation gates remain D.110c-0b0 work.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Publish lifecycle and recovery literals frozen only by reference",
+      "required_change": "Record lifecycle successor-prepared and recovery active-new inline in the RED freeze."
+    },
+    {
+      "severity": "P2",
+      "title": "Unselected duplicate Complete generation has no stated reclamation owner",
+      "required_change": "Assign cleanup accounting to D.110c-0b0 or D.110c-0b1; D.110c-0b0a proves only authentication inertness."
+    },
+    {
+      "severity": "P2",
+      "title": "Residual wrapper vocabulary",
+      "required_change": "Call the existing API the retained one-call API and scope unchanged to exports, shapes, semantics, and product use, with the documentation comment as the sole permitted edit."
+    }
+  ]
+}

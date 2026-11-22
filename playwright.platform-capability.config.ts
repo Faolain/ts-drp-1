@@ -8,20 +8,26 @@ import { defineConfig, devices } from "@playwright/test";
 // over an https origin so `crypto.subtle` runs in a secure context offline.
 //
 // Runs all three engines — a capability that differs per engine is exactly the thing this exists
-// to catch, so a chromium-only run would defeat the purpose.
+// to catch, so a chromium-only run would defeat the purpose. The two mobile-emulation projects add
+// viewport/user-agent engine-regression coverage only: they still run desktop Playwright WebKit and
+// Chromium, and therefore are not evidence about real iOS Safari or Android WebView crypto support.
 export default defineConfig({
 	expect: { timeout: 10_000 },
 	forbidOnly: Boolean(process.env.CI),
 	fullyParallel: true,
+	globalSetup: "./tests/platform/phase-2j-webcrypto-global-setup.ts",
+	outputDir: "./test-results/phase-2j/playwright",
 	projects: [
 		{ name: "chromium", use: { ...devices["Desktop Chrome"] } },
 		{ name: "firefox", use: { ...devices["Desktop Firefox"] } },
 		{ name: "webkit", use: { ...devices["Desktop Safari"] } },
+		{ name: "ios-safari-emulation", use: { ...devices["iPhone 15"] } },
+		{ name: "android-chrome-emulation", use: { ...devices["Pixel 7"] } },
 	],
 	reporter: "line",
 	retries: 0,
 	testDir: "./tests/platform",
-	testMatch: /.*\.pw\.ts/u,
+	testMatch: /webcrypto-capability\.pw\.ts/u,
 	timeout: 30_000,
 	use: { trace: "retain-on-failure" },
 });

@@ -1,0 +1,482 @@
+commit f3617a8284af6d149441f0531ddec520370a34fe
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 16:01:06 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 16:01:06 2026 -0400
+
+    docs: amend rebase frontier liveness plan
+
+diff --git a/.logs/d110c-trajectory-fable51-high-oneoff-20260903/SHA256SUMS b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/SHA256SUMS
+new file mode 100644
+index 00000000..ab967959
+--- /dev/null
++++ b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/SHA256SUMS
+@@ -0,0 +1,4 @@
++5ce9319722ee60b7f53acd94a80aa486d2ac91f1d3fbf7fb0ae710579c012999  prompt.md
++f66633725d63a8ec8b935107bc477fdad6c3a1844bc45eaef7555e762686ad2a  schema.json
++548aced41665097671411992e572dea51833e23580333d69d706b1657ba3862a  result.md
++663d9583b961dc4f3a02a7f1bbdce799fc18b2df920943259666882bae00ca76  verification.md
+diff --git a/.logs/d110c-trajectory-fable51-high-oneoff-20260903/prompt.md b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/prompt.md
+new file mode 100644
+index 00000000..32d46fc5
+--- /dev/null
++++ b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/prompt.md
+@@ -0,0 +1,95 @@
++You are the single expressly authorized Fable 5.1/high read-only architecture
++reviewer for ts-drp. This is a one-off course/trajectory review. Do not edit any
++file, run tests or workloads, invoke agents/subagents, or review unrelated
++untracked work. Inspect the current repository with Read, Glob, and Grep only.
++
++Repository and immutable review anchor:
++
++- branch: `codex/phase3a1b-p6-golden-path`
++- signed/pushed HEAD: `da3e75514e3921b71d57d611d9e2b61785124b07`
++- HEAD tree: `28ec9ed7762888193ee42d1803b7cb0a9a8f8a33`
++- signed/pushed combined D.110c-0c1f2/f4 GREEN:
++  `9e1781e0966953d7adce8cf6b0a4d9e56d12299a`
++- signed/pushed corrected causal RED / plan anchor:
++  `fcd8735c8316b048166560ab904704102ce90705`
++
++Review whether our recent decisions and present trajectory are correct for the
++actual golden-path need: a single long-lived room must perform genuine,
++authenticated `epoch 0 -> 1 -> 2 -> ... -> N` transitions, survive restart and
++reopen, continue issuing/publishing, keep active control/durable structures and
++fresh-process post-GC memory bounded, safely prune only after authenticated
++replacement plus rollback/availability gates, and feed Phase 7's genuine
++multi-epoch archive/cold-join path. Distinct-room churn and synthetic epoch
++records do not satisfy this.
++
++Inspect at minimum:
++
++- `docs/production-hardening/production-hardening-tdd-plan-v2.md`, especially
++  D.110c-0c1f2, D.110c-0c1f4, D.110c-0c1f5, D.110c-c/d, the >=100-transition
++  gate, and Phase 7 dependencies;
++- `.logs/d110c-0c1f5-source-audit-fcd8735c/audit.md`;
++- `.logs/d110c-0c1f24-green-working-fcd8735c/validation.md` and `commands.md`;
++- `.logs/d110c-0c1f24-clean-9e1781e0/proof.md`;
++- the current owners in `packages/node/src/v3-live.ts`,
++  `packages/node/src/creator-adoption*.ts`,
++  `packages/node/src/internal/creator-transition-advance.ts`,
++  `packages/protocol-v3/src/index.ts`, and the focused D.110c tests.
++
++Recent decisions to assess precisely:
++
++1. D.110c-0c1f2/f4 now authenticate multi-author recovery frontiers and pinned-
++   genesis bootstrap authority. The focused 41-test set, exact two-title browser
++   proof, retained 195-test suite, affected builds/typechecks/lint/format/diff,
++   and isolated offline checkout passed.
++2. We removed an invalid transition-side successor-ACL check because the
++   proposed closure has no detached successor ACL candidate and the check made
++   genuine close fail. The creator instead derives the successor writer set
++   from the authenticated successor snapshot ACL before signing; the aggregate
++   carrier binds current/successor ACL digests. Decide whether this is a sound
++   authority boundary or whether independent transition rederivation is a real
++   blocker.
++3. We did not declare the same-room loop complete. The f5 audit found a genuine
++   rebase-supersession/contiguous-frontier gap: replacement rows get new target
++   sequences, source rows become published, but the successor lacks an
++   authenticated per-author proof that missing source sequences were superseded,
++   so blindly raising a maximum frontier would authenticate unseen lower rows.
++4. We created D.110c-0c1f5 as a blocking high-risk prerequisite and prohibited
++   production edits until an exact proof construction and compatibility boundary
++   are selected and reviewed. Candidate families include an authenticated
++   source-retirement interval/bitmap, a signed per-author source-to-target rebase
++   receipt, and a stronger aggregate supersession proof; a bare max is rejected.
++5. The intended next order is: finish one formal Grok/Kimi/Opus review of the
++   signed f2/f4 plan->RED->GREEN history, close those narrow semantics only if
++   their blocking union is empty, then select/review an exact f5 design, execute
++   deterministic causal RED/GREEN, and only afterward proceed to repeated same-
++   room functional/restart/pruning and >=100-transition gates. No long campaign
++   is currently authorized by this review.
++
++Audit for hidden problems, especially:
++
++- whether cross-source filtered issuance/rebase scans ever use the target
++  successor bootstrap policy where the displaced source policy is required;
++- whether aggregate/opening verification really binds object, author, exact
++  contiguous frontier, current/successor ACL digests, genesis pin, and creator
++  authority without trusting untrusted storage;
++- whether f5 is the actual minimal missing product seam or merely a test/model
++  artifact;
++- whether the proposed f5 families preserve offline/rebase outbox continuity,
++  fail closed on skipped/duplicated/substituted rows, and avoid O(N) hidden
++  control growth;
++- whether any completed narrow evidence is being overclaimed or needlessly
++  reopened;
++- whether the next ordering reaches the golden paths efficiently without
++  skipping authority, restart, pruning, memory, durable-census, or Phase-7
++  archive/cold-join obligations.
++
++Return a concise, source-grounded result. Separate demonstrated defects from
++risks and optional improvements. P0/P1 must identify an executable semantic,
++security, evidence-integrity, or golden-path blocker with exact file/section
++evidence; do not elevate prose/bookkeeping preferences. Recommend the smallest
++justified next action and say explicitly whether to proceed, correct narrowly,
++or stop/reslice. This review is advisory and cannot authorize production edits
++or a campaign.
++
++Model disclosure: Fable 5.1 (`claude-fable-5-1`), high effort, read-only, no
++nested subagents. After this run, no further Fable invocation is authorized.
+diff --git a/.logs/d110c-trajectory-fable51-high-oneoff-20260903/result.md b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/result.md
+new file mode 100644
+index 00000000..ed5c3bc6
+--- /dev/null
++++ b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/result.md
+@@ -0,0 +1,67 @@
++# D.110c trajectory — one-off Fable 5.1/high review
++
++- Session: `8323a0e9-296a-4f5f-b981-cf2c034725b6`
++- Model: `claude-fable-5-1`
++- Effort: `high`
++- Terminal state: completed successfully; no nested subagents
++- External transcript:
++  `/Users/aristotle/.claude/projects/-Users-aristotle-Documents-Projects-ts-drp-1/8323a0e9-296a-4f5f-b981-cf2c034725b6.jsonl`
++- Transcript SHA-256:
++  `b0f317390e0b023063b344a282383c08ee3a880e1f67db907677c8461bdc2b8e`
++- Transcript bytes: `871355`
++- Verdict: `CORRECT_NARROWLY`
++- Trajectory sound: `true`
++- Counts: P0=0, P1=1, P2=5
++
++## Blocking finding
++
++The existing f5 audit correctly identifies the numeric-boundary silent-stall
++case, but it omits related reachable close-wide failures in
++`packages/node/src/creator-close.ts`: duplicate author/sequence slots throw at
++line 489; an offline noncreator first observed above a null prior boundary
++throws at lines 513–525; and an admitted sequence at or below the previous
++boundary throws at line 528. Because ingress does not enforce a per-author
++sequence prefix and rebase reissues displaced operations at fresh sequences,
++an honest offline noncreator can leave a persistent vertex that makes each
++later creator close fail. This blocks the repeated same-room golden path.
++
++The narrow required correction is docs/tests planning only before production
++work: add null-boundary, regression, and duplicate-slot cases to f5's causal RED
++matrix and freeze a close-liveness invariant under which a foreign author's
++sequence anomaly may stall/refuse that author's frontier but cannot prevent the
++creator from closing the room.
++
++## Nonblocking findings
++
++1. State the actual authority of a covered-historical row before selecting the
++   f5 proof family; the current consumer authorizes a reissue candidate, not
++   application state directly, so do not select a needlessly heavy proof from a
++   stronger threat claim.
++2. Prefer one combined governing review for signed f2/f4 checkpoint acceptance
++   and f5 exact-design selection because f5 changes the same aggregate carrier.
++3. The null-boundary branch emits `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`
++   where the plan assigns `AUTHOR_REENTRY_PROOF_REQUIRED`; cover and correct it
++   during f5 GREEN rather than as a separate slice.
++4. The cross-object displaced-source branch stores a target-derived bootstrap
++   policy in an unused field, while the asserted same-room transport handoff
++   correctly uses the source registration's policy. Narrow the plan wording or
++   remove/fix the dead field during the relevant owned change.
++5. Describe aggregate writer-set equality as creator-attested rather than
++   independently verifier-derived. The removed transition-side successor-ACL
++   check remains correctly rejected because no detached successor ACL candidate
++   exists and the creator already owns the transition signature.
++
++## Recommended order
++
++1. Amend f5's plan and RED matrix with the close-wide liveness cases.
++2. Run one Grok/Kimi/Opus review covering f2/f4 checkpoint acceptance and f5
++   exact-design selection.
++3. Produce genuine-product-path f5 REDs for null- and numeric-boundary rebase,
++   plus no-gap controls, restart, later closes, reopen, and publish.
++4. Implement only the accepted f5 construction and rerun its focused, retained,
++   browser, static, and isolated-checkout gates.
++5. Continue through D.110c-c restart/pruning/census, D.110c-d's at-least-100
++   same-room transitions and memory gate, then Phase 7 archive/cold join.
++
++This advisory review authorizes neither production edits nor a campaign. No
++further Fable invocation is authorized without a new express user request.
+diff --git a/.logs/d110c-trajectory-fable51-high-oneoff-20260903/schema.json b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/schema.json
+new file mode 100644
+index 00000000..05babcd0
+--- /dev/null
++++ b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/schema.json
+@@ -0,0 +1,55 @@
++{
++	"type": "object",
++	"properties": {
++		"verdict": {
++			"type": "string",
++			"enum": ["PROCEED", "CORRECT_NARROWLY", "STOP_AND_RESLICE", "NO_VERDICT"]
++		},
++		"trajectory_sound": { "type": "boolean" },
++		"p0_count": { "type": "integer", "minimum": 0 },
++		"p1_count": { "type": "integer", "minimum": 0 },
++		"p2_count": { "type": "integer", "minimum": 0 },
++		"findings": {
++			"type": "array",
++			"items": {
++				"type": "object",
++				"properties": {
++					"severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
++					"title": { "type": "string" },
++					"evidence": { "type": "string" },
++					"required_action": { "type": "string" }
++				},
++				"required": ["severity", "title", "evidence", "required_action"],
++				"additionalProperties": false
++			}
++		},
++		"demonstrated_facts": {
++			"type": "array",
++			"items": { "type": "string" }
++		},
++		"golden_path_gaps": {
++			"type": "array",
++			"items": { "type": "string" }
++		},
++		"smallest_next_action": { "type": "string" },
++		"recommended_sequence": {
++			"type": "array",
++			"items": { "type": "string" }
++		},
++		"summary": { "type": "string" }
++	},
++	"required": [
++		"verdict",
++		"trajectory_sound",
++		"p0_count",
++		"p1_count",
++		"p2_count",
++		"findings",
++		"demonstrated_facts",
++		"golden_path_gaps",
++		"smallest_next_action",
++		"recommended_sequence",
++		"summary"
++	],
++	"additionalProperties": false
++}
+diff --git a/.logs/d110c-trajectory-fable51-high-oneoff-20260903/verification.md b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/verification.md
+new file mode 100644
+index 00000000..1ea69703
+--- /dev/null
++++ b/.logs/d110c-trajectory-fable51-high-oneoff-20260903/verification.md
+@@ -0,0 +1,40 @@
++# Verification
++
++Review execution:
++
++- model `claude-fable-5-1`, effort `high`, read-only tools only;
++- session `8323a0e9-296a-4f5f-b981-cf2c034725b6` completed successfully;
++- nested subagents spawned: `0`;
++- verdict `CORRECT_NARROWLY`, P0/P1/P2 `0/1/5`;
++- transcript bytes `871355`;
++- transcript SHA-256
++  `b0f317390e0b023063b344a282383c08ee3a880e1f67db907677c8461bdc2b8e`.
++
++Local corroboration and amendment audit:
++
++- `rg` found `creator issuance-frontier author slot is ambiguous` only at
++  `packages/node/src/creator-close.ts:489` and no test assertion;
++- `rg` found `creator issuance-frontier boundary regressed` only at
++  `packages/node/src/creator-close.ts:528` and no test assertion;
++- source inspection confirmed the null/absent prior-boundary throws, ingress
++  admission without a per-author prefix gate, fresh-sequence reissue, and
++  source completion after replacement issue;
++- the plan contains exactly one
++  `D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` and exactly one
++  `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED` occurrence;
++- `git diff --name-only` contains only
++  `docs/production-hardening/production-hardening-tdd-plan-v2.md` among tracked
++  files; no production or test source changed;
++- `git diff --check` passes;
++- `python3 -m json.tool schema.json` passes;
++- `NODE_OPTIONS=--max-old-space-size=8192 pnpm exec prettier --check` passes
++  for the plan and all files in this evidence root after one mechanical schema
++  formatting correction;
++- the self-excluding `SHA256SUMS` manifest validates;
++- protected `.agents/`, `.claude/`, and `.pnpm-store/` remain untracked and
++  unchanged by this slice;
++- all 27 existing stashes remain present.
++
++No product test, workload, campaign, production edit, or additional Fable run
++was performed. This is a plan/evidence amendment before the governing
++Grok/Kimi/Opus high-risk design review.
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 1e7a3f8c..9e05cefd 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -97283,12 +97283,15 @@ record field from 0c1f1. Only `frontiers` changes from an array of repeated-key
+ objects to an author-sorted array of exact two-element canonical arrays:
+ `[author, admittedAuthorSequence]`, where `author` is one lowercase 64-hex
+ Ed25519 public key and `admittedAuthorSequence` is either null or a nonnegative
+-safe integer. The outer vector must contain exactly the permissionless-aware
+-successor write-authorized set, and every inner value must be an ordinary exact
+-two-element decoded array with no holes, extra properties, duplicate author,
+-reordering, coercion, or alternate object/map form. The semantic identity and
+-signature preimage remain one-to-one; compact syntax does not omit or weaken a
+-frontier fact.
++safe integer. The creator close must attest exactly the permissionless-aware
++successor write-authorized set in the outer vector, and every inner value must
++be an ordinary exact two-element decoded array with no holes, extra properties,
++duplicate author, reordering, coercion, or alternate object/map form. The
++opener authenticates that creator attestation and consumers fail closed when a
++required author is absent; the transition verifier cannot independently
++rederive the set because its closure contains no detached successor-ACL
++candidate. The semantic identity and signature preimage remain one-to-one;
++compact syntax does not omit or weaken a frontier fact.
+ 
+ The carrier's `objectId` is additionally constrained by the independently
+ opened current and successor latched ACLs, whose canonical grammar permits at
+@@ -97732,10 +97735,14 @@ author/dependency/logical time, digest/signature mutation, issued/outbox
+ substitution, use of sequence zero through covered-historical authority,
+ hot-adoption policy loss, cold-reopen policy loss, and cross-application reopen.
+ Pending recovery is retained as a no-classification control, not given a new
+-field. A displaced-source/migration mutant proves its filtered store uses the
+-matching source registration's pinned genesis anchor and policy, never the
++field. The same-room transport-handoff mutant proves its filtered store uses
++the matching source registration's pinned genesis anchor and policy, never the
+ target registration's values or `undefined`, and cannot stale-publish a source
+-sequence-zero row. Current-epoch rows retain their existing path; the
++sequence-zero row. The cross-object displaced-source structure currently
++copies a target-derived policy into an unconsumed field; no f4 behavior or
++authority claim relies on that field, and removing or source-deriving it is
++owned only by a later change that otherwise touches that cross-object branch.
++Current-epoch rows retain their existing path; the
+ null-frontier post-bootstrap refusal applies only to historical rows. The full
+ legacy recovery roster must prove the declared compatibility mode. Exact
+ source-shape gates prove there is one shared predicate, the four recovery-input
+@@ -97809,11 +97816,13 @@ change.
+ 
+ ###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+ 
+-**Status: bounded source/architecture audit complete with no safe production
+-repair selected; BLOCKED pending the governing high-risk plan/design review
+-before final closure of D.110c-0c1f2/f4, parent D.110c-0c1/0c, the same-room
+-≥100-transition gate, Phase-6 exit, or Phase-7 multi-author cold join. No f5
+-production edit is authorized.** Owner: the interaction among
++**Status: bounded source/architecture audit and targeted close-liveness
++addendum complete with no safe production repair selected; BLOCKED pending one
++combined governing high-risk review of the signed f2/f4 checkpoint and f5
++exact-design selection before final closure of D.110c-0c1f2/f4, parent
++D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
++multi-author cold join. No f5 production edit is authorized.** Owner: the
++interaction among
+ `examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
+ issue path and `completeRebaseSource()` disposition, the authenticated close
+ graph captured by `packages/node/src/v3-live.ts`,
+@@ -97839,6 +97848,34 @@ the prior aggregate is 4, observing 7 and 8 leaves the boundary at 4 forever.
+ Subsequent valid writes remain above the same hole and signerless cold recovery
+ cannot authenticate them.
+ 
++The targeted addendum establishes three related close-wide liveness failures,
++not merely another cold-recovery symptom. When a prior aggregate contains an
++author with a null boundary, a first creator-observed sequence greater than one
++throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; when the author is absent from
++an otherwise present prior aggregate, the same shape throws
++`AUTHOR_REENTRY_PROOF_REQUIRED`. An admitted foreign-author sequence at or
++below a numeric prior boundary throws `creator issuance-frontier boundary
++regressed`, and duplicate `(author, sequence)` identities throw `creator
++issuance-frontier author slot is ambiguous`. In each case the exception aborts
++the creator's whole close, while the accepted offending vertex remains in that
++epoch graph and makes an unchanged retry fail again. Receive-side ingress does
++not enforce a per-author contiguous issuance prefix, and genuine rebase assigns
++fresh target sequences before completing the displaced source, so these states
++are reachable through ordinary offline noncreator behavior rather than only by
++a fabricated fixture.
++
++The required close-liveness invariant is therefore explicit: a foreign
++author's missing, duplicate, regressed, or noncontiguous admitted rows may
++prevent that author's frontier from advancing, or may produce an exact reviewed
++per-author refusal/disposition, but must not by themselves prevent the creator
++from closing the room. Any treatment must remain fail closed for that author,
++must not authenticate the anomalous row or cross a gap implicitly, and must
++preserve creator close/adoption availability for the other valid authors. The
++existing null-boundary branch also emits the legacy-migration code where the
++earlier plan assigns the author-reentry code; f5 GREEN owns exact causal tests
++and the reviewed error-code correction rather than hiding it in a separate
++slice.
++
+ Replacing the prefix with an observed maximum is explicitly rejected. Seeing
+ sequence 7 does not prove that unobserved sequences 5 and 6 were represented by
+ the admitted replacement, nor that their operation bytes, disposition, and
+@@ -97847,6 +97884,20 @@ below it pass `authenticatedCoveredHistoricalOutboxRow()` solely because its
+ number is below a creator-signed high-water mark. That would turn a liveness
+ defect into an authority defect.
+ 
++Design selection must nevertheless begin from the actual consumer contract,
++not silently strengthen it. A covered-historical row is an authenticated
++candidate for reissue under the current ACL, admission policy, canonical
++operation transformation, and displaced-operation identity deduplication; it
++does not directly install application state. The current predicate already
++accepts an author-signed historical row at or below the creator-attested
++boundary without a per-sequence digest commitment. The governing review must
++decide exactly which source disposition fact is necessary for safe reissue and
++frontier settlement before selecting a per-gap receipt, settled prefix, or
++accumulator. This qualification does not authorize the bare maximum or weaken
++the six proof obligations below; it prevents choosing an O(rebase) proof log or
++new cryptography to satisfy a stronger authority claim than any production
++consumer needs.
++
+ The f5 audit must compare at least: (1) a creator-authenticated supersession
+ commitment binding each skipped source `(author, sequence, digest)` to its exact
+ admitted replacement or terminal disposition; (2) a bounded settled-prefix
+@@ -97883,13 +97934,23 @@ frontier or tests-only durable record. One noncreator writer must create a
+ known settled prefix, retain at least two displaced rows, allocate intervening
+ sequences so their genuine rebase replacements appear above a gap, and have
+ those replacements admitted by the creator. The creator then performs at least
+-two further real close/adopt transitions. After restart, the unchanged writer
+-database cold reopens at the resulting successor and attempts one new
+-issue/publish. RED is causal only if exact evidence proves the old rows, fresh
+-replacement rows, creator observations, aggregate boundary, and recovery
+-refusal, and the terminal failure is the frozen f5 token rather than timing,
+-transport, fixture, or unrelated recovery failure. A no-gap control must stay
+-green.
++two further real close/adopt transitions. A second genuine null-boundary case
++must keep the writer offline across the first close, reissue its displaced row
++at a first observed sequence greater than one, admit it at the creator, and
++prove the next creator close aborts at the exact current refusal. Focused
++mutants cover an absent prior-author entry, a foreign-author sequence at or
++below a numeric prior boundary, and a duplicate `(author, sequence)` slot; each
++must demonstrate current close-wide failure while the no-gap control remains
++green. After restart, the unchanged writer database cold reopens at the
++resulting successor and attempts one new issue/publish. RED is causal only if
++exact evidence proves the old rows, fresh replacement rows, creator
++observations, aggregate boundary, close result, and recovery refusal, and the
++tests emit exact
++`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` for the numeric/cold-reopen
++case and exact `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED` for the
++null, absent, regression, and duplicate close-wide cases after first asserting
++their current product outcomes. Timing, transport, fixture, or unrelated
++recovery failures are noncausal and stop.
+ 
+ GREEN must make that unchanged RED and control pass while proving exact state
+ and operation accounting. Adversarial mutants cover each proof obligation
+@@ -97907,10 +97968,28 @@ not a substitute for the governing high-risk review. Its exact session is
+ is `739b7cd23e9a27700da5f12539c32ebf96a6882d6cc08fc562c3a98deda55994`.
+ It also identified the already-corrected first-observed-sequence-one predicate
+ and nonblocking empty-writer/byte-budget/pending-custody test obligations. No
+-further Fable run is authorized. The f5 source audit and exact design require
+-the governing Grok 4.6/high, direct Kimi K3 with
+-`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review before any f5
+-production edit. If the selected construction needs a carrier/wire change,
++further Fable run was authorized by that result. A later expressly authorized
++one-off Fable 5.1/high trajectory review, session
++`8323a0e9-296a-4f5f-b981-cf2c034725b6`, returned `CORRECT_NARROWLY`, P0/P1/P2
++`0/1/5`; its external transcript SHA-256 is
++`b0f317390e0b023063b344a282383c08ee3a880e1f67db907677c8461bdc2b8e`.
++Local source inspection confirmed its blocking close-liveness paths above. Its
++nonblocking dispositions are also explicit above: use the real historical-row
++consumer contract, describe the exact writer set as creator-attested, narrow
++the f4 source-policy claim to the tested same-room handoff, and retain the
++cross-object unused field as separately owned cleanup. No further Fable run is
++authorized without new express user instruction.
++
++The next single governing plan review—Grok 4.6/high, direct Kimi K3 with
++`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh—must occur before any f5
++production edit and cover both the signed f2/f4 plan→RED→GREEN history as a
++narrow implementation checkpoint and f5 exact-design selection under the
++amended causal matrix. It may accept f2/f4 checkpoint evidence without
++claiming general historical-rebase safety, but f2/f4 final semantic closure
++remains held by f5. This combined review avoids recursively reviewing the same
++aggregate carrier in two rounds and does not reopen or alter immutable
++RED/GREEN evidence.
++If the selected construction needs a carrier/wire change,
+ new authority statement, dependency, public API, threshold change, or migration
+ protocol, stop after the audit and create the corresponding explicit high-risk
+ prerequisite instead of widening f5 silently.

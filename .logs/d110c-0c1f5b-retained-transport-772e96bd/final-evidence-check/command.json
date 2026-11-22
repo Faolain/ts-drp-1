@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "-e",
+    "const fs=require(\"fs\"),cp=require(\"child_process\"),p=process.argv[1];let count=0;for(const f of fs.readdirSync(p)){if(f.endsWith(\".mjs\")){cp.execFileSync(process.execPath,[\"--check\",p+\"/\"+f]);count++}if(f.endsWith(\".mjs\")||f.endsWith(\".md\")){const s=fs.readFileSync(p+\"/\"+f,\"utf8\");if(/\\n\\s*\\n$/.test(s)||/[ \\t]+$/m.test(s))throw Error(\"Evidence whitespace \"+f)}}console.log(JSON.stringify({syntaxFiles:count,evidenceWhitespacePassed:true}));",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-transport-772e96bd"
+  ],
+  "start": "2026-09-06T01:39:20.170Z"
+}

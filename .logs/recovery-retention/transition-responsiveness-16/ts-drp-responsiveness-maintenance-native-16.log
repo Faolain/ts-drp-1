@@ -1,0 +1,43 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+(node:54186) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:54185) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/creator-maintenance-host-turn-native.test.ts (2 tests | 2 failed) 11132ms
+   × joins genuine native participant custody before a maintenance host turn and handles close 5442ms
+     → released-participant checkpoint was not reached
+   × joins genuine native participant custody before a maintenance host turn and handles foreign-native-control 5689ms
+     → released-participant checkpoint was not reached
+ ✓ tests/creator-adoption-host-turn-native.test.ts (7 tests) 20147ms
+   ✓ retains original public owners while native adoption boundary begin is held  3447ms
+   ✓ retains original public owners while native adoption boundary publish is held  3007ms
+   ✓ retains original public owners while native adoption boundary commit is held  3044ms
+   ✓ retains original public owners while native adoption boundary recovery is held  2946ms
+   ✓ retains original public owners while native adoption boundary activate is held  2858ms
+   ✓ joins session close while native adoption boundary commit is held  2433ms
+   ✓ joins session close while native adoption boundary recovery is held  2409ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/creator-maintenance-host-turn-native.test.ts > joins genuine native participant custody before a maintenance host turn and handles close
+ FAIL  tests/creator-maintenance-host-turn-native.test.ts > joins genuine native participant custody before a maintenance host turn and handles foreign-native-control
+Error: released-participant checkpoint was not reached
+ ❯ tests/creator-maintenance-host-turn-native.test.ts:144:12
+    142|     gate.arrival,
+    143|     maintenance.then(() => {
+    144|      throw Error("released-participant checkpoint was not reached");
+       |            ^
+    145|     }),
+    146|    ]);
+ ❯ tests/creator-maintenance-host-turn-native.test.ts:141:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 7 passed (9)
+   Start at  12:24:37
+   Duration  26.20s (transform 4.91s, setup 0ms, collect 11.55s, tests 31.28s, environment 0ms, prepare 165ms)
+

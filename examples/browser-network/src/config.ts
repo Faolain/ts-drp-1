@@ -73,6 +73,7 @@ export function buildModularNetworkConfig(environment: BrowserNetworkEnv): DRPNo
 					invite: { inviteToken: membershipInvite },
 					mode: "invite",
 				},
+				peer_selection: { expected_replicas: 50 },
 				recovery: {
 					backend_cooldown_ms: 1_000,
 					health_poll_interval_ms: 250,
@@ -163,6 +164,7 @@ export function getNetworkConfigFromEnv(environment: BrowserNetworkEnv, metricsO
 	const config: DRPNodeConfig = {
 		network_config: {
 			browser_metrics: true,
+			control_plane: { peer_selection: { expected_replicas: 50 } },
 		},
 	};
 

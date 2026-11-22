@@ -1,0 +1,207 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 17,
+  "passed": 17,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner",
+      "status": "passed",
+      "title": "freezes the D.108e2a activation boundary and its single topic owner",
+      "duration": 263.703125,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect",
+      "status": "passed",
+      "title": "rejects a hostile cold authentication profile before every downstream effect",
+      "duration": 49.89854199999991,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners",
+      "status": "passed",
+      "title": "freezes exactly seven RED and eight GREEN owners",
+      "duration": 1.6395829999999023,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster",
+      "status": "passed",
+      "title": "retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster",
+      "duration": 0.4039589999999862,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently",
+      "status": "passed",
+      "title": "derives the exact epoch-one identity and pending epoch-zero lineage independently",
+      "duration": 424.27095899999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED keeps the root and products outside D.108d1",
+      "status": "passed",
+      "title": "keeps the root and products outside D.108d1",
+      "duration": 2.8067919999998594,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory",
+      "status": "passed",
+      "title": "pins the complete zero-skip GREEN inventory",
+      "duration": 1.356375000000071,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate",
+      "status": "passed",
+      "title": "imports the shipped successor activation owner without a source-pattern readiness gate",
+      "duration": 0.40949999999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation",
+      "status": "passed",
+      "title": "genuine successor imports its verified snapshot before epoch-one activation",
+      "duration": 304.33520799999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED private custody alone selects installEpochAnchor",
+      "status": "passed",
+      "title": "private custody alone selects installEpochAnchor",
+      "duration": 2021.5597090000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED divergent genesis identity fails before every live effect",
+      "status": "passed",
+      "title": "divergent genesis identity fails before every live effect",
+      "duration": 1314.0043329999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one",
+      "status": "passed",
+      "title": "pending epoch-zero outbox is classified and never published as epoch one",
+      "duration": 244.55100000000039,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal",
+      "status": "passed",
+      "title": "old handle registration author and prepared capability are terminal",
+      "duration": 241.21016599999984,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim",
+      "status": "passed",
+      "title": "hot duplicate returns the same handle before a second source claim",
+      "duration": 308.6448329999994,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed",
+      "status": "passed",
+      "title": "conflicting hot duplicate bindings fail closed",
+      "duration": 281.9965000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
+      "status": "passed",
+      "title": "post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
+      "duration": 415.17054199999984,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1 creator successor activation RED"
+      ],
+      "fullName": "D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt",
+      "status": "passed",
+      "title": "TTL expiry performs one bounded full reverify attempt",
+      "duration": 928.6622500000003,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "baseCommit": "acec5c3fe03c83add9cd2c992dcdae88786c48cf",
+  "reviewedImplementationHead": "3f47ced3099134d4b0c7f1bd2b11aee2a652ae7a",
+  "reviewedEvidenceHead": "5f03da91ad83d3bf2ee98fb069740864af4b90a0",
+  "reviewCheckout": "/tmp/d110c-f5b0v-confirm.QdxCuI/checkout",
+  "implementationPathCount": 21,
+  "binaryDiffSha256": "0a215e343c56138ca46a514ad828a72645aa0fff03e85d28b9f7cd711ece4204",
+  "reviewers": {
+    "grok": {
+      "model": "grok-4.6-build",
+      "effort": "high",
+      "sessionId": "01a070b7-7c16-7721-be1a-3a87cfe13ba2",
+      "initialStrictClassification": "NO_VERDICT",
+      "resumedTerminalVerdict": "PASS",
+      "p0": 0,
+      "p1": 0,
+      "p2": 2
+    },
+    "sol": {
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "verdict": "PASS",
+      "p0": 0,
+      "p1": 0,
+      "p2": 3
+    },
+    "fable": {
+      "model": "claude-fable-5-1",
+      "effort": "xhigh",
+      "launcher": "claude-phel",
+      "sessionId": "e57364e1-8dbb-46f4-80b4-fbe1719afcd6",
+      "verdict": "PASS",
+      "p0": 0,
+      "p1": 0,
+      "p2": 3
+    }
+  },
+  "blockingUnion": {
+    "p0": 0,
+    "p1": 0
+  },
+  "parentF5bReady": true
+}
+

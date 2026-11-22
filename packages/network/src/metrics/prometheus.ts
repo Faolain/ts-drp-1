@@ -168,6 +168,7 @@ class PrometheusAvgMinMax<Labels extends Record<string, string | number> = Recor
  */
 export class PrometheusMetricsRegister implements MetricsRegister {
 	private pushgateway: TypePromPushgateway<"text/plain; version=0.0.4; charset=utf-8">;
+	private readonly pushgatewayUrl: string;
 	private interval: NodeJS.Timeout | undefined;
 
 	/**
@@ -175,6 +176,7 @@ export class PrometheusMetricsRegister implements MetricsRegister {
 	 * @param pushgatewayUrl - The URL of the Pushgateway
 	 */
 	constructor(pushgatewayUrl: string) {
+		this.pushgatewayUrl = pushgatewayUrl;
 		this.pushgateway = new PromPushgateway(pushgatewayUrl, {}, globalRegistry);
 	}
 
@@ -240,6 +242,29 @@ export class PrometheusMetricsRegister implements MetricsRegister {
 			await this.pushgateway.pushAdd({ jobName });
 		} catch (e) {
 			console.error("Error pushing metrics", e);
+		}
+	}
+
+	/**
+	 * Push metrics and reject unless the Pushgateway confirms an exact 2xx response.
+	 * @param jobName - The job name under which to push the metrics.
+	 * @param groupings - Closed grouping labels encoded into the Pushgateway path.
+	 * @param signal - Optional process-lifetime cancellation signal.
+	 */
+	async pushMetricsOrThrow(
+		jobName: string,
+		groupings: Readonly<Record<string, string>>,
+		signal?: AbortSignal
+	): Promise<void> {
+		const pushgateway = new PromPushgateway(this.pushgatewayUrl, { signal }, globalRegistry);
+		const result = await pushgateway.push({ groupings: { ...groupings }, jobName });
+		const response = result.resp;
+		const statusCode =
+			response !== null && typeof response === "object" && "statusCode" in response
+				? Reflect.get(response, "statusCode")
+				: undefined;
+		if (typeof statusCode !== "number" || !Number.isInteger(statusCode) || statusCode < 200 || statusCode >= 300) {
+			throw new Error(`Pushgateway rejected metrics with status ${String(statusCode)}`);
 		}
 	}
 }

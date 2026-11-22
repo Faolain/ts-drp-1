@@ -1,0 +1,79 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-62/result.json",
+  "baselineSha256": "1f206670b43e564a35a87e853fff6d657ac7f8e2b290b5f1e32586ed47f36cad",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u genuine successor recovered-delivery RED"
+      ],
+      "fullName": "D.110c-0c1f5b0u genuine successor recovered-delivery RED replays exact above-snapshot evidence once after authority/base validation and before resumed issue",
+      "status": "passed",
+      "title": "replays exact above-snapshot evidence once after authority/base validation and before resumed issue",
+      "duration": 784.7165419999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u genuine successor recovered-delivery RED"
+      ],
+      "fullName": "D.110c-0c1f5b0u genuine successor recovered-delivery RED replays authenticated notifications after callback two rejects without duplicating canonical state or issuance",
+      "status": "passed",
+      "title": "replays authenticated notifications after callback two rejects without duplicating canonical state or issuance",
+      "duration": 576.8627500000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u genuine successor recovered-delivery RED"
+      ],
+      "fullName": "D.110c-0c1f5b0u genuine successor recovered-delivery RED fails closed and releases successor custody when recovered sink fails",
+      "status": "passed",
+      "title": "fails closed and releases successor custody when recovered sink fails",
+      "duration": 398.9565829999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0u genuine successor recovered-delivery RED"
+      ],
+      "fullName": "D.110c-0c1f5b0u genuine successor recovered-delivery RED fails closed and releases successor custody when recovered commit fails",
+      "status": "passed",
+      "title": "fails closed and releases successor custody when recovered commit fails",
+      "duration": 399.7443750000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "1c8bab3e42a1243292f6e6887ff0230dddaf29b0011fda3868210adb0b95c7cd",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

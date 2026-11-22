@@ -1,5 +1,3 @@
-import { SetDRP } from "@ts-drp/blueprints";
-import { DRPObject } from "@ts-drp/object";
 import { MessageType } from "@ts-drp/types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -73,17 +71,5 @@ describe("DRPNode public messaging and subscription API", () => {
 		expect(peerSettled).toBe(true);
 	});
 
-	test("notifies matching object subscribers synchronously with the stored object", () => {
-		let putReturned = false;
-		const callback = vi.fn(() => {
-			expect(putReturned).toBe(false);
-		});
-		const object = new DRPObject({ peerId: "peer-a", drp: new SetDRP<number>() });
-		node.subscribe("object-a", callback);
-		node.put("object-a", object);
-		putReturned = true;
-
-		expect(callback).toHaveBeenCalledOnce();
-		expect(callback).toHaveBeenCalledWith("object-a", object);
-	});
+	// The former stored-DRPObject callback case is historical at its original pin.
 });

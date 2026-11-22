@@ -1,0 +1,23 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2023",
+		"paths": {
+			"@ts-drp/*": ["../../../packages/*/dist/src/index.d.ts", "../../../packages/*"],
+			"@ts-drp/protocol-v3": ["../../../packages/protocol-v3/dist/src/public.d.ts"]
+		}
+	},
+	"files": [
+		"contract.ts",
+		"../../../packages/storage-node/tests/fixtures/declaration-discovery-environment.ts",
+		"../../../packages/storage-node/tests/fixtures/declaration-discovery-child.ts",
+		"../../../packages/storage-node/tests/snapshot-declaration-discovery-red.test.ts",
+		"../../../packages/storage-browser/tests/assets/snapshot-declaration-discovery-entry.ts",
+		"../../../packages/storage-browser/tests/snapshot-declaration-discovery-red.pw.ts",
+		"../../../packages/storage-browser/playwright.snapshot-declaration-discovery.config.ts"
+	],
+	"include": []
+}

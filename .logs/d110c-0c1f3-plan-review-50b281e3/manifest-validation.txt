@@ -1,0 +1,2 @@
+The self-excluding SHA256SUMS manifest was validated from this evidence root
+with `shasum -a 256 -c SHA256SUMS`; all six entries returned `OK`.

@@ -1,0 +1,5 @@
+{
+	"extends": "../cold-discovery/tsconfig.json",
+	"include": ["./completion-*.ts", "./run-completion.mts"],
+	"exclude": []
+}

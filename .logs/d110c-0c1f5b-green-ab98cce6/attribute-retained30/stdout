@@ -1,0 +1,1 @@
+{"mismatches":[{"file":"packages/protocol-v3/registry/registry-v1.json","expected":"2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9","actual":"663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190","signedHead":"663281a11da08d99e4a751ed3f439c1562a49d3b70ab21b34de50959bf47c190"}],"total":5,"failed":2,"skipped":3,"registryMatchesSignedW0":true}

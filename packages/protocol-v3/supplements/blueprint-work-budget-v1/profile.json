@@ -1,0 +1,31 @@
+{
+	"profileId": "blueprint-work-budget-v1",
+	"protocolMajor": 3,
+	"packageSchemaVersion": 1,
+	"legacyManifestSchemaVersion": 1,
+	"budgetedManifestSchemaVersion": 2,
+	"blueprintDigestDomain": "ts-drp/blueprint-admission/v3",
+	"manifest": {
+		"fields": ["schemaVersion", "operationDiscriminator", "workBudgetProfile", "operations"],
+		"workBudgetProfile": "blueprint-work-budget-v1",
+		"operationFields": ["name", "argumentSchema", "maxCanonicalOperationBytes"],
+		"operationOrdering": "unique-name-codepoint",
+		"limitDomain": "positive-safe-integer"
+	},
+	"binding": {
+		"preimage": "exact-canonical-whole-blueprint-package-bytes",
+		"includesOperationDiscriminator": true,
+		"includesOperationIdentity": true,
+		"includesMaxCanonicalOperationBytes": true,
+		"separateBudgetDigest": false
+	},
+	"claims": {
+		"operationByteEnforcement": false,
+		"transportFrameLimit": false,
+		"reducerInvocation": false,
+		"liveAnchorBinding": false,
+		"parametersRegistryChange": false,
+		"protocolV2Change": false,
+		"wallClockOrInstructionMeter": false
+	}
+}

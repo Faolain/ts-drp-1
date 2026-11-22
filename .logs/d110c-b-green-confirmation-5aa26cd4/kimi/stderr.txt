@@ -1,0 +1,952 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+5aa26cd489784b0478d06e9f4a01806972c92ad1 test(d110c-b): close final review blockers G
+f2066512f0311a56863be0d769531c6b783d9fef feat(node): complete D.110c-b hot epoch adoption G
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 1774 ++++++++++
+ .../grok/input-packet.md                           | 3428 ++++++++++++++++++++
+ .../d110c-b-final-review-f2066512/grok/public.txt  |    1 +
+ .../d110c-b-final-review-f2066512/grok/review.diff | 1988 ++++++++++++
+ .../d110c-b-final-review-f2066512/grok/status.json |    9 +
+ .../d110c-b-final-review-f2066512/grok/stderr.log  |    0
+ .../kimi/resume.stderr.txt                         |    1 +
+ .../kimi/resume.stream.jsonl                       |    3 +
+ .../d110c-b-final-review-f2066512/kimi/stderr.txt  |  249 ++
+ .../kimi/stream.jsonl                              |   21 +
+ .logs/d110c-b-final-review-f2066512/opus/raw.json  |    1 +
+ .../d110c-b-final-review-f2066512/opus/stderr.txt  |    0
+ .logs/d110c-b-final-review-f2066512/prompt.md      |   53 +
+ .../batch1-vitest-complete.json                    |    1 +
+ .../batch1-vitest-corrected.json                   |    1 +
+ .../batch1-vitest-final.json                       |    1 +
+ .../batch1-vitest-green.json                       |    1 +
+ .../batch1-vitest-isolated.json                    |    1 +
+ .logs/d110c-b-green-90147e3c/batch1-vitest.json    |    1 +
+ .logs/d110c-b-green-90147e3c/batch2-chromium.json  |  155 +
+ .logs/d110c-b-green-90147e3c/green-ledger.md       |   58 +
+ .logs/d110c-b-green-90147e3c/manifest.sha256       |   17 +
+ .../retained-activation-browser.json               |  942 ++++++
+ .../retained-live-close-browser.json               |  420 +++
+ .logs/d110c-b-green-90147e3c/retained-node.json    |    1 +
+ .../retained-ordering-focused-corrected.json       |  218 ++
+ .../retained-ordering-focused.json                 |  304 ++
+ .../retained-product-browser-corrected.json        | 1239 +++++++
+ .../retained-product-browser-final.json            | 1239 +++++++
+ .../retained-product-browser-green.json            | 1146 +++++++
+ .../retained-product-browser.json                  | 1239 +++++++
+ .../accepted-statuses.txt                          |   24 +
+ .../changed-paths.sha256                           |   15 +
+ .../changed-paths.txt                              |   15 +
+ .../correction-ledger.md                           |   58 +
+ .../d110c-a-private-fixture-typecheck.status       |    1 +
+ .../d110c-a-private-fixture-typecheck.stderr       |    0
+ .../d110c-a-private-fixture-typecheck.stdout       |    0
+ .../diagnostic-focused-initial.json                |  186 ++
+ .../diagnostic-focused-lock-expectation.json       |  186 ++
+ .../diagnostic-focused-pre-isolation-green.json    |  155 +
+ .../diagnostic-retained-stale-expectation.json     | 1239 +++++++
+ .../diff-check.status                              |    1 +
+ .../diff-check.stderr                              |    0
+ .../diff-check.stdout                              |    0
+ .../eslint.status                                  |    1 +
+ .../eslint.stderr                                  |    0
+ .../eslint.stdout                                  |    0
+ .../focused-browser-final.json                     |  155 +
+ .../focused-browser-final.status                   |    1 +
+ .../focused-browser-pre-failed-lock-proof.json     |  155 +
+ ...cused-browser-predecessor-count-diagnostic.json |  186 ++
+ .../manifest-validation.status                     |    1 +
+ .../manifest-validation.stderr                     |    0
+ .../manifest-validation.stdout                     |  138 +
+ .../manifest.sha256                                |  138 +
+ .../node-build-typecheck.status                    |    1 +
+ .../node-build-typecheck.stderr                    |    0
+ .../node-build-typecheck.stdout                    |    0
+ .../node-build.status                              |    1 +
+ .../node-build.stderr                              |    0
+ .../node-build.stdout                              |    8 +
+ ...nal-green-manifest-validation-diagnostic.status |    1 +
+ ...nal-green-manifest-validation-diagnostic.stderr |   18 +
+ ...nal-green-manifest-validation-diagnostic.stdout |   17 +
+ .../original-green-manifest-validation.status      |    1 +
+ .../original-green-manifest-validation.stderr      |    0
+ .../original-green-manifest-validation.stdout      |   17 +
+ .../playwright-focused-list.status                 |    1 +
+ .../playwright-focused-list.stderr                 |    0
+ .../playwright-focused-list.stdout                 |    3 +
+ .../playwright-retained-list.status                |    1 +
+ .../playwright-retained-list.stderr                |    0
+ .../playwright-retained-list.stdout                |   32 +
+ .../prettier-check.status                          |    1 +
+ .../prettier-check.stderr                          |    0
+ .../prettier-check.stdout                          |    2 +
+ .../prettier-final-docs.status                     |    1 +
+ .../prettier-final-docs.stderr                     |    0
+ .../prettier-final-docs.stdout                     |    2 +
+ .../prettier-write.status                          |    1 +
+ .../prettier-write.stderr                          |    0
+ .../prettier-write.stdout                          |   18 +
+ .../reporter-summary.json                          |  173 +
+ .../retained-activation-browser.json               |  942 ++++++
+ .../retained-activation-browser.status             |    1 +
+ .../retained-live-close-browser.json               |  420 +++
+ .../retained-live-close-browser.status             |    1 +
+ .../retained-node-correction.json                  |    1 +
+ .../retained-node-correction.status                |    1 +
+ .../retained-product-browser-fields-leaked.json    | 1239 +++++++
+ .../retained-product-browser-final.json            | 1146 +++++++
+ .../retained-product-browser-final.status          |    1 +
+ ...ined-product-browser-pre-failed-lock-proof.json | 1146 +++++++
+ .../runtime-identity-diagnostic.json               |    0
+ .../runtime-identity-diagnostic.status             |    1 +
+ .../runtime-identity-diagnostic.stderr             |   19 +
+ .../runtime-identity.json                          |    1 +
+ .../runtime-identity.status                        |    1 +
+ .../runtime-identity.stderr                        |    0
+ .../source-shape.json                              |   22 +
+ .../source-shape.status                            |    1 +
+ .../source-shape.stderr                            |    0
+ .../state-audit.txt                                |   13 +
+ .../storage-browser-build-typecheck.status         |    1 +
+ .../storage-browser-build-typecheck.stderr         |    0
+ .../storage-browser-build-typecheck.stdout         |    0
+ .../storage-browser-build.status                   |    1 +
+ .../storage-browser-build.stderr                   |    0
+ .../storage-browser-build.stdout                   |    4 +
+ .../test-assertion-inventory.txt                   |   12 +
+ .../v3-chat-typecheck.status                       |    1 +
+ .../v3-chat-typecheck.stderr                       |    0
+ .../v3-chat-typecheck.stdout                       |    4 +
+ .../v3-room-build.status                           |    1 +
+ .../v3-room-build.stderr                           |    0
+ .../v3-room-build.stdout                           |    4 +
+ .../v3-room-typecheck.status                       |    1 +
+ .../v3-room-typecheck.stderr                       |    0
+ .../v3-room-typecheck.stdout                       |    4 +
+ .../vitest-focused-list-diagnostic.status          |    1 +
+ .../vitest-focused-list-diagnostic.stderr          |   16 +
+ .../vitest-focused-list-diagnostic.stdout          |    0
+ .../vitest-focused-list.status                     |    1 +
+ .../vitest-focused-list.stderr                     |    0
+ .../vitest-focused-list.stdout                     |    1 +
+ .../production-hardening-tdd-plan-v2.md            |   76 +-
+ examples/v3-room/src/index.ts                      |   16 +-
+ packages/node/src/creator-adoption-activate.ts     |    6 +-
+ .../phase-6a-creator-successor-product-entry.ts    |   49 +-
+ .../tests/phase-6a-creator-successor-product.pw.ts |  123 +-
+ .../creator-successor-product-contract.ts          |   31 +
+ tests/fixtures/phase-6b-d110c-b/source-shape.mjs   |   24 +-
+ 134 files changed, 22805 insertions(+), 20 deletions(-)
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 9c4de59d..3df70b88 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -3616,25 +3616,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			activeHandle = undefined;
+ 			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+ 		}
+-		if (bindCurrentCreatorClose === undefined) {
++		const failCloseRebind = async (): Promise<never> => {
+ 			activeHandle = replacement;
+ 			replacementOwned = false;
+ 			successorProjectionAuthority = authority;
+ 			creatorCloseHandle = undefined;
+ 			creatorCloseUnavailableContinuity = "stalled";
+ 			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
++			await predecessorClose.stop().catch(() => undefined);
+ 			throw terminalFailure;
+-		}
++		};
++		if (bindCurrentCreatorClose === undefined) return failCloseRebind();
+ 		const rebound = await bindCurrentCreatorClose(replacement);
+-		if (!rebound.ok) {
+-			activeHandle = replacement;
+-			replacementOwned = false;
+-			successorProjectionAuthority = authority;
+-			creatorCloseHandle = undefined;
+-			creatorCloseUnavailableContinuity = "stalled";
+-			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
+-			throw terminalFailure;
+-		}
++		if (!rebound.ok) return failCloseRebind();
+ 		activeHandle = replacement;
+ 		replacementOwned = false;
+ 		successorProjectionAuthority = authority;
+diff --git a/packages/node/src/creator-adoption-activate.ts b/packages/node/src/creator-adoption-activate.ts
+index 991a47cf..62817c51 100644
+--- a/packages/node/src/creator-adoption-activate.ts
++++ b/packages/node/src/creator-adoption-activate.ts
+@@ -188,8 +188,10 @@ async function deactivateOwner(owner: ActiveOwner): Promise<void> {
+ 	try {
+ 		if (typeof deactivate === "function") await Reflect.apply(deactivate, owner.handle, []);
+ 	} finally {
+-		if (currentOwner(owner)) activeOwners.delete(owner.topic);
+-		await owner.lock?.release();
++		if (currentOwner(owner)) {
++			activeOwners.delete(owner.topic);
++			await owner.lock?.release();
++		}
+ 	}
+ }
+ 
+diff --git a/tests/fixtures/phase-6b-d110c-b/source-shape.mjs b/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+index 2c80d560..ca68fe0b 100644
+--- a/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
++++ b/tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+@@ -4,13 +4,14 @@ import { resolve } from "node:path";
+ 
+ const root = resolve(import.meta.dirname, "../../..");
+ const read = (path) => readFile(resolve(root, path), "utf8");
+-const [adoption, commit, activation, live, room, browser] = await Promise.all([
++const [adoption, commit, activation, live, room, browser, contract] = await Promise.all([
+ 	read("packages/node/src/creator-adoption.ts"),
+ 	read("packages/node/src/creator-adoption-commit.ts"),
+ 	read("packages/node/src/creator-adoption-activate.ts"),
+ 	read("packages/node/src/v3-live.ts"),
+ 	read("examples/v3-room/src/index.ts"),
+ 	read("packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts"),
++	read("tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts"),
+ ]);
+ 
+ function section(source, start, end) {
+@@ -27,6 +28,7 @@ const activateMaterial = section(
+ 	"/**\n * Activates one freshly committed"
+ );
+ const ownerWrapper = section(activation, "function wrapOwner(", "function browserLockRealm(");
++const deactivateOwner = section(activation, "async function deactivateOwner(", "async function abandonOwner(");
+ const filteredIssuance = section(live, "function creatorFilteredIssuanceStore(", "function openRecoveryAuthorization(");
+ const liveActivation = section(
+ 	live,
+@@ -56,6 +58,10 @@ const predicates = Object.freeze({
+ 		activateMaterial.includes("activeOwners.set(topic, replacement)"),
+ 	activationRetainsAuthenticatedOwnerHeadAndToken:
+ 		activation.includes("readonly head: ActiveHead;") && activation.includes("readonly token: object;"),
++	activationReleasesOnlyTheCurrentOwnerLock:
++		deactivateOwner.includes("if (currentOwner(owner)) {") &&
++		deactivateOwner.includes("activeOwners.delete(owner.topic)") &&
++		deactivateOwner.includes("await owner.lock?.release()"),
+ 	commitRequiresExactNextEpoch:
+ 		commit.includes("successorEpoch === currentEpoch + 1") &&
+ 		commit.includes('currentEpoch === 0\n\t\t\t? "v3-live-generation-1"'),
+@@ -83,6 +89,17 @@ const predicates = Object.freeze({
+ 		roomAdoption.includes('new TypeError("D110C_B_ACTIVATION_STALLED")') &&
+ 		roomAdoption.includes('new TypeError("D110C_B_CLOSE_REBIND_FAILED")') &&
+ 		roomAdoption.includes('creatorCloseUnavailableContinuity = "stalled"'),
++	productCloseRebindFailureIsBehaviorallyInjected:
++		browser.includes("rejectCloseBind: true") &&
++		browser.includes('return Object.freeze({ ok: false, reason: "STORE_UNAVAILABLE" })') &&
++		productProof.includes('detail: "D110C_B_CLOSE_REBIND_FAILED"') &&
++		productProof.includes('closeAuthority: "unavailable"') &&
++		productProof.includes('continuity: "stalled"'),
++	productProofAuthenticatesVisibleAndRawEpochHeads:
++		productProof.includes("rawAuthorityAtEpoch(selected, epoch)") &&
++		(productProof.match(/isD110cBSuccessorAuthority\(/gu)?.length ?? 0) >= 4 &&
++		productProof.includes("heldTsDrpLocks(page)") &&
++		productProof.includes("expect(closeBindFailureLocks).toHaveLength(2)"),
+ 	productProofClosesEpochTwoToThree:
+ 		productProof.includes("D110C_B_PRODUCT_HOT_LOOP_COMPLETE") &&
+ 		productProof.includes("{ epoch: 2, successorEpoch: 3 }"),
+@@ -91,6 +108,11 @@ const predicates = Object.freeze({
+ 		successorAuthority.includes("Number.isSafeInteger(currentEpoch)") &&
+ 		successorAuthority.includes("currentEpoch < 1") &&
+ 		successorAuthority.includes("epoch: currentEpoch"),
++	testsOnlyAuthorityOracleIsExact:
++		contract.includes("export function isD110cBSuccessorAuthority(") &&
++		contract.includes("Reflect.ownKeys(record).length !== D108D2_AUTHORITY_KEYS.length") &&
++		contract.includes("D108D2_AUTHORITY_KEYS.every((key) => Object.hasOwn(record, key))") &&
++		contract.includes("record.epoch === expectedEpoch"),
+ });
+ 
+ const failed = Object.entries(predicates).filter(([, value]) => value !== true);
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 9b2bb1df..2edd01ee 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -94537,8 +94537,10 @@ ordering test then passed, proving both requests were pending before redirect
+ release, the invalid adoption remained exact
+ `D110C_B_ACTIVATION_STALLED` with zero verifier calls, and its settlement
+ preceded the later rehearsal or activation. These failed reporters and the
+-corrected focused reporter remain immutable diagnostic evidence under the
+-working root; they are not presented as GREEN passes.
++corrected focused reporter used the working roots only as staging locations.
++Their retained copies live in the tracked consolidated GREEN evidence root;
++the untracked working roots are not described as immutable custody and are not
++presented as GREEN passes.
+ 
+ The final retained gates are green. Root Vitest passed 62/62 suites and
+ 282/282 tests with zero failures or pending tests in `retained-node.json`.
+@@ -94559,6 +94561,76 @@ The consolidated immutable GREEN evidence root is
+ its validated 17-entry self-excluding manifest SHA-256 is
+ `ce501e519d7bb726d896938ada4443540c9dfecfe9e1299ba9202a37be4dc469`.
+ 
++The first formal plan->RED->GREEN review inspected signed/pushed GREEN
++`f2066512f0311a56863be0d769531c6b783d9fef`. Grok 4.6/high completed normally
++after 660.123 seconds with `stop_reason=end_turn`; the runner conservatively
++classified the response `NO_VERDICT` because inspection prose preceded its
++terminal schema, while the retained terminal JSON itself says `APPROVED`,
++P0=0/P1=0/P2=2. It requested the exact expected-epoch authority oracle and
++terminal predecessor-close cleanup. Standard direct Kimi K3 exact session
++`session_45264236-ae29-4ee8-9692-d980b386192e`, resumed after its internal
++review branches stalled, returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=5: the
++blocking finding was the absence of a behavioral close-bind-failure injection.
++Opus xhigh session `c68e57d2-9ca6-4801-992b-4e7bb5e81fc9` returned
++`CHANGES_REQUIRED`, P0=0/P1=4/P2=5. Its blocking findings were the missing
++explicit Chromium lock/fault proof, missing static/custody artifacts, an
++untracked GREEN evidence root, and the missing exact authority oracle. These
++verdicts are preserved without relabelling Grok's runner classification or
++claiming any reviewer inspected the later correction.
++
++One bounded correction closes that blocking union without changing the slice's
++wire, schema, public API, dependency, authority, threshold, workload, or cold-
++reopen boundary. The tests-only exact-key
++`isD110cBSuccessorAuthority(value, expectedEpoch)` reuses the unchanged seven-
++key epoch-1 roster, rejects a non-positive or unsafe expected epoch, and checks
++both visible and independently decoded raw AHE authority at epochs 1 and 2.
++The Chromium proof queries the native Web Lock inventory before activation and
++across both replacements, requiring zero successor-owner locks at genesis and
++one unchanged stable-topic lock thereafter. A dedicated tests-only
++`d110cBSnapshot()` isolates replacement and close-bind counters from retained
++D.108 instrumentation contracts. The same title injects one real
++`bindCreatorLiveClose()` refusal after genuine adoption, proves exact
++`D110C_B_CLOSE_REBIND_FAILED`, retained epoch-1 replacement authority, active
++but stalled/unavailable close custody, one predecessor deactivation, refusal
++of another close, two distinct room locks while the failed replacement remains
++active, and restoration to the sole main-room lock after shutdown.
++The production failure path best-effort stops its terminal predecessor close
++handle, and `deactivateOwner()` now deletes the owner and releases its shared
++lock only while its token is still current.
++
++The correction retains failed test reporters as diagnostics, not passes. The
++first complete retained run exposed only two new zero-valued counters in an
++old exact snapshot; the counters were consequently isolated behind the
++D.110c-b-specific inspection method rather than widening the retained
++snapshot. A focused run then established the real observed predecessor-
++deactivation count across the second hot replacement before the final focused
++Chromium result passed and emitted `D110C_B_PRODUCT_HOT_LOOP_COMPLETE`. The
++complete successor-product configuration subsequently passed 30/30 across
++Chromium, Firefox, and WebKit; successor activation passed 24/24; creator live
++close passed 9/9; and the affected retained Node pair passed. The corrected
++source-shape gate has seventeen predicates, adding exact current-owner lock
++release, behavioral close-bind injection, visible/raw authority, native lock,
++and exact-key-oracle checks.
++
++The correction checkpoint tracks both the original consolidated GREEN root
++and the new correction root. The latter retains separate stdout, stderr, and
++status artifacts for both affected package builds and build-source
++typechecks, v3-room typecheck/build, independent v3-chat typecheck, the private
++D.110c-a fixture typecheck, exact-owner ESLint, the 12-GiB formatter, diff and
++seventeen-predicate source-shape checks, reporter summaries, changed paths and
++source hashes, protected-path/stash/process/port state, commit/signature/ref
++custody, and a validating self-excluding manifest. The signed correction and
++its evidence receive the one already-permitted material confirmation; there is
++no new review slice.
++
++The nonblocking findings are dispositioned prospectively. The post-transfer
++alias-cleanup mutant, retained title/stall-token hygiene, and an exact durable-
++head tuple assertion are owned by D.110c-c before its retained gate. D.110c-c
++also pins the disclosed one-displaced-generation boundary and proves the third
++adoption only after authenticated pruning/catch-up exists. No D.110c-b result
++is reinterpreted as a third adoption, cold reopen, or bounded long-horizon
++proof.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The
+diff --git a/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts b/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+index 97167274..7a986171 100644
+--- a/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
++++ b/packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+@@ -5,10 +5,12 @@ type PlainRecord = Readonly<Record<string, unknown>>;
+ interface DirectRoomSession {
+ 	activateMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+ 	adoptCreatorSuccessor(): Promise<void>;
++	authority(): PlainRecord | null;
+ 	close(): Promise<void>;
+ 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+ 	rehearseMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+ 	sealEpoch(): Promise<unknown>;
++	status(): PlainRecord;
+ }
+ 
+ type DirectRoomHeadFault =
+@@ -148,6 +150,12 @@ interface LifetimeInstrumentation {
+ 	acceptedVertex(): Promise<void>;
+ 	cleanupReplacements(): Promise<void>;
+ 	d110cColdReopenCount(): number;
++	d110cBSnapshot(): Readonly<{
++		readonly activationCount: number;
++		readonly closeBindCount: number;
++		readonly closeBindFailureCount: number;
++		readonly predecessorDeactivateCount: number;
++	}>;
+ 	configure(
+ 		input: Readonly<{
+ 			readonly failBeforePublication?: boolean;
+@@ -162,6 +170,7 @@ interface LifetimeInstrumentation {
+ 			readonly pauseTerminalTransition?: boolean;
+ 			readonly pauseVerification?: boolean;
+ 			readonly rejectPredecessorDeactivate?: boolean;
++			readonly rejectCloseBind?: boolean;
+ 			readonly rejectReplacementDeactivate?: boolean;
+ 			readonly retainTarget?: boolean;
+ 			readonly throwIssueLocal?: boolean;
+@@ -218,6 +227,7 @@ declare global {
+ 					readonly pauseRedirectRecovery?: boolean;
+ 					readonly pauseTerminalTransition?: boolean;
+ 					readonly pauseVerification?: boolean;
++					readonly rejectCloseBind?: boolean;
+ 					readonly rejectPredecessorDeactivate?: boolean;
+ 					readonly rejectReplacementDeactivate?: boolean;
+ 					readonly retainTarget?: boolean;
+@@ -233,12 +243,20 @@ declare global {
+ 			closeDirectCreator(name: string): Promise<void>;
+ 			create(input: unknown): Promise<string>;
+ 			deleteDatabases(prefix: string): Promise<readonly string[]>;
++			d110cBSnapshot(): Readonly<{
++				readonly activationCount: number;
++				readonly closeBindCount: number;
++				readonly closeBindFailureCount: number;
++				readonly predecessorDeactivateCount: number;
++			}>;
+ 			d110cFloorMatrix(): Promise<PlainRecord>;
+ 			directAdoptionSettled(name: string): boolean;
++			directCreatorState(name: string): PlainRecord;
+ 			d108e5OperationSettled(observation: string): boolean;
+ 			d108e5Snapshot(): Readonly<{ readonly redirectRecoveryCount: number; readonly verificationCount: number }>;
+ 			deliver(packet: RelayPacket): void;
+ 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
++			rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord>;
+ 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
+ 			join(input: unknown): Promise<void>;
+ 			lifetimeSnapshot(): LifetimeInstrumentationSnapshot &
+@@ -642,7 +660,10 @@ function exactRecord(value: unknown): PlainRecord {
+ 	return value as PlainRecord;
+ }
+ 
+-async function rawAuthority(databaseName: string): Promise<PlainRecord> {
++async function rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord> {
++	if (!Number.isSafeInteger(expectedEpoch) || expectedEpoch < 1) {
++		throw new TypeError("D110C_B_EXPECTED_EPOCH_INVALID");
++	}
+ 	const database = await openExistingDatabase(`${databaseName}--ahe`);
+ 	try {
+ 		const transaction = database.transaction(["blobs", "generations", "objects"], "readonly");
+@@ -679,7 +700,9 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
+ 			return exactRecord(decodeCanonical(bytes));
+ 		});
+ 		const projections = decoded.filter((value) => value.kind === "v3-live-generation-2");
+-		const trusts = decoded.filter((value) => value.kind === "drp-anchor-trust-state" && value.currentEpoch === 1);
++		const trusts = decoded.filter(
++			(value) => value.kind === "drp-anchor-trust-state" && value.currentEpoch === expectedEpoch
++		);
+ 		if (projections.length !== 1 || trusts.length !== 1) {
+ 			throw new TypeError("D.108d2 successor projection is ambiguous");
+ 		}
+@@ -699,7 +722,7 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
+ 		return Object.freeze({
+ 			aclDigest: anchor.aclDigest,
+ 			anchorDigest,
+-			epoch: 1,
++			epoch: expectedEpoch,
+ 			genesisAnchorDigest: trust.genesisAnchorDigest,
+ 			lifecycle: "active",
+ 			objectId: trust.objectId,
+@@ -710,6 +733,10 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
+ 	}
+ }
+ 
++function rawAuthority(databaseName: string): Promise<PlainRecord> {
++	return rawAuthorityAtEpoch(databaseName, 1);
++}
++
+ async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord> {
+ 	const database = await openExistingDatabase(`${databaseName}--drp-snapshot-quarantine-v1`);
+ 	try {
+@@ -1592,6 +1619,14 @@ const api = Object.freeze({
+ 		for (const name of names) await deleteDatabase(name);
+ 		return Object.freeze(names);
+ 	},
++	d110cBSnapshot(): Readonly<{
++		readonly activationCount: number;
++		readonly closeBindCount: number;
++		readonly closeBindFailureCount: number;
++		readonly predecessorDeactivateCount: number;
++	}> {
++		return instrumentation().d110cBSnapshot();
++	},
+ 	d110cFloorMatrix(): Promise<PlainRecord> {
+ 		return d110cFloorMatrix();
+ 	},
+@@ -1601,6 +1636,11 @@ const api = Object.freeze({
+ 		}
+ 		return directAdoptionSettlements.get(name) === true;
+ 	},
++	directCreatorState(name: string): PlainRecord {
++		const room = directRooms.get(name);
++		if (room === undefined) throw new TypeError("D110C_B_DIRECT_ROOM_ABSENT");
++		return Object.freeze({ authority: room.authority(), status: room.status() });
++	},
+ 	d108e5OperationSettled(observation: string): boolean {
+ 		if (!d108e5OperationSettlements.has(observation)) {
+ 			throw new TypeError("D.108e5 direct operation observation is absent");
+@@ -1627,6 +1667,9 @@ const api = Object.freeze({
+ 			snapshotDeclaration: await rawSnapshotDeclaration(databaseName),
+ 		});
+ 	},
++	rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord> {
++		return rawAuthorityAtEpoch(databaseName, expectedEpoch);
++	},
+ 	async importSuccessor(
+ 		carrier: SuccessorCarrier,
+ 		sourceDatabaseName: string,
+diff --git a/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts b/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+index c257a84f..8944f289 100644
+--- a/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
++++ b/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+@@ -28,6 +28,7 @@ const contractLoad = import(
+ 		];
+ 		readonly D108E5_BROWSER_BEHAVIORS: readonly [string, string, string, string];
+ 		isD108d2Authority(value: unknown): boolean;
++		isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number): boolean;
+ 	}>
+ >;
+ // @ts-expect-error Playwright loads this ESM test before registration; the package typecheck uses an older module target.
+@@ -38,6 +39,7 @@ const D108E2C_PRODUCT_BROWSER_BEHAVIORS = contract.D108E2C_PRODUCT_BROWSER_BEHAV
+ const D108E3_BROWSER_BEHAVIORS = contract.D108E3_BROWSER_BEHAVIORS;
+ const D108E5_BROWSER_BEHAVIORS = contract.D108E5_BROWSER_BEHAVIORS;
+ let isD108d2Authority: (value: unknown) => boolean = () => false;
++let isD110cBSuccessorAuthority: (value: unknown, expectedEpoch: number) => boolean = () => false;
+ const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
+ const CHANNEL_NAME = "d108d2-successor-product";
+ 
+@@ -60,6 +62,8 @@ function createState() {
+     acceptedVertexFailureGate: Promise.resolve(),
+     activationCount: 0,
+     activationFailureGate: Promise.resolve(),
++    closeBindCount: 0,
++    closeBindFailureCount: 0,
+     commitCount: 0,
+     coldReopenCount: 0,
+     failBeforePublication: false,
+@@ -86,6 +90,7 @@ function createState() {
+     postPredecessorDeactivationPauseCount: 0,
+     predecessorDeactivateCount: 0,
+     rejectPredecessorDeactivate: false,
++    rejectCloseBind: false,
+     rejectReplacementDeactivate: false,
+     releaseAcceptedVertexFailure: undefined,
+     releaseActivationFailure: undefined,
+@@ -112,6 +117,8 @@ function createState() {
+   const configure = (input) => {
+     state.acceptedVertexFailureCount = 0;
+     state.activationCount = 0;
++    state.closeBindCount = 0;
++    state.closeBindFailureCount = 0;
+     state.commitCount = 0;
+     state.coldReopenCount = 0;
+     state.failBeforePublication = input.failBeforePublication === true;
+@@ -134,6 +141,7 @@ function createState() {
+     state.postPredecessorDeactivationPauseCount = 0;
+     state.predecessorDeactivateCount = 0;
+     state.rejectPredecessorDeactivate = input.rejectPredecessorDeactivate === true;
++    state.rejectCloseBind = input.rejectCloseBind === true;
+     state.rejectReplacementDeactivate = input.rejectReplacementDeactivate === true;
+     state.replacementDeactivateCount = 0;
+     state.replacementDeactivateCompletedCount = 0;
+@@ -234,6 +242,12 @@ function createState() {
+         state.releaseVerification?.();
+         state.releaseVerification = undefined;
+       },
++      d110cBSnapshot: () => Object.freeze({
++        activationCount: state.activationCount,
++        closeBindCount: state.closeBindCount,
++        closeBindFailureCount: state.closeBindFailureCount,
++        predecessorDeactivateCount: state.predecessorDeactivateCount,
++      }),
+       snapshot: () => Object.freeze({
+         activationCount: state.activationCount,
+         commitCount: state.commitCount,
+@@ -395,6 +409,14 @@ export const republishV3RetainedTo = (handle, targetPeerId) => actual.republishV
+ import * as actual from ${JSON.stringify(creatorClose)};
+ export const bindCreatorLiveClose = async (input) => {
+   const planeId = planeIds.get(input.plane);
++  if (planeId === state.targetPlaneId) {
++    state.closeBindCount += 1;
++    if (state.rejectCloseBind) {
++      state.rejectCloseBind = false;
++      state.closeBindFailureCount += 1;
++      return Object.freeze({ ok: false, reason: "STORE_UNAVAILABLE" });
++    }
++  }
+   const result = await actual.bindCreatorLiveClose({ ...input, plane: unwrapPlane(input.plane) });
+   if (planeId !== undefined && result.ok === true) closeHandlePlaneIds.set(result.handle, planeId);
+   return result;
+@@ -646,6 +668,21 @@ async function snapshot(page: Page): Promise<Readonly<Record<string, unknown>>>
+ 	return page.evaluate(() => window.phase6aCreatorSuccessorProduct.snapshot());
+ }
+ 
++async function heldTsDrpLocks(page: Page): Promise<readonly string[]> {
++	return page.evaluate(async () => {
++		const query = Reflect.get(navigator.locks, "query");
++		if (typeof query !== "function") throw new TypeError("D110C_B_LOCK_QUERY_UNAVAILABLE");
++		const selected = (await Reflect.apply(query, navigator.locks, [])) as Readonly<{
++			readonly held?: readonly Readonly<{ readonly name?: string }>[];
++		}>;
++		return Object.freeze(
++			(selected.held ?? [])
++				.flatMap(({ name }) => (typeof name === "string" && name.startsWith("ts-drp:") ? [name] : []))
++				.sort()
++		);
++	});
++}
++
+ async function waitForText(page: Page, text: string): Promise<void> {
+ 	await expect
+ 		.poll(
+@@ -663,6 +700,7 @@ test.describe.configure({ mode: "serial" });
+ 
+ test.beforeAll(async ({ browser }) => {
+ 	isD108d2Authority = contract.isD108d2Authority;
++	isD110cBSuccessorAuthority = contract.isD110cBSuccessorAuthority;
+ 	servers = Object.freeze(
+ 		await Promise.all(
+ 			["creator", "established", "late"].map(() =>
+@@ -2104,6 +2142,7 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+ 
+ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody", async ({
+ 	browser,
++	browserName,
+ }) => {
+ 	const retainedPages = [creator, established, late].filter((page): page is Page => page !== undefined);
+ 	const retainedBefore = await Promise.all(retainedPages.map(snapshot));
+@@ -2120,18 +2159,40 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
+ 			clientId: "alice",
+ 			databaseName,
+ 		});
++		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({}));
++		const initialLocks = browserName === "chromium" ? await heldTsDrpLocks(page) : Object.freeze([]);
++		if (browserName === "chromium") expect(initialLocks).toHaveLength(0);
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-zero"));
+ 		const closeZero = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+ 		expect(closeZero).toMatchObject({ epoch: 0, successorEpoch: 1 });
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-one"));
+ 		const epochOne = await snapshot(page);
+-		expect(epochOne.authority).toMatchObject({ epoch: 1 });
++		expect(isD110cBSuccessorAuthority(epochOne.authority, 1)).toBe(true);
++		expect(
++			isD110cBSuccessorAuthority(
++				await page.evaluate(
++					({ databaseName: selected, epoch }) =>
++						window.phase6aCreatorSuccessorProduct.rawAuthorityAtEpoch(selected, epoch),
++					{ databaseName, epoch: 1 }
++				),
++				1
++			)
++		).toBe(true);
++		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
++			activationCount: 1,
++			closeBindCount: 1,
++			closeBindFailureCount: 0,
++			predecessorDeactivateCount: 1,
++		});
++		const epochOneLocks = browserName === "chromium" ? await heldTsDrpLocks(page) : Object.freeze([]);
++		if (browserName === "chromium") expect(epochOneLocks).toHaveLength(1);
+ 		const closeOne = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+ 		expect(closeOne).toMatchObject({ epoch: 1, successorEpoch: 2 });
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+ 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-two"));
+ 		const epochTwo = await snapshot(page);
++		expect(isD110cBSuccessorAuthority(epochTwo.authority, 2)).toBe(true);
+ 		expect(epochTwo.authority).toMatchObject({
+ 			epoch: 2,
+ 			genesisAnchorDigest: (epochOne.authority as Readonly<Record<string, unknown>>).genesisAnchorDigest,
+@@ -2144,11 +2205,71 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
+ 			"d110c-b-epoch-two",
+ 		]);
+ 		expect(epochTwo.roomId).toBe((epochTwo.authority as Readonly<Record<string, unknown>>).anchorDigest);
++		expect(epochTwo.latchedAcl).toMatchObject({ currentEpoch: 2, nextEpoch: 3 });
++		expect(
++			isD110cBSuccessorAuthority(
++				await page.evaluate(
++					({ databaseName: selected, epoch }) =>
++						window.phase6aCreatorSuccessorProduct.rawAuthorityAtEpoch(selected, epoch),
++					{ databaseName, epoch: 2 }
++				),
++				2
++			)
++		).toBe(true);
++		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
++			activationCount: 2,
++			closeBindCount: 2,
++			closeBindFailureCount: 0,
++			predecessorDeactivateCount: 1,
++		});
++		if (browserName === "chromium") expect(await heldTsDrpLocks(page)).toEqual(epochOneLocks);
+ 		const closeTwo = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+ 		expect(closeTwo).toMatchObject({ epoch: 2, successorEpoch: 3 });
+ 		const pendingEpochThree = await snapshot(page);
+ 		expect(pendingEpochThree.authority).toEqual(epochTwo.authority);
+ 		expect(pendingEpochThree.accepted).toEqual(epochTwo.accepted);
++		if (browserName === "chromium") expect(await heldTsDrpLocks(page)).toEqual(epochOneLocks);
++
++		const closeBindFailureName = "d110c-b-close-bind-failure";
++		await page.evaluate((name) => window.phase6aCreatorSuccessorProduct.openDirectCreator(name), closeBindFailureName);
++		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({ rejectCloseBind: true }));
++		await page.evaluate((name) => window.phase6aCreatorSuccessorProduct.sealDirectCreator(name), closeBindFailureName);
++		await page.evaluate(
++			(name) => window.phase6aCreatorSuccessorProduct.beginDirectAdoption(name),
++			closeBindFailureName
++		);
++		const closeBindFailure = await page.evaluate(
++			(name) => window.phase6aCreatorSuccessorProduct.waitForDirectAdoption(name),
++			closeBindFailureName
++		);
++		const closeBindFailureState = await page.evaluate(
++			(name) => window.phase6aCreatorSuccessorProduct.directCreatorState(name),
++			closeBindFailureName
++		);
++		expect(closeBindFailure).toMatchObject({ detail: "D110C_B_CLOSE_REBIND_FAILED", status: "rejected" });
++		expect(isD110cBSuccessorAuthority(closeBindFailureState.authority, 1)).toBe(true);
++		expect(closeBindFailureState.status).toMatchObject({
++			closeAuthority: "unavailable",
++			continuity: "stalled",
++			lifecycle: "active",
++		});
++		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
++			activationCount: 1,
++			closeBindCount: 1,
++			closeBindFailureCount: 1,
++			predecessorDeactivateCount: 1,
++		});
++		if (browserName === "chromium") {
++			const closeBindFailureLocks = await heldTsDrpLocks(page);
++			expect(closeBindFailureLocks).toHaveLength(2);
++			expect(closeBindFailureLocks).toContain(epochOneLocks[0]);
++			expect(closeBindFailureLocks.filter((name) => name !== epochOneLocks[0])).toHaveLength(1);
++		}
++		await expect(
++			page.evaluate((name) => window.phase6aCreatorSuccessorProduct.sealDirectCreator(name), closeBindFailureName)
++		).rejects.toThrow("D110C_B_CLOSE_REBIND_FAILED");
++		await page.evaluate((name) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(name), closeBindFailureName);
++		if (browserName === "chromium") expect(await heldTsDrpLocks(page)).toEqual(epochOneLocks);
+ 		expect(await Promise.all(retainedPages.map(snapshot))).toEqual(retainedBefore);
+ 		process.stdout.write("D110C_B_PRODUCT_HOT_LOOP_COMPLETE\n");
+ 	} finally {
+diff --git a/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts b/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+index 151edd22..17818b9a 100644
+--- a/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+@@ -580,3 +580,34 @@ export function isD108d2Authority(value: unknown): boolean {
+ 		record.profileId === "creator-trusted-v1"
+ 	);
+ }
++
++/**
++ * Validates one exact D.110c-b successor-authority projection at the supplied epoch.
++ * @param value - Candidate room/chat authority value.
++ * @param expectedEpoch - Positive safe authenticated epoch expected by the caller.
++ * @returns Whether the candidate has the unchanged authority key roster and exact epoch.
++ */
++export function isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number): boolean {
++	if (!Number.isSafeInteger(expectedEpoch) || expectedEpoch < 1) return false;
++	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
++	const record = value as Readonly<Record<string, unknown>>;
++	if (
++		Reflect.ownKeys(record).length !== D108D2_AUTHORITY_KEYS.length ||
++		!D108D2_AUTHORITY_KEYS.every((key) => Object.hasOwn(record, key))
++	) {
++		return false;
++	}
++	return (
++		typeof record.aclDigest === "string" &&
++		/^[0-9a-f]{64}$/u.test(record.aclDigest) &&
++		typeof record.anchorDigest === "string" &&
++		/^[0-9a-f]{64}$/u.test(record.anchorDigest) &&
++		record.epoch === expectedEpoch &&
++		typeof record.genesisAnchorDigest === "string" &&
++		/^[0-9a-f]{64}$/u.test(record.genesisAnchorDigest) &&
++		record.lifecycle === "active" &&
++		typeof record.objectId === "string" &&
++		record.objectId.length > 0 &&
++		record.profileId === "creator-trusted-v1"
++	);
++}
+gpg: Signature made Wed Sep  2 15:02:25 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+gpg: Signature made Wed Sep  2 14:04:12 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+f2066512f0311a56863be0d769531c6b783d9fef
+  origin/codex/phase3a1b-p6-golden-path
+[
+  {
+    "file": "diagnostic-focused-initial.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:37:01.881Z",
+      "duration": 2238.182,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "diagnostic-focused-lock-expectation.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:37:27.085Z",
+      "duration": 2649.3669999999997,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "diagnostic-focused-pre-isolation-green.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:37:50.293Z",
+      "duration": 2618.0890000000004,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "diagnostic-retained-stale-expectation.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:38:17.815Z",
+      "duration": 23999.357,
+      "expected": 15,
+      "skipped": 12,
+      "unexpected": 3,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "focused-browser-final.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:58:32.705Z",
+      "duration": 2882.4759999999997,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "focused-browser-pre-failed-lock-proof.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:43:47.321Z",
+      "duration": 2644.531,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "focused-browser-predecessor-count-diagnostic.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:43:30.848Z",
+      "duration": 2422.1020000000003,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-activation-browser.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:47:08.871Z",
+      "duration": 22463.463,
+      "expected": 24,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-live-close-browser.json",
+    "playwright": {
+      "startTime": "2026-09-02T18:47:35.753Z",
+      "duration": 25107.595,
+      "expected": 9,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "vitest": null,
+    "topLevelErrors": 0
+  },
+  {
+    "file": "retained-node-correction.json",
+    "playwright": null,
+    "vitest": {
+      "success": true,
+      "numTotalTestSuites": 6,
+      "numPassedTestSuites": 6,
+      "numFailedTestSuites": 0,
+      "numTotalTests": 9,
+      "numPassedTests": 9,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "topLevelErrors": 0
+  
+
+---
+138
+0
+          {
+                      "text": "D110C_B_PRODUCT_HOT_LOOP_COMPLETE\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:58:33.578Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-65b35a71ef81040e746e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2143,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T18:58:32.705Z",
+    "duration": 2882.4759999999997,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
+
+0

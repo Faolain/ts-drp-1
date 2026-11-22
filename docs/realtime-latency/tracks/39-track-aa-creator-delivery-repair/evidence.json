@@ -1,0 +1,152 @@
+{
+  "observed_on": "2026-10-23",
+  "base": "11552c43b66b7abad4f44eb7c6803fc4ba8e664a",
+  "scope": "Track AA delivery correctness; not sustained FPS or steady-state bandwidth acceptance",
+  "focused_owner_checks": {
+    "tests_passed": 21,
+    "duplicate_target_requests": 100,
+    "shared_native_replays": 1,
+    "distinct_target_pool_limit": 32,
+    "repair_native_send_limit": 4,
+    "cancellation": "aborts immediately; charges and joins remain until actual native settlement"
+  },
+  "fairness_after_coalescing": {
+    "healthy_rows_per_profile": 40,
+    "shipped_admission_ms": 2051,
+    "settlement_admission_ms": 2133,
+    "unchanged_deadline_ms": 10000
+  },
+  "single_replay_stall": {
+    "rows": 80,
+    "successful_send_delay_ms": 100,
+    "duplicate_requests": 80,
+    "max_native_replays": 1,
+    "retained_gate_ms": 8292,
+    "durable_issue_wait_ms": 8268,
+    "ephemeral_path": "not measured"
+  },
+  "silent_loss_before_final_replay_coalescing": {
+    "tests_passed": 4,
+    "shipped_writer_to_creator_ms": 3579,
+    "shipped_creator_to_writer_ms": 4023,
+    "settlement_writer_to_creator_ms": 3778,
+    "settlement_creator_to_writer_ms": 4002,
+    "lost_answer_tests_passed": 4,
+    "note": "all eight assertions passed; original coverage-enabled command failed afterward due concurrent coverage output; clean rerun included below"
+  },
+  "loaded_native_run_before_final_replay_coalescing": {
+    "passed": 43,
+    "failed": 2,
+    "skipped": 2,
+    "failures": {
+      "historical_successor_representation_readiness": "same test failed on inherited B1 baseline",
+      "shipped_fairness_10s": "28/40 at10.125s under concurrent browser/cost/tests; later same deadline passes after coalescing"
+    },
+    "clean_loss_cases": 8
+  },
+  "loaded_browser_before_final_replay_coalescing": {
+    "passed": true,
+    "blocks": 80,
+    "writer_issue_ms": 3465,
+    "creator_pause_ms": 8000,
+    "creator_admitted": 80,
+    "after_resume_ms": 40137,
+    "interpretation": "eventual convergence under pause/overload; not game-rate performance"
+  },
+  "historical_comparison": {
+    "p3_live_transport_failures": 7,
+    "all_match_baseline_test_names": true,
+    "successor_representation_readiness_failure_matches_baseline": true,
+    "previous_added_deactivation_source_pin_regression": "fixed"
+  },
+  "validation": {
+    "node_typecheck_and_producer_presign": "passed",
+    "all_package_builds_before_final_replay_coalescing": "passed",
+    "shadowed_sources_guard": "passed",
+    "final_node_build": "passed",
+    "changed_owner_and_test_lint": "passed"
+  },
+  "remaining_performance": {
+    "single_full_replay_fifo_stall": "measured above",
+    "512_row_no_loss_bandwidth": "no completed loaded pre-coalescing sample; opt-in probe records phase attribution for serialized combined-tree run",
+    "cost_probe_enable": "TRACK_AA_MEASURE_COST=1",
+    "single_replay_probe_enable": "TRACK_AA_MEASURE_REPLAY_STALL=1"
+  },
+  "local_evidence": [
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/replay-owner-red.log",
+      "sha256": "6e050e94e87ae7a8660eda423435e20910c323d613a78dfb6e9ebd269234958d"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/replay-owner-green.log",
+      "sha256": "626e12b3da1084164169585296f4d54fdd072857c026fc649f815446b12a4d7d"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/fairness-isolated.log",
+      "sha256": "57e6246979abd8525b038927f2d548682dc0280c2667ce574b4ae353e5bd7094"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/single-replay-stall.log",
+      "sha256": "90ad615cd91ef3379a426415f6138ab4d60c2d5acf71f79f14f85df4a38256b3"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/periodic-native.log",
+      "sha256": "a68f13ef91d4e104a76bb99302a806476f9015337a94f3db968fb7ce7c7f7cd4"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/periodic-native-final.log",
+      "sha256": "9dacc514a12cc418ad28131b4d0953b28932ec598f755e42a43477d8591a9934"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/browser-final.log",
+      "sha256": "b5d5d0bc6b7dd391e1322d0a27797f08d532b2320d36d2454c53cc62c54e8240"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/periodic-legacy-pins.log",
+      "sha256": "73faf076e9f0b24da2aee155c311e5636589c80ea690c2b6575753c039b6eb96"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/inherited-suite-comparison.json",
+      "sha256": "bcef6efe08e4d00ce6249eadde6300e7a5d9b1c820e362c1413e9a9bf811245f"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/replay-owner-type.log",
+      "sha256": "68783201b8fc3959f72f1a1b856baa288a07798a459d31d4c58ab91a7112db28"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/loss-final-coalesced.log",
+      "sha256": "d03fccab4225a0f7a21a68089644665fc2e49e91e46ff4658cf5ed1551dd020c"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/replay-final-build.log",
+      "sha256": "dc347aaa7ef61ecde006577c9e001c3f51946c1021445f7548b344464367e27f"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/replay-final-lint-clean.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/review-first.log",
+      "sha256": "9a98919b41b5f7ca6f1f627ea40fd386503beed476da3beafed0da2dce257aba"
+    },
+    {
+      "path": "/private/tmp/ts-drp-aa-evidence/review-second.log",
+      "sha256": "daaefda49879c2db551225c1583caf5c38002b1a0cb6530b671556ed2e8ed5fd"
+    }
+  ],
+  "final_loss_checks_after_coalescing": {
+    "passed": 8,
+    "failed": 0,
+    "shipped_writer_to_creator_ms": 3966,
+    "shipped_creator_to_writer_ms": 4017,
+    "settlement_writer_to_creator_ms": 3909,
+    "settlement_creator_to_writer_ms": 4013,
+    "coverage_enabled": false,
+    "exit_code": 0
+  },
+  "reviews": {
+    "first_independent_review": "all four findings confirmed and fixed: lost-answer retries, native cancellation/join, priority starvation, duplicate pre-admission decoding",
+    "second_independent_review": "both findings confirmed and fixed: targeted replay accumulation and sweep-only cooldown bypass",
+    "remaining_single_replay_fifo_stall": "confirmed performance blocker; outside scoped delivery-correctness repair"
+  }
+}

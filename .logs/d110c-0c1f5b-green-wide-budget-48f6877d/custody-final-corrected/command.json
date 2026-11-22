@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-green-wide-budget-48f6877d/custody-signed-corrected.mjs",
+    "final"
+  ],
+  "start": "2026-09-06T06:42:47.067Z"
+}

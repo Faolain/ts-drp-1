@@ -1,0 +1,9 @@
+route:
+  receiver: shadow-soak-webhook
+  group_by: [alertname, instance]
+
+receivers:
+  - name: shadow-soak-webhook
+    webhook_configs:
+      - url: __SHADOW_ALERT_WEBHOOK_URL__
+        send_resolved: true

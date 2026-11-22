@@ -1,0 +1,5 @@
+ packages/node/src/creator-close.ts                 |  23 ++++-
+ .../phase-6a-v3/creator-adoption-contract.ts       |   4 +-
+ .../foreign-author-close-liveness-contract.ts      | 106 +++++++++++++++++----
+ ...0c1f5-foreign-author-close-liveness-red.test.ts |   8 +-
+ 4 files changed, 112 insertions(+), 29 deletions(-)

@@ -1,0 +1,163 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 13,
+  "passed": 13,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership",
+      "status": "passed",
+      "title": "[RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership",
+      "duration": 188.82270900000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress",
+      "status": "passed",
+      "title": "[control] preserves causalJoin ABI refusal on local generation and genuine signed ingress",
+      "duration": 338.86758299999974,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] preserves legacy join structural retirement without exposing an application intent",
+      "status": "passed",
+      "title": "[RED] preserves legacy join structural retirement without exposing an application intent",
+      "duration": 177.93695799999978,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [control] keeps settlement join control-only",
+      "status": "passed",
+      "title": "[control] keeps settlement join control-only",
+      "duration": 136.93833300000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending",
+      "status": "passed",
+      "title": "[RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending",
+      "duration": 139.08199999999988,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published",
+      "status": "passed",
+      "title": "[RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published",
+      "duration": 124.14562500000011,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [control] excludes an authenticated activation vertex while surfacing later source work",
+      "status": "passed",
+      "title": "[control] excludes an authenticated activation vertex while surfacing later source work",
+      "duration": 190.95033299999977,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] refuses a settlement issued/outbox mismatch with the existing corruption classification",
+      "status": "passed",
+      "title": "[RED] refuses a settlement issued/outbox mismatch with the existing corruption classification",
+      "duration": 48.78825000000052,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] latches terminal state when the terminal transaction outcome is unknown",
+      "status": "passed",
+      "title": "[RED] latches terminal state when the terminal transaction outcome is unknown",
+      "duration": 82.98166700000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit",
+      "status": "passed",
+      "title": "[RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit",
+      "duration": 39.435457999999926,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] returns a typed failure for a malformed durable settlement plan: non-array entries",
+      "status": "passed",
+      "title": "[RED] returns a typed failure for a malformed durable settlement plan: non-array entries",
+      "duration": 34.6894999999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor",
+      "status": "passed",
+      "title": "[RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor",
+      "duration": 32.63325000000077,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0b rejected-GREEN corrective RED"
+      ],
+      "fullName": "D.110c-0c1f5b0b rejected-GREEN corrective RED [RED] returns a typed failure for a malformed durable settlement plan: top-level extra key",
+      "status": "passed",
+      "title": "[RED] returns a typed failure for a malformed durable settlement plan: top-level extra key",
+      "duration": 33.692165999999816,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

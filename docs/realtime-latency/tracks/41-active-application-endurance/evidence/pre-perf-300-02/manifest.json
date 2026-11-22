@@ -1,0 +1,214 @@
+{
+  "kind": "native-active-app-endurance",
+  "classification": "completed pre-replay candidate, not final integrated source",
+  "sourceHead": "6f414a258998a9da913e638b22a3891241e88829",
+  "sourceDiffSha256": "25f03f5aad064464da5416fac6e2e337b830f7cae11f1768e6c7be66e3187449",
+  "concurrentProcesses": 3,
+  "apps": {
+    "canvas": {
+      "completedEpochs": 300,
+      "acceptedOperations": 3000,
+      "rejectedAttempts": 0,
+      "reopenEpoch": 150,
+      "testMilliseconds": 2366332,
+      "driverMilliseconds": 2365684.651667,
+      "logicalFinal": [
+        {
+          "issuance:issued_records": [
+            18,
+            12670
+          ],
+          "issuance:settlement_plans": [
+            1,
+            106
+          ],
+          "journal:scopes": [
+            7,
+            32926
+          ]
+        },
+        {
+          "issuance:issued_records": [
+            54,
+            36838
+          ],
+          "issuance:settlement_plans": [
+            1,
+            2559
+          ],
+          "journal:scopes": [
+            7,
+            32441
+          ]
+        }
+      ],
+      "physicalFinal": {
+        "wal": 47742944,
+        "sharedMemory": 393216,
+        "primaryOrOther": 1183744
+      },
+      "physicalFiles": 43,
+      "last25DistinctPhysicalTotals": 25,
+      "last25DistinctPrimaryTotals": 1,
+      "last25WalGrowthBytes": 988800,
+      "remoteDuringRollover": 0,
+      "remoteDuringMaintenance": 598,
+      "droppedSourceDispositionCount": 600
+    },
+    "grid": {
+      "completedEpochs": 300,
+      "acceptedOperations": 3000,
+      "rejectedAttempts": 0,
+      "reopenEpoch": 150,
+      "testMilliseconds": 1700671,
+      "driverMilliseconds": 1699993.927666,
+      "logicalFinal": [
+        {
+          "issuance:issued_records": [
+            18,
+            12306
+          ],
+          "issuance:settlement_plans": [
+            1,
+            106
+          ],
+          "journal:scopes": [
+            7,
+            32692
+          ]
+        },
+        {
+          "issuance:issued_records": [
+            54,
+            35466
+          ],
+          "issuance:settlement_plans": [
+            1,
+            2576
+          ],
+          "journal:scopes": [
+            7,
+            32049
+          ]
+        }
+      ],
+      "physicalFinal": {
+        "wal": 47705864,
+        "sharedMemory": 393216,
+        "primaryOrOther": 1167360
+      },
+      "physicalFiles": 43,
+      "last25DistinctPhysicalTotals": 25,
+      "last25DistinctPrimaryTotals": 1,
+      "last25WalGrowthBytes": 992920,
+      "remoteDuringRollover": 0,
+      "remoteDuringMaintenance": 598,
+      "droppedSourceDispositionCount": 600
+    },
+    "chat": {
+      "completedEpochs": 300,
+      "acceptedOperations": 3000,
+      "rejectedAttempts": 0,
+      "reopenEpoch": 150,
+      "testMilliseconds": 2639589,
+      "driverMilliseconds": 2638933.844333,
+      "logicalFinal": [
+        {
+          "issuance:issued_records": [
+            18,
+            12631
+          ],
+          "issuance:settlement_plans": [
+            1,
+            106
+          ],
+          "journal:scopes": [
+            7,
+            33150
+          ]
+        },
+        {
+          "issuance:issued_records": [
+            54,
+            36691
+          ],
+          "issuance:settlement_plans": [
+            1,
+            2578
+          ],
+          "journal:scopes": [
+            7,
+            32399
+          ]
+        }
+      ],
+      "physicalFinal": {
+        "wal": 47722344,
+        "sharedMemory": 393216,
+        "primaryOrOther": 1376256
+      },
+      "physicalFiles": 43,
+      "last25DistinctPhysicalTotals": 25,
+      "last25DistinctPrimaryTotals": 1,
+      "last25WalGrowthBytes": 988800,
+      "remoteDuringRollover": 0,
+      "remoteDuringMaintenance": 598,
+      "droppedSourceDispositionCount": 600
+    }
+  },
+  "artifacts": {
+    "source.diff.gz": {
+      "sha256": "7356efebb511fe0054e2c34c9c1dde2bc012f4c2252051d7b6b4fe2fe284c8d0",
+      "uncompressedSha256": "25f03f5aad064464da5416fac6e2e337b830f7cae11f1768e6c7be66e3187449",
+      "uncompressedBytes": 56323
+    },
+    "canvas.jsonl.gz": {
+      "sha256": "9641a11c7d7bbb44c5dcd18529957d2014cb5b6dffb6c4eaa0b0fedec4f8107b",
+      "uncompressedSha256": "1f9013d0309686ac50ce121123d48e2293e1ac3c0d23b2e5b5866d2f542dde03",
+      "uncompressedBytes": 4767828
+    },
+    "canvas-test.log.gz": {
+      "sha256": "5b37893ebb7ce4b05608af4b20a745b5d758597b93da35d2f883b125603c916f",
+      "uncompressedSha256": "52cca93a981689980936cfee313564730e37f006a16c74ce227da0900302f1b2",
+      "uncompressedBytes": 6880
+    },
+    "grid.jsonl.gz": {
+      "sha256": "90ebcac79e6de03930d7149dd94cb4eb9ae3934468d8ef77e0603ad775b0e281",
+      "uncompressedSha256": "32048b9a92e2fc548f5e9b2aa0b1c14075def429642133b737566128ed31bfc6",
+      "uncompressedBytes": 4767528
+    },
+    "grid-test.log.gz": {
+      "sha256": "e1adaffdfb324af1d9b588ac1c80652ff5edb1927abb45a82822251b101e8a0c",
+      "uncompressedSha256": "14b6df54cfd77757076a6d67469902e6649517e8fd431de54566e3bb488caa5c",
+      "uncompressedBytes": 6746
+    },
+    "chat.jsonl.gz": {
+      "sha256": "f5c987405c362ceb8420102646be3e8db16a8c83179d8a3695f9ba2c9da88988",
+      "uncompressedSha256": "8b8edd590860fbff2316a88c87205d5d9dbddc9fb7d804e0bf6af02077873075",
+      "uncompressedBytes": 4770675
+    },
+    "chat-test.log.gz": {
+      "sha256": "590a95a0dd46433724119fb5630b0f938006f14ff4aa2c51caf051b389acc973",
+      "uncompressedSha256": "81a83fefe384accd4c2b9841244bffe6756e864880ec1302cb852f662bc1e374",
+      "uncompressedBytes": 6746
+    }
+  },
+  "limits": [
+    "scripted signed-byte loss and explicit durable replay, not automatic networking",
+    "bounded four-write rollover stream, not continuous high-rate traffic",
+    "zero remote acceptance during rollover in this schedule",
+    "no ephemeral traffic, browser, WebRTC or FPS evidence",
+    "logical/primary plateau does not imply whole-WAL plateau",
+    "final replay, capacity and rejoin composition not included"
+  ],
+  "interruptedPredecessor": {
+    "directory": "/private/tmp/active-endurance-preperf-300-01",
+    "classification": "owner-turn cleanup terminated processes; incomplete, not a product failure",
+    "completedEpochs": {
+      "canvas": 156,
+      "grid": 221,
+      "chat": 139
+    },
+    "sameSource": true
+  }
+}

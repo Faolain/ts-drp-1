@@ -1,0 +1,48 @@
+{
+  "initialCheck": {
+    "command": "node -e 'const fs=require(\"fs\"),p=require(\"path\"),c=require(\"crypto\"),{execFileSync:e}=require(\"child_process\");const d=\".logs/d110c-0c1f5b-red-oracle-97c0836b\";const hash=b=>c.createHash(\"sha256\").update(b).digest(\"hex\");const m=fs.readFileSync(d+\"/manifest.sha256\",\"utf8\");for(const l of m.trim().split(\"\\n\")){const [,h,n]=l.match(/^([a-f0-9]{64})  (.+)$/);if(hash(fs.readFileSync(p.resolve(d,n)))!==h)throw Error(n)}const r=JSON.parse(fs.readFileSync(d+\"/result.json\")),v=JSON.parse(fs.readFileSync(d+\"/focused.json\"));const rows=v.testResults.flatMap(t=>t.assertionResults);const counts=Object.fromEntries([\"passed\",\"failed\",\"pending\"].map(s=>[s,rows.filter(a=>a.status===s).length]));if(rows.length!==45||counts.passed!==5||counts.failed!==23||counts.pending!==17||v.testResults.length!==2||r.violations.length||r.topLevel.length||r.executionCount!==1)throw Error(\"matrix\");for(const o of r.outcomes){const a=rows.find(x=>x.fullName===o.name);if(!a||a.status!==o.status||JSON.stringify(a.failureMessages)!==JSON.stringify(o.failureMessages))throw Error(o.name)}const git=(...a)=>e(\"git\",a,{encoding:\"utf8\",maxBuffer:32*1024*1024}).trim();const previous=JSON.parse(fs.readFileSync(\".logs/d110c-0c1f5b-green-f031b166/custody-after.json\"));const patch=e(\"git\",[\"diff\",\"--\",...previous.changed],{encoding:\"utf8\"});const same=patch===fs.readFileSync(\".logs/d110c-0c1f5b-green-f031b166/partial-production.patch\",\"utf8\");const stashes=git(\"stash\",\"list\",\"--format=%H %gd %gs\");const head=git(\"rev-parse\",\"HEAD\"),remote=git(\"ls-remote\",\"origin\",\"refs/heads/codex/phase3a1b-p6-golden-path\").split(/\\s/)[0];if(!same||stashes!==previous.stashes.trim()||head!==remote)throw Error(\"custody\");console.log(JSON.stringify({verifiedAt:new Date().toISOString(),head,remote,signature:git(\"log\",\"--format=%h %G? %s\",\"-1\"),evidenceRoot:d,manifest:hash(m),entries:m.trim().split(\"\\n\").length,reporterHash:hash(fs.readFileSync(d+\"/focused.json\")),reporter:{files:v.testResults.length,total:rows.length,counts},selectedOutcomesMatchRawReporter:true,selected:r.selected,violations:r.violations,topLevel:r.topLevel,partialProductionUnchanged:same,stashesUnchanged:true,stashCount:stashes.split(\"\\n\").length},null,2));'",
+    "exitCode": 1,
+    "error": "Error: matrix; diagnostic expected pending assertion status instead of skipped (see diagnostic.md)."
+  },
+  "correctedCheck": {
+    "command": "node -e 'const fs=require(\"fs\"),p=require(\"path\"),c=require(\"crypto\"),{execFileSync:e}=require(\"child_process\");const d=\".logs/d110c-0c1f5b-red-oracle-97c0836b\";const hash=b=>c.createHash(\"sha256\").update(b).digest(\"hex\");const m=fs.readFileSync(d+\"/manifest.sha256\",\"utf8\");for(const l of m.trim().split(\"\\n\")){const [,h,n]=l.match(/^([a-f0-9]{64})  (.+)$/);if(hash(fs.readFileSync(p.resolve(d,n)))!==h)throw Error(n)}const r=JSON.parse(fs.readFileSync(d+\"/result.json\")),v=JSON.parse(fs.readFileSync(d+\"/focused.json\"));const rows=v.testResults.flatMap(t=>t.assertionResults);const counts=Object.fromEntries([\"passed\",\"failed\",\"skipped\"].map(s=>[s,rows.filter(a=>a.status===s).length]));if(rows.length!==45||counts.passed!==5||counts.failed!==23||counts.skipped!==17||v.testResults.length!==2||r.violations.length||r.topLevel.length||r.executionCount!==1)throw Error(\"matrix\");for(const o of r.outcomes){const a=rows.find(x=>x.fullName===o.name);if(!a||a.status!==o.status||JSON.stringify(a.failureMessages)!==JSON.stringify(o.failureMessages))throw Error(o.name)}const git=(...a)=>e(\"git\",a,{encoding:\"utf8\",maxBuffer:32*1024*1024}).trim();const previous=JSON.parse(fs.readFileSync(\".logs/d110c-0c1f5b-green-f031b166/custody-after.json\"));const patch=e(\"git\",[\"diff\",\"--\",...previous.changed],{encoding:\"utf8\"});const same=patch===fs.readFileSync(\".logs/d110c-0c1f5b-green-f031b166/partial-production.patch\",\"utf8\");const stashes=git(\"stash\",\"list\",\"--format=%H %gd %gs\");const head=git(\"rev-parse\",\"HEAD\"),remote=git(\"ls-remote\",\"origin\",\"refs/heads/codex/phase3a1b-p6-golden-path\").split(/\\s/)[0];if(!same||stashes!==previous.stashes.trim()||head!==remote)throw Error(\"custody\");console.log(JSON.stringify({verifiedAt:new Date().toISOString(),head,remote,signature:git(\"log\",\"--format=%h %G? %s\",\"-1\"),evidenceRoot:d,manifest:hash(m),entries:m.trim().split(\"\\n\").length,reporterHash:hash(fs.readFileSync(d+\"/focused.json\")),reporter:{files:v.testResults.length,total:rows.length,counts},selectedOutcomesMatchRawReporter:true,selected:r.selected,violations:r.violations,topLevel:r.topLevel,partialProductionUnchanged:same,stashesUnchanged:true,stashCount:stashes.split(\"\\n\").length},null,2));'",
+    "exitCode": 0,
+    "result": {
+      "verifiedAt": "2026-09-05T17:51:56.247Z",
+      "head": "88fef44293e688220e554c0bab9a7f3e0b68ae25",
+      "remote": "88fef44293e688220e554c0bab9a7f3e0b68ae25",
+      "signature": "88fef442 G test: record isolated parent oracle consistency RED",
+      "evidenceRoot": ".logs/d110c-0c1f5b-red-oracle-97c0836b",
+      "manifest": "45be504889e8735915336082c88247b0a5a4f3069023e47ec2db905e1c2789cf",
+      "entries": 64,
+      "reporterHash": "6ad854ef9374303adb80defa205d7f165931fa8ed0b8c99b528322503c8c60e4",
+      "reporter": {
+        "files": 2,
+        "total": 45,
+        "counts": {
+          "passed": 5,
+          "failed": 23,
+          "skipped": 17
+        }
+      },
+      "selectedOutcomesMatchRawReporter": true,
+      "selected": 28,
+      "violations": [],
+      "topLevel": [],
+      "partialProductionUnchanged": true,
+      "stashesUnchanged": true,
+      "stashCount": 27
+    }
+  },
+  "static": {
+    "diffCheck": {
+      "command": "git diff --check -- docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "exitCode": 0
+    },
+    "format": {
+      "command": "NODE_OPTIONS=--max-old-space-size=12288 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "exitCode": 0,
+      "stdout": "Checking formatting...\nAll matched files use Prettier code style!\n"
+    }
+  }
+}

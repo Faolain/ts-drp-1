@@ -1,0 +1,573 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+9ade7c70 docs(hardening): correct settlement progress contract
+cf4b6d82 docs(hardening): reslice segmented settlement progress
+2af10e2d docs(hardening): close settlement reclamation slice
+commit 9ade7c703c5ba67451273df73da4d9a4d17f951f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 20:04:40 2026 -0400
+
+    docs(hardening): correct settlement progress contract
+
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 3102 +++++++++++++++++
+ .../grok/input-packet.md                           | 3479 ++++++++++++++++++++
+ .../grok/public.txt                                |    1 +
+ .../grok/review.diff                               |  202 ++
+ .../grok/status.json                               |    9 +
+ .../grok/stderr.log                                |    0
+ .../kimi/raw-standard.jsonl                        |   60 +
+ .../kimi/raw.jsonl                                 |    1 +
+ .../kimi/stderr-standard.txt                       |  559 ++++
+ .../kimi/stderr.txt                                |    3 +
+ .../manifest.sha256                                |   14 +
+ .../opus/result.json                               |    1 +
+ .../opus/stderr.txt                                |    0
+ .../review-prompt.md                               |   19 +
+ .../production-hardening-tdd-plan-v2.md            |  241 +-
+ 16 files changed, 7645 insertions(+), 72 deletions(-)
+.logs/d110c-0c1f5b0r-design-3a156aca/:
+design.md
+manifest.sha256
+next-prompt.md
+pre-review.md
+
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/:
+grok
+kimi
+manifest.sha256
+opus
+review-prompt.md
+commit 9ade7c703c5ba67451273df73da4d9a4d17f951f
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 20:04:40 2026 -0400
+
+    docs(hardening): correct settlement progress contract
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index c3a9ac81..1aca8813 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -99464,7 +99464,7 @@ Selected bounded contract:
+ - Preserve the legacy `SettlementPlanEntry` four-key form and scalar
+   `replacementSequence` semantics exactly when the new optional member is
+   absent. Add optional `replacementProgress` only for an unlinked
+-  `rebase-required` or `transform-required` entry. Its exact public shapes are:
++  `rebase` or `transform` entry. Its exact public shapes are:
+ 
+   - `SettlementReplacementChunk` has readonly numeric
+     `replacementSequence` and `throughIntent` members.
+@@ -99472,95 +99472,192 @@ Selected bounded contract:
+     `intentCount`, `Uint8Array` `intentDigest`, and readonly
+     `SettlementReplacementChunk[]` `chunks` members.
+ 
+-- Export one settlement bound,
+-  `SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16`, and use it for both the progress
+-  validator and Node's existing application-batch entry ceiling so the two
+-  cannot drift. A progress record has `intentCount` in `1..16`, an exact
+-  32-byte digest and
+-  zero through `intentCount` chunks. Chunk sequence numbers and
+-  `throughIntent` values are each strictly increasing; every
+-  `throughIntent` is in `1..intentCount`. The consumed prefix is zero for no
+-  chunks and otherwise the final `throughIntent`. The legacy scalar remains
+-  `null` while the prefix is partial and becomes exactly the final chunk's
+-  sequence only when the prefix reaches `intentCount`. Expire/manual-review
+-  entries cannot carry progress.
++- Export the settlement-owned bound
++  `SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16`. Do not replace or import it as
++  Node's peer-ingress `APPLICATION_BATCH_MAX_ENTRIES` owner: that existing
++  admission constant remains Node-owned at 16, and a behavioral conformance
++  assertion pins their equality without creating a future threshold-change
++  channel. The bound is exhaustive because an admitted source vertex contains
++  at most 16 intents and the room maps each source intent to one replacement
++  or drops it; transform remains deterministic 1:1 and cannot expand the
++  count. Exceeding 16 is a fail-closed room invariant breach that leaves the
++  source and prune gate intact. A progress record has `intentCount` in
++  `1..16`, an exact 32-byte digest and zero through `intentCount` chunks.
++  Chunk sequence numbers and `throughIntent` values are each strictly
++  increasing; every `throughIntent` is in `1..intentCount`. The consumed
++  prefix is zero for no chunks and otherwise the final `throughIntent`. The
++  legacy scalar remains `null` while the prefix is partial and becomes exactly
+ .../opus/result.json                               |    1 +
+ .../opus/stderr.txt                                |    0
+ .../review-prompt.md                               |   19 +
+ .../production-hardening-tdd-plan-v2.md            |  241 +-
+ 16 files changed, 7645 insertions(+), 72 deletions(-)
+     277 /tmp/plan.diff
+I'll inspect the signed commit, the accepted D.110c-0c1f5b0t design, and the named production seams before judging the replacement-progress contract.The plan slice is in view; next I’ll read the accepted design, parent f5b acceptance, and the production seams it names.The current scalar plan and split-required issue path are the next seams to inspect.I still need the storage backends, transform growth, digest helpers, and the parent 64-writer acceptance text.{"verdict":"CHANGES_REQUIRED","p0":[],"p1":[{"title":"Legacy one-chunk vs progress-form upgrade is not ordered, so split probes can refuse or rewrite the frozen one-chunk path","evidence":"Plan D.110c-0c1f5b0t (docs/production-hardening/production-hardening-tdd-plan-v2.md:99499-99523, 99556-99559) says a progress entry needs the 5-key effect, a legacy entry keeps the two-key effect, the room 'submits the remaining suffix once; split-required(p) remains nonmutating, after which it submits the exact prefix … with the matching progress effect', and 'the existing one-chunk path remains unchanged'. Current room drain always one-shots the full list with the two-key effect (examples/v3-room/src/index.ts:2921-3014) and treats split-required as failure (2934-2940). Node split is nonmutating and happens before issueOneVertex (packages/node/src/v3-live.ts:6696-6715). copySettlementPlanEffect currently accepts only the two-key replacement shape (packages/issuance-store/src/contract.ts:285-297). If GREEN CAS-upgrades every rebase/transform entry before the suffix probe, a fitting batch is stored as 5-key progress and the one-chunk vectors change. If GREEN probes a still-legacy four-key entry with the 5-key effect, the specified legacy/progress mismatch refuses before any split. Restart after a lazy upgrade also needs the probe to switch effect kind.","correction":"Pin the room order: against a four-key unlinked rebase/transform entry, the remaining-suffix probe uses the existing two-key replacement effect. Only after nonmutating split-required(p) may the room CAS-upgrade that same source to replacementProgress (intentCount = rederived list length, 0 chunks, stored digest) and then issue operations[fromIntent, throughIntent) with the 5-key effect. A later suffix against an already-progress entry always uses the 5-key effect. intentCount===1 and any suffix that Node accepts in one vertex must remain the four-key/two-key one-chunk path byte-for-byte."},{"title":"Merge can drop partial chunks the first time the four-key equality short-circuit misses","evidence":"writeMergedSettlementPlan rebuilds four-key entries and copies only prior.replacementSequence (examples/v3-room/src/index.ts:2864-2909). sameSettlementEntry ignores any future replacementProgress (2835-2839), so an unchanged source set accidentally keeps stored progress via the short-circuit, but any fence-clear or entry-set change rewrites the plan without chunks. f5b0r already clears a displaced fenceSequence and drops sources that now classify terminal (design.md:208-215, 384-387). Test 5 and review item 5 require crash/restart plus close/reopen with no skipped/duplicated intents (plan:99560-99563). A rewrite that turns a partial-progress entry back into a four-key unlinked row would re-issue already committed chunk sequences; dropping the entry would skip the remaining suffix. settlementPlanPermitsAuthenticatedPruning still keys only on the scalar (packages/issuance-store/src/maintenance.ts:110-126), which is correct only if partial progress stays scalar-null and is retained until the final chunk."},{"title":"16 is the correct count ceiling, but the RED split matrix is not causal unless it names the existing byte-budget split","evidence":"APPLICATION_BATCH_MAX_ENTRIES is 16 and APPLICATION_BATCH_LIMITS.maxBytes is 65,536 (packages/node/src/v3-live.ts:235-236, 6696-6715). rebaseIntents emits at most that many child ops from one source vertex (6823-6861). Room transform is 1:1 and must preserve action (examples/v3-room/src/index.ts:363, 2988-3008), so replacement count cannot exceed the source vertex. That source already passed the same batch contract when it was issued; drainSnapshot even splits ordinary issue at 16 (2702-2714). SETTLEMENT_REPLACEMENT_MAX_INTENTS=16 is therefore the right intentCount bound (plan:99475-99486), but a legal multi-intent rebase of small ops will usually be accepted as one vertex and never hit split-required. Test 4 still requires genuine split-required and ≥2 replacement vertices for both rebase and transform growth (99556-99559). A RED that uses 17 intents will fail the new bound rather than the missing progress behavior (review item 8)."},{"title":"Ambiguous-outcome and clone/copy seams still bind only the scalar, so the first partial chunk is specified to commit and then fail closed","evidence":"Plan readback must observe digest, prefix, chunk sequence, final scalar and revision (99515-99517; test 2 at 99548-99552). Production still treats a replacement as linked iff entry.replacementSequence === candidate.authorSequence (packages/storage-browser/src/internal/browser-issuance-store.ts:967-983; packages/storage-node/src/internal/node-issuance-store.ts:1061). cloneDurableIssueCommit and copySettlementPlanEffect keep only {kind, sourceSequence} (packages/issuance-store/src/contract.ts:269-276, 285-297). applySettlementPlanEffect currently fills the scalar once (415-438). Under the new projection the scalar stays null until throughIntent===intentCount, so the existing readback would latch ISSUANCE_RECOVERY_CORRUPT on the first durable partial chunk. GREEN includes the three backends, but RED will not be causal unless those exact functions are named as the mismatch matrix rather than a new export."}],"p2":[{"title":"Pin the digest preimage as a dense array of detached operations","evidence":"The formula at plan:99490-99497 is hashDomain(\"ts-drp/settlement-replacement-intents/v1\", encodeCanonical(orderedReplacementOperations)) and says logical time/sequence are excluded. encodeCanonical already accepts arrays (packages/canonical/src/index.ts:12, 296-303) and hashDomain takes (domain, ...Uint8Array[]) (561-566). The JS value is still unnamed, so a wrapper record vs a dense operation array would fail-closed on reopen.","disposition":"State that orderedReplacementOperations is the dense Array of detached replacement operation records after expire-filter and transform, in source.intents order, with no logicalTime or authorSequence wrapper, encoded with default canonical limits."},{"title":"Pin Node JSON nested-digest grammar","evidence":"Browser keeps DATABASE_VERSION=2 and the fourth store settlementPlans (packages/storage-browser/src/internal/browser-issuance-store.ts:51-53, 1284). Node keeps entries_json and currently serializes only the four keys, converting only top-level sourceDigest from number[] (packages/storage-node/src/internal/node-issuance-store.ts:376-412). An intentDigest left as number[] will fail copySettlementPlanEntry and surface as ISSUANCE_RECOVERY_CORRUPT.","disposition":"When replacementProgress is present, JSON must include version, intentCount, intentDigest as a 32-byte 0..255 integer array using the sourceDigest convention, and chunks as {replacementSequence, throughIntent}; the Node decoder must convert that nested digest before copySettlementPlan."},{"title":"Pin digest-mismatch error ownership","evidence":"Plan:99510-99517 maps malformed durable values to ISSUANCE_RECOVERY_CORRUPT, invalid caller effect shape to ISSUANCE_COMMIT_INVALID, and structurally valid stale comparison to ISSUANCE_RETRY_REQUIRED. Room resume mismatch is only 'fails closed and does not issue' (99496-99497). Node range-vs-operations.length is an issue-path check (99503-99506) and today would be localIssueFailure rather than an ISSUANCE_* code (packages/node/src/v3-live.ts:6243-6258, 6691-6715).","disposition":"Room rederive mismatch: throw before issueLocal and do not rewrite the plan. Effect digest/prefix/revision mismatch against a well-formed stored progress row: ISSUANCE_RETRY_REQUIRED. Unknown extra keys / non-closed 5-key effect / fromIntent/throughIntent/intentCount not safe integers: ISSUANCE_COMMIT_INVALID. Node operations.length !== throughIntent-fromIntent: existing malformed-input, before transactIssue."}],"summary":"f5b0t is the right blocking prerequisite: the scalar replacementSequence / two-key planEffect / one-shot room drain cannot represent crash-safe split-required progress, and parent f5b plus the 64-writer/three-close matrix stay blocked unchanged. The additive 5-key progress grammar, 16-count ceiling, fence-first rule, scalar-gated prune, fail-closed old readers, and unchanged browser v2 / Node table shape are the right shape. Before tests-only RED, pin (1) lazy two-key probe then CAS-upgrade only after nonmutating split-required so one-chunk vectors stay byte-identical, (2) merge copies replacementProgress and never blanks partial chunks, (3) RED split fixtures use the existing 65,536-byte batch prefix split rather than intentCount>16, and (4) copy/clone/readback bind chunk sequence while the scalar is still null."}
+===
+{"duration_api_ms":558741,"stop_reason":"tool_use","session_id":"baf16883-37fa-42c6-84a0-eb1c54a1b36f","total_cost_usd":3.1529279999999997,"usage":{"input_tokens":52,"cache_creation_input_tokens":119085,"cache_read_input_tokens":1862318,"output_tokens":41161,"output_tokens_details":{"thinking_tokens":29489},"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":119085,"ephemeral_5m_input_tokens":0},"inference_geo":"not_available","iterations":[{"input_tokens":2,"output_tokens":5974,"cache_read_input_tokens":118331,"cache_creation_input_tokens":754,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":754},"type":"message"}],"speed":"standard"},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":1539,"outputTokens":19,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.001634,"contextWindow":200000,"maxOutputTokens":32000,"thinkingTokens":0,"canonicalModel":"claude-haiku-4-5","provider":"firstParty","costBasis":"list"},"claude-opus-5":{"inputTokens":52,"outputTokens":41161,"cacheReadInputTokens":1862318,"cacheCreationInputTokens":119085,"webSearchRequests":0,"costUSD":3.1512939999999996,"contextWindow":1000000,"maxOutputTokens":64000,"thinkingTokens":29489,"canonicalModel":"claude-opus-5","provider":"firstParty","costBasis":"list"}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","fast_mode_disabled_reason":"sdk_opt_in_required","subagent_stats":{"spawned":0,"requested":{"background":0,"foreground":0,"unset":0},"started_in_background":0,"max_depth":0,"spawned_by_subagents":0,"completed":0,"failed":0,"killed":{"parent":0,"user":0,"system":0},"refused":{"depth_limit":0,"concurrency_limit":0,"budget":0},"by_type":{}},"is_error":false,"num_turns":43,"subtype":"success","api_error_status":null,"result":"{\"verdict\":\"CHANGES_REQUIRED\",\"p0\":[{\"title\":\"Plan re-merge silently discards replacementProgress, re-issuing chunk 1 (duplicate intents)\",\"evidence\":\"The f5b0t contract states only that the legacy scalar is preserved; it never says replacementProgress must survive a plan rewrite. The single plan writer rebuilds every entry from scratch carrying exactly one prior field — examples/v3-room/src/index.ts:2877-2884 `replacementSequence: prior?.replacementSequence ?? null` — and its no-op short-circuit comparator ignores any new member (index.ts:2835-2839 `sameSettlementEntry`, used by the `unchanged` test at :2893-2901). The accepted design mandates this merge on every restart *before any issue* and requires the entry set to change (.logs/d110c-0c1f5b0r-design-3a156aca/design.md step 3: \\\"a replacement row that is itself displaced becomes a new source entry\\\", \\\"An entry whose source row now classifies terminal ... is removed from the plan at merge\\\", \\\"Write it with transactWriteSettlementPlan (CAS on revision) before any issue\\\"). Any such rewrite while a consumed prefix is partial resets the entry to unlinked-with-no-progress, and the drain at index.ts:2973-2974 then re-derives the full ordered list and re-issues intents 1..p a second time. This is the exact duplicate-intent failure RED item 5 claims to exclude.\",\"correction\":\"Add one invariant to the contract: an entry carried forward by a plan merge/rewrite MUST carry its `replacementProgress` byte-for-byte, the merge comparator MUST include it, and `transactWriteSettlementPlan` MUST refuse a write that drops or shrinks an existing entry's chunk prefix for an unchanged (sourceSequence, sourceDigest, disposition) triple.\"},{\"title\":\"Store-side prefix/digest refusal is post-signature and permanently halts operation admission, so \\\"reread the plan and continue\\\" is unreachable\",\"evidence\":\"The contract makes stale-prefix/wrong-digest refusals a routine outcome (`ISSUANCE_RETRY_REQUIRED` for \\\"a structurally valid but stale plan comparison\\\"; the room \\\"rereads the plan, and continues\\\"). But the plan effect is applied inside `transactIssue` after `buildAndSign` has already signed (packages/issuance-store/src/conformance.ts:315 then :327-335; `applySettlementPlanEffect` at packages/issuance-store/src/contract.ts:429-433 throws `ISSUANCE_RETRY_REQUIRED`). That throw lands in packages/node/src/v3-live.ts:6468-6490 with `signerResolved === true` and `reservation` non-undefined (replacements are application operations, so `controlOperation` is false at :6346/:6354 and `reserveOperation` returns a value), which takes the branch at :6473-6474 and sets `registration.operationAdmissionHalted = true`. That flag is terminal — `issueOneVertex` refuses everything afterwards at :6329 and it is only ever cleared at registration creation (:8363) — and the room sees `admission-rejected`, not a retryable outcome. So a benign CAS/stale-prefix refusal bricks the plane mid-settlement instead of allowing resume, and \\\"refuses before mutation\\\" is true only of durable state, not of the plane.\",\"correction\":\"Require the Node issue owner to read the plan and validate digest, `fromIntent` vs durable prefix, and range *before* `buildAndSign`, returning a distinct nonmutating `V3LocalIssueResult` kind that does not set `operationAdmissionHalted`; keep the in-transaction store check as the authoritative re-check and state explicitly that its failure is a reopen-required outcome, not a plane halt.\"}],\"p1\":[{\"title\":\"intentCount/intentDigest origination is unspecified; lazy creation reproduces the false-completion bug the slice exists to fix\",\"evidence\":\"The progress record carries `version`, `intentCount`, `intentDigest`, `chunks`, but the additive effect fields are only `sourceSequence`, `intentDigest`, `fromIntent`, `throughIntent` — no `intentCount`. The contract says the store \\\"atomically appends the chunk\\\" and that the scalar fills \\\"only when the prefix reaches intentCount\\\", but never says who first writes `intentCount`/`intentDigest`, nor what happens to a progress effect against an entry that has no `replacementProgress`. The only hint is the migration bullet (\\\"may be CAS-upgraded to the progress form ... before replacement issue\\\"). If a backend instead creates the record lazily on the first chunk it must infer `intentCount`, and inferring it from `throughIntent` marks a 2-chunk replacement complete after chunk 1 — verbatim the defect quoted in the slice's own Status paragraph.\",\"correction\":\"State that the room establishes `replacementProgress` (version 1, intentCount, intentDigest, zero chunks) through `transactWriteSettlementPlan` CAS before the first replacement issue, and that a progress effect against an entry without a durable `replacementProgress`, or with a mismatching `intentDigest`, is refused with no mutation.\"},{\"title\":\"Repointing APPLICATION_BATCH_MAX_ENTRIES at the issuance-store bound moves a peer-vertex admission threshold into the issuance package\",\"evidence\":\"The contract directs `SETTLEMENT_REPLACEMENT_MAX_INTENTS` to be used for \\\"Node's existing application-batch entry ceiling so the two cannot drift\\\". That ceiling is packages/node/src/v3-live.ts:235, consumed at :6169 inside `applicationBatchEntries`, which is reached from `acceptedApplicationOperation` (:6200-6208) on the authenticated-ingress paths at :3984, :5586, :5734, :5762, :5789 — i.e. it decides acceptance of batch vertices authored by *other* peers, and it also gates the frozen 64-writer workload. Repointing it makes a network-facing admission threshold owned by `@ts-drp/issuance-store`, contradicting this slice's own \\\"No ... threshold ... change is authorized\\\" and \\\"the durable/public issuance-store type addition is the entire compatibility cost\\\". The value is 16 in both places today, so nothing changes now; the defect is the ownership/drift channel pointing the wrong way.\",\"correction\":\"Leave `APPLICATION_BATCH_MAX_ENTRIES` as Node's owned acceptance constant and enforce anti-drift with a typecheck/test equality assertion against `SETTLEMENT_REPLACEMENT_MAX_INTENTS` instead of substituting the import.\"},{\"title\":\"No Node failure kind is assigned to the new refusals, so the room cannot separate retryable from fail-closed\",\"evidence\":\"The error-ownership paragraph names only issuance-store codes (`ISSUANCE_RECOVERY_CORRUPT`, `ISSUANCE_COMMIT_INVALID`, `ISSUANCE_RETRY_REQUIRED`), but every refusal reaches the room as a `V3LocalIssueResult` kind from the closed set at packages/node/src/v3-live.ts:540-551. The 5-key effect is currently rejected as `malformed-input` at :6244-6258, and post-transaction failures collapse to `admission-rejected`/`issuance-rejected` at :6486-6490. The room branches only on `!issued.ok` (examples/v3-room/src/index.ts:2934-2941), so a stale-prefix refusal the contract wants retried and a digest mismatch the contract requires to fail closed (\\\"mismatch fails closed and does not issue, relink, rebuild or downgrade\\\") are indistinguishable.\",\"correction\":\"Pin the exact `V3LocalIssueResult` kind for each new refusal class (shape/range, digest mismatch, stale prefix) and state which one the room retries after a plan reread versus halts on.\"},{\"title\":\"Partial progress is not reconciled with the design's merge-time entry removal and displaced-replacement re-sourcing\",\"evidence\":\"design.md step 3 removes an entry whose source row now classifies terminal, and turns a displaced replacement row into a new source entry. The f5b0t contract only says \\\"The room resumes at the durable consumed prefix\\\" and never states what happens when an entry with a nonzero prefix is removed at merge (intents p+1..n are dropped — a skipped intent), or when the vertex carrying chunk 1 is itself displaced and re-sourced while the original entry still resumes at p+1 (intents 1..p are re-derived under the new entry while the old entry skips them). RED item 5 asserts \\\"no skipped, duplicated or substituted intent\\\" across close/reopen, so the RED will hit both cases with no specified expected behavior.\",\"correction\":\"State the two rules explicitly: an entry with a nonzero consumed prefix may not be removed at merge (or, if removal is intended, that the remaining suffix is deliberately abandoned and why), and a displaced partial-chunk row that becomes a new source entry does not rewind the original entry's prefix.\"},{\"title\":\"logicalTime monotonicity across the chunks of one replacement is unpinned and the counter is not durable\",\"evidence\":\"Splitting one replacement vertex into several newly exposes its operation run to a counter reset. `logicalTime` is in-memory, seeded from `input.initialLogicalTime` (examples/v3-room/src/index.ts:1811), raised only by observed vertices (:1913-1922), and allocated per replacement operation at :3006-3007. Node enforces strict increase only *within* one submission (packages/node/src/v3-live.ts:6269-6276, :6306), not across vertices. After a crash between chunk 1 and chunk 2 the reopened room can allocate chunk 2 logical times at or below chunk 1's, reordering the same source's intents — and the contract deliberately excludes logicalTime from the binding digest, so nothing detects it.\",\"correction\":\"Require the room to seed the replacement run from a durable floor (e.g. strictly above the logicalTime of the last recorded chunk) and state that chunk k+1's first logicalTime must exceed chunk k's last, or state explicitly why intra-source logicalTime order is irrelevant to the application.\"}],\"p2\":[{\"title\":\"Canonical limits for the binding digest encode are unspecified and differ from Node's issue-time limits\",\"evidence\":\"The expression is `hashDomain(\\\"ts-drp/settlement-replacement-intents/v1\\\", encodeCanonical(orderedReplacementOperations))` with no limits argument, so it uses DEFAULT_LIMITS (maxDepth 128, maxItems 1e6, maxBytes 256 MiB — packages/canonical/src/index.ts:27-31), whereas Node encodes and accepts the same operations under APPLICATION_BATCH_LIMITS (65,536 bytes, depth 8, 1,024 items — packages/node/src/v3-live.ts:236, :6222-6229). A list that digests cleanly can therefore be one Node will never accept, and the contract forbids any downgrade out of that state (\\\"Reject ... converting a valid multi-intent replacement to manual review or unsupported status\\\").\",\"disposition\":\"Name the exact limits profile used for the digest encode and require the room to reject the list before pinning progress if any operation fails to encode under Node's batch limits.\"},{\"title\":\"intentCount is not defined against the expire filter\",\"evidence\":\"The room's replacement list is `source.intents` with `policy === \\\"expire\\\"` entries dropped (examples/v3-room/src/index.ts:2977-3009), so it can be shorter than `source.intents.length` and shorter than the `operationCount` each intent carries (:2826-2827, set by `rebaseIntents` at packages/node/src/v3-live.ts:6839-6841). The contract says only \\\"intentCount in 1..16\\\".\",\"disposition\":\"State that intentCount is the length of the post-policy ordered replacement-operation list, not the source intent or operationCount.\"},{\"title\":\"A new hash domain is introduced under a \\\"no cryptography change\\\" scope sentence\",\"evidence\":\"The contract adds the domain \\\"ts-drp/settlement-replacement-intents/v1\\\" while asserting \\\"No wire envelope, protobuf, checkpoint, anchor, authority, cryptography, dependency, threshold, workload or public Node issue-input change is authorized\\\". `hashDomain` is documented as taking a \\\"Registered hash domain\\\" (packages/canonical/src/index.ts:556-561) and the plan document is the de-facto registry. The value is device-local and never on the wire, so this is a wording/registration gap rather than a protocol change.\",\"disposition\":\"Register the new domain alongside the existing v3 domains in the plan and reword the scope sentence to \\\"no wire-bound cryptographic domain or suite change\\\".\"},{\"title\":\"\\\"transform growth\\\" wording conflicts with the derivation that makes 16 correct\",\"evidence\":\"16 is correct: `rebaseIntents` yields at most APPLICATION_BATCH_MAX_ENTRIES intents for a batch source (packages/node/src/v3-live.ts:6169, :6838-6841) or exactly 1 otherwise, and the room's transform is a stability-checked 1→1 map (examples/v3-room/src/index.ts:2989-3005), so the ordered list can never exceed 16. RED item 4's phrase \\\"transform growth\\\" can be read as intent-count growth, which would invalidate the bound.\",\"disposition\":\"Reword to \\\"transform byte growth\\\" and record that the 1→1 transform contract is what makes 1..16 exhaustive.\"},{\"title\":\"The bound and the new symbols must be proven behaviorally, not by importing them\",\"evidence\":\"RED acceptance requires \\\"failure is behavioral and not a missing import/export\\\", but item 1 asks to prove \\\"the bound\\\" and the new shapes, and `SETTLEMENT_REPLACEMENT_MAX_INTENTS`, `SettlementReplacementProgress` and the optional entry member do not exist yet. A test that imports the constant or annotates a fixture with the new type fails at resolution/typecheck. Behavioral probes do exist: an untyped 5-key entry fixture through `copySettlementPlan` returns undefined today (packages/issuance-store/src/contract.ts:299-319), a 5-key effect throws ISSUANCE_COMMIT_INVALID (:285-297 via :470-491), and a 17-operation `issueLocal` splits at 16 (packages/node/src/v3-live.ts:6701-6711).\",\"disposition\":\"Require all new-shape and bound assertions to run through `unknown` fixtures and existing exported validators, and to assert Node's ceiling via observed split behavior rather than by importing the constant.\"}],\"summary\":\"The slice's premise is accurate and verified: the entry holds one scalar (types.ts:50-55), `applySettlementPlanEffect` can fill it exactly once (contract.ts:429-433), the room submits all replacement intents in one call (index.ts:3011-3014), and Node returns `split-required` nonmutatingly before issuing (v3-live.ts:6701-6711). The bound is right — `rebaseIntents` yields at most 16 intents and the room's transform is a stability-checked 1→1 map, so 1..16 is exhaustive and cannot be exceeded by rebase or transform. Legacy compatibility is largely sound: exact-key entry validation makes an old reader fail closed and poison rather than downgrade (node-issuance-store.ts:387-416, :584-595), browser DATABASE_VERSION stays 2 with the same four stores, `hashDomain` is already available to the room, and `@ts-drp/node` already depends on `@ts-drp/issuance-store`, so no new dependency is implied. Two blockers remain. First, the contract's only stated preservation rule is the scalar, while the design mandates a plan re-merge before every issue and the sole plan writer rebuilds entries carrying just `replacementSequence` — so any rewrite during a partial prefix erases progress and re-issues chunk 1, the exact duplicate the slice exists to prevent. Second, prefix/digest refusals land inside `transactIssue` after signing, and Node's catch sets the terminal `operationAdmissionHalted` flag, so the specified \\\"reread the plan and continue\\\" resume is unreachable and a routine stale-prefix retry bricks the plane. Five P1s cover unspecified `intentCount` origination (whose lazy-creation reading reproduces the false-completion bug verbatim), the admission-threshold ownership move, unassigned Node failure kinds, the unreconciled merge-removal/re-sourcing cases, and unpinned cross-chunk logicalTime. With those corrections the contract is exact enough for tests-only RED; as written the RED matrix would have to invent the missing rules.\"}","structured_output":{"verdict":"CHANGES_REQUIRED","p0":[{"title":"Plan re-merge silently discards replacementProgress, re-issuing chunk 1 (duplicate intents)","evidence":"The f5b0t contract states only that the legacy scalar is preserved; it never says replacementProgress must survive a plan rewrite. The single plan writer rebuilds every entry from scratch carrying exactly one prior field — examples/v3-room/src/index.ts:2877-2884 `replacementSequence: prior?.replacementSequence ?? null` — and its no-op short-circuit comparator ignores any new member (index.ts:2835-2839 `sameSettlementEntry`, used by the `unchanged` test at :2893-2901). The accepted design mandates this merge on every restart *before any issue* and requires the entry set to change (.logs/d110c-0c1f5b0r-design-3a156aca/design.md step 3: \"a replacement row that is itself displaced becomes a new source entry\", \"An entry whose source row now classifies terminal ... is removed from the plan at merge\", \"Write it with transactWriteSettlementPlan (CAS on revision) before any issue\"). Any such rewrite while a consumed prefix is partial resets the entry to unlinked-with-no-progress, and the drain at index.ts:2973-2974 then re-derives the full ordered list and re-issues intents 1..p a second time. This is the exact duplicate-intent failure RED item 5 claims to exclude.","correction":"Add one invariant to the contract: an entry carried forward by a plan merge/rewrite MUST carry its `replacementProgress` byte-for-byte, the merge comparator MUST include it, and `transactWriteSettlementPlan` MUST refuse a write that drops or shrinks an existing entry's chunk prefix for an unchanged (sourceSequence, sourceDigest, disposition) triple."},{"title":"Store-side prefix/digest refusal is post-signature and permanently halts operation admission, so \"reread the plan and continue\" is unreachable","evidence":"The contract makes stale-prefix/wrong-digest refusals a routine outcome (`ISSUANCE_RETRY_REQUIRED` for \"a structurally valid but stale plan comparison\"; the room \"rereads the plan, and continues\"). But the plan effect is applied inside `transactIssue` after `buildAndSign` has already signed (packages/issuance-store/src/conformance.ts:315 then :327-335; `applySettlementPlanEffect` at packages/issuance-store/src/contract.ts:429-433 throws `ISSUANCE_RETRY_REQUIRED`). That throw lands in packages/node/src/v3-live.ts:6468-6490 with `signerResolved === true` and `reservation` non-undefined (replacements are application operations, so `controlOperation` is false at :6346/:6354 and `reserveOperation` returns a value), which takes the branch at :6473-6474 and sets `registration.operationAdmissionHalted = true`. That flag is terminal — `issueOneVertex` refuses everything afterwards at :6329 and it is only ever cleared at registration creation (:8363) — and the room sees `admission-rejected`, not a retryable outcome. So a benign CAS/stale-prefix refusal bricks the plane mid-settlement instead of allowing resume, and \"refuses before mutation\" is true only of durable state, not of the plane.","correction":"Require the Node issue owner to read the plan and validate digest, `fromIntent` vs durable prefix, and range *before* `buildAndSign`, returning a distinct nonmutating `V3LocalIssueResult` kind that does not set `operationAdmissionHalted`; keep the in-transaction store check as the authoritative re-check and state explicitly that its failure is a reopen-required outcome, not a plane halt."}],"p1":[{"title":"intentCount/intentDigest origination is unspecified; lazy creation reproduces the false-completion bug the slice exists to fix","evidence":"The progress record carries `version`, `intentCount`, `intentDigest`, `chunks`, but the additive effect fields are only `sourceSequence`, `intentDigest`, `fromIntent`, `throughIntent` — no `intentCount`. The contract says the store \"atomically appends the chunk\" and that the scalar fills \"only when the prefix reaches intentCount\", but never says who first writes `intentCount`/`intentDigest`, nor what happens to a progress effect against an entry that has no `replacementProgress`. The only hint is the migration bullet (\"may be CAS-upgraded to the progress form ... before replacement issue\"). If a backend instead creates the record lazily on the first chunk it must infer `intentCount`, and inferring it from `throughIntent` marks a 2-chunk replacement complete after chunk 1 — verbatim the defect quoted in the slice's own Status paragraph.","correction":"State that the room establishes `replacementProgress` (version 1, intentCount, intentDigest, zero chunks) through `transactWriteSettlementPlan` CAS before the first replacement issue, and that a progress effect against an entry without a durable `replacementProgress`, or with a mismatching `intentDigest`, is refused with no mutation."},{"title":"Repointing APPLICATION_BATCH_MAX_ENTRIES at the issuance-store bound moves a peer-vertex admission threshold into the issuance package","evidence":"The contract directs `SETTLEMENT_REPLACEMENT_MAX_INTENTS` to be used for \"Node's existing application-batch entry ceiling so the two cannot drift\". That ceiling is packages/node/src/v3-live.ts:235, consumed at :6169 inside `applicationBatchEntries`, which is reached from `acceptedApplicationOperation` (:6200-6208) on the authenticated-ingress paths at :3984, :5586, :5734, :5762, :5789 — i.e. it decides acceptance of batch vertices authored by *other* peers, and it also gates the frozen 64-writer workload. Repointing it makes a network-facing admission threshold owned by `@ts-drp/issuance-store`, contradicting this slice's own \"No ... threshold ... change is authorized\" and \"the durable/public issuance-store type addition is the entire compatibility cost\". The value is 16 in both places today, so nothing changes now; the defect is the ownership/drift channel pointing the wrong way.","correction":"Leave `APPLICATION_BATCH_MAX_ENTRIES` as Node's owned acceptance constant and enforce anti-drift with a typecheck/test equality assertion against `SETTLEMENT_REPLACEMENT_MAX_INTENTS` instead of substituting the import."},{"title":"No Node failure kind is assigned to the new refusals, so the room cannot separate retryable from fail-closed","evidence":"The error-ownership paragraph names only issuance-store codes (`ISSUANCE_RECOVERY_CORRUPT`, `ISSUANCE_COMMIT_INVALID`, `ISSUANCE_RETRY_REQUIRED`), but every refusal reaches the room as a `V3LocalIssueResult` kind from the closed set at packages/node/src/v3-live.ts:540-551. The 5-key effect is currently rejected as `malformed-input` at :6244-6258, and post-transaction failures collapse to `admission-rejected`/`issuance-rejected` at :6486-6490. The room branches only on `!issued.ok` (examples/v3-room/src/index.ts:2934-2941), so a stale-prefix refusal the contract wants retried and a digest mismatch the contract requires to fail closed (\"mismatch fails closed and does not issue, relink, rebuild or downgrade\") are indistinguishable.","correction":"Pin the exact `V3LocalIssueResult` kind for each new refusal class (shape/range, digest mismatch, stale prefix) and state which one the room retries after a plan reread versus halts on."},{"title":"Partial progress is not reconciled with the design's merge-time entry removal and displaced-replacement re-sourcing","evidence":"design.md step 3 removes an entry whose source row now classifies terminal, and turns a displaced replacement row into a new source entry. The f5b0t contract only says \"The room resumes at the durable consumed prefix\" and never states what happens when an entry with a nonzero prefix is removed at merge (intents p+1..n are dropped — a skipped intent), or when the vertex carrying chunk 1 is itself displaced and re-sourced while the original entry still resumes at p+1 (intents 1..p are re-derived under the new entry while the old entry skips them). RED item 5 asserts \"no skipped, duplicated or substituted intent\" across close/reopen, so the RED will hit both cases with no specified expected behavior.","correction":"State the two rules explicitly: an entry with a nonzero consumed prefix may not be removed at merge (or, if removal is intended, that the remaining suffix is deliberately abandoned and why), and a displaced partial-chunk row that becomes a new source entry does not rewind the original entry's prefix."},{"title":"logicalTime monotonicity across the chunks of one replacement is unpinned and the counter is not durable","evidence":"Splitting one replacement vertex into several newly exposes its operation run to a counter reset. `logicalTime` is in-memory, seeded from `input.initialLogicalTime` (examples/v3-room/src/index.ts:1811), raised only by observed vertices (:1913-1922), and allocated per replacement operation at :3006-3007. Node enforces strict increase only *within* one submission (packages/node/src/v3-live.ts:6269-6276, :6306), not across vertices. After a crash between chunk 1 and chunk 2 the reopened room can allocate chunk 2 logical times at or below chunk 1's, reordering the same source's intents — and the contract deliberately excludes logicalTime from the binding digest, so nothing detects it.","correction":"Require the room to seed the replacement run from a durable floor (e.g. strictly above the logicalTime of the last recorded chunk) and state that chunk k+1's first logicalTime must exceed chunk k's last, or state explicitly why intra-source logicalTime order is irrelevant to the application."}],"p2":[{"title":"Canonical limits for the binding digest encode are unspecified and differ from Node's issue-time limits","evidence":"The expression is `hashDomain(\"ts-drp/settlement-replacement-intents/v1\", encodeCanonical(orderedReplacementOperations))` with no limits argument, so it uses DEFAULT_LIMITS (maxDepth 128, maxItems 1e6, maxBytes 256 MiB — packages/canonical/src/index.ts:27-31), whereas Node encodes and accepts the same operations under APPLICATION_BATCH_LIMITS (65,536 bytes, depth 8, 1,024 items — packages/node/src/v3-live.ts:236, :6222-6229). A list that digests cleanly can therefore be one Node will never accept, and the contract forbids any downgrade out of that state (\"Reject ... converting a valid multi-intent replacement to manual review or unsupported status\").","disposition":"Name the exact limits profile used for the digest encode and require the room to reject the list before pinning progress if any operation fails to encode under Node's batch limits."},{"title":"intentCount is not defined against the expire filter","evidence":"The room's replacement list is `source.intents` with `policy === \"expire\"` entries dropped (examples/v3-room/src/index.ts:2977-3009), so it can be shorter than `source.intents.length` and shorter than the `operationCount` each intent carries (:2826-2827, set by `rebaseIntents` at packages/node/src/v3-live.ts:6839-6841). The contract says only \"intentCount in 1..16\".","disposition":"State that intentCount is the length of the post-policy ordered replacement-operation list, not the source intent or operationCount."},{"title":"A new hash domain is introduced under a \"no cryptography change\" scope sentence","evidence":"The contract adds the domain \"ts-drp/settlement-replacement-intents/v1\" while asserting \"No wire envelope, protobuf, checkpoint, anchor, authority, cryptography, dependency, threshold, workload or public Node issue-input change is authorized\". `hashDomain` is documented as taking a \"Registered hash domain\" (packages/canonical/src/index.ts:556-561) and the plan document is the de-facto registry. The value is device-local and never on the wire, so this is a wording/registration gap rather than a protocol change.","disposition":"Register the new domain alongside the existing v3 domains in the plan and reword the scope sentence to \"no wire-bound cryptographic domain or suite change\"."},{"title":"\"transform growth\" wording conflicts with the derivation that makes 16 correct","evidence":"16 is correct: `rebaseIntents` yields at most APPLICATION_BATCH_MAX_ENTRIES intents for a batch source (packages/node/src/v3-live.ts:6169, :6838-6841) or exactly 1 otherwise, and the room's transform is a stability-checked 1→1 map (examples/v3-room/src/index.ts:2989-3005), so the ordered list can never exceed 16. RED item 4's phrase \"transform growth\" can be read as intent-count growth, which would invalidate the bound.","disposition":"Reword to \"transform byte growth\" and record that the 1→1 transform contract is what makes 1..16 exhaustive."},{"title":"The bound and the new symbols must be proven behaviorally, not by importing them","evidence":"RED acceptance requires \"failure is behavioral and not a missing import/export\", but item 1 asks to prove \"the bound\" and the new shapes, and `SETTLEMENT_REPLACEMENT_MAX_INTENTS`, `SettlementReplacementProgress` and the optional entry member do not exist yet. A test that imports the constant or annotates a fixture with the new type fails at resolution/typecheck. Behavioral probes do exist: an untyped 5-key entry fixture through `copySettlementPlan` returns undefined today (packages/issuance-store/src/contract.ts:299-319), a 5-key effect throws ISSUANCE_COMMIT_INVALID (:285-297 via :470-491), and a 17-operation `issueLocal` splits at 16 (packages/node/src/v3-live.ts:6701-6711).","disposition":"Require all new-shape and bound assertions to run through `unknown` fixtures and existing exported validators, and to assert Node's ceiling via observed split behavior rather than by importing the constant."}],"summary":"The slice's premise is accurate and verified: the entry holds one scalar (types.ts:50-55), `applySettlementPlanEffect` can fill it exactly once (contract.ts:429-433), the room submits all replacement intents in one call (index.ts:3011-3014), and Node returns `split-required` nonmutatingly before issuing (v3-live.ts:6701-6711). The bound is right — `rebaseIntents` yields at most 16 intents and the room's transform is a stability-checked 1→1 map, so 1..16 is exhaustive and cannot be exceeded by rebase or transform. Legacy compatibility is largely sound: exact-key entry validation makes an old reader fail closed and poison rather than downgrade (node-issuance-store.ts:387-416, :584-595), browser DATABASE_VERSION stays 2 with the same four stores, `hashDomain` is already available to the room, and `@ts-drp/node` already depends on `@ts-drp/issuance-store`, so no new dependency is implied. Two blockers remain. First, the contract's only stated preservation rule is the scalar, while the design mandates a plan re-merge before every issue and the sole plan writer rebuilds entries carrying just `replacementSequence` — so any rewrite during a partial prefix erases progress and re-issues chunk 1, the exact duplicate the slice exists to prevent. Second, prefix/digest refusals land inside `transactIssue` after signing, and Node's catch sets the terminal `operationAdmissionHalted` flag, so the specified \"reread the plan and continue\" resume is unreachable and a routine stale-prefix retry bricks the plane. Five P1s cover unspecified `intentCount` origination (whose lazy-creation reading reproduces the false-completion bug verbatim), the admission-threshold ownership move, unassigned Node failure kinds, the unreconciled merge-removal/re-sourcing cases, and unpinned cross-chunk logicalTime. With those corrections the contract is exact enough for tests-only RED; as written the RED matrix would have to invent the missing rules."},"ttft_ms":1550,"type":"result","duration_ms":563580,"uuid":"0166aff0-6c2b-4054-8075-8fa377ecbcbc","ttft_stream_ms":798,"time_to_request_ms":53,"first_content_frame_ms":798,"queued_turn_count":0}
+===
+     559 .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr-standard.txt
+     571 .logs/d110c-0c1f5b0r-design-3a156aca/design.md
+    1130 total
+ex.operation, authenticated.admitted.logicalTime)) ||
+6155:function applicationBatchEntries(
+6200:function acceptedApplicationOperation(
+6207:	const entries = applicationBatchEntries(payload, operation);
+6819:		acceptedApplicationOperation(source, operation, classified.authenticated.admitted.logicalTime)
+6837:	const batch = applicationBatchEntries(payload, sourceOperation);
+	try {
+		const decoded: unknown = JSON.parse(entriesJson);
+		if (!Array.isArray(decoded)) return undefined;
+		const entries = decoded.map((entry) => {
+			if (typeof entry !== "object" || entry === null) {
+				return entry;
+			}
+			const sourceDigest = Reflect.get(entry, "sourceDigest");
+			if (
+				!Array.isArray(sourceDigest) ||
+				sourceDigest.length === 0 ||
+				sourceDigest.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
+			) {
+				return entry;
+			}
+			return { ...entry, sourceDigest: Uint8Array.from(sourceDigest as number[]) };
+		});
+		return copySettlementPlan({ entries, fenceSequence, revision, scope }, scope);
+	} catch {
+		return undefined;
+	}
+}
+
+function readSettlementPlanRow(database: DatabaseSync, scope: DurableIssueScope): SettlementPlan | null | undefined {
+	const raw = statement(
+		database,
+		"SELECT object_id,author,revision,fence_sequence,entries_json FROM settlement_plans WHERE object_id=? AND author=?"
+	).get(scope.objectId, scope.author);
+	return raw === undefined ? null : copySettlementPlanRow(raw, scope);
+}
+
+function issuedCommit(row: NativeIssuedRow): DurableIssueCommit {
+	const scope = { author: row.author, objectId: row.objectId };
+	const envelope = {
+		canonicalPreimageBytes: new Uint8Array(row.canonicalPreimageBytes),
+		digest: new Uint8Array(row.digest),
+		signature: new Uint8Array(row.signature),
+	};
+	return cloneDurableIssueCommit({
+		authorSequence: row.authorSequence,
+		envelope,
+		issuedRecord: { authorSequence: row.authorSequence, envelope, scope },
+		outboxEntry: { authorSequence: row.authorSequence, envelope, scope },
+	});
+}
+
+			if (!Object.hasOwn(descriptor, "value")) {
+				throw new CanonicalEncodingError(`accessor property ${key} is outside the canonical domain`);
+			}
+			assertWellFormedString(key);
+			entries.push({
+				keyBytes: encodeInternal(key, active, depth + 1, limits),
+				valueBytes: encodeInternal(descriptor.value, active, depth + 1, limits),
+			});
+		}
+		entries.sort((left, right) => compareBytes(left.keyBytes, right.keyBytes));
+		return concat([
+			Uint8Array.of(TAG.OBJECT),
+			encodeVarUint(entries.length),
+			...entries.flatMap(({ keyBytes, valueBytes }) => [keyBytes, valueBytes]),
+		]);
+	} finally {
+		active.delete(value);
+	}
+}
+
+/**
+ * Encodes a value with the frozen reference tag codec.
+ * @param value - Value in the canonical data domain.
+ * @param limits - Optional resource-limit overrides.
+ * @returns Canonical bytes.
+ */
+export function encodeCanonical(value: unknown, limits: Partial<CanonicalLimits> = {}): Uint8Array {
+	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...limits };
+	const bytes = encodeInternal(value, new Set<object>(), 0, configured);
+	if (bytes.byteLength > configured.maxBytes) {
+		throw new CanonicalEncodingError("canonical value exceeds byte limit");
+22:	maxBytes: number;
+30:	maxBytes: 256 * 1024 * 1024,
+148:		if (bytes.byteLength > limits.maxBytes) throw new CanonicalEncodingError("string exceeds byte limit");
+299:	if (bytes.byteLength > configured.maxBytes) {
+515:	if (bytes.byteLength > configured.maxBytes) {
+99476:  `SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16`, and use it for both the progress
+99502:  its replacement kind. `fromIntent` must equal the durable consumed prefix;
+99513:  Malformed durable values use `ISSUANCE_RECOVERY_CORRUPT`; invalid caller
+99518:- The room resumes at the durable consumed prefix. It submits the remaining
+99539:  only the first or last chunk, scalar reuse, and converting a valid
+99561:   the final chunk, in the same epoch and after close/reopen. Prove no skipped,
+99563:   mismatch refusal, and monotonic merge/readback.
+99439:###### D.110c-0c1f5b0t segmented settlement replacement-progress prerequisite
+this internal call without a wire/schema/public-API/authority/dependency or
+threshold change, it stops and reslices under the existing high-risk rule.
+f5b0d is now CLOSED within that resliced boundary. Backend corrective RED
+`0cafd357`/evidence `a0bd87f1` became three-owner GREEN `292fc14f`/evidence
+`502198f3`: focused 12/12, real Chromium 1/1, retained 136/136 and 124/124,
+and isolated 12/12 plus 136/136. Rejected confirmation `508d700a` then found
+the live legacy-cap and stale-oracle P1s. Tests-only RED `7d037ed8`/evidence
+`932db106` selected 19 tests, 18 pass and the sole exact 8,193 boundary failure;
+one-line GREEN `b384c7d9`/evidence `400994f9` passed 19/19, unchanged backend
+12/12, Chromium 1/1, corrected retained 134/134 and 122/122, and isolated
+19/19 plus 134/134 plus 122/122. Final Grok/Kimi/Opus confirmation is
+signed/pushed at `b15917ff` under
+`.logs/d110c-0c1f5b0d-legacy-confirmation-400994f9/`; its union is empty.
+
+Nonblocking dispositions remain explicit. Parent f5b owns the genuine
+production invocation, the remaining owner-presence/fallback replacement,
+checkpoint-derived exact `terminalThrough`, closed-epoch receipt comparison,
+bounded per-invocation pruning, settlement recovery window and removal of the
+rejected post-hoc replay/comment. D.110c-c owns journal/snapshot/seal/AHE
+retirement. The single-use counter-limit local needs no cleanup-only commit.
+The published `./maintenance` path is an intentional exact-store trusted
+same-realm capability; its stale “package-internal” JSDoc is f5b0d
+documentation debt and does not expand the threat model or block f5b.
+
+f5b0b P2 disposition is explicit. Authenticated frontier threading and
+classifier-local terminal suppression, replacement `planEffect` authority,
+and same-store activation-digest runtime coverage were assigned to f5b0c; room
+typecheck and replacement `planEffect` authority are now discharged by f5b0c.
+Authenticated frontier/terminal suppression and same-store activation-digest
+runtime coverage move to f5b because only that integration owns the verified
+checkpoint frontier and genuine adoption fixture. The payload-seeded
+settlement control set also belongs to f5b. Historical misleading
+`[control]` titles remain immutable with a recorded naming caveat. The Node
+typecheck exit 2 is inherited and byte-identical to the untouched parent after
+root normalization. Future GREEN evidence that runs children against built
+Node output must retain the selected built-output path/hash/shape identity in
+the evidence pack; f5b0b's final detached checkout rebuilt and passed, so this
+is nonblocking prospective evidence guidance.
+
+###### D.110c-0c1f5b0t segmented settlement replacement-progress prerequisite
+
+**Status: BLOCKING PLAN CHECKPOINT on 2026-09-04.** The first parent f5b RED
+stopped before any test or production edit under the accepted design stop rule:
+the persisted `SettlementPlanEntry` has only one scalar
+`replacementSequence`, `applySettlementPlanEffect` may fill it only once, the
+room currently submits all detached replacement intents to one `issueLocal`
+call, and Node returns `split-required` before issuing anything. Linking the
+first chunk would falsely mark the plan complete; linking only the last would
+make earlier issued chunks unauthenticated and unresumable; reusing the scalar
+effect is rejected. A room-only retry loop therefore cannot provide exact-once,
+crash-safe multi-vertex settlement. This is a demonstrated stored-contract
+gap, not permission to weaken the multi-intent acceptance.
+
+Owners: `@ts-drp/issuance-store` contract plus memory/browser/Node backends,
+the Node settlement-effect validation seam, and the v3-room settlement drain
+owner. Deadline: GREEN and an empty P0/P1 final review union before parent f5b
+RED resumes, D.110c-c/d, the same-room 64-writer and at-least-100-transition
+gates, the MMORPG golden-path claim, Phase-6 exit, or Phase 7. Because this is
+an additive public TypeScript and durable-value contract adjacent to issuance,
+one exact Grok 4.6/high, Kimi K3 100-step and Opus xhigh design review is
+required before its causal tests-only RED. No production edit precedes RED.
+
+Selected bounded contract:
+
+- Preserve the legacy `SettlementPlanEntry` four-key form and scalar
+  `replacementSequence` semantics exactly when the new optional member is
+  absent. Add optional `replacementProgress` only for an unlinked
+  `rebase` or `transform` entry. Its exact public shapes are:
+
+  - `SettlementReplacementChunk` has readonly numeric
+    `replacementSequence` and `throughIntent` members.
+559
+   substituted intent, preserved fence-first order, strictly increasing
+   cross-chunk logical time, digest mismatch refusal, monotonic merge/readback,
+   open-progress source retention and correct displaced-chunk re-sourcing.
+
+The signed initial plan checkpoint is
+`cf4b6d820031a546a8013b500be7bfac100a8a3f`. Its single Grok/Kimi/Opus design
+round is preserved under `.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/`.
+Grok exited normally with a terminal `CHANGES_REQUIRED` JSON object after
+progress prose (the strict wrapper therefore records `NO_VERDICT`, not a
+cancellation); direct standard Kimi and Opus xhigh also returned
+`CHANGES_REQUIRED`. The blocking union was plan-merge loss of open progress,
+post-sign stale-prefix refusal halting the plane, unspecified progress
+origination, wrong batch-constant ownership, unnamed Node outcomes,
+cross-close source/chunk custody and cross-chunk logical time. This corrected
+contract adopts those findings in one batch. Every P2 is also discharged here:
+the dense digest preimage and bounded limits, post-policy count, registered
+local domain, transform byte-growth wording, unknown-fixture RED technique,
+nested Node JSON grammar, exact error codes, 16-bound derivation, independent
+constant ownership/equality control and existing Node result kinds are now
+explicit. One material confirmation of this corrected executable contract is
+required; no recursive review of its later bookkeeping prose is permitted.
+
+GREEN is limited to issuance-store types/contract/conformance, the three
+backends, bounded test fixtures, the internal Node effect/range validation and
+the room settlement-drain loop. Focused tests, affected builds/typechecks,
+exact-owner lint/format/diff, retained issuance/room/recovery suites and an
+isolated clean-checkout gate are mandatory. Evidence lives under the usual
+self-excluding RED/GREEN manifests. The final Grok/Kimi/Opus implementation
+review examines plan through causal RED through GREEN; only P0/P1 blocks and
+each P2 receives an owner and disposition. Parent f5b retains genuine
+checkpoint/close/adopt, every-peer authenticated pruning, 8,192/8,193 recovery,
+three-close restart/cold-reopen and explicit 64-active-writer composition; this
+prerequisite neither satisfies nor weakens any of them.
+
+###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
+
+**Status: BLOCKED on f5b0t GREEN and its empty P0/P1 review union.** The first
+causal RED stopped before any edit when the accepted split-required case
+demonstrated that the scalar replacement link cannot represent crash-safe
+multi-vertex progress. After f5b0t closes, this record resumes under the
+accepted D.110c-0c1f5b0r design and the prospective 64-writer composition
+amendment; f5b0a, f5b0s, f5b0b, f5b0c, f5b0d and W0 remain closed, f5b0p-a/b
+remain deleted, and no parent f5b production edit precedes its resumed RED.
+
+Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
+three-proposal reconciliation and the
+`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` terminus below describe the
+pre-f5b0r candidate families and are historical audit record only; that token
+exists nowhere under `packages/` or `examples/`. The authoritative f5b slice
+definition and RED obligations are design.md "TDD implementation slices" item
+6 and RED cases 1–27; the no-rebase trigger is replaced by delayed-dependency
+case 1.
+Owner: the cross-epoch relationship among creator-admitted
+per-author identities, aggregate coverage, historical outbox classification,
+rebase source→replacement/disposition correlation, close-set/history proofs,
+writer-side proof availability after restart, and bounded pruning. Deadline:
+one exact construction must be audited, reviewed, causally RED, and GREEN after
+f5a but before parent 0c1/0c, D.110c-c/d, the ≥100-transition gate, Phase-6
+exit, or Phase-7 multi-author cold join.
+
+The audit must cover two independent genuine triggers. The rebase trigger is
+the existing prior boundary `S`, displaced source rows above it, intervening
+local allocations, fresh replacement sequences above a hole, and later cold
+reopen. The no-rebase trigger is honest delivery ordering: sequence `n+1` is
+admitted in epoch `k` while `n` is delayed, the creator closes epoch `k`, and
+the old-anchor `n` can no longer be admitted after adoption. Because later close
+graphs contain neither earlier admitted `n+1` nor admissible `n`, the adjacent
+prefix remains permanently below both. A test that fabricates admission of the
+old-anchor row under epoch `k+1` is invalid.
+
+The audit also owns the exact reachability and meaning of
+`D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED`: determine whether any genuine
+recovery, membership, or admitted-set lifecycle can produce a currently
+authorized writer absent from the prior authenticated aggregate. If none can,
+retain the guard fail closed as unreachable defense and do not manufacture a
+fixture-only carrier mismatch to justify product behavior. The same audit owns
+the `priorIdentity === undefined` genesis-close branch where a foreign
+first-observed sequence above one currently throws
+`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; it must determine whether
+that state is genuinely reachable and, if so, whether it belongs to the same
+settlement construction or a separately reviewed prerequisite. It also owns
+the case where a current-epoch regressed row shares an `(author, sequence)`
+with already-covered history under an unchanged numeric frontier.
+
+The bounded architecture audit must reconcile, not merely list, the review's
+three proposals:
+
+1. an author-signed source→replacement/disposition binding compacted into a
+   creator-settled prefix, including its new authority/schema statement,
+   temporary open-gap custody, byte ceiling, crash ordering, and pruning;
+2. a creator-attested covered run or other bounded admitted-set carrier,
+   including how prior covered rows below a moving floor remain classifiable or
+   are durably and safely retired, how held/refused rows surface without a new
+   public contract, and why one interval is sufficient under repeated gaps;
+3. membership/consistency under existing close-set or RFC 9162 history roots,
+   including the exact leaf grammar and ordinal, authenticated root chain,
+   source→replacement relationship, inclusion-proof production and delivery,
+   writer-side availability after restart, proof pruning, and why ordinary
+   reopen does not reconstruct O(epoch) history; and
+4. any simpler ingress/order or issuance construction that prevents permanent
+   holes without losing honest operations, relying on retries, or weakening
+   offline/rebase continuity.
+
+For every candidate, produce exact state-growth bounds by writers, open gaps,
+rebases, and epochs; identify the signer and pinned trust path; trace source,
+creator, successor, restart, and cold-reopen custody; define crash-before and
+crash-after behavior; and test replay, substitution, equivocation,
+cross-author/object/epoch, skipped sequence, multiple disjoint runs, rollback,
+availability, and prune boundaries. A solution cannot hide O(epoch), O(rebase),
+or unbounded O(gap) proof material in an uncounted journal, archive, bootstrap
+store, registration, or application callback required for ordinary reopen.
+
+Before choosing, mechanically establish whether the genuine writer database
+and authenticated successor material contain enough exact close-set/history
+leaves or inclusion proofs to validate an earlier admitted replacement after
+restart. Also establish whether current recovery can report and retain a
+per-row held/refused disposition without changing a public result or silently
+ignoring an unclassifiable published row. If either fact is absent, the audit
+must reject the candidate or name the explicit high-risk carrier/API/retention
+prerequisite.
+
+The selected design and compatibility boundary receive the one permitted
+material Grok/Kimi/Opus confirmation. F5b RED remains unauthorized until that
+confirmation has an empty P0/P1 union. Its eventual genuine RED must cover both
+triggers, multiple gaps, restart, at least two later close/adopt transitions,
+unchanged writer storage, cold reopen, and post-reopen issue/publish; terminate
+only at `D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED`; and keep a no-gap
+control green. If the design needs a carrier/wire/API/dependency/authority,
+threshold, migration, archive, or pruning-policy change, stop and open that
+named prerequisite rather than folding it into f5b.
+
+The bounded audit is
+`.logs/d110c-0c1f5-source-audit-fcd8735c/audit.md`. It pins signed/pushed RED
+anchor `fcd8735c8316b048166560ab904704102ce90705`, traces the exact room reissue,
+same-store completion, close-graph capture, aggregate advancement, and both
+historical consumers, and rejects a bare observed maximum because it would
+authenticate unseen rows below that maximum. It selects no production repair;
+the four candidate families and six proof obligations above must be decided by
+the required plan review first. Its one-entry self-excluding manifest validates
+and has SHA-256
+`f53ae45b110472fc83e90c4e8113330ef3b70e6ee89b26f085d1ab2e65a94485`.
+{"role":"meta","type":"system.version","version":"0.40.1"}
+{"role":"assistant","tool_calls":[{"type":"function","id":"tool_0fyhIuoPyFCcia1kmxQdAZiC","function":{"name":"Bash","arguments":"{\"command\":\"git log --format='%H %s' -3 cf4b6d820031a546a8013b500be7bfac100a8a3f && git show --stat cf4b6d820031a546a8013b500be7bfac100a8a3f | head -60\"}"}},{"type":"function","id":"tool_kLoQZYL3RDiDGl630M2KxANe","function":{"name":"Bash","arguments":"{\"command\":\"ls .logs/d110c-0c1f5b0r-design-3a156aca/ 2>/dev/null && wc -l .logs/d110c-0c1f5b0r-design-3a156aca/design.md 2>/dev/null\"}"}}]}
+{"role":"tool","tool_call_id":"tool_0fyhIuoPyFCcia1kmxQdAZiC","content":"cf4b6d820031a546a8013b500be7bfac100a8a3f docs(hardening): reslice segmented settlement progress\n2af10e2d5ff61d58ee6ac12d9634ca2ae8bdf9dd docs(hardening): close settlement reclamation slice\nb15917ff070c32a6580ef7a07d5ac03212481361 test(hardening): accept reclamation correction\ncommit cf4b6d820031a546a8013b500be7bfac100a8a3f\nAuthor: Faolain <Faolain@users.noreply.github.com>\nDate:   Fri Sep 4 19:33:36 2026 -0400\n\n    docs(hardening): reslice segmented settlement progress\n\n .../production-hardening-tdd-plan-v2.md            | 170 +++++++++++++++++++--\n 1 file changed, 156 insertions(+), 14 deletions(-)\n"}
+{"role":"tool","tool_call_id":"tool_kLoQZYL3RDiDGl630M2KxANe","content":"design.md\nmanifest.sha256\nnext-prompt.md\npre-review.md\n     571 .logs/d110c-0c1f5b0r-design-3a156aca/design.md\n"}
+{"role":"assistant","tool_calls":[{"type":"function","id":"tool_gjS0pKbsyCMCCmxPjfHh36de","function":{"name":"Bash","arguments":"{\"command\":\"git show cf4b6d820031a546a8013b500be7bfac100a8a3f --format= > /tmp/d110c_t_diff.txt; wc -l /tmp/d110c_t_diff.txt\"}"}},{"type":"function","id":"tool_P5HbliGUHIaxLYgDD2FDOIZI","function":{"name":"Read","arguments":"{\"path\":\".logs/d110c-0c1f5b0r-design-3a156aca/design.md\"}"}}]}
+{"role":"tool","tool_call_id":"tool_gjS0pKbsyCMCCmxPjfHh36de","content":"     194 /tmp/d110c_t_diff.t
+60
+{'role': 'assistant', 'content': 'One last check — the default canonical limits for the digest expression, since `encodeCanonical` with defaults could reject large operation lists.', 'tool_calls': [{'type': 'function', 'id': 'tool_2bqCCjNR7QTgd7oqwRVsT7ym', 'function': {'name': 'Bash', 'arguments': '{"command":"sed -n \'270,300p\' packages/canonical/src/index.ts; grep -n \\"DEFAULT_CANONICAL_LIMIT
+{'role': 'tool', 'tool_call_id': 'tool_2bqCCjNR7QTgd7oqwRVsT7ym', 'content': '\t\t\tif (!Object.hasOwn(descriptor, "value")) {\n\t\t\t\tthrow new CanonicalEncodingError(`accessor property ${key} is outside the canonical domain`);\n\t\t\t}\n\t\t\tassertWellFormedString(key);\n\t\t\tentries.push({\n\t\t\t\tkeyBytes: encodeInternal(key, active, depth + 1, limits),\n\t\t\t\tvalueBytes: encodeInternal(
+{'role': 'assistant', 'content': 'Let me pin exact line numbers in the plan file for citations.', 'tool_calls': [{'type': 'function', 'id': 'tool_nb3FYWlsqdIkakzEMgmXeRP7', 'function': {'name': 'Bash', 'arguments': '{"command":"grep -n \\"resumes at the durable consumed prefix\\\\|SETTLEMENT_REPLACEMENT_MAX_INTENTS\\\\|must equal the durable consumed prefix\\\\|Malformed durable values use\\\\|con
+{'role': 'tool', 'tool_call_id': 'tool_nb3FYWlsqdIkakzEMgmXeRP7', 'content': '99476:  `SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16`, and use it for both the progress\n99502:  its replacement kind. `fromIntent` must equal the durable consumed prefix;\n99513:  Malformed durable values use `ISSUANCE_RECOVERY_CORRUPT`; invalid caller\n99518:- The room resumes at the durable consumed prefix. It submits the
+{'role': 'assistant', 'content': '{"verdict":"CHANGES_REQUIRED","p0":[],"p1":[{"title":"Cross-close fate of an open progress entry is unspecified, admitting both intent loss and double-apply","evidence":"The f5b0t contract specifies only same-epoch resume (\\"The room resumes at the durable consumed prefix\\", docs/production-hardening/production-hardening-tdd-plan-v2.md:99518-99524) and never sta
+{'role': 'meta', 'type': 'session.resume_hint', 'session_id': 'session_cad0bef3-08a5-4b90-bb47-c4309bce9642', 'command': 'kimi -r session_cad0bef3-08a5-4b90-bb47-c4309bce9642', 'content': 'To resume this session: kimi -r session_cad0bef3-08a5-4b90-bb47-c4309bce9642'}
+24:	maxItems: number;
+29:	maxItems: 1_000_000,
+214:			if (value.length > limits.maxItems) throw new CanonicalEncodingError("array exceeds item limit");
+225:			if (value.size > limits.maxItems) throw new CanonicalEncodingError("map exceeds item limit");
+248:			if (value.size > limits.maxItems) throw new CanonicalEncodingError("set exceeds item limit");
+329:		if (this.items > this.limits.maxItems) {
+				view.setInt32(index * 4, value[index] as number, false);
+			});
+			return concat([Uint8Array.of(TAG.INT32_ARRAY), encodeVarUint(value.length), bytes]);
+		}
+		if (value instanceof Uint32Array) {
+			const bytes = typedArrayBytes(value.length, 4, (view, index) => {
+				view.setUint32(index * 4, value[index] as number, false);
+			});
+			return concat([Uint8Array.of(TAG.UINT32_ARRAY), encodeVarUint(value.length), bytes]);
+		}
+		if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof Date || value instanceof RegExp) {
+			throw new CanonicalEncodingError("value requires an explicit protocol codec");
+		}
+		if (Array.isArray(value)) {
+			if (value.length > limits.maxItems) throw new CanonicalEncodingError("array exceeds item limit");
+			const parts = [Uint8Array.of(TAG.ARRAY), encodeVarUint(value.length)];
+			for (let index = 0; index < value.length; index++) {
+				if (!Object.hasOwn(value, index)) {
+					throw new CanonicalEncodingError("sparse arrays are outside the canonical domain");
+				}
+				parts.push(encodeInternal(value[index], active, depth + 1, limits));
+			}
+			return concat(parts);
+		}
+		if (value instanceof Map) {
+			if (value.size > limits.maxItems) throw new CanonicalEncodingError("map exceeds item limit");
+			const entries: { keyBytes: Uint8Array; valueBytes: Uint8Array }[] = [];
+			for (const [key, item] of value.entries()) {
+				entries.push({
+					keyBytes: encodeInternal(key, active, depth + 1, limits),
+					valueBytes: encodeInternal(item, active, depth + 1, limits),
+				});
+			}
+			entries.sort((left, right) => compareBytes(left.keyBytes, right.keyBytes));
+			for (let index = 1; index < entries.length; index++) {
+				const previous = entries[index - 1];
+				const current = entries[index];
+				if (previous !== undefined && current !== undefined && bytesEqual(previous.keyBytes, current.keyBytes)) {
+					throw new CanonicalEncodingError("map contains duplicate canonical keys");
+				}
+			}
+			return concat([
+				Uint8Array.of(TAG.MAP),
+				encodeVarUint(entries.length),
+				...entries.flatMap(({ keyBytes, valueBytes }) => [keyBytes, valueBytes]),
+			]);
+		}
+		if (value instanceof Set) {
+			if (value.size > limits.maxItems) throw new CanonicalEncodingError("set exceeds item limit");
+			const items = [...value].map((item) => encodeInternal(item, active, depth + 1, limits));
+			items.sort(compareBytes);
+			for (let index = 1; index < items.length; index++) {
+				const previous = items[index - 1];
+				const current = items[index];
+				if (previous !== undefined && current !== undefined && bytesEqual(previous, current)) {
+					throw new CanonicalEncodingError("set contains duplicate canonical values");
+				}
+			}
+			return concat([Uint8Array.of(TAG.SET), encodeVarUint(items.length), ...items]);
+		}
+		if (!isPlainObject(value)) {
+		if (!Number.isSafeInteger(length) || length < 0 || this.offset + length > this.bytes.byteLength) {
+			throw new CanonicalDecodingError("truncated canonical value");
+		}
+		const output = this.bytes.subarray(this.offset, this.offset + length);
+		this.offset += length;
+		return output;
+	}
+
+	public byte(): number {
+		return this.take(1)[0] as number;
+	}
+
+	public countItems(count = 1): void {
+		this.items += count;
+		if (this.items > this.limits.maxItems) {
+			throw new CanonicalDecodingError("canonical value exceeds item limit");
+		}
+	}
+
+	public varUint(): bigint {
+		let result = BigInt(0);
+		let shift = BigInt(0);
+		let count = 0;
+		while (true) {
+			const byte = this.byte();
+			count++;
+258c6109fc7197317d36e31615e0679683b87d89d79a760246e3c7177efc79bf  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/command.json
+a91c530ea303332b61094e743b7b681eae177c14841b7cc66440ebf8c5da3b38  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/events.jsonl
+5165437e58c70699654d51f9bf2d1431d035a3ac61b42b16d9dc9c2932172efe  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/input-packet.md
+0b3ce9aabd3695bef307c51fa334dc812909b0f15917b8c35ee677855877948d  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/public.txt
+420a68d36f61c689008b0e21b6a7a310ce0ece301888bb2c395d42d4fbbfbd15  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/review.diff
+fb9739b138988378a1bfef9f38c8f29daaa9d5975f1edd6ef69189d243a343f2  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/status.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/stderr.log
+ced006b431add5603684ae762158b285161f97494b0b36c51e08b825c5c5b120  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw-standard.jsonl
+1202cd19f6cfd50687a1c3bccf8949a396223c3dfc8a212a36cc2a3da4f4ed02  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw.jsonl
+1eda0d9e6ff7acb22a4c86a0cc2618e63e429327c93f9f4f82bf5354a2608d82  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr-standard.txt
+352d8fb43f5414679bfd73f492d8c9c4185cb94ff1b80da4b8f92be763b0cf26  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr.txt
+9aabf1972aba2cc2ad4648c14333ec98b899ec734a50b016995194b606952ab2  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/result.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/stderr.txt
+a10acfb01efc2de0a5fcae63d5b22d68942f7c12cebe910cc6ad75c95903df84  .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/review-prompt.md
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/command.json: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/command.json
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/events.jsonl: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/events.jsonl
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/input-packet.md: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/input-packet.md
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/public.txt: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/public.txt
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/review.diff: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/review.diff
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/status.json: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/status.json
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/stderr.log: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/stderr.log
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw-standard.jsonl: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw-standard.jsonl
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw.jsonl: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw.jsonl
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr-standard.txt: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr-standard.txt
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr.txt: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr.txt
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/result.json: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/result.json
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/stderr.txt: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/stderr.txt
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/review-prompt.md: FAILED open or read
+MISSING/INVALID: .logs/d110c-0c1f5b0t-plan-review-cf4b6d82/review-prompt.md
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/command.json: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/events.jsonl: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/input-packet.md: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/public.txt: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/review.diff: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/status.json: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/grok/stderr.log: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw-standard.jsonl: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/raw.jsonl: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr-standard.txt: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/kimi/stderr.txt: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/result.json: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/opus/stderr.txt: OK
+.logs/d110c-0c1f5b0t-plan-review-cf4b6d82/review-prompt.md: OK

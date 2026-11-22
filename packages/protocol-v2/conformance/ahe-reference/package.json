@@ -1,0 +1,14 @@
+{
+  "name": "ts-drp-attested-hard-epochs-reference",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-first executable reference model for authenticated hard-epoch compaction in ts-drp",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "bench": "node test/benchmark.mjs",
+    "model": "python model/validate_epoch_model.py --max-exhaustive-vertices 7 --output ../results/epoch-model-validation.json && python model/validate_seal.py --output ../results/seal-model-validation.json && python model/approximate_membership_counterexample.py --output ../results/approximate-membership-counterexample.json && python model/storage_scaling.py --output ../results/storage-scaling.json && python model/browser_surface_audit.py --output ../results/browser-surface-audit.json",
+    "browser": "python browser/run_browser_tests.py"
+  },
+  "engines": { "node": ">=20" }
+}

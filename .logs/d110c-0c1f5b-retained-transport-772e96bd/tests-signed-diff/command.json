@@ -1,0 +1,14 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "show",
+    "--format=fuller",
+    "--patch",
+    "--unified=0",
+    "772e96bdad4f1b881fd547e09e849c97226cb980",
+    "--",
+    "tests/phase-3a1b-p3-live-transport-red.test.ts"
+  ],
+  "start": "2026-09-06T01:31:08.976Z"
+}

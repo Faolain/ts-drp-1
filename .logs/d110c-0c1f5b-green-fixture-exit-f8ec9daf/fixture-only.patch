@@ -1,0 +1,78 @@
+diff --git a/tests/fixtures/phase-3b-v3/certified-genesis-contract.ts b/tests/fixtures/phase-3b-v3/certified-genesis-contract.ts
+index 96c0625fc1995c6c1477e02660ef9fdfd7da244d..d6274da3a7af7c83b34c76b596975527637f1baa 100644
+--- a/tests/fixtures/phase-3b-v3/certified-genesis-contract.ts
++++ b/tests/fixtures/phase-3b-v3/certified-genesis-contract.ts
+@@ -179,7 +179,13 @@ export function makeCertifiedGenesis(options: CertifiedGenesisOptions = {}): Cer
+  * @param material - Valid certified genesis material.
+  * @returns Detached public installation input.
+  */
+-export function installInput(material = makeCertifiedGenesis()): Readonly<Record<string, unknown>> {
++export function installInput(material = makeCertifiedGenesis()): Readonly<{
++	exactCanonicalCertifiedGenesisCertificateBytes: Uint8Array;
++	exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
++	exactCanonicalProfileBytes: Uint8Array;
++	exactCanonicalSignerSetBytes: Uint8Array;
++	pinnedGenesisAnchorDigest: string;
++}> {
+ 	return Object.freeze({
+ 		exactCanonicalCertifiedGenesisCertificateBytes: new Uint8Array(material.certificateBytes),
+ 		exactCanonicalGenesisAnchorPreimageBytes: new Uint8Array(material.anchorBytes),
+diff --git a/tests/genesis-profile.test.ts b/tests/genesis-profile.test.ts
+index e6826d553d5d1d30ec3dd22cfb0b05d9ad1ffa56..651eb06bf2fc4a9d4a738aa824dac7a0f01c4ec0 100644
+--- a/tests/genesis-profile.test.ts
++++ b/tests/genesis-profile.test.ts
+@@ -121,9 +121,14 @@ describe("Phase 3b certified genesis", () => {
+ 			);
+ 			for (const row of certificate.signatures) {
+ 				expect(
+-					ed25519.verify(row.signature, Uint8Array.from(Buffer.from(material.anchorDigest, "hex")), row.publicKey, {
+-						zip215: false,
+-					})
++					ed25519.verify(
++						row.signature,
++						Uint8Array.from(Buffer.from(material.anchorDigest, "hex")),
++						Uint8Array.from(Buffer.from(row.publicKey, "hex")),
++						{
++							zip215: false,
++						}
++					)
+ 				).toBe(true);
+ 			}
+ 			expect(encodeCanonical(decodeCanonical(material.anchorBytes))).toEqual(material.anchorBytes);
+diff --git a/tests/phase-3g-v3-room-rebase-red.test.ts b/tests/phase-3g-v3-room-rebase-red.test.ts
+index 485e28975c76fb98f70f7e6fb1b080f6753bf6d1..592179bdfbcdd8b1051bfe3b8244ef9383137f0e 100644
+--- a/tests/phase-3g-v3-room-rebase-red.test.ts
++++ b/tests/phase-3g-v3-room-rebase-red.test.ts
+@@ -1191,7 +1191,7 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
+ 			...base,
+ 			projectAcceptedOperations: (input: {
+ 				readonly authenticatedBase: undefined;
+-				readonly currentEpochOperations: readonly Readonly<Record<string, unknown>>[];
++				readonly currentEpochOperations: readonly Readonly<{ readonly operation: Readonly<Record<string, unknown>> }>[];
+ 			}) => {
+ 				if (
+ 					input.currentEpochOperations.some(
+@@ -1253,7 +1253,7 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
+ 			...base,
+ 			projectAcceptedOperations: (input: {
+ 				readonly authenticatedBase: undefined;
+-				readonly currentEpochOperations: readonly Readonly<Record<string, unknown>>[];
++				readonly currentEpochOperations: readonly Readonly<{ readonly operation: Readonly<Record<string, unknown>> }>[];
+ 			}) => {
+ 				if (input.currentEpochOperations.some(({ operation }) => Reflect.get(operation, "value") === 2)) {
+ 					projectionRejections += 1;
+diff --git a/tests/phase-5d-pacemaker-red.test.ts b/tests/phase-5d-pacemaker-red.test.ts
+index 836428e6b92d3406849dc422ac94a5b7a3ce971b..f2bb3286189ac0a390fa1dd81304e4c3daf88287 100644
+--- a/tests/phase-5d-pacemaker-red.test.ts
++++ b/tests/phase-5d-pacemaker-red.test.ts
+@@ -371,7 +371,9 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
+ 			assertClosedItfTrace(trace);
+ 			expect(trace.states.every(({ n }) => n === descriptor.n)).toBe(true);
+ 			for (const event of descriptor.requiredEvents) expect(events.has(event), event).toBe(true);
+-			const mutant = structuredClone(trace);
++			const mutant = structuredClone(trace) as Omit<ItfTrace, "states"> & {
++				readonly states: ItfTrace["states"][number][];
++			};
+ 			const terminal = mutant.states.at(-1);
+ 			if (terminal === undefined) throw new Error("TRACE_TOO_SHORT");
+ 			mutant.states[mutant.states.length - 1] = {

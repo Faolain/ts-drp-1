@@ -1,0 +1,182 @@
+diff --git a/build/esm/FDBTransaction.js b/build/esm/FDBTransaction.js
+index 8a2bcf72..fab960f0 100644
+--- a/build/esm/FDBTransaction.js
++++ b/build/esm/FDBTransaction.js
+@@ -43,6 +43,7 @@ class FDBTransaction extends FakeEventTarget {
+     for (const f of this._rollbackLog.reverse()) {
+       f();
+     }
++    this._rollbackLog.length = 0;
+     if (errName !== null) {
+       const e = new DOMException(undefined, errName);
+       this.error = e;
+@@ -93,22 +94,27 @@ class FDBTransaction extends FakeEventTarget {
+       if (isUpgradeTransaction) {
+         this.db._rawDatabase.connections = this.db._rawDatabase.connections.filter(connection => !connection._rawDatabase.transactions.includes(this));
+       }
+-      // Fire an event named abort at transaction with its bubbles attribute initialized to true.
+-      const event = new FakeEvent("abort", {
+-        bubbles: true,
+-        cancelable: false
+-      });
+-      event.eventPath = [this.db];
+-      this.dispatchEvent(event);
++      try {
++        // Fire an event named abort at transaction with its bubbles attribute initialized to true.
++        const event = new FakeEvent("abort", {
++          bubbles: true,
++          cancelable: false
++        });
++        event.eventPath = [this.db];
++        this.dispatchEvent(event);
+ 
+-      // If transaction is an upgrade transaction, then:
+-      if (isUpgradeTransaction) {
+-        // Let request be the open request associated with transaction.
+-        const request = this._openRequest;
+-        // Set request’s transaction to null.
+-        request.transaction = null;
+-        // Set request’s result to undefined.
+-        request.result = undefined;
++        // If transaction is an upgrade transaction, then:
++        if (isUpgradeTransaction) {
++          // Let request be the open request associated with transaction.
++          const request = this._openRequest;
++          // Set request’s transaction to null.
++          request.transaction = null;
++          // Set request’s result to undefined.
++          request.result = undefined;
++        }
++      } finally {
++        // Upgrade-abort bookkeeping above still needs this transaction registered.
++        this.db._rawDatabase.removeTransaction(this);
+       }
+     });
+     this._state = "finished";
+@@ -245,9 +251,15 @@ class FDBTransaction extends FakeEventTarget {
+     if (this._state !== "finished") {
+       // Either aborted or committed already
+       this._state = "finished";
+-      if (!this.error) {
+-        const event = new FakeEvent("complete");
+-        this.dispatchEvent(event);
++      // A finished commit cannot roll back, even if a complete listener throws.
++      this._rollbackLog.length = 0;
++      try {
++        if (!this.error) {
++          const event = new FakeEvent("complete");
++          this.dispatchEvent(event);
++        }
++      } finally {
++        this.db._rawDatabase.removeTransaction(this);
+       }
+     }
+   }
+diff --git a/build/esm/lib/Database.js b/build/esm/lib/Database.js
+index cc4084f4..bcb80381 100644
+--- a/build/esm/lib/Database.js
++++ b/build/esm/lib/Database.js
+@@ -10,6 +10,12 @@ class Database {
+     this.version = version;
+     this.processTransactions = this.processTransactions.bind(this);
+   }
++  removeTransaction(transaction) {
++    const index = this.transactions.indexOf(transaction);
++    if (index !== -1) {
++      this.transactions.splice(index, 1);
++    }
++  }
+   processTransactions() {
+     queueTask(() => {
+       const running = this.transactions.filter(transaction => transaction._started && transaction._state !== "finished");
+diff --git a/build/cjs/FDBTransaction.js b/build/cjs/FDBTransaction.js
+index 80ed69f9..d452c6b1 100644
+--- a/build/cjs/FDBTransaction.js
++++ b/build/cjs/FDBTransaction.js
+@@ -50,6 +50,7 @@ class FDBTransaction extends _FakeEventTarget.default {
+     for (const f of this._rollbackLog.reverse()) {
+       f();
+     }
++    this._rollbackLog.length = 0;
+     if (errName !== null) {
+       const e = new DOMException(undefined, errName);
+       this.error = e;
+@@ -100,22 +101,27 @@ class FDBTransaction extends _FakeEventTarget.default {
+       if (isUpgradeTransaction) {
+         this.db._rawDatabase.connections = this.db._rawDatabase.connections.filter(connection => !connection._rawDatabase.transactions.includes(this));
+       }
+-      // Fire an event named abort at transaction with its bubbles attribute initialized to true.
+-      const event = new _FakeEvent.default("abort", {
+-        bubbles: true,
+-        cancelable: false
+-      });
+-      event.eventPath = [this.db];
+-      this.dispatchEvent(event);
++      try {
++        // Fire an event named abort at transaction with its bubbles attribute initialized to true.
++        const event = new _FakeEvent.default("abort", {
++          bubbles: true,
++          cancelable: false
++        });
++        event.eventPath = [this.db];
++        this.dispatchEvent(event);
+ 
+-      // If transaction is an upgrade transaction, then:
+-      if (isUpgradeTransaction) {
+-        // Let request be the open request associated with transaction.
+-        const request = this._openRequest;
+-        // Set request’s transaction to null.
+-        request.transaction = null;
+-        // Set request’s result to undefined.
+-        request.result = undefined;
++        // If transaction is an upgrade transaction, then:
++        if (isUpgradeTransaction) {
++          // Let request be the open request associated with transaction.
++          const request = this._openRequest;
++          // Set request’s transaction to null.
++          request.transaction = null;
++          // Set request’s result to undefined.
++          request.result = undefined;
++        }
++      } finally {
++        // Upgrade-abort bookkeeping above still needs this transaction registered.
++        this.db._rawDatabase.removeTransaction(this);
+       }
+     });
+     this._state = "finished";
+@@ -252,9 +258,15 @@ class FDBTransaction extends _FakeEventTarget.default {
+     if (this._state !== "finished") {
+       // Either aborted or committed already
+       this._state = "finished";
+-      if (!this.error) {
+-        const event = new _FakeEvent.default("complete");
+-        this.dispatchEvent(event);
++      // A finished commit cannot roll back, even if a complete listener throws.
++      this._rollbackLog.length = 0;
++      try {
++        if (!this.error) {
++          const event = new _FakeEvent.default("complete");
++          this.dispatchEvent(event);
++        }
++      } finally {
++        this.db._rawDatabase.removeTransaction(this);
+       }
+     }
+   }
+diff --git a/build/cjs/lib/Database.js b/build/cjs/lib/Database.js
+index afd0763a..20e69193 100644
+--- a/build/cjs/lib/Database.js
++++ b/build/cjs/lib/Database.js
+@@ -16,6 +16,12 @@ class Database {
+     this.version = version;
+     this.processTransactions = this.processTransactions.bind(this);
+   }
++  removeTransaction(transaction) {
++    const index = this.transactions.indexOf(transaction);
++    if (index !== -1) {
++      this.transactions.splice(index, 1);
++    }
++  }
+   processTransactions() {
+     (0, _scheduling.queueTask)(() => {
+       const running = this.transactions.filter(transaction => transaction._started && transaction._state !== "finished");

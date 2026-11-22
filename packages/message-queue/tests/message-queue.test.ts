@@ -14,6 +14,62 @@ describe("MessageQueue", () => {
 	afterEach(async () => {});
 
 	describe("basic functionality", () => {
+		it("joins every entered handler while close discards only unentered custody", async () => {
+			let enter!: () => void, release!: () => void;
+			const entered = new Promise<void>((resolve) => { enter = resolve; });
+			const held = new Promise<void>((resolve) => { release = resolve; });
+			const calls: string[] = [];
+			queue.subscribe(async (message) => { calls.push(message); enter(); await held; });
+			queue.subscribe((message) => { calls.push("second:" + message); });
+			let joined = false;
+			const first = queue.enqueueJoined("entered").then(() => { joined = true; });
+			await entered;
+			// Ordinary enqueue still means buffered, not joined.
+			await queue.enqueue("ordinary-discarded");
+			const discarded = queue.enqueueJoined("joined-discarded");
+			const refused = expect(discarded).rejects.toThrow("Channel is closed");
+			queue.close();
+			await refused;
+			expect(joined).toBe(false);
+			release(); await first;
+			expect(calls).toEqual(["entered", "second:entered"]);
+		});
+
+		it("discards a resolved receive before handler entry without releasing entered work", async () => {
+			const handler = vi.fn();
+			queue.subscribe(handler);
+			// Enter the original receive wait before delivering and closing in one
+			// synchronous turn; this exercises resolved-but-unentered custody.
+			await Promise.resolve();
+			const pending = queue.enqueueJoined("not-entered");
+			const refused = expect(pending).rejects.toThrow("Channel is closed");
+			queue.close(); await refused;
+			await Promise.resolve(); await Promise.resolve();
+			expect(handler).not.toHaveBeenCalled();
+			queue.start(); await queue.enqueueJoined("after-restart");
+			expect(handler).toHaveBeenCalledExactlyOnceWith("after-restart");
+			queue.close();
+		});
+
+		it("preserves undefined rejection before either enqueue representation", async () => {
+			const handler = vi.fn(); queue.subscribe(handler);
+			await expect(queue.enqueue(undefined as unknown as string)).rejects.toThrow("Unexpected undefined value in channel");
+			await expect(queue.enqueueJoined(undefined as unknown as string)).rejects.toThrow("Unexpected undefined value in channel");
+			expect(handler).not.toHaveBeenCalled(); queue.close();
+		});
+
+		it("rejects excess joined sends without losing buffered custody", async () => {
+			const bounded = new MessageQueue<string>({ id: "joined-capacity", maxSize: 1, logConfig: { level: "silent" } });
+			const first = bounded.enqueueJoined("buffered"), second = bounded.enqueueJoined("blocked");
+			const rejected = expect(bounded.enqueueJoined("excess")).rejects.toThrow("Channel pending send capacity exceeded");
+			await rejected;
+			const seen: string[] = [];
+			bounded.subscribe((message) => { seen.push(message); });
+			await Promise.all([first, second]);
+			expect(seen).toEqual(["buffered", "blocked"]);
+			bounded.close();
+		});
+
 		it("should process messages in order", async () => {
 			const promises: Promise<void>[] = [];
 			const resolvers: (() => void)[] = [];

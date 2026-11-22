@@ -1,0 +1,78 @@
+{
+	"schemaVersion": "phase-4a-blueprint-fold-red-v1",
+	"lineage": {
+		"phase0jRuntimeCommit": "a9aa765886a9f4bc4e92cfd95e9532cf8c3983c1",
+		"phase0nPolicyCommit": "6fd009266d58c4c55843f4faf54b68d38466beba",
+		"phase4aPlanCommit": "3c21a0157b258cd9ae214a9b401b9cc6d5933170"
+	},
+	"domains": {
+		"artifact": "ts-drp/blueprint-artifact/v3",
+		"blueprint": "ts-drp/blueprint-admission/v3",
+		"state": "ts-drp/state/v3"
+	},
+	"limits": {
+		"maxBytes": 32768,
+		"maxDepth": 16,
+		"maxItems": 16384
+	},
+	"files": {
+		"artifact": "application-blueprint.mjs",
+		"package": "blueprint-package.json",
+		"typeAudit": "public-type-audit.ts"
+	},
+	"initialState": {
+		"map": {},
+		"set": [],
+		"total": 1
+	},
+	"graph": {
+		"anchorHash": "0000000000000000000000000000000000000000000000000000000000000000",
+		"objectId": "object:phase-4a",
+		"epoch": 4,
+		"vertices": [
+			{
+				"hash": "1111111111111111111111111111111111111111111111111111111111111111",
+				"dependencies": ["0000000000000000000000000000000000000000000000000000000000000000"],
+				"operation": { "action": "map_set", "key": "alpha", "value": "one" }
+			},
+			{
+				"hash": "2222222222222222222222222222222222222222222222222222222222222222",
+				"dependencies": ["0000000000000000000000000000000000000000000000000000000000000000"],
+				"operation": { "action": "set_add", "value": "red" }
+			},
+			{
+				"hash": "3333333333333333333333333333333333333333333333333333333333333333",
+				"dependencies": [
+					"1111111111111111111111111111111111111111111111111111111111111111",
+					"2222222222222222222222222222222222222222222222222222222222222222"
+				],
+				"operation": { "action": "add_mul", "add": 2, "multiplier": 3 }
+			}
+		]
+	},
+	"requiredFailureClasses": [
+		"INVALID_APPLICATION_STATE",
+		"BLUEPRINT_RUNTIME_PROVENANCE",
+		"BLUEPRINT_DIGEST_MISMATCH",
+		"BLUEPRINT_OPERATION_INVALID",
+		"BLUEPRINT_REDUCER_FAILED",
+		"BLUEPRINT_REDUCER_ASYNC",
+		"BLUEPRINT_RESULT_INVALID",
+		"BLUEPRINT_AUTHORIZATION_REQUIRED",
+		"BLUEPRINT_AUTHORIZATION_REJECTED",
+		"BLUEPRINT_ALREADY_ADOPTED"
+	],
+	"causalMutants": [
+		"missing-runtime-provenance",
+		"public-reducer-table-dispatch",
+		"wrong-reducer-selection",
+		"omitted-authorization",
+		"authorize-after-reduce",
+		"direct-state-mutation",
+		"structured-clone",
+		"promise-acceptance",
+		"skipped-canonical-validation",
+		"partial-adoption",
+		"anchor-application"
+	]
+}

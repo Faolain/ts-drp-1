@@ -1,0 +1,25 @@
+{
+  "baseline": "7c19a4792eb63eecb85e4ac7a1484df88c77c984",
+  "signature": "G",
+  "indexEmpty": true,
+  "protectedSources": 11,
+  "greenSources": 3,
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "67be57e7ad5f72335c8e89b770a031960bf48b636594ec52e3b6c3adbb2db717",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b"
+  },
+  "builtIdentities": 7,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "manifestRoots": 42,
+  "protectedEvidenceFiles": 4838,
+  "inputCount": 942,
+  "allHashesAndPathsPreserved": true,
+  "sourcePatchSha256": "54baa695c170ae83431fee7b4478e1ced4227dc62fab7043b53fef95c594df8a",
+  "runtimeBinariesExact": true,
+  "ownedProcessGroup": 18440,
+  "remainingOwnedGroup": [],
+  "quiescent": true,
+  "trackedStatus": "M examples/v3-room/src/index.ts\n M packages/node/src/creator-adoption.ts\n M packages/node/src/creator-close.ts\n M packages/node/src/internal/closed-epoch-cleanup.ts\n M packages/node/src/internal/creator-transition-advance.ts\n M packages/node/src/v3-live.ts\n M packages/protocol-v3/src/creator-checkpoint.ts\n M packages/protocol-v3/src/creator-close.ts\n M packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs\n M tests/fixtures/phase-6a-v3/creator-adoption-contract.ts\n M tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts\n M tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts\n M tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts\n M tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts"
+}

@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),accepted=path.join(root,'.logs/d110c-0c1f5b-red-room-guard-reporters-5f6fb6c0'),room='examples/v3-room/src/index.ts',head='b75e75ed8a0cc944139929c501eea684cde4e715';
+const read=f=>JSON.parse(fs.readFileSync(f)),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),write=(f,v)=>fs.writeFileSync(path.join(out,f),JSON.stringify(v,null,2)+'\n',{flag:'wx'}),git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',maxBuffer:128*1024*1024}).trim();
+const base=read(path.join(accepted,'custody-after.json')),matrix=read(path.join(accepted,'matrix.json')),stage=process.argv[2];
+if(!['before','after'].includes(stage))throw Error('mode');
+if(git('rev-parse','HEAD')!==head||git('log','-1','--format=%G?')!=='G')throw Error('HEAD drift');
+const ownerHashes=Object.fromEntries(Object.keys(base.productionHashes).map(f=>[f,hash(fs.readFileSync(path.join(root,f)))]));
+for(const[f,h]of Object.entries(base.productionHashes))if((stage==='before'||f!==room)&&ownerHashes[f]!==h)throw Error('Owner drift '+f);
+const patch=execFileSync('git',['-C',root,'diff','--binary','--full-index','--',...Object.keys(ownerHashes)],{maxBuffer:128*1024*1024});
+if(stage==='before'&&hash(patch)!=='245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed')throw Error('Patch drift');
+const original=read(path.join(root,'.logs/d110c-0c1f5b-green-57834387/custody-before.json'));
+if(git('stash','list','--format=%H %gd %gs')!==original.stashes.trim())throw Error('Stash drift');
+for(const f of original.untracked)if(!fs.existsSync(path.join(root,f)))throw Error('Protected missing '+f);
+const manifests={...Object.fromEntries(base.immutable.map(v=>[v.dir,v.sha256])),'.logs/d110c-0c1f5b-red-room-guard-reporters-5f6fb6c0':'3e968b850bfcac36c2eca4f91ca7b4e43f2869591af8da42224217a4c279c8ad'};
+for(const[dir,h]of Object.entries(manifests)){const b=fs.readFileSync(path.join(root,dir,'manifest.sha256'));if(hash(b)!==h)throw Error('Manifest drift '+dir);for(const line of b.toString().trim().split('\n')){const m=/^([a-f0-9]{64})\s+(.+)$/u.exec(line),f=m[2].startsWith('.logs/')?path.join(root,m[2]):path.join(root,dir,m[2]);if(hash(fs.readFileSync(f))!==m[1])throw Error('Evidence drift '+f);}}
+const testHashes={...base.retainedHashes,...matrix.fileHashes};
+for(const[f,h]of Object.entries(testHashes))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Test drift '+f);
+for(const[f,h]of Object.entries(base.built))if(hash(fs.readFileSync(path.join(root,f)))!==h)throw Error('Runtime drift '+f);
+write('custody-'+stage+'.json',{head,signature:'G',ownerHashes,patchSha256:hash(patch),built:base.built,testHashes,stashCount:27,protectedPaths:original.untracked.length,manifests,status:git('status','--short','--untracked-files=no')});
+if(stage==='before'){fs.writeFileSync(path.join(out,'room-before.ts'),fs.readFileSync(path.join(root,room)),{flag:'wx'});write('patch-reference.json',{immutable:'.logs/d110c-0c1f5b-green-ab98cce6/partial-production.patch',beforeActualGitDiffSha256:hash(patch)});}else fs.writeFileSync(path.join(out,'partial-production.patch'),patch,{flag:'wx'});
+console.log(JSON.stringify({stage,ownerCount:Object.keys(ownerHashes).length,patchSha256:hash(patch),built:7,tests:Object.keys(testHashes).length,stashCount:27,protectedPaths:original.untracked.length}));

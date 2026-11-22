@@ -1,0 +1,12 @@
+{
+  "unchangedPredicates": [
+    "chatHasNoDirectNodeAdoptionConsumer",
+    "chatOwnsOnlyReviewedRoomHeadCapability",
+    "chatInputAllowsOnlyDeclarationWhenProductExists",
+    "noNodeRootWidening",
+    "roomInputAllowsOnlyDeclarationWhenProductExists",
+    "roomIsSoleConsumerWhenProductExists"
+  ],
+  "syntax": "PASS",
+  "sourcePaths": 2
+}

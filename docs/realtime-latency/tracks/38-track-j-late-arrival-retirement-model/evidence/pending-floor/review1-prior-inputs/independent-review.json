@@ -1,0 +1,35 @@
+{
+  "status": "Two confirmed P2 model assertion gaps; superseded by corrected model evidence in parent directory",
+  "reviewSession": "01a1693e-6bde-7231-86af-1bed0a06b29f",
+  "exitCode": 0,
+  "inputs": {
+    "packages/protocol-v3/formal/pending-floor-ephemeral.qnt": {
+      "archive": "pending-floor-ephemeral.qnt.gz",
+      "sha256": "76fca04128062725c30050b061524867941a4a7e33e4012fedc45663c8f8cc4d",
+      "gzipSha256": "f2d03551b030d38c5c8b8defbb38638c6dd1b1246665a5500eca1825fe2718be"
+    },
+    "packages/protocol-v3/formal/check-pending-floor.mjs": {
+      "archive": "check-pending-floor.mjs.gz",
+      "sha256": "a7976675e0ef5e4928640575b5738f4c85ce7c2a0d17b26fc8def24a72a41bdf",
+      "gzipSha256": "27b1792e0909712b278a7fa885c4f7b33e1416a829297cea267b65c1597fe39c"
+    }
+  },
+  "log": "independent-review.log.gz",
+  "logSha256": "06b6a5cdaa8b1dc046aa6908292864ee824361ce7d77312cded286e5cf89a90e",
+  "logGzipSha256": "873825a12e866d01ffe8cd4ae7fc6aaf07006ec80ae2a80799f4820e298c73d0",
+  "findings": [
+    "Queued delivery omitted pending/postcommit traffic observations.",
+    "Owner delivery safety depended on mutant flag rather than actual decision evidence."
+  ],
+  "disposition": [
+    "Record observations in actual queued delivery; add isolated queue-only suspension bypass.",
+    "Record delivery/grant pre-state evidence and assert decisions; exercise stale capture after fresh replacement grant."
+  ],
+  "freshVerification": [
+    "Baseline directed tests",
+    "Three selected positive TLC graphs",
+    "Archived evidence hash validation",
+    "Reproduction of both assertion blind spots"
+  ],
+  "scope": "Superseded review input, retained for finding provenance; not final corrected-model verification."
+}

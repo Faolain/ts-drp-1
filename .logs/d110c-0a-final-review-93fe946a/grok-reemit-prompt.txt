@@ -1,0 +1,1 @@
+Re-emit the final verdict you already reached in the immediately preceding turn. Output only the required JSON object, with no progress prose and no further inspection.

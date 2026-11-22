@@ -1,0 +1,52 @@
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(595,21): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(597,24): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(598,23): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(599,19): error TS7006: Parameter 'digest' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(607,22): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(608,19): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(609,30): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(627,5): error TS2322: Type 'Readonly<{ baseExpectedHead: Readonly<{ generationId: GenerationId; kind: "present"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>; ... 4 more ...; state: GenerationState; }>' is not assignable to type 'GenerationRecord'.
+  Types of property 'baseExpectedHead' are incompatible.
+    Type 'Readonly<{ generationId: GenerationId; kind: "present"; objectId: StorageObjectId; revision: HeadRevision; closureDigest: ClosureDigest; } | { ...; }>' is not assignable to type 'ExpectedHead'.
+      Type 'Readonly<{ revision: number; kind: "present"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'ExpectedHead'.
+        Type 'Readonly<{ revision: number; kind: "present"; objectId: StorageObjectId; generationId: GenerationId; closureDigest: ClosureDigest; }>' is not assignable to type 'PresentHead'.
+          Types of property 'revision' are incompatible.
+            Type 'number' is not assignable to type 'HeadRevision'.
+              Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(639,20): error TS7006: Parameter 'objectId' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(644,35): error TS7006: Parameter 'objectId' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(696,14): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(707,21): error TS7006: Parameter 'declaration' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(707,34): error TS7006: Parameter 'options' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(712,14): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(713,16): error TS7006: Parameter 'receipt' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(713,25): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(714,22): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(717,14): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(719,11): error TS7006: Parameter 'signal' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(723,21): error TS7006: Parameter 'descriptor' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(733,16): error TS7006: Parameter 'descriptor' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(733,28): error TS7006: Parameter 'bytes' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(740,18): error TS7006: Parameter 'options' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(803,8): error TS2739: Type 'Readonly<{ close: () => Promise<void>; compareAndMarkOutboxPublished: (input: any) => Promise<void>; readIssued: (scope: any, sequence: any) => Promise<DurableIssueCommit | null>; readLineage: (scope: any) => Promise<...>; readOutboxPage: (input: any) => Promise<...>; transactIssue: (scope: any, buildAndSign: any) =...' is missing the following properties from type 'DurableIssuanceStore': readSettlementPlan, transactWriteSettlementPlan
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(805,35): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(806,22): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(806,29): error TS7006: Parameter 'sequence' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(811,23): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(816,26): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(823,19): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(823,26): error TS7006: Parameter 'buildAndSign' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(827,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(829,24): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(830,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(831,15): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(832,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts(235,100): error TS2339: Property 'text' does not exist on type 'Expression'.
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts(597,27): error TS2339: Property 'declarations' does not exist on type 'ForInitializer'.
+  Property 'declarations' does not exist on type 'Expression'.
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts(598,27): error TS2339: Property 'declarations' does not exist on type 'ForInitializer'.
+  Property 'declarations' does not exist on type 'Expression'.
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts(599,43): error TS2339: Property 'declarations' does not exist on type 'ForInitializer'.
+  Property 'declarations' does not exist on type 'Expression'.
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts(600,27): error TS2339: Property 'declarations' does not exist on type 'ForInitializer'.
+  Property 'declarations' does not exist on type 'Expression'.

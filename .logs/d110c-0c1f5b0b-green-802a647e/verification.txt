@@ -1,0 +1,18 @@
+production signature: G
+production changed paths: 1
+exact precommit patch sha256: 45d768ccace40f95ee88130342e4e2aea30df9cdda0557c0a0cf9d5caf4d4436
+final compatibility focused: 27/27
+canonical Phase-3g: 14/14
+expanded focused: 40/40
+original retained: 87/87
+legacy consumers: 26/26
+rebuilt shared consumers: 64/64
+built child: 1/1, 16 filtered
+detached focused: 27/27 and 40/40
+detached built child: 1/1, 16 filtered
+Node/protocol builds and protocol typecheck/public smoke: passed
+Node typecheck: inherited exit 2, exact normalized parent equality
+ESLint/Prettier/diff/source shape: passed
+wire/protobuf/dependency/crypto/API/threshold/fixture/plan changes: none
+reviewers invoked: none
+protected untracked paths and all 27 stashes: preserved

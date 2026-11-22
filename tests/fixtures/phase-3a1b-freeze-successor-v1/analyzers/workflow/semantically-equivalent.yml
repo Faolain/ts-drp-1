@@ -1,0 +1,26 @@
+permissions: { contents: read }
+name: "Protocol v3 blueprint operation budget freeze"
+jobs:
+  protocol-v3-blueprint-operation-budget:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    name: "Require immutable protocol-v3 operation budget enforcement"
+    steps:
+      - with: { ref: "${{ github.sha }}", fetch-depth: 0 }
+        uses: actions/checkout@v4
+      - run: "pnpm install --frozen-lockfile"
+      - env:
+          WORKSPACE_ALIAS: "${{ github.workspace }}"
+          TARGET: "${{ github.event.pull_request.base.sha }}"
+          RATCHET: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+        run: >-
+          readarray -t BASES < <(git merge-base --all "$TARGET" HEAD);
+          if [ "${#BASES[@]}" != 1 ]; then exit 1; fi;
+          POINT="${BASES[0]}";
+          if git cat-file -e "$POINT:$RATCHET"; then
+          git show "$POINT:$RATCHET" > "$RUNNER_TEMP/archive.mjs";
+          node "$RUNNER_TEMP/archive.mjs" "$TARGET"; fi;
+          PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT="$WORKSPACE_ALIAS" node "$RATCHET" "$TARGET"
+      - run: pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts
+"on":
+  pull_request: { types: [ready_for_review, edited, reopened, synchronize, opened] }

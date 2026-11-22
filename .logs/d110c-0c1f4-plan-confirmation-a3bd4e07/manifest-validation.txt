@@ -1,0 +1,13 @@
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/commands.md: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/external-transcript-hashes.txt: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/command.json: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/events.jsonl: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/input-packet.md: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/public.txt: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/review.diff: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/status.json: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/grok/stderr.log: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/local-audit.md: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/prompt.md: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/review-results.md: OK
+.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/schema.json: OK

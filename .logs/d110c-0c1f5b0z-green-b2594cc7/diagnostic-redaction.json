@@ -1,0 +1,19 @@
+{
+  "quarantine": "/tmp/d110c-f5b0z-green-private-vE5I6v",
+  "permissions": {
+    "directory": "0700",
+    "files": "0600"
+  },
+  "rawProcessSha256": "a3f29547b7f3be3ccb3787ca305a41d3ebb79c5c141b99bbada4d1fe178a574d",
+  "rawWhitespaceDiagnosticSha256": "7fedf65f4e70b722565c31b404daf025fef32c263821513e112070e69165c284",
+  "sanitizedProcessSha256": "ed99f8e5697512717916a6869e2cdc43e6fe32951118ddbf0797a4d4d93fd78f",
+  "omittedUnrelatedCommands": 848,
+  "credentialOccurrencesRedacted": 9,
+  "allEvidenceScannedAgainstObservedSecrets": true,
+  "rawTestBuildNativeStreamsUnchanged": true,
+  "redactionScope": [
+    "browser-process-preflight/stdout",
+    "evidence-whitespace.json"
+  ],
+  "reason": "Unrelated process command arguments contained credentials. Raw newly generated diagnostics retained privately outside repository; no such artifact was committed or pushed."
+}

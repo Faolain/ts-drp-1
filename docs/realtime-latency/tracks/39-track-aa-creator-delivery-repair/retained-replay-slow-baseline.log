@@ -1,0 +1,21 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-replay-performance
+
+(node:29962) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a single slow replay's retained gate and durable issue stall
+TRACK_AA_REPLAY_POPULATED 6072
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a single slow replay's retained gate and durable issue stall
+TRACK_AA_REPLAY_WARMED 22075
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a single slow replay's retained gate and durable issue stall
+TRACK_AA_REPLAY_STALL {"seedOperationRows":80,"replayRows":82,"successfulSendDelayMs":100,"duplicateRequests":81,"maxNativeReplays":2,"replayWallMs":8401,"firstDurableIssueWaitMs":8389,"issueSamples":20,"durableIssueMs":{"p50":77.32,"p95":85.25,"p99":8389.37,"max":8389.37},"receiverObservedMs":{"p50":87.84,"p95":95.86,"p99":8509.97,"max":8509.97},"receivedNewRows":20,"census":{"networkRegistrations":1,"authorVertexCounts":2,"closeAuthors":102,"closeCharges":103,"closeVertices":103,"controlVertices":0,"latchedOperations":0,"pendingIngress":0,"pendingIngressBytes":0,"quarantinedDigests":0,"rebaseSnapshotRows":0,"causalityIndex":103,"gatePresent":1,"drainingPendingIngress":0,"terminalBarrierPresent":0,"releaseTerminalBarrierPresent":0,"active":1,"terminal":0,"terminalPublicationInputBytes":0,"admittedInputJobs":0,"admittedInputBytes":0,"admittedReadControlJobs":0,"admittedPendingPublicationJobs":0,"admittedEgressControlJobs":0,"replayableEgressKeys":0,"admittedGossipQueueJobs":0,"admittedGossipQueueBytes":0,"deliveryRepairWake":0}}
+
+ ✓ tests/track-aa-retained-replay-owner.test.ts (6 tests | 5 skipped) 32378ms
+   ✓ measures a single slow replay's retained gate and durable issue stall  32378ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 5 skipped (6)
+   Start at  03:12:05
+   Duration  36.06s (transform 2.22s, setup 0ms, collect 3.48s, tests 32.38s, environment 0ms, prepare 38ms)

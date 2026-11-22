@@ -1,0 +1,21 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"]
+		},
+		"rootDir": ".."
+	},
+	"files": [
+		"phase-2l-a-shared-issuance-contract.test.ts",
+		"phase-2l-a-b2-b3-corrective.test.ts",
+		"phase-2l-a-b4-b5-semantic-lineage-null.test.ts",
+		"phase-2l-a-b6-b7-terminal-input-poison.test.ts"
+	]
+}

@@ -1,0 +1,49 @@
+{
+  "verdict": "PASS",
+  "findings": [
+    {
+      "severity": "P2",
+      "file": "specs/current-registry-governance/derive-inventory.mjs",
+      "line": 47,
+      "title": "Successor historical fixture family is unnamed in the derived inventory",
+      "evidence": "Owner map §6 keeps tests/fixtures/phase-3a1b-freeze-successor-v1/{successor-contract.json,successor-contract-type.ts,successor-test-context.ts,temporary-repository-harness.mjs,controlled-freeze-successor.mjs,analyzers/workflow/routing-analyzer.ts} as historical evidence and tells current consumers to drop live routing/hash use. Those paths are not in any of the seven policy inventories and are not in helpers[], so inventory.json neither marks them preserved-input nor lists successor-contract.json currentSha256 pins of editable tests (gossip/work/operation files at successor-contract.json:90-101,144-152). The successor RED file is editable, so GREEN can still follow the owner map, but the frozen inventory does not mechanically forbid restamping those historical currentSha256/currentBlob fields. Walk also only matches path+sha256 or path-keyed sha256, not currentSha256.",
+      "violated_requirement": "Complete inventory classification; no opportunistic restamp of historical evidence after RED begins"
+    },
+    {
+      "severity": "P3",
+      "file": "specs/current-registry-governance/README.md",
+      "line": 198,
+      "title": "Schema property insertion order is compressed relative to the live bijection",
+      "evidence": "README says add authorShareMultiplier and keep declaration order plus seven required names. Live registry parameters.fields lists the optional multiplier first (registry-v1.json:55-66). The retained bijection oracle requires schema $defs.parameters.properties keys to equal that registry field order (registry-spec-n1prime-b.test.ts:491-497). Owner map §7 states the same. An implementer who only appends the property would fail that existing oracle, so this is wording tightness, not a missing consumer.",
+      "violated_requirement": "Schema catch-up must match registry declaration order while keeping seven required names"
+    }
+  ],
+  "checked_requirements": [
+    "One prospective transition owner; five child CLIs become integrity-only and reject supplied transition-base arguments",
+    "Missing/obsolete/partial bases reject; no recursive historical projection, candidate-checker fallback, or accept-either registry",
+    "Old signed attestations stay historical and are not restamped",
+    "Blueprint profile tuple stays five keys and protectedPathCount 47 because production validation requires it",
+    "Historical payloads do not pin live root policy",
+    "Baseline amendment is outside obsolete-policy approval; local tests must not claim old-base PR or remote host protection installation passed",
+    "Complete inventory over the seven inherited policies plus reviewed helpers/tests/sources, with fileEntry mode/type and baseline hashes",
+    "Hash-bound source/view validation on both snapshots; closed 20-path source roster; policy self-hash exclusion",
+    "Fixed required source roster; extra parsed sources cannot use an unbound side channel",
+    "Base-semantic mutants versus candidate-only custody mutants; no hardcoded whole-registry digest short-circuit",
+    "Unchanged v2 execution using the real extracted checker and copied current v2 closure",
+    "Real Git ancestry controls in runner.sh without mapfile or cd",
+    "Preserved workflow jobs/setup/subsystem semantics across all eleven consumers, including author-authorization push-before",
+    "Lifecycle eight exclusions including **/.logs/**; vite.config.mts already has them and is preserved-input",
+    "Seal/pacemaker/author-authorization readiness cases must execute; bootstrap-success becomes missing/obsolete-base rejection",
+    "Historical test supersession without suite-level skip, including c2/d/d2/b2b live-hash owners",
+    "Independent canonical/hash oracle; absent digest matches parameters-basic; present-four is new",
+    "Fresh strict compiler runner with baseline/green/isolated stages and provenance",
+    "Scripts inspected for concrete defects: runner merge-base uniqueness, oracle encoding/framing, gate-plan counts, typecheck argument/cwd/overwrite rules"
+  ],
+  "limitations": [
+    "Read-only inspection only; no proposal script, test, checker, compiler, hasher, or Git command was executed",
+    "Could not independently re-derive inventory.json or recompute present-four digestHex; absent canonicalHex/digestHex were compared by reading parameters-basic",
+    "Exact runtime paths, log directories, and observed test counts cannot exist until implementation",
+    "Eight dirty production owners, host branch protection, and post-sign checkpoint-to-working-tree evidence remain outside this design freeze",
+    "Vite loadConfigFromFile alias shape was judged from the object alias in vite.config.mts and UserConfig typing, not by executing the loader"
+  ]
+}

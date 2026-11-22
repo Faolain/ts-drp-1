@@ -1,0 +1,84 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-replay-performance
+
+(node:68941) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":32,"acceptedRows":33,"elapsedMs":1068.8997920000002}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":64,"acceptedRows":65,"elapsedMs":2777.217334}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":96,"acceptedRows":97,"elapsedMs":5191.04375}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":128,"acceptedRows":129,"elapsedMs":8486.460125000001}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":160,"acceptedRows":161,"elapsedMs":12590.112417}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":192,"acceptedRows":193,"elapsedMs":17698.111584}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":224,"acceptedRows":225,"elapsedMs":24143.000125}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":256,"acceptedRows":257,"elapsedMs":31503.302042}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":288,"acceptedRows":289,"elapsedMs":53743.484542000006}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":320,"acceptedRows":321,"elapsedMs":100288.644959}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION {"requestedRows":512,"completedIssues":352,"acceptedRows":353,"elapsedMs":154956.783}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_REPLAY_POPULATION_FAILURE {"requestedRows":512,"completedIssues":357,"acceptedRows":358,"elapsedMs":165699.23966700002,"census":{"networkRegistrations":1,"authorVertexCounts":1,"closeAuthors":358,"closeCharges":359,"closeVertices":359,"controlVertices":0,"latchedOperations":0,"pendingIngress":0,"pendingIngressBytes":0,"quarantinedDigests":0,"rebaseSnapshotRows":0,"causalityIndex":359,"gatePresent":1,"drainingPendingIngress":0,"terminalBarrierPresent":0,"releaseTerminalBarrierPresent":0,"active":1,"terminal":0,"terminalPublicationInputBytes":0,"admittedInputJobs":0,"admittedInputBytes":0,"admittedReadControlJobs":0,"admittedPendingPublicationJobs":0,"admittedEgressControlJobs":0,"replayableEgressKeys":0,"admittedGossipQueueJobs":0,"admittedGossipQueueBytes":0,"deliveryRepairWake":0},"error":"TypeError: v3 room issue failed: issuance-rejected: v3 local issue transaction failed: creator issuance maintenance proof reserve is exhausted"}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_CAPACITY_SEAL {"elapsedMs":548.2969169999997,"seal":{"closedVertexCount":358,"commitQcRef":{"byteLength":518,"digest":"b2616cb86e16f592a3abe4dd2681dc2186fc3ea983185b2eb37a5a22ad1e1bdc"},"currentTrustRef":{"byteLength":1780,"digest":"afb627e103c2191ec954e53e21f34445f7d122511f030f822d6d16186c5ab616"},"cutValueRef":{"byteLength":1437,"digest":"f9c737d44353c062713f99b77f5daf242bdd8046e7f1ec87b5c11f9524e95b40"},"epoch":0,"lifecycle":"successor-pending-adoption","ok":true,"successorAnchorDigest":"53df6f25f7d9ca641617d60f02b5b066bc8948b4a89c6818129777a0cb6390dd","successorEpoch":1,"successorTrustRef":{"byteLength":1781,"digest":"e945b120768c289e6ef808aaa970cd1746b52f1896bfb867bcfada8d35cc97b6"}}}
+
+stdout | tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TRACK_AA_CAPACITY_FINISH {"elapsedMs":5037.047500000015,"error":"TypeError: v3 room issue failed: issuance-rejected: v3 local issue transaction failed: creator issuance maintenance proof reserve is exhausted"}
+
+ ❯ tests/track-aa-retained-replay-owner.test.ts (13 tests | 1 failed | 12 skipped) 170962ms
+   ↓ duplicate targeted requests join the native active replay instead of reserving queued snapshots
+   ↓ a held native targeted retained send leaves durable issue schedulable while its replay slot remains charged
+   ↓ a held native requested retained send leaves durable issue schedulable while its replay slot remains charged
+   ↓ a slow target cannot hold another target's ordered replay or grow its captured prefix after concurrent issue
+   ↓ retirement aborts the shared replay but keeps its native slot charged until the actual send settles
+   ↓ 32 held target sends bound buffers and native work without filling the durable input pool
+   ↓ a held broadcast replay releases durable issue and joins later prefix demand without another stream
+   ↓ a native floor advance during a held replay of 1 rows prevents stale continuation and success
+   ↓ a native floor advance during a held replay of 3 rows prevents stale continuation and success
+   ↓ measures a single slow replay's retained gate and durable issue stall
+   ↓ measures a quiet 128-row replay's native scan and buffer costs
+   × measures a quiet 512-row replay's native scan and buffer costs 170961ms
+     → v3 room issue failed: issuance-rejected: v3 local issue transaction failed: creator issuance maintenance proof reserve is exhausted
+   ↓ measures native replay scans when every send overlaps a new durable append
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/track-aa-retained-replay-owner.test.ts > measures a quiet 512-row replay's native scan and buffer costs
+TypeError: v3 room issue failed: issuance-rejected: v3 local issue transaction failed: creator issuance maintenance proof reserve is exhausted
+ ❯ issueOwned packages/node/src/v3-room.ts:4713:23
+    4711|   }
+    4712|   if (!issued.ok) {
+    4713|    rejectOwned(owned, new TypeError(`v3 room issue failed: ${issued.ki…
+       |                       ^
+    4714|    return;
+    4715|   }
+ ❯ drainSnapshot packages/node/src/v3-room.ts:4756:4
+ ❯ packages/node/src/v3-room.ts:4769:5
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)
+   Start at  03:51:54
+   Duration  174.94s (transform 2.27s, setup 0ms, collect 3.74s, tests 170.96s, environment 0ms, prepare 43ms)

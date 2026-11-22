@@ -16,7 +16,7 @@ import { DRPNode } from "../src/index.js";
 
 const NAMESPACE = `drp-network:v1:${"d".repeat(43)}`;
 
-describe("_connectObjectCreator per-dial containment", () => {
+describe("current room creator per-dial containment", () => {
 	const nodes: DRPNode[] = [];
 	let unhandledRejections: unknown[] = [];
 	const onUnhandledRejection = (reason: unknown): void => {
@@ -45,7 +45,7 @@ describe("_connectObjectCreator per-dial containment", () => {
 		nodes.push(fixture.node);
 		fixture.connect.mockRejectedValueOnce(new Error("first targeted dial failed")).mockResolvedValueOnce(undefined);
 
-		await fixture.node["_connectObjectCreator"](id);
+		await fixture.node["_connectRoomCreator"](id);
 
 		expect(fixture.connect).toHaveBeenCalledTimes(2);
 		expect(fixture.connect).toHaveBeenNthCalledWith(1, [...first.addresses]);
@@ -62,7 +62,7 @@ describe("_connectObjectCreator per-dial containment", () => {
 		nodes.push(fixture.node);
 		fixture.connect.mockRejectedValueOnce(new Error("first room dial failed")).mockResolvedValueOnce(undefined);
 
-		await fixture.node["_connectObjectCreator"](id);
+		await fixture.node["_connectRoomCreator"](id);
 
 		expect(fixture.connect).toHaveBeenCalledTimes(2);
 		expect(fixture.connect).toHaveBeenNthCalledWith(1, [...first.addresses]);
@@ -130,6 +130,8 @@ function nodeConfig(): DRPNodeConfig {
 function fakeNetwork(connect: ReturnType<typeof vi.fn>): DRPNetworkNode {
 	return {
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		changeTopicScoreParams: vi.fn(),
 		connect,
 		connectToBootstraps: vi.fn((): Promise<void> => Promise.resolve()),

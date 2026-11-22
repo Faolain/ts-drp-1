@@ -1,0 +1,8 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-replay-budget-zIt6Xr/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-06T06:01:46.882Z"
+}

@@ -5,6 +5,7 @@ import { type IMetrics } from "@ts-drp/types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { disableTracing, enableTracing, flush, isTracingEnabled, OpentelemetryMetrics } from "../src/index.js";
+import * as contextManager from "../src/context-manager.js";
 
 // Mock OpenTelemetry dependencies
 vi.mock("@opentelemetry/api", () => {
@@ -123,9 +124,9 @@ describe("tracing lifecycle", () => {
 		metrics = new OpentelemetryMetrics("metric");
 	});
 
-	test("should enable and disable tracing", () => {
+	test("should enable and disable tracing", async () => {
 		expect(isTracingEnabled()).toBe(false);
-		enableTracing({
+		await enableTracing({
 			provider: {
 				serviceName: "test",
 				exporterUrl: "http://localhost:9999",
@@ -151,9 +152,9 @@ describe("tracing lifecycle", () => {
 		expect(result).toBe(2);
 	});
 
-	test("metrics created while disabled acquire a tracer lazily after enablement", () => {
+	test("metrics created while disabled acquire a tracer lazily after enablement", async () => {
 		const fn = metrics.traceFunc("lazy", (value: number) => value + 1);
-		enableTracing();
+		await enableTracing();
 
 		expect(fn(1)).toBe(2);
 		const mockProvider = vi.mocked(WebTracerProvider).mock.results[0].value;
@@ -161,7 +162,7 @@ describe("tracing lifecycle", () => {
 	});
 
 	test("should allow flushing traces", async () => {
-		enableTracing();
+		await enableTracing();
 
 		expect(WebTracerProvider).toHaveBeenCalled();
 		const mockProvider = vi.mocked(WebTracerProvider).mock.results[0].value;
@@ -171,10 +172,57 @@ describe("tracing lifecycle", () => {
 		disableTracing();
 	});
 
+	test("concurrent enablement joins one initialization and captures options", async () => {
+		let resume!: () => void;
+		const gate = new Promise<void>(resolve => {resume = resolve;});
+		const initialize = vi.spyOn(contextManager, "initContextManager").mockImplementationOnce(() => gate);
+		try {
+			const options = {provider: {exporterUrl: "http://localhost:7777", exporterHeaders: {"x-test": "original"}}};
+			const first = enableTracing(options), second = enableTracing({provider: {exporterUrl: "http://localhost:8888"}});
+			expect(second).toBe(first);
+			expect(isTracingEnabled()).toBe(false);
+			await Promise.resolve();
+			expect(initialize).toHaveBeenCalledOnce();
+			options.provider.exporterHeaders["x-test"] = "mutated";
+			resume(); await first;
+			expect(isTracingEnabled()).toBe(true);
+			expect(WebTracerProvider).toHaveBeenCalledOnce();
+			expect(OTLPTraceExporter).toHaveBeenCalledWith({url: "http://localhost:7777", headers: {"x-test": "original"}});
+		} finally {resume(); initialize.mockRestore();}
+	});
+
+	test("disablement fences pending enablement before provider effects", async () => {
+		let resume!: () => void;
+		const gate = new Promise<void>(resolve => {resume = resolve;});
+		const initialize = vi.spyOn(contextManager, "initContextManager").mockImplementationOnce(() => gate);
+		try {
+			const pending = enableTracing();
+			await Promise.resolve(); disableTracing(); resume(); await pending;
+			expect(isTracingEnabled()).toBe(false);
+			expect(WebTracerProvider).not.toHaveBeenCalled();
+			expect(OTLPTraceExporter).not.toHaveBeenCalled();
+			await enableTracing();
+			expect(isTracingEnabled()).toBe(true);
+			expect(WebTracerProvider).toHaveBeenCalledOnce();
+		} finally {resume(); initialize.mockRestore();}
+	});
+
+	test("failed initialization stays disabled and permits an explicit retry", async () => {
+		const failure = new Error("context initialization failed");
+		const initialize = vi.spyOn(contextManager, "initContextManager").mockImplementationOnce(() => {throw failure;});
+		try {
+			await expect(enableTracing()).rejects.toBe(failure);
+			expect(isTracingEnabled()).toBe(false);
+			expect(WebTracerProvider).not.toHaveBeenCalled();
+			await enableTracing();
+			expect(isTracingEnabled()).toBe(true);
+		} finally {initialize.mockRestore();}
+	});
+
 	describe("wrapping functions", () => {
-		beforeEach(() => {
+		beforeEach(async () => {
 			vi.clearAllMocks();
-			enableTracing();
+			await enableTracing();
 		});
 
 		test("should wrap synchronous functions", () => {

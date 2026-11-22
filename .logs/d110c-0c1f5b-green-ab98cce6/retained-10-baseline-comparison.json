@@ -1,0 +1,297 @@
+{
+  "baseline": ".logs/d110c-0c1f5b0u-green-ea02487e/commands/retained-10/result.json",
+  "baselineReporterSha256": "b0667e48c42febe3d689244b39094dd5dba17e184e84a1bcbb6ca70492e82a25",
+  "baselineCommand": {
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "run",
+      "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "--no-file-parallelism",
+      "--coverage.enabled=false",
+      "--reporter=json",
+      "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-green-working-747ce566/retained-10/result.json"
+    ],
+    "start": "2026-09-05T06:26:44.031Z"
+  },
+  "evidenceCommit": "60548549219378b30548c3c638da178561c17875",
+  "evidenceSignature": "G",
+  "currentReporterSha256": "03121576c0692d9f9a29182e6292612b8574a7fe9504157ea8e61704bd29a905",
+  "test": {
+    "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "currentSha256": "a5747c8ae66b86884843bebf54346abdbbfb788cb80dee87dac6cf65208b7fdf",
+    "signedSha256": "a5747c8ae66b86884843bebf54346abdbbfb788cb80dee87dac6cf65208b7fdf",
+    "byteIdentical": true,
+    "fixtureLine": 260
+  },
+  "policy": {
+    "file": "examples/v3-room/src/index.ts",
+    "byteIdentical": true,
+    "current": "function assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes: Uint8Array): void {\n\tconst parameters = decodeCanonical(exactCanonicalParametersCarrierBytes);\n\tif (parameters === null || typeof parameters !== \"object\" || Array.isArray(parameters)) return;\n\tif (!Object.hasOwn(parameters, \"lineagePolicy\")) return;\n\tconst lineagePolicy = (parameters as Readonly<Record<string, unknown>>).lineagePolicy;\n\tif (lineagePolicy === null || typeof lineagePolicy !== \"object\" || Array.isArray(lineagePolicy)) {\n\t\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n\t}\n\tconst mode = (lineagePolicy as Readonly<Record<string, unknown>>).mode;\n\tif (mode === \"fixed-creator\") return;\n\tif (mode === \"ephemeral-chain\" || mode === \"durable-pinned\" || mode === \"durable-recursive\") {\n\t\tthrow new TypeError(UNSUPPORTED_LINEAGE_POLICY);\n\t}\n\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n}\n",
+    "signed": "function assertSupportedGenesisLineagePolicy(exactCanonicalParametersCarrierBytes: Uint8Array): void {\n\tconst parameters = decodeCanonical(exactCanonicalParametersCarrierBytes);\n\tif (parameters === null || typeof parameters !== \"object\" || Array.isArray(parameters)) return;\n\tif (!Object.hasOwn(parameters, \"lineagePolicy\")) return;\n\tconst lineagePolicy = (parameters as Readonly<Record<string, unknown>>).lineagePolicy;\n\tif (lineagePolicy === null || typeof lineagePolicy !== \"object\" || Array.isArray(lineagePolicy)) {\n\t\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n\t}\n\tconst mode = (lineagePolicy as Readonly<Record<string, unknown>>).mode;\n\tif (mode === \"fixed-creator\") return;\n\tif (mode === \"ephemeral-chain\" || mode === \"durable-pinned\" || mode === \"durable-recursive\") {\n\t\tthrow new TypeError(UNSUPPORTED_LINEAGE_POLICY);\n\t}\n\tthrow new TypeError(\"v3 room genesis lineage policy is invalid\");\n}\n"
+  },
+  "totals": {
+    "total": 20,
+    "passed": 2,
+    "failed": 18,
+    "pending": 0
+  },
+  "allOutcomesAndFirstFailureLinesMatch": true,
+  "comparisons": [
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:444:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:444:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:481:27\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:481:27\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+      "status": "failed",
+      "failureMessages": [
+        "AssertionError: expected [Function] to throw error including 'issuance-rejected' but got 'truncated canonical value'\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Assertion.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1550:20\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:499:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "AssertionError: expected [Function] to throw error including 'issuance-rejected' but got 'truncated canonical value'\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Assertion.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1550:20\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:499:3\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+      "status": "failed",
+      "failureMessages": [
+        "AssertionError: expected [Function] to throw error including 'readiness' but got 'truncated canonical value'\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Assertion.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1550:20\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:530:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "AssertionError: expected [Function] to throw error including 'readiness' but got 'truncated canonical value'\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1325:16)\n    at Assertion.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Assertion.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1550:20\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:530:4\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:550:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:550:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > orders exact rebase and transform inputs while expire and held review perform no issue",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:606:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:606:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > closes one source exactly once after every child has a terminal outcome",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:672:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:672:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > preserves published source work and completes pending work only after target acceptance",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:706:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:706:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > batches sixteen compatible rebases behind one target signature",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:746:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:746:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > splits seventeen compatible rebases into sixteen plus one",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:792:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:792:23\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > refuses a foreign-author displaced intent before signing or issuing",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:828:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:828:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > sorts displaced pages before assigning fresh target logical times",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:880:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:880:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > suppresses an accepted exact identity before issue and rejects changed bytes",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:904:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:904:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > keeps the source pending and terminally exposes target issue or publication failure",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:957:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:957:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > keeps a failed source completion pending and retries it on reopen",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1008:34\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1008:34\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > fails unknown policy and unstable transform identity before target issuance",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1108:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1108:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > keeps a transformed source pending when the product projection rejects its replacement",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1163:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1163:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > keeps a recovered projection-rejected replacement and its source pending without reissue",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:637:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:702:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1593:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1535:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1217:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "baselineStatus": "failed",
+      "baselineFailureMessages": [
+        "TypeError: truncated canonical value\n    at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:305:19)\n    at decodeInternal (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:445:34)\n    at decodeCanonical (/Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js:504:19)\n    at assertSupportedGenesisLineagePolicy (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:630:21)\n    at decodeCreatorInvite (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:695:2)\n    at createV3RoomSessionOwned (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1572:19)\n    at createV3RoomSession (/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts:1512:9)\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts:1217:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+      ],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+      "status": "passed",
+      "failureMessages": [],
+      "baselineStatus": "passed",
+      "baselineFailureMessages": [],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    },
+    {
+      "name": "Phase 3g room-owned rebase scheduling RED > keeps the reserved terminal activation outside the real chat and zone displacement policies",
+      "status": "passed",
+      "failureMessages": [],
+      "baselineStatus": "passed",
+      "baselineFailureMessages": [],
+      "sameStatus": true,
+      "sameFirstFailureLines": true
+    }
+  ],
+  "disposition": "Stopped at actual failure; baseline attribution is not a pass or waiver. No test or production edit/rerun."
+}

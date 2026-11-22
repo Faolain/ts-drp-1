@@ -1,0 +1,56 @@
+867d7f09a78bb106cae10419b636bfa3638b11d6 G test: align retained finality export rosters
+
+diff --git a/tests/fixtures/phase-5-v3/seal-types.ts b/tests/fixtures/phase-5-v3/seal-types.ts
+index adb882c1..c02ba6dc 100644
+--- a/tests/fixtures/phase-5-v3/seal-types.ts
++++ b/tests/fixtures/phase-5-v3/seal-types.ts
+@@ -100,7 +100,12 @@ export interface CandidateSealModules {
+ 
+ export const EXPECTED_EXPORTS = Object.freeze({
+ 	browser: Object.freeze(["openBrowserSealVoteStore"]),
+-	keychain: Object.freeze(["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"]),
++	keychain: Object.freeze([
++		"createRecoverableFinalitySigner",
++		"signCreatorAnchorRequest",
++		"signCreatorIssuanceRetirementRequest",
++		"signSealRegisteredDigest",
++	]),
+ 	protocol: Object.freeze([
+ 		"openSealAuthority",
+ 		"prepareRoundChange",
+diff --git a/tests/fixtures/phase-5e-v3/creator-actor-contract.ts b/tests/fixtures/phase-5e-v3/creator-actor-contract.ts
+index 031f102a..08078e04 100644
+--- a/tests/fixtures/phase-5e-v3/creator-actor-contract.ts
++++ b/tests/fixtures/phase-5e-v3/creator-actor-contract.ts
+@@ -96,7 +96,12 @@ export const EXACT_VOTE_TRANSACTION_STORES = Object.freeze(["signerState", "stor
+ export const EXPECTED_EXPORTS = Object.freeze({
+ 	creator: Object.freeze(["createCreatorSealActor"]),
+ 	evidence: Object.freeze(["openBrowserSealEvidenceStore"]),
+-	finality: Object.freeze(["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"]),
++	finality: Object.freeze([
++		"createRecoverableFinalitySigner",
++		"signCreatorAnchorRequest",
++		"signCreatorIssuanceRetirementRequest",
++		"signSealRegisteredDigest",
++	]),
+ });
+ 
+ export const CRASH_CHECKPOINTS = Object.freeze([
+diff --git a/tests/phase-5e-creator-actor-red.test.ts b/tests/phase-5e-creator-actor-red.test.ts
+index 26477556..5b2184bf 100644
+--- a/tests/phase-5e-creator-actor-red.test.ts
++++ b/tests/phase-5e-creator-actor-red.test.ts
+@@ -255,7 +255,12 @@ describe("Phase 5e durable creator actor RED", () => {
+ 		expect(EXPECTED_EXPORTS).toEqual({
+ 			creator: ["createCreatorSealActor"],
+ 			evidence: ["openBrowserSealEvidenceStore"],
+-			finality: ["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"],
++			finality: [
++				"createRecoverableFinalitySigner",
++				"signCreatorAnchorRequest",
++				"signCreatorIssuanceRetirementRequest",
++				"signSealRegisteredDigest",
++			],
+ 		});
+ 	});
+ 

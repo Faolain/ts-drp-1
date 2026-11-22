@@ -1,0 +1,288 @@
+{
+	"whole": {
+		"packages/storage/src/index.ts": "f44b3384bf938a5d821208c760daf251f2a61e83cfc5ec69959b1d9e0e1bb8dd",
+		"packages/storage/src/types.ts": "74590f4cab68a5fce21cca8804d41e77215b164362c67a2ade2036eecd80f6c6",
+		"packages/storage/package.json": "f7d47bd5aa959f98933ed87028d7d11f58f585e7da8b8052bd2a623d83ee0f93",
+		"packages/storage-browser/src/index.ts": "30d32c3b4e9f9b4a7036602fe2338315167112bec41ca83a753b4feaba3bf56c",
+		"packages/storage-browser/src/maintenance.ts": "98549a8aa34e893c58e7d0fc754f51c5a9e4b43467dcb5368a8df2edda8d69a1",
+		"packages/storage-browser/package.json": "778e423600035d673a89a7bdbe57f377466f0fcd9b3e63f6437a45c525dbdfca",
+		"packages/storage-node/src/index.ts": "14688ec0442cf331f329a5cb944bfa893f6a6ef08eeedd8bb6352651283d7211",
+		"packages/storage-node/src/maintenance.ts": "5265f78aa8a5651efc3db311bfe44c4de77b042618cef7d81c21e4a649d3eed3",
+		"packages/storage-node/package.json": "1f9622ff045cf8aaf00599f96c4bd751ca98e88a713e02f76cda0e13fa8c5c1f",
+		"packages/storage-browser/src/internal/idb-adapter.ts": "7fff06a2bcf36b567ba117477dc552472bd91d22ce8ae4a1e190a16ae83d76db",
+		"packages/storage-node/src/internal/create-scaffold.ts": "2bae60012a81e9cb55cc95751dd8637670a070dda8a570ad5842c5dbafda5dc8",
+		"packages/issuance-store/src/maintenance.ts": "636950d28fdb26a95d222ad8c744c5280f0011630f3649e0c1863e4c930c3b05"
+	},
+	"spans": {
+		"packages/storage/src/maintenance.ts": [
+			{
+				"name": "AHE_RECLAMATION_LOCAL_ONLY_POLICY_DIGEST",
+				"sha256": "0fd38212484b0b4695d19f4aaf82002ea69e4c6bbf6fbf5f08dbe27dede1bf72"
+			},
+			{
+				"name": "AHE_RECLAMATION_ERROR_CODES",
+				"sha256": "1166e5f45318c189502ab96e83d2cba6df1f40123a500c851a131f515ab63d68"
+			},
+			{
+				"name": "AheReclamationErrorCode",
+				"sha256": "c356d24db09e67fdee6a8a548f1160f780703cde56c1e3d4f82cd21923c89cfe"
+			},
+			{
+				"name": "AheReclamationInput",
+				"sha256": "e069418f1037685871a47da75c3fb95dbfce0eb7fe554dd3f3326112397d540b"
+			},
+			{
+				"name": "AheReclamationReceipt",
+				"sha256": "db3c6f01264fd92bfc19f617ae8f652d2e7db1da84109edb35590d5beb0e913d"
+			},
+			{
+				"name": "AheReclamationMaintenance",
+				"sha256": "0f0f3abe879e838c4f1fdc57bae819884ccdff825945a0e9144eff4febe75c33"
+			},
+			{
+				"name": "AheReclamationPromotion",
+				"sha256": "72575a2f89ca2e663a48b6f725f3f7bf080537ed90ca45a996e301aa5bb57b5d"
+			},
+			{
+				"name": "AheReclamationBlobObservation",
+				"sha256": "25df6a6f2cbb210f11f21bbae9a38126ce6cc1ddb959b2bf82ab06a2fc7c3a6d"
+			},
+			{
+				"name": "AheReclamationSnapshot",
+				"sha256": "0882b958e017ce0682effd66963818e78926051ca6cfbd773b9163567a3c0bdd"
+			},
+			{
+				"name": "AheReclamationDecision",
+				"sha256": "b4d5fcdb2f75296fe16cefdaeef0b2d6f14feeae5aaa9592d481e367a9d8226f"
+			},
+			{
+				"name": "AheReclamationError",
+				"sha256": "23ee8b0333b6679f4e04d5ef33ad888aee78bfa7ee9416b748a98c88f74163cd"
+			},
+			{
+				"name": "failure",
+				"sha256": "ea019946f62d6b3780837e62da1e0960533bbcb415416b3fc8fc9c19dc223eff"
+			},
+			{
+				"name": "invalid",
+				"sha256": "0cb6bc7bee33963ded20d8a8239b7d50b53355133142a26551a33960b49d7312"
+			},
+			{
+				"name": "retry",
+				"sha256": "0ecce1cc937ab2a1459fab25d0fe6aec3e33c6bba109e37d484eb0e0086acede"
+			},
+			{
+				"name": "corrupt",
+				"sha256": "fd8a5dfb8a008fe10005433512f219cce54c7260e40ef0d1fa8e70fafd82eb20"
+			},
+			{
+				"name": "cloneHead",
+				"sha256": "d4ee1fb8c9d3e50158d3d7b873552c36e0aa7d3de9e780a3871083258137a787"
+			},
+			{
+				"name": "cloneGeneration",
+				"sha256": "d7c3392754b01bda94e1855a14afa2ae378681b5292ae1f80656a450c91ff294"
+			},
+			{
+				"name": "copyGenerationIds",
+				"sha256": "bc42f85c3b41c951189b17c6bf4c2eb4c58f6dbb13f94cd364f54316bf8997de"
+			},
+			{
+				"name": "copyRollbackIds",
+				"sha256": "7486b71cfd35c7af924c1ea65884b1b092b5c790833a4587262ccf9a575e2337"
+			},
+			{
+				"name": "captureAheReclamationInput",
+				"sha256": "1a9e8455ab928b5b24d7563ebe4bd57c7c857211bc8295e42d97b80374a72618"
+			},
+			{
+				"name": "generationKey",
+				"sha256": "2222a032279bb7614a434a93b3c6ca39c48419a431c9c094f7184b963fb7c150"
+			},
+			{
+				"name": "promotionKey",
+				"sha256": "6ab2750ede5c2cfe9b762790c8aeed3bc5300e7c87c525e5fb8945629a61f3f6"
+			},
+			{
+				"name": "copyPromotions",
+				"sha256": "bc1a2c968df489b71df6c9f40e044b87435db00a2b1a701bce38a8dde8b83973"
+			},
+			{
+				"name": "copyGenerations",
+				"sha256": "a9fd1a6a582e9dfde3857a73058b6c459b0b76cf1cdb6c845df9b70aa860162f"
+			},
+			{
+				"name": "copyBlobFacts",
+				"sha256": "bc3137b160f965b198db511da48075cef7fdf22d2b34cb69b06615b8af5d1bb1"
+			},
+			{
+				"name": "verifyPromotionsAndBlobs",
+				"sha256": "c8b1aa90065e5bc229668c7e3da513a8f1eb62df41c775f1801ce7788e2bc2a5"
+			},
+			{
+				"name": "parentMatches",
+				"sha256": "41f58bbe7ac56e5ff25ffeb4593658375797bc44604925d4df100202f07b7e69"
+			},
+			{
+				"name": "sameIds",
+				"sha256": "57a229a47a3efa603ae95a482777f4ffd05693a5e675e1c0157a9e138e03b372"
+			},
+			{
+				"name": "classifyAheReclamation",
+				"sha256": "34bb256af3a360dc120446bc5cf59fed9c7ed360bb3105c4b9e64dd7bccd5147"
+			},
+			{
+				"name": "createAheReclamationReceipt",
+				"sha256": "a1a93ed3e85679f9c59ff03e863e44706d05c7a67d87b20f8adb15a1659d3a30"
+			},
+			{
+				"name": "createAheReclamationError",
+				"sha256": "4ccf049161cd982aa787298e1dd1860e2f1e1f8c5916b4c92b52d7c51454adf9"
+			}
+		],
+		"packages/storage-browser/src/internal/ahe-reclamation.ts": [
+			{
+				"name": "BrowserAheReclamationCrashEdge",
+				"sha256": "51df9f272fd95239ff7e5b77f1b4b950706122430a8f2a8f6ce55af7e0f0c01f"
+			},
+			{
+				"name": "BrowserAheReclamationCrashObserver",
+				"sha256": "6e78485bac3d18bdf3d39d0374610adeb193f5502faabad7a8a4f7eca22aa0df"
+			},
+			{
+				"name": "BrowserAheReclamationCountFault",
+				"sha256": "51250cc2973d3e1301b1bda10ab0d0ca1c24763391e5d4f156d5d253cab5c259"
+			},
+			{
+				"name": "BrowserAheReclamationLifecycle",
+				"sha256": "05e192ff24776cda5c3c0f595b83ede7f3446934f76be5f8860a912312abb97c"
+			},
+			{
+				"name": "TransactionOutcome",
+				"sha256": "35b1835cbff38e805d714ff258a3c2a3d365ad6c732a26b789ba09560d372780"
+			},
+			{
+				"name": "maintenanceByStore",
+				"sha256": "709f0bdcc0fc626a5bd5ac95e5297095ca307b06e99d5b4363c44944437b9db9"
+			},
+			{
+				"name": "crashObserverByStore",
+				"sha256": "ce442dc4e74ec6abb1b7f233e142453138a3cb04bced4c4ed5d8091ed4727065"
+			},
+			{
+				"name": "countFaultByStore",
+				"sha256": "bd2cc4a937ab06229227b315bffe1f54122d748231414a8b1422ad1550c93dd0"
+			},
+			{
+				"name": "rowProperty",
+				"sha256": "be675ff8506d840a6658f1cffd6a6c52fdd6dab43b1473247f531bbb27884932"
+			},
+			{
+				"name": "bytes",
+				"sha256": "af68c0b4286270b0890c53278f9a7b752bffd9c8f8bd675fc2f1d1ca7827b435"
+			},
+			{
+				"name": "requestValue",
+				"sha256": "6c6ffc5458b37e78fe820b0ac75e60f26e87b5a91a9429cdc436e4c511c8a350"
+			},
+			{
+				"name": "transactionOutcome",
+				"sha256": "3c9f7694c9e75cf8cbab923b84d9858eaeaa69ce972a90f61e97b1f56a45ab85"
+			},
+			{
+				"name": "abortIfActive",
+				"sha256": "870fbd4c7090c088d2f4a9c46ba8e63ce926460362f4166363260d1932843d8f"
+			},
+			{
+				"name": "expectKey",
+				"sha256": "575f9829487b67cb6534dd7f8d8869f64dd73d8ef1db07335495afa7ff775db6"
+			},
+			{
+				"name": "loadSnapshot",
+				"sha256": "6e1a2f87ca5f9613807d6b50aa97aadb9303238be4590e93c3a4f9499ebd8b9d"
+			},
+			{
+				"name": "BrowserAheReclamationMaintenance",
+				"sha256": "19249da5ebc9b941e0f805c5c67029a4078f1b7352aa482a8dd779af0ff533a1"
+			},
+			{
+				"name": "browserAheReclamationMaintenanceForStore",
+				"sha256": "8e6412dddeff5b232f6d36d55deffe9c096b093ad4b6a0a27c7fc46c304486b0"
+			},
+			{
+				"name": "installBrowserAheReclamationCrashObserver",
+				"sha256": "a6fd179376e138b48f62328518d8986f343cfe75acd2d238b815352174750685"
+			},
+			{
+				"name": "installBrowserAheReclamationCountFault",
+				"sha256": "5ab2dcd3fcf035fd088a873f82d8d3bb8120ae8ffa2f53af1ab42caac8965021"
+			}
+		],
+		"packages/storage-node/src/internal/ahe-reclamation.ts": [
+			{
+				"name": "NodeAheReclamationCrashEdge",
+				"sha256": "840ba5c62a361d0033f93a469f3f56666a3d11fa89cb70e70f88c476d5a914b7"
+			},
+			{
+				"name": "NodeAheReclamationCrashObserver",
+				"sha256": "16bccd3bce8bd1a309ef35a8fa905135b9190079e6324385926477aaa8940f81"
+			},
+			{
+				"name": "NodeAheReclamationCountFault",
+				"sha256": "1e48cfca070b9b2e6b183ef7b345c99cdf8b6d446f745bcfc0002941d74572b9"
+			},
+			{
+				"name": "Lifecycle",
+				"sha256": "732b3f8969c7961e40126f201d0033627e6caee01676f2b4690f221479f67777"
+			},
+			{
+				"name": "Row",
+				"sha256": "228cd751420adb30afddb42faca2cefd0265a23c5ce3671abb3c1898b7e30344"
+			},
+			{
+				"name": "maintenanceByStore",
+				"sha256": "709f0bdcc0fc626a5bd5ac95e5297095ca307b06e99d5b4363c44944437b9db9"
+			},
+			{
+				"name": "crashObserverByStore",
+				"sha256": "960dd1d5e592fc28eec9eb644c9f64788e4fcb8ea337efbd6d57a41a8525a34b"
+			},
+			{
+				"name": "countFaultByStore",
+				"sha256": "d402c77c9676d55c63a6d37c1c53828c4a7ce35f50b4cd46d8140df82f701374"
+			},
+			{
+				"name": "databaseBytes",
+				"sha256": "250bb5aa27ac5e020fd94648194824d72fdabb76a6de0d1e35952341eb8775e9"
+			},
+			{
+				"name": "loadSnapshot",
+				"sha256": "97597021adb2d7f2fea5b275d0d357b3af3db96f07b4296a07202125cd23632f"
+			},
+			{
+				"name": "changed",
+				"sha256": "c9ae16e91a0c2366fb46d7b5049abe16c4d391513fecd02d9fc0aaf5b1670984"
+			},
+			{
+				"name": "expectCount",
+				"sha256": "e6f033425501bab1c3d5bb09abf5c0dab237ed365c9958c0ec0c252ec536c465"
+			},
+			{
+				"name": "NodeAheReclamationMaintenance",
+				"sha256": "d19930b30d9c7e5d51f5de0d7fb52fb86c66ac6f17aceda49743a7d559ce0494"
+			},
+			{
+				"name": "nodeAheReclamationMaintenanceForStore",
+				"sha256": "5792ac2eac09cda934b32f1a3f44a9ee6f39b21f297e373816a0972e60e5d2f2"
+			},
+			{
+				"name": "installNodeAheReclamationCrashObserver",
+				"sha256": "087a9424a702c83214e61f1cd9ce54e092cddbeb7be1981bdd58ddadf07f6b48"
+			},
+			{
+				"name": "installNodeAheReclamationCountFault",
+				"sha256": "aba2aff21d22de72387d1b3a9d42a73e8bb9407a04f80447f69e88dce209601a"
+			}
+		]
+	}
+}

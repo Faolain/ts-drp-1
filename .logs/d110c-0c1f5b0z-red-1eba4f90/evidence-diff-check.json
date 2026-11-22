@@ -1,0 +1,10 @@
+{
+  "fullCommand": ["git", "diff", "--cached", "--check"],
+  "fullStatus": 2,
+  "fullOutput": ".logs/d110c-0c1f5b0z-red-1eba4f90/signed-tests-check/stdout:9: new blank line at EOF.\n",
+  "rawBytesPreserved": true,
+  "soleExcludedRawPath": ".logs/d110c-0c1f5b0z-red-1eba4f90/signed-tests-check/stdout",
+  "sourceAndOtherArtifactStatus": 0,
+  "testCommitWhitespaceStatus": 0,
+  "scope": "Raw capture disposition only; executable sources, helpers, assessment and scripts remain checked."
+}

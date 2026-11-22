@@ -1,0 +1,5 @@
+Scope: 2 of 48 workspace projects
+packages/issuance-store typecheck$ tsc --noEmit
+packages/issuance-store typecheck: Done
+examples/v3-room typecheck$ tsc --noEmit
+examples/v3-room typecheck: Done

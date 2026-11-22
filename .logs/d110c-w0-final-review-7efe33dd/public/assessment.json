@@ -1,0 +1,30 @@
+{
+  "decision": "Accept the bounded W0 tests-only reconciliation and its retained-consumer repair; do not accept the unfinished parent production repair",
+  "reviewHead": "0181584496cb213fc8872b57f473f911589fd4d8",
+  "blockingFindingUnion": [],
+  "grok": "PASS; no findings; normal terminal JSON validated independently of the unchanged prose-marker wrapper classification",
+  "sol": "PASS; no findings",
+  "fable": "PASS; three P3 evidence-precision notes, each explicitly identifies no violated frozen requirement",
+  "dispositions": [
+    {
+      "finding": "Derived graph occupancy",
+      "disposition": "Accepted precision limit, no code defect or new runtime requirement",
+      "evidence": "The helper derives journal count plus the anchor, and the assertion checks that arithmetic. It does not observe a private graph counter. Exact persisted input accounting, offender sequence/share charging, overflow rejection and genuine close remain independently exercised. Describe occupancy as derived, not a measured private capacity reading."
+    },
+    {
+      "finding": "Historical saturation title mapping",
+      "disposition": "Accepted documentation precision; preserve every historical artifact and current title",
+      "evidence": "The historical consumed reporter has six controls: five titles remain unchanged, the legacy saturation control is explicitly retitled and reconciled to current profile rules in GREEN, and the settlement companion is new. The current seven-case frozen roster is preserved literally in main and isolation. References to original W0 seven mean that frozen current roster, not seven literal titles in the older six-case reporter."
+    },
+    {
+      "finding": "Second cold-input pin coverage",
+      "disposition": "Accepted evidence limit, no claim that this pin is necessary to the historical fallback path",
+      "evidence": "Both actual construction sites supply detached original bootstrap bytes through the existing field. The current-successor site is reached by the retained committed-issuance recovery control and remains compatible with genuine recovery and issuance. Unlike epoch-two cold reopening, the tests do not isolate this pin as the causal reason for success at that second site. No frozen requirement asks for a new failure there."
+    }
+  ],
+  "typecheckClaimBoundary": "The newly widened forty-root main and isolated programs have exact matching 92-diagnostic inventories, three targeted. Earlier narrower W0 and consumer before/after evidence establishes its own scope only. Reviewer shorthand calling all 92 inherited does not establish that this wider inventory was run before GREEN; do not make that claim or a clean whole-program claim.",
+  "refactorCleanDisposition": "The optional profile selector stays on the existing genuine shared fixture; the public store surface comes from its existing owner; checkpoint/transition verification uses existing production authority before a test-only projection; both cold sites share one validated original bootstrap. No new production adapter, parallel verifier or compatibility owner was introduced.",
+  "sourceChangeAfterReview": "None required by findings; commit only the three already-reviewed W0 test/helper files, preserving all eight pending production owners byte-for-byte",
+  "retestsOrReviewRetriesRequired": false,
+  "remainingScope": "Registry governance and grid authority composition, then full parent acceptance and remaining D.110c work before the reviewed 64-active-writer/100-genuine-transition campaign."
+}

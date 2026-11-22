@@ -1,0 +1,18 @@
+[
+  {
+    "name": "D.110c-0c1f5b0a final-review corrective RED > installs and reopens genuine settlement-profile trust without rewriting its profile, then settles with successor floor trust",
+    "file": "/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0a final-review corrective RED > normalizes exactly one settlement checkpoint and no legacy carriers while retaining legacy cardinalities",
+    "file": "/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0a final-review corrective RED > uses the settlement author-authorization ceiling for 256 authors while preserving legacy byte and author caps",
+    "file": "/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0a final-review corrective RED > binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency",
+    "file": "/private/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout/tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  }
+]

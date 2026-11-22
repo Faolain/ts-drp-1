@@ -1,0 +1,1538 @@
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"thought","data":"The"}
+{"type":"thought","data":" user"}
+{"type":"thought","data":" wants"}
+{"type":"thought","data":" me"}
+{"type":"thought","data":" to"}
+{"type":"thought","data":" resume"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" D"}
+{"type":"thought","data":"."}
+{"type":"thought","data":"110"}
+{"type":"thought","data":"c"}
+{"type":"thought","data":"-"}
+{"type":"thought","data":"0"}
+{"type":"thought","data":"c"}
+{"type":"thought","data":"1"}
+{"type":"thought","data":"a"}
+{"type":"thought","data":" review"}
+{"type":"thought","data":" I"}
+{"type":"thought","data":" was"}
+{"type":"thought","data":" performing"}
+{"type":"thought","data":"."}
+{"type":"thought","data":" I"}
+{"type":"thought","data":" had"}
+{"type":"thought","data":" already"}
+{"type":"thought","data":" completed"}
+{"type":"thought","data":" extensive"}
+{"type":"thought","data":" analysis"}
+{"type":"thought","data":" and"}
+{"type":"thought","data":" was"}
+{"type":"thought","data":" about"}
+{"type":"thought","data":" to"}
+{"type":"thought","data":" emit"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" JSON"}
+{"type":"thought","data":" review"}
+{"type":"thought","data":" object"}
+{"type":"thought","data":"."}
+{"type":"thought","data":" Let"}
+{"type":"thought","data":" me"}
+{"type":"thought","data":" recall"}
+{"type":"thought","data":" my"}
+{"type":"thought","data":" conclusions"}
+{"type":"thought","data":":\n"}
+{"type":"thought","data":"The test looks fine as-is—it's only asserting the count of a specific candidate kind (`drp-hard-epoch-cut`) at a particular epoch, not the total candidate count."}
+{"type":"thought","data":" Adding a retirement candidate shouldn't break that assertion."}
+{"type":"thought","data":"\n\nI can now conclude the review."}
+{"type":"thought","data":" The only P1 is the minting-through-boundary logic 95727-95737 combined with the pending-outbox-after-close path (enqueuePendingPublication at terminalState === \"terminal\" in v3-live."}
+{"type":"thought","data":"ts:6310)."}
+{"type":"thought","data":" That combination can block close whenever any address in (prior, next-1] still has a pending outbox, which is the normal pre-publish state 0→1 fixtures rely on."}
+{"type":"thought","data":" The RED proof would encode the wrong rule if we ship the current plan, so RED is blocked by this P1."}
+{"type":"thought","data":"\n\nEverything else (opener mapping, empty lineage, exhausted MAX_SAFE_INTEGER, classifier loosening, digest binding) is either P2 or acceptable under creator-trusted authority."}
+{"type":"thought","data":" 0b1 tests remain green."}
+{"type":"thought","data":" I can now emit the JSON review object."}
+{"type":"text","data":"I"}
+{"type":"text","data":" have"}
+{"type":"text","data":" the"}
+{"type":"text","data":" remaining"}
+{"type":"text","data":" classifier"}
+{"type":"text","data":" and"}
+{"type":"text","data":" census"}
+{"type":"text","data":" evidence"}
+{"type":"text","data":"."}
+{"type":"text","data":" Em"}
+{"type":"text","data":"itting"}
+{"type":"text","data":" the"}
+{"type":"text","data":" terminal"}
+{"type":"text","data":" review"}
+{"type":"text","data":" object"}
+{"type":"text","data":"."}
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool","codex__codex","codex__codex-reply","railway__whoami","railway__list-workspaces","railway__list-projects","railway__create-project","railway__create-deployment","railway__create-service","railway__update-service","railway__list-services","railway__get-service-config","railway__get-service-metrics","railway__list-variables","railway__set-variables","railway__create-volume","railway__update-volume","railway__delete-volume","railway__create-bucket","railway__delete-bucket","railway__list-domains","railway__domain-status","railway__generate-domain","railway__search-docs","railway__fetch-docs","railway__list-feature-flags","railway__get-feature-flag","railway__set-feature-flag","railway__delete-feature-flag","railway__list-deployments","railway__get-status","railway__get-logs","railway__http-requests","railway__http-error-rate","railway__http-response-time","railway__redeploy","railway__restart-service","railway__get-deployment-diagnosis","railway__environment-status","railway__list-tcp-proxies","railway__create-tcp-proxy","railway__delete-tcp-proxy","railway__connect-service-source","railway__accept-deploy","railway__railway-agent","react-grab-mcp__get_element_context"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"usage","usage":{"input_tokens":10893,"output_tokens":2061,"cache_read_input_tokens":186368,"cache_creation_input_tokens":0,"reasoning_tokens":1958},"signature":"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"}
+{"type":"tool_call","toolCallId":"call-697b0118-becf-4d7c-a7ce-de300ca8455a-107","title":"read_file","kind":"read","status":"pending","toolName":"read_file","rawInput":{"target_file":"tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts","offset":95,"limit":30},"content":[],"locations":[]}
+{"type":"tool_call_update","toolCallId":"call-697b0118-becf-4d7c-a7ce-de300ca8455a-107","status":null,"content":[],"rawOutput":null,"locations":[{"path":"tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts","line":95}]}
+{"type":"tool_call","toolCallId":"call-697b0118-becf-4d7c-a7ce-de300ca8455a-108","title":"read_file","kind":"read","status":"pending","toolName":"read_file","rawInput":{"target_file":"docs/production-hardening/production-hardening-tdd-plan-v2.md","offset":95725,"limit":20},"content":[],"locations":[]}
+{"type":"tool_call_update","toolCallId":"call-697b0118-becf-4d7c-a7ce-de300ca8455a-108","status":null,"content":[],"rawOutput":null,"locations":[{"path":"docs/production-hardening/production-hardening-tdd-plan-v2.md","line":95725}]}
+{"type":"tool_call_update","toolCallId":"call-697b0118-becf-4d7c-a7ce-de300ca8455a-107","status":"completed","content":[{"type":"content","content":{"type":"text","text":"95→\t\t\tcurrentTrust: { currentEpoch: 2 },\n\t\t\tok: true,\n\t\t\tpredecessorTrust: { currentEpoch: 1 },\n\t\t});\n\t});\n100→\n\tit(\"retires the stale proof pair and predecessor ACL under the bounded advance\", () => {\n\t\tconst { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;\n\t\texpect(existingAdvance).toMatchObject({ ok: false, reason: \"TRUST_CLOSURE_INVALID\" });\n\t\texpect(bounded).toEqual({ kind: \"successor\", ok: true });\n\t\texpect(currentCensus).toHaveLength(5);\n\t\texpect(proposedCensus).toHaveLength(4);\n\t\texpect(activeCensus).toHaveLength(5);\n\t\texpect(entries(currentCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(1);\n\t\texpect(entries(currentCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(1);\n110→\t\texpect(entries(currentCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 1)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 1, \"commit\")).toHaveLength(1);\n\t\texpect(entries(activeCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 1)).toHaveLength(1);\n120→\t});\n\n\tit(\"cold reopens the genuine active epoch-two room through the bounded checkpoint owner\", () => {\n\t\tconst { active, current, proposed } = fixture.evidence.durableHeads;\n\t\texpect(Number(proposed.revision)).toBe(Number(current.revision) + 1);"}}],"rawOutput":{"type":"ReadFile","FileContent":{"content":"95→\t\t\tcurrentTrust: { currentEpoch: 2 },\n\t\t\tok: true,\n\t\t\tpredecessorTrust: { currentEpoch: 1 },\n\t\t});\n\t});\n100→\n\tit(\"retires the stale proof pair and predecessor ACL under the bounded advance\", () => {\n\t\tconst { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;\n\t\texpect(existingAdvance).toMatchObject({ ok: false, reason: \"TRUST_CLOSURE_INVALID\" });\n\t\texpect(bounded).toEqual({ kind: \"successor\", ok: true });\n\t\texpect(currentCensus).toHaveLength(5);\n\t\texpect(proposedCensus).toHaveLength(4);\n\t\texpect(activeCensus).toHaveLength(5);\n\t\texpect(entries(currentCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(1);\n\t\texpect(entries(currentCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(1);\n110→\t\texpect(entries(currentCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 1)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 1, \"commit\")).toHaveLength(1);\n\t\texpect(entries(activeCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 1)).toHaveLength(1);\n120→\t});\n\n\tit(\"cold reopens the genuine active epoch-two room through the bounded checkpoint owner\", () => {\n\t\tconst { active, current, proposed } = fixture.evidence.durableHeads;\n\t\texpect(Number(proposed.revision)).toBe(Number(current.revision) + 1);","content_concise":"95→\t\t\tcurrentTrust: { currentEpoch: 2 },\n\t\t\tok: true,\n\t\t\tpredecessorTrust: { currentEpoch: 1 },\n\t\t});\n\t});\n100→\n\tit(\"retires the stale proof pair and predecessor ACL under the bounded advance\", () => {\n\t\tconst { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;\n\t\texpect(existingAdvance).toMatchObject({ ok: false, reason: \"TRUST_CLOSURE_INVALID\" });\n\t\texpect(bounded).toEqual({ kind: \"successor\", ok: true });\n\t\texpect(currentCensus).toHaveLength(5);\n\t\texpect(proposedCensus).toHaveLength(4);\n\t\texpect(activeCensus).toHaveLength(5);\n\t\texpect(entries(currentCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(1);\n\t\texpect(entries(currentCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(1);\n110→\t\texpect(entries(currentCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 1)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 1, \"commit\")).toHaveLength(1);\n\t\texpect(entries(activeCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 1)).toHaveLength(1);\n120→\t});\n\n\tit(\"cold reopens the genuine active epoch-two room through the bounded checkpoint owner\", () => {\n\t\tconst { active, current, proposed } = fixture.evidence.durableHeads;\n\t\texpect(Number(proposed.revision)).toBe(Number(current.revision) + 1);","absolute_path":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts","offset":95,"limit":30,"raw_output":"\t\t\tcurrentTrust: { currentEpoch: 2 },\n\t\t\tok: true,\n\t\t\tpredecessorTrust: { currentEpoch: 1 },\n\t\t});\n\t});\n\n\tit(\"retires the stale proof pair and predecessor ACL under the bounded advance\", () => {\n\t\tconst { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;\n\t\texpect(existingAdvance).toMatchObject({ ok: false, reason: \"TRUST_CLOSURE_INVALID\" });\n\t\texpect(bounded).toEqual({ kind: \"successor\", ok: true });\n\t\texpect(currentCensus).toHaveLength(5);\n\t\texpect(proposedCensus).toHaveLength(4);\n\t\texpect(activeCensus).toHaveLength(5);\n\t\texpect(entries(currentCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(1);\n\t\texpect(entries(currentCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(1);\n\t\texpect(entries(currentCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(proposedCensus, \"drp-hard-epoch-cut\", 1)).toHaveLength(1);\n\t\texpect(entries(proposedCensus, \"drp-seal-qc\", 1, \"commit\")).toHaveLength(1);\n\t\texpect(entries(activeCensus, \"drp-hard-epoch-cut\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-seal-qc\", 0, \"commit\")).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 0)).toHaveLength(0);\n\t\texpect(entries(activeCensus, \"drp-v3-latched-acl\", 1)).toHaveLength(1);\n\t});\n\n\tit(\"cold reopens the genuine active epoch-two room through the bounded checkpoint owner\", () => {\n\t\tconst { active, current, proposed } = fixture.evidence.durableHeads;\n\t\texpect(Number(proposed.revision)).toBe(Number(current.revision) + 1);\n","total_lines":136}},"locations":[]}
+{"type":"tool_call_update","toolCallId":"call-697b0118-becf-4d7c-a7ce-de300ca8455a-108","status":"completed","content":[{"type":"content","content":{"type":"text","text":"95725→both adjacent closures exist, not to create an O(N) proof chain.\n\nMinting starts from the authenticated prior checkpoint and exact issuance\nscope. It reads the lineage and every address strictly above the prior boundary\nthrough `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address\n95730→must be dense and increasing and have one byte-identical issued/outbox pair, a\ncanonical vertex, valid author signature, exact current room/anchor/epoch,\n`published` state, and a digest present in both the captured close graph and\nsealed durable replay. Missing, duplicate, pending, malformed, substituted,\ncross-scope, non-current, or non-member rows refuse signing. The successor\nanchor, Cut/QC, and snapshot identities are fixed before completing the\ndeterministic Ed25519 signature. A close with no newly issued address carries\nthe prior sequence forward while rebinding it to the new successor checkpoint.\n\nCold reopen never trusts this record merely because storage returned it. The\n95740→opener consumes pinned-genesis-derived creator trust plus the independently\nauthenticated room floor, verifies the exact signature and all scope/head/\nCut/QC/snapshot fields, and requires the one candidate selected from the\nbounded active closure. Missing, duplicate, stale, future, cross-room,\ncross-author, forked, malformed, or nonmonotonic candidates fail closed. An"}}],"rawOutput":{"type":"ReadFile","FileContent":{"content":"95725→both adjacent closures exist, not to create an O(N) proof chain.\n\nMinting starts from the authenticated prior checkpoint and exact issuance\nscope. It reads the lineage and every address strictly above the prior boundary\nthrough `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address\n95730→must be dense and increasing and have one byte-identical issued/outbox pair, a\ncanonical vertex, valid author signature, exact current room/anchor/epoch,\n`published` state, and a digest present in both the captured close graph and\nsealed durable replay. Missing, duplicate, pending, malformed, substituted,\ncross-scope, non-current, or non-member rows refuse signing. The successor\nanchor, Cut/QC, and snapshot identities are fixed before completing the\ndeterministic Ed25519 signature. A close with no newly issued address carries\nthe prior sequence forward while rebinding it to the new successor checkpoint.\n\nCold reopen never trusts this record merely because storage returned it. The\n95740→opener consumes pinned-genesis-derived creator trust plus the independently\nauthenticated room floor, verifies the exact signature and all scope/head/\nCut/QC/snapshot fields, and requires the one candidate selected from the\nbounded active closure. Missing, duplicate, stale, future, cross-room,\ncross-author, forked, malformed, or nonmonotonic candidates fail closed. An","content_concise":"95725→both adjacent closures exist, not to create an O(N) proof chain.\n\nMinting starts from the authenticated prior checkpoint and exact issuance\nscope. It reads the lineage and every address strictly above the prior boundary\nthrough `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address\n95730→must be dense and increasing and have one byte-identical issued/outbox pair, a\ncanonical vertex, valid author signature, exact current room/anchor/epoch,\n`published` state, and a digest present in both the captured close graph and\nsealed durable replay. Missing, duplicate, pending, malformed, substituted,\ncross-scope, non-current, or non-member rows refuse signing. The successor\nanchor, Cut/QC, and snapshot identities are fixed before completing the\ndeterministic Ed25519 signature. A close with no newly issued address carries\nthe prior sequence forward while rebinding it to the new successor checkpoint.\n\nCold reopen never trusts this record merely because storage returned it. The\n95740→opener consumes pinned-genesis-derived creator trust plus the independently\nauthenticated room floor, verifies the exact signature and all scope/head/\nCut/QC/snapshot fields, and requires the one candidate selected from the\nbounded active closure. Missing, duplicate, stale, future, cross-room,\ncross-author, forked, malformed, or nonmonotonic candidates fail closed. An","absolute_path":"/Users/aristotle/Documents/Projects/ts-drp-1/docs/production-hardening/production-hardening-tdd-plan-v2.md","offset":95725,"limit":20,"raw_output":"both adjacent closures exist, not to create an O(N) proof chain.\n\nMinting starts from the authenticated prior checkpoint and exact issuance\nscope. It reads the lineage and every address strictly above the prior boundary\nthrough `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address\nmust be dense and increasing and have one byte-identical issued/outbox pair, a\ncanonical vertex, valid author signature, exact current room/anchor/epoch,\n`published` state, and a digest present in both the captured close graph and\nsealed durable replay. Missing, duplicate, pending, malformed, substituted,\ncross-scope, non-current, or non-member rows refuse signing. The successor\nanchor, Cut/QC, and snapshot identities are fixed before completing the\ndeterministic Ed25519 signature. A close with no newly issued address carries\nthe prior sequence forward while rebinding it to the new successor checkpoint.\n\nCold reopen never trusts this record merely because storage returned it. The\nopener consumes pinned-genesis-derived creator trust plus the independently\nauthenticated room floor, verifies the exact signature and all scope/head/\nCut/QC/snapshot fields, and requires the one candidate selected from the\nbounded active closure. Missing, duplicate, stale, future, cross-room,\ncross-author, forked, malformed, or nonmonotonic candidates fail closed. An\n","total_lines":96140}},"locations":[]}
+{"type":"thought","data":"The"}
+{"type":"thought","data":" "}
+{"type":"thought","data":"0"}
+{"type":"thought","data":"b"}
+{"type":"thought","data":"1"}
+{"type":"thought","data":" test"}
+{"type":"thought","data":" asserts"}
+{"type":"thought","data":" `"}
+{"type":"thought","data":"current"}
+{"type":"thought","data":"Census"}
+{"type":"thought","data":")."}
+{"type":"thought","data":"to"}
+{"type":"thought","data":"Have"}
+{"type":"thought","data":"Length"}
+{"type":"thought","data":"("}
+{"type":"thought","data":"5"}
+{"type":"thought","data":")`"}
+{"type":"thought","data":" and"}
+{"type":"thought","data":" `"}
+{"type":"thought","data":"proposed"}
+{"type":"thought","data":"Census"}
+{"type":"thought","data":")."}
+{"type":"thought","data":"to"}
+{"type":"thought","data":"Have"}
+{"type":"thought","data":"Length"}
+{"type":"thought","data":"("}
+{"type":"thought","data":"4"}
+{"type":"thought","data":")`"}
+{"type":"thought","data":" -"}
+{"type":"thought","data":" those"}
+{"type":"thought","data":" ARE"}
+{"type":"thought","data":" total"}
+{"type":"thought","data":" length"}
+{"type":"thought","data":" assertions"}
+{"type":"thought","data":"."}
+{"type":"thought","data":" Adding"}
+{"type":"thought","data":" a"}
+{"type":"thought","data":" retirement"}
+{"type":"thought","data":" candidate"}
+{"type":"thought","data":" would"}
+{"type":"thought","data":" break"}
+{"type":"thought","data":" retained"}
+{"type":"thought","data":" "}
+{"type":"thought","data":"0"}
+{"type":"thought","data":"b"}
+{"type":"thought","data":"1"}
+{"type":"thought","data":" tests"}
+{"type":"thought","data":" unless"}
+{"type":"thought","data":" GRE..."}
+{"type":"text","data":"{\""}
+{"type":"text","data":"ver"}
+{"type":"text","data":"dict"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"CHANG"}
+{"type":"text","data":"ES"}
+{"type":"text","data":"_"}
+{"type":"text","data":"REQUIRED"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"summary"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Audit"}
+{"type":"text","data":" at"}
+{"type":"text","data":" d"}
+{"type":"text","data":"6"}
+{"type":"text","data":"f"}
+{"type":"text","data":"5"}
+{"type":"text","data":"de"}
+{"type":"text","data":"26"}
+{"type":"text","data":" is"}
+{"type":"text","data":" correct"}
+{"type":"text","data":":"}
+{"type":"text","data":" creator"}
+{"type":"text","data":"Filtered"}
+{"type":"text","data":"Iss"}
+{"type":"text","data":"uance"}
+{"type":"text","data":"Store"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"455"}
+{"type":"text","data":"0"}
+{"type":"text","data":"-"}
+{"type":"text","data":"462"}
+{"type":"text","data":"4"}
+{"type":"text","data":")"}
+{"type":"text","data":" and"}
+{"type":"text","data":" recover"}
+{"type":"text","data":"V"}
+{"type":"text","data":"3"}
+{"type":"text","data":"Live"}
+{"type":"text","data":"Replica"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"509"}
+{"type":"text","data":"7"}
+{"type":"text","data":"-"}
+{"type":"text","data":"509"}
+{"type":"text","data":"8"}
+{"type":"text","data":")"}
+{"type":"text","data":" authenticate"}
+{"type":"text","data":" only"}
+{"type":"text","data":" current"}
+{"type":"text","data":"/"}
+{"type":"text","data":"dis"}
+{"type":"text","data":"placed"}
+{"type":"text","data":" plus"}
+{"type":"text","data":" pinned"}
+{"type":"text","data":" genesis"}
+{"type":"text","data":";"}
+{"type":"text","data":" open"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Checkpoint"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":" binds"}
+{"type":"text","data":" only"}
+{"type":"text","data":" the"}
+{"type":"text","data":" immediate"}
+{"type":"text","data":" predecessor"}
+{"type":"text","data":";"}
+{"type":"text","data":" cut"}
+{"type":"text","data":"/"}
+{"type":"text","data":"anchor"}
+{"type":"text","data":"/"}
+{"type":"text","data":"RFC"}
+{"type":"text","data":" "}
+{"type":"text","data":"916"}
+{"type":"text","data":"2"}
+{"type":"text","data":"/"}
+{"type":"text","data":"read"}
+{"type":"text","data":"Line"}
+{"type":"text","data":"age"}
+{"type":"text","data":"/"}
+{"type":"text","data":"pr"}
+{"type":"text","data":"uned"}
+{"type":"text","data":"Through"}
+{"type":"text","data":"Author"}
+{"type":"text","data":"Sequence"}
+{"type":"text","data":" carry"}
+{"type":"text","data":" no"}
+{"type":"text","data":" genesis"}
+{"type":"text","data":"-"}
+{"type":"text","data":"rooted"}
+{"type":"text","data":" per"}
+{"type":"text","data":"-"}
+{"type":"text","data":"author"}
+{"type":"text","data":" resolved"}
+{"type":"text","data":" frontier"}
+{"type":"text","data":";"}
+{"type":"text","data":" prune"}
+{"type":"text","data":"Published"}
+{"type":"text","data":"Prefix"}
+{"type":"text","data":" is"}
+{"type":"text","data":" unused"}
+{"type":"text","data":" on"}
+{"type":"text","data":" the"}
+{"type":"text","data":" product"}
+{"type":"text","data":" path"}
+{"type":"text","data":"."}
+{"type":"text","data":" The"}
+{"type":"text","data":" creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"signed"}
+{"type":"text","data":" cumulative"}
+{"type":"text","data":" retirement"}
+{"type":"text","data":" record"}
+{"type":"text","data":","}
+{"type":"text","data":" genesis"}
+{"type":"text","data":"-"}
+{"type":"text","data":"rooted"}
+{"type":"text","data":" final"}
+{"type":"text","data":"ity"}
+{"type":"text","data":" signature"}
+{"type":"text","data":","}
+{"type":"text","data":" successor"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bound"}
+{"type":"text","data":" A"}
+{"type":"text","data":"HE"}
+{"type":"text","data":" candidate"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"only"}
+{"type":"text","data":" fail"}
+{"type":"text","data":"-"}
+{"type":"text","data":"closed"}
+{"type":"text","data":" compatibility"}
+{"type":"text","data":" are"}
+{"type":"text","data":" a"}
+{"type":"text","data":" sound"}
+{"type":"text","data":" O"}
+{"type":"text","data":"("}
+{"type":"text","data":"1"}
+{"type":"text","data":")"}
+{"type":"text","data":" carrier"}
+{"type":"text","data":" without"}
+{"type":"text","data":" Cut"}
+{"type":"text","data":"/"}
+{"type":"text","data":"anchor"}
+{"type":"text","data":","}
+{"type":"text","data":" public"}
+{"type":"text","data":" API"}
+{"type":"text","data":","}
+{"type":"text","data":" or"}
+{"type":"text","data":" store"}
+{"type":"text","data":"-"}
+{"type":"text","data":"schema"}
+{"type":"text","data":" changes"}
+{"type":"text","data":"."}
+{"type":"text","data":" RED"}
+{"type":"text","data":" is"}
+{"type":"text","data":" causal"}
+{"type":"text","data":":"}
+{"type":"text","data":" genuine"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"→"}
+{"type":"text","data":"1"}
+{"type":"text","data":" close"}
+{"type":"text","data":" plus"}
+{"type":"text","data":" a"}
+{"type":"text","data":" second"}
+{"type":"text","data":" product"}
+{"type":"text","data":"-"}
+{"type":"text","data":"shaped"}
+{"type":"text","data":" issued"}
+{"type":"text","data":" row"}
+{"type":"text","data":","}
+{"type":"text","data":" inspect"}
+{"type":"text","data":" the"}
+{"type":"text","data":" real"}
+{"type":"text","data":" proposed"}
+{"type":"text","data":" closure"}
+{"type":"text","data":","}
+{"type":"text","data":" throw"}
+{"type":"text","data":" D"}
+{"type":"text","data":"110"}
+{"type":"text","data":"C"}
+{"type":"text","data":"_"}
+{"type":"text","data":"0"}
+{"type":"text","data":"C"}
+{"type":"text","data":"1"}
+{"type":"text","data":"A"}
+{"type":"text","data":"_"}
+{"type":"text","data":"RET"}
+{"type":"text","data":"IRE"}
+{"type":"text","data":"MENT"}
+{"type":"text","data":"_"}
+{"type":"text","data":"CHECKPOINT"}
+{"type":"text","data":"_"}
+{"type":"text","data":"UN"}
+{"type":"text","data":"AVAILABLE"}
+{"type":"text","data":"."}
+{"type":"text","data":" One"}
+{"type":"text","data":" P"}
+{"type":"text","data":"1"}
+{"type":"text","data":" blocks"}
+{"type":"text","data":":"}
+{"type":"text","data":" mint"}
+{"type":"text","data":"ing"}
+{"type":"text","data":" uses"}
+{"type":"text","data":" through"}
+{"type":"text","data":"="}
+{"type":"text","data":"line"}
+{"type":"text","data":"age"}
+{"type":"text","data":".next"}
+{"type":"text","data":"-"}
+{"type":"text","data":"1"}
+{"type":"text","data":" ("}
+{"type":"text","data":"or"}
+{"type":"text","data":" next"}
+{"type":"text","data":" if"}
+{"type":"text","data":" exhausted"}
+{"type":"text","data":")"}
+{"type":"text","data":" and"}
+{"type":"text","data":" refuses"}
+{"type":"text","data":" the"}
+{"type":"text","data":" whole"}
+{"type":"text","data":" signature"}
+{"type":"text","data":" on"}
+{"type":"text","data":" any"}
+{"type":"text","data":" pending"}
+{"type":"text","data":" address"}
+{"type":"text","data":","}
+{"type":"text","data":" which"}
+{"type":"text","data":" would"}
+{"type":"text","data":" fail"}
+{"type":"text","data":" ordinary"}
+{"type":"text","data":" close"}
+{"type":"text","data":" while"}
+{"type":"text","data":" out"}
+{"type":"text","data":"box"}
+{"type":"text","data":" is"}
+{"type":"text","data":" still"}
+{"type":"text","data":" pending"}
+{"type":"text","data":" and"}
+{"type":"text","data":" contradicts"}
+{"type":"text","data":" leaving"}
+{"type":"text","data":" unpublished"}
+{"type":"text","data":" work"}
+{"type":"text","data":" above"}
+{"type":"text","data":" the"}
+{"type":"text","data":" bound"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"find"}
+{"type":"text","data":"ings"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"[{\""}
+{"type":"text","data":"severity"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"P"}
+{"type":"text","data":"1"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"title"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Mint"}
+{"type":"text","data":"ing"}
+{"type":"text","data":" through"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bound"}
+{"type":"text","data":" cannot"}
+{"type":"text","data":" be"}
+{"type":"text","data":" lineage"}
+{"type":"text","data":".next"}
+{"type":"text","data":"-"}
+{"type":"text","data":"1"}
+{"type":"text","data":" with"}
+{"type":"text","data":" whole"}
+{"type":"text","data":"-"}
+{"type":"text","data":"close"}
+{"type":"text","data":" refusal"}
+{"type":"text","data":" on"}
+{"type":"text","data":" pending"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"path"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"docs"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"-"}
+{"type":"text","data":"td"}
+{"type":"text","data":"d"}
+{"type":"text","data":"-"}
+{"type":"text","data":"plan"}
+{"type":"text","data":"-"}
+{"type":"text","data":"v"}
+{"type":"text","data":"2"}
+{"type":"text","data":".md"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"line"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"957"}
+{"type":"text","data":"29"}
+{"type":"text","data":",\""}
+{"type":"text","data":"evidence"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"The"}
+{"type":"text","data":" plan"}
+{"type":"text","data":" sets"}
+{"type":"text","data":" through"}
+{"type":"text","data":"Author"}
+{"type":"text","data":"Sequence"}
+{"type":"text","data":" ="}
+{"type":"text","data":" lineage"}
+{"type":"text","data":"."}
+{"type":"text","data":"exhausted"}
+{"type":"text","data":" ?"}
+{"type":"text","data":" lineage"}
+{"type":"text","data":".next"}
+{"type":"text","data":" :"}
+{"type":"text","data":" lineage"}
+{"type":"text","data":".next"}
+{"type":"text","data":" -"}
+{"type":"text","data":" "}
+{"type":"text","data":"1"}
+{"type":"text","data":" and"}
+{"type":"text","data":" says"}
+{"type":"text","data":" missing"}
+{"type":"text","data":"/"}
+{"type":"text","data":"pending"}
+{"type":"text","data":"/"}
+{"type":"text","data":"non"}
+{"type":"text","data":"-"}
+{"type":"text","data":"member"}
+{"type":"text","data":" rows"}
+{"type":"text","data":" refuse"}
+{"type":"text","data":" signing"}
+{"type":"text","data":"."}
+{"type":"text","data":" Durable"}
+{"type":"text","data":"Line"}
+{"type":"text","data":"age"}
+{"type":"text","data":".next"}
+{"type":"text","data":" is"}
+{"type":"text","data":" the"}
+{"type":"text","data":" next"}
+{"type":"text","data":" un"}
+{"type":"text","data":"issued"}
+{"type":"text","data":" ordinal"}
+{"type":"text","data":";"}
+{"type":"text","data":" !"}
+{"type":"text","data":"exhausted"}
+{"type":"text","data":" &&"}
+{"type":"text","data":" next"}
+{"type":"text","data":"==="}
+{"type":"text","data":"0"}
+{"type":"text","data":" yields"}
+{"type":"text","data":" -"}
+{"type":"text","data":"1"}
+{"type":"text","data":","}
+{"type":"text","data":" which"}
+{"type":"text","data":" is"}
+{"type":"text","data":"Valid"}
+{"type":"text","data":"Durable"}
+{"type":"text","data":"Author"}
+{"type":"text","data":"Sequence"}
+{"type":"text","data":" rejects"}
+{"type":"text","data":"."}
+{"type":"text","data":" issue"}
+{"type":"text","data":"Local"}
+{"type":"text","data":" writes"}
+{"type":"text","data":" publish"}
+{"type":"text","data":"State"}
+{"type":"text","data":" pending"}
+{"type":"text","data":" before"}
+{"type":"text","data":" graph"}
+{"type":"text","data":" admission"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"571"}
+{"type":"text","data":"0"}
+{"type":"text","data":"-"}
+{"type":"text","data":"578"}
+{"type":"text","data":"3"}
+{"type":"text","data":");"}
+{"type":"text","data":" compare"}
+{"type":"text","data":"And"}
+{"type":"text","data":"Mark"}
+{"type":"text","data":"Out"}
+{"type":"text","data":"box"}
+{"type":"text","data":"Published"}
+{"type":"text","data":" runs"}
+{"type":"text","data":" later"}
+{"type":"text","data":" in"}
+{"type":"text","data":" publish"}
+{"type":"text","data":"Pending"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"625"}
+{"type":"text","data":"8"}
+{"type":"text","data":"-"}
+{"type":"text","data":"626"}
+{"type":"text","data":"7"}
+{"type":"text","data":");"}
+{"type":"text","data":" enqueue"}
+{"type":"text","data":"Pending"}
+{"type":"text","data":"Publication"}
+{"type":"text","data":" still"}
+{"type":"text","data":" drains"}
+{"type":"text","data":" out"}
+{"type":"text","data":"box"}
+{"type":"text","data":" after"}
+{"type":"text","data":" terminal"}
+{"type":"text","data":"State"}
+{"type":"text","data":"==="}
+{"type":"text","data":"terminal"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"631"}
+{"type":"text","data":"0"}
+{"type":"text","data":"-"}
+{"type":"text","data":"631"}
+{"type":"text","data":"8"}
+{"type":"text","data":")."}
+{"type":"text","data":" blueprint"}
+{"type":"text","data":"Closing"}
+{"type":"text","data":" free"}
+{"type":"text","data":"zes"}
+{"type":"text","data":" new"}
+{"type":"text","data":" issue"}
+{"type":"text","data":" at"}
+{"type":"text","data":" snapshot"}
+{"type":"text","data":" start"}
+{"type":"text","data":","}
+{"type":"text","data":" so"}
+{"type":"text","data":" already"}
+{"type":"text","data":"-"}
+{"type":"text","data":"pending"}
+{"type":"text","data":" graph"}
+{"type":"text","data":" members"}
+{"type":"text","data":" remain"}
+{"type":"text","data":" pending"}
+{"type":"text","data":" through"}
+{"type":"text","data":" mint"}
+{"type":"text","data":" ("}
+{"type":"text","data":"before"}
+{"type":"text","data":" terminal"}
+{"type":"text","data":"ize"}
+{"type":"text","data":")."}
+{"type":"text","data":" For"}
+{"type":"text","data":"cing"}
+{"type":"text","data":" through"}
+{"type":"text","data":"="}
+{"type":"text","data":"next"}
+{"type":"text","data":"-"}
+{"type":"text","data":"1"}
+{"type":"text","data":" then"}
+{"type":"text","data":" refusing"}
+{"type":"text","data":" on"}
+{"type":"text","data":" pending"}
+{"type":"text","data":" would"}
+{"type":"text","data":" block"}
+{"type":"text","data":" ordinary"}
+{"type":"text","data":" close"}
+{"type":"text","data":" and"}
+{"type":"text","data":" leave"}
+{"type":"text","data":" the"}
+{"type":"text","data":" "}
+{"type":"text","data":"957"}
+{"type":"text","data":"49"}
+{"type":"text","data":"-"}
+{"type":"text","data":"957"}
+{"type":"text","data":"50"}
+{"type":"text","data":" above"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bound"}
+{"type":"text","data":" pending"}
+{"type":"text","data":"/"}
+{"type":"text","data":"offline"}
+{"type":"text","data":"/"}
+{"type":"text","data":"rebase"}
+{"type":"text","data":" path"}
+{"type":"text","data":" unreachable"}
+{"type":"text","data":"."}
+{"type":"text","data":" Naive"}
+{"type":"text","data":" iteration"}
+{"type":"text","data":" to"}
+{"type":"text","data":" exhausted"}
+{"type":"text","data":" next"}
+{"type":"text","data":"==="}
+{"type":"text","data":"MAX"}
+{"type":"text","data":"_"}
+{"type":"text","data":"SAFE"}
+{"type":"text","data":"_"}
+{"type":"text","data":"INTEGER"}
+{"type":"text","data":" is"}
+{"type":"text","data":" also"}
+{"type":"text","data":" unbounded"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"required"}
+{"type":"text","data":"_"}
+{"type":"text","data":"action"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Replace"}
+{"type":"text","data":" the"}
+{"type":"text","data":" arithmetic"}
+{"type":"text","data":" rule"}
+{"type":"text","data":" with"}
+{"type":"text","data":" a"}
+{"type":"text","data":" p"}
+{"type":"text","data":"aged"}
+{"type":"text","data":" issued"}
+{"type":"text","data":"/"}
+{"type":"text","data":"out"}
+{"type":"text","data":"box"}
+{"type":"text","data":" scan"}
+{"type":"text","data":" of"}
+{"type":"text","data":" the"}
+{"type":"text","data":" un"}
+{"type":"text","data":"retired"}
+{"type":"text","data":" delta"}
+{"type":"text","data":"."}
+{"type":"text","data":" The"}
+{"type":"text","data":" inclusive"}
+{"type":"text","data":" bound"}
+{"type":"text","data":" is"}
+{"type":"text","data":" the"}
+{"type":"text","data":" longest"}
+{"type":"text","data":" dense"}
+{"type":"text","data":" prefix"}
+{"type":"text","data":" strictly"}
+{"type":"text","data":" above"}
+{"type":"text","data":" the"}
+{"type":"text","data":" prior"}
+{"type":"text","data":" bound"}
+{"type":"text","data":" ("}
+{"type":"text","data":"null"}
+{"type":"text","data":" at"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"→"}
+{"type":"text","data":"1"}
+{"type":"text","data":")"}
+{"type":"text","data":" where"}
+{"type":"text","data":" each"}
+{"type":"text","data":" address"}
+{"type":"text","data":" has"}
+{"type":"text","data":" issued"}
+{"type":"text","data":"/"}
+{"type":"text","data":"out"}
+{"type":"text","data":"box"}
+{"type":"text","data":" byte"}
+{"type":"text","data":" equality"}
+{"type":"text","data":","}
+{"type":"text","data":" a"}
+{"type":"text","data":" canonical"}
+{"type":"text","data":" vertex"}
+{"type":"text","data":","}
+{"type":"text","data":" valid"}
+{"type":"text","data":" author"}
+{"type":"text","data":" signature"}
+{"type":"text","data":","}
+{"type":"text","data":" current"}
+{"type":"text","data":" room"}
+{"type":"text","data":"/"}
+{"type":"text","data":"anchor"}
+{"type":"text","data":"/"}
+{"type":"text","data":"epoch"}
+{"type":"text","data":","}
+{"type":"text","data":" out"}
+{"type":"text","data":"box"}
+{"type":"text","data":" published"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" membership"}
+{"type":"text","data":" in"}
+{"type":"text","data":" the"}
+{"type":"text","data":" captured"}
+{"type":"text","data":" close"}
+{"type":"text","data":" graph"}
+{"type":"text","data":" and"}
+{"type":"text","data":" sealed"}
+{"type":"text","data":" durable"}
+{"type":"text","data":" replay"}
+{"type":"text","data":"."}
+{"type":"text","data":" A"}
+{"type":"text","data":" pending"}
+{"type":"text","data":","}
+{"type":"text","data":" unpublished"}
+{"type":"text","data":","}
+{"type":"text","data":" non"}
+{"type":"text","data":"-"}
+{"type":"text","data":"current"}
+{"type":"text","data":","}
+{"type":"text","data":" or"}
+{"type":"text","data":" non"}
+{"type":"text","data":"-"}
+{"type":"text","data":"member"}
+{"type":"text","data":" suffix"}
+{"type":"text","data":" is"}
+{"type":"text","data":" omitted"}
+{"type":"text","data":" from"}
+{"type":"text","data":" the"}
+{"type":"text","data":" bound"}
+{"type":"text","data":" and"}
+{"type":"text","data":" does"}
+{"type":"text","data":" not"}
+{"type":"text","data":" refuse"}
+{"type":"text","data":" the"}
+{"type":"text","data":" checkpoint"}
+{"type":"text","data":";"}
+{"type":"text","data":" those"}
+{"type":"text","data":" addresses"}
+{"type":"text","data":" stay"}
+{"type":"text","data":" above"}
+{"type":"text","data":" the"}
+{"type":"text","data":" bound"}
+{"type":"text","data":" for"}
+{"type":"text","data":" existing"}
+{"type":"text","data":" pending"}
+{"type":"text","data":"/"}
+{"type":"text","data":"offline"}
+{"type":"text","data":"/"}
+{"type":"text","data":"rebase"}
+{"type":"text","data":" custody"}
+{"type":"text","data":"."}
+{"type":"text","data":" H"}
+{"type":"text","data":"oles"}
+{"type":"text","data":","}
+{"type":"text","data":" duplicates"}
+{"type":"text","data":","}
+{"type":"text","data":" substitutions"}
+{"type":"text","data":","}
+{"type":"text","data":" or"}
+{"type":"text","data":" g"}
+{"type":"text","data":"apped"}
+{"type":"text","data":" issued"}
+{"type":"text","data":" bytes"}
+{"type":"text","data":" inside"}
+{"type":"text","data":" the"}
+{"type":"text","data":" claimed"}
+{"type":"text","data":" prefix"}
+{"type":"text","data":" still"}
+{"type":"text","data":" refuse"}
+{"type":"text","data":" signing"}
+{"type":"text","data":"."}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"→"}
+{"type":"text","data":"1"}
+{"type":"text","data":" fails"}
+{"type":"text","data":" closed"}
+{"type":"text","data":" unless"}
+{"type":"text","data":" published"}
+{"type":"text","data":" sequence"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":" exists"}
+{"type":"text","data":" ("}
+{"type":"text","data":"through"}
+{"type":"text","data":"="}
+{"type":"text","data":"0"}
+{"type":"text","data":")."}
+{"type":"text","data":" Later"}
+{"type":"text","data":" empty"}
+{"type":"text","data":" published"}
+{"type":"text","data":" deltas"}
+{"type":"text","data":" carry"}
+{"type":"text","data":" the"}
+{"type":"text","data":" prior"}
+{"type":"text","data":" inclusive"}
+{"type":"text","data":" sequence"}
+{"type":"text","data":" and"}
+{"type":"text","data":" re"}
+{"type":"text","data":"bind"}
+{"type":"text","data":" successor"}
+{"type":"text","data":" heads"}
+{"type":"text","data":"/"}
+{"type":"text","data":"line"}
+{"type":"text","data":"age"}
+{"type":"text","data":"."}
+{"type":"text","data":" Do"}
+{"type":"text","data":" not"}
+{"type":"text","data":" loop"}
+{"type":"text","data":" to"}
+{"type":"text","data":" MAX"}
+{"type":"text","data":"_"}
+{"type":"text","data":"SAFE"}
+{"type":"text","data":"_"}
+{"type":"text","data":"INTEGER"}
+{"type":"text","data":".\""}
+{"type":"text","data":"},"}
+{"type":"text","data":"{\""}
+{"type":"text","data":"severity"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"P"}
+{"type":"text","data":"2"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"title"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Op"}
+{"type":"text","data":"ener"}
+{"type":"text","data":" must"}
+{"type":"text","data":" map"}
+{"type":"text","data":" record"}
+{"type":"text","data":" successor"}
+{"type":"text","data":" to"}
+{"type":"text","data":" the"}
+{"type":"text","data":" live"}
+{"type":"text","data":" floor"}
+{"type":"text","data":","}
+{"type":"text","data":" not"}
+{"type":"text","data":" record"}
+{"type":"text","data":" current"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"path"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"docs"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"-"}
+{"type":"text","data":"td"}
+{"type":"text","data":"d"}
+{"type":"text","data":"-"}
+{"type":"text","data":"plan"}
+{"type":"text","data":"-"}
+{"type":"text","data":"v"}
+{"type":"text","data":"2"}
+{"type":"text","data":".md"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"line"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"957"}
+{"type":"text","data":"39"}
+{"type":"text","data":",\""}
+{"type":"text","data":"evidence"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"The"}
+{"type":"text","data":" record"}
+{"type":"text","data":" is"}
+{"type":"text","data":" minted"}
+{"type":"text","data":" at"}
+{"type":"text","data":" close"}
+{"type":"text","data":" of"}
+{"type":"text","data":" N"}
+{"type":"text","data":" with"}
+{"type":"text","data":" current"}
+{"type":"text","data":"="}
+{"type":"text","data":"N"}
+{"type":"text","data":" and"}
+{"type":"text","data":" successor"}
+{"type":"text","data":"="}
+{"type":"text","data":"N"}
+{"type":"text","data":"+"}
+{"type":"text","data":"1"}
+{"type":"text","data":" and"}
+{"type":"text","data":" stored"}
+{"type":"text","data":" in"}
+{"type":"text","data":" the"}
+{"type":"text","data":" successor"}
+{"type":"text","data":" A"}
+{"type":"text","data":"HE"}
+{"type":"text","data":" generation"}
+{"type":"text","data":"."}
+{"type":"text","data":" After"}
+{"type":"text","data":" adoption"}
+{"type":"text","data":" the"}
+{"type":"text","data":" authenticated"}
+{"type":"text","data":" room"}
+{"type":"text","data":" floor"}
+{"type":"text","data":" current"}
+{"type":"text","data":" is"}
+{"type":"text","data":" N"}
+{"type":"text","data":"+"}
+{"type":"text","data":"1"}
+{"type":"text","data":"."}
+{"type":"text","data":" Reading"}
+{"type":"text","data":" “"}
+{"type":"text","data":"exact"}
+{"type":"text","data":" current"}
+{"type":"text","data":"/"}
+{"type":"text","data":"successor"}
+{"type":"text","data":" heads"}
+{"type":"text","data":"”"}
+{"type":"text","data":" as"}
+{"type":"text","data":" checkpoint"}
+{"type":"text","data":"."}
+{"type":"text","data":"current"}
+{"type":"text","data":"Epoch"}
+{"type":"text","data":"==="}
+{"type":"text","data":"floor"}
+{"type":"text","data":"."}
+{"type":"text","data":"epoch"}
+{"type":"text","data":" would"}
+{"type":"text","data":" reject"}
+{"type":"text","data":" every"}
+{"type":"text","data":" legitimate"}
+{"type":"text","data":" reopen"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"required"}
+{"type":"text","data":"_"}
+{"type":"text","data":"action"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Freeze"}
+{"type":"text","data":" opener"}
+{"type":"text","data":" equality"}
+{"type":"text","data":":"}
+{"type":"text","data":" successor"}
+{"type":"text","data":"Epoch"}
+{"type":"text","data":"/"}
+{"type":"text","data":"anchor"}
+{"type":"text","data":" bind"}
+{"type":"text","data":" the"}
+{"type":"text","data":" independently"}
+{"type":"text","data":" authenticated"}
+{"type":"text","data":" current"}
+{"type":"text","data":" room"}
+{"type":"text","data":" head"}
+{"type":"text","data":"/"}
+{"type":"text","data":"trust"}
+{"type":"text","data":";"}
+{"type":"text","data":" closed"}
+{"type":"text","data":"/"}
+{"type":"text","data":"current"}
+{"type":"text","data":" epoch"}
+{"type":"text","data":"/"}
+{"type":"text","data":"anchor"}
+{"type":"text","data":" bind"}
+{"type":"text","data":" the"}
+{"type":"text","data":" retained"}
+{"type":"text","data":" immediate"}
+{"type":"text","data":" predecessor"}
+{"type":"text","data":" ("}
+{"type":"text","data":"genesis"}
+{"type":"text","data":" at"}
+{"type":"text","data":" epoch"}
+{"type":"text","data":" "}
+{"type":"text","data":"1"}
+{"type":"text","data":")."}
+{"type":"text","data":" Disposition"}
+{"type":"text","data":" in"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" opener"}
+{"type":"text","data":" tests"}
+{"type":"text","data":";"}
+{"type":"text","data":" no"}
+{"type":"text","data":" extra"}
+{"type":"text","data":" confirmation"}
+{"type":"text","data":" round"}
+{"type":"text","data":".\""}
+{"type":"text","data":"},"}
+{"type":"text","data":"{\""}
+{"type":"text","data":"severity"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"P"}
+{"type":"text","data":"2"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"title"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Classifier"}
+{"type":"text","data":" must"}
+{"type":"text","data":" wrap"}
+{"type":"text","data":" exact"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"→"}
+{"type":"text","data":"1"}
+{"type":"text","data":"/+"}
+{"type":"text","data":"N"}
+{"type":"text","data":" predicates"}
+{"type":"text","data":","}
+{"type":"text","data":" not"}
+{"type":"text","data":" loosen"}
+{"type":"text","data":" them"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"path"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"docs"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"-"}
+{"type":"text","data":"td"}
+{"type":"text","data":"d"}
+{"type":"text","data":"-"}
+{"type":"text","data":"plan"}
+{"type":"text","data":"-"}
+{"type":"text","data":"v"}
+{"type":"text","data":"2"}
+{"type":"text","data":".md"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"line"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"958"}
+{"type":"text","data":"08"}
+{"type":"text","data":",\""}
+{"type":"text","data":"evidence"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"inspect"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":"Advance"}
+{"type":"text","data":" exact"}
+{"type":"text","data":"Combined"}
+{"type":"text","data":"Closure"}
+{"type":"text","data":" is"}
+{"type":"text","data":" ("}
+{"type":"text","data":"current"}
+{"type":"text","data":" minus"}
+{"type":"text","data":" trust"}
+{"type":"text","data":")"}
+{"type":"text","data":" plus"}
+{"type":"text","data":" successor"}
+{"type":"text","data":" trust"}
+{"type":"text","data":" plus"}
+{"type":"text","data":" Cut"}
+{"type":"text","data":"/"}
+{"type":"text","data":"QC"}
+{"type":"text","data":" ("}
+{"type":"text","data":"creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"trust"}
+{"type":"text","data":"-"}
+{"type":"text","data":"advance"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"88"}
+{"type":"text","data":"-"}
+{"type":"text","data":"98"}
+{"type":"text","data":","}
+{"type":"text","data":"161"}
+{"type":"text","data":"-"}
+{"type":"text","data":"167"}
+{"type":"text","data":")."}
+{"type":"text","data":" inspect"}
+{"type":"text","data":"Bounded"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":"Advance"}
+{"type":"text","data":" requires"}
+{"type":"text","data":" retained"}
+{"type":"text","data":".length"}
+{"type":"text","data":"==="}
+{"type":"text","data":"current"}
+{"type":"text","data":"."}
+{"type":"text","data":"closure"}
+{"type":"text","data":".length"}
+{"type":"text","data":"-"}
+{"type":"text","data":"4"}
+{"type":"text","data":" and"}
+{"type":"text","data":" proposed"}
+{"type":"text","data":"="}
+{"type":"text","data":"retained"}
+{"type":"text","data":"+"}
+{"type":"text","data":"new"}
+{"type":"text","data":" trust"}
+{"type":"text","data":"+"}
+{"type":"text","data":"Cut"}
+{"type":"text","data":"+"}
+{"type":"text","data":"QC"}
+{"type":"text","data":" ("}
+{"type":"text","data":"creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"trust"}
+{"type":"text","data":"-"}
+{"type":"text","data":"checkpoint"}
+{"type":"text","data":"-"}
+{"type":"text","data":"advance"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"205"}
+{"type":"text","data":"-"}
+{"type":"text","data":"214"}
+{"type":"text","data":")."}
+{"type":"text","data":" inspect"}
+{"type":"text","data":"Trust"}
+{"type":"text","data":"Closure"}
+{"type":"text","data":" already"}
+{"type":"text","data":" allows"}
+{"type":"text","data":" extra"}
+{"type":"text","data":" sc"}
+{"type":"text","data":"ann"}
+{"type":"text","data":"able"}
+{"type":"text","data":" blobs"}
+{"type":"text","data":"."}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"b"}
+{"type":"text","data":"1"}
+{"type":"text","data":" asserts"}
+{"type":"text","data":" current"}
+{"type":"text","data":"Census"}
+{"type":"text","data":" length"}
+{"type":"text","data":" "}
+{"type":"text","data":"5"}
+{"type":"text","data":" and"}
+{"type":"text","data":" proposed"}
+{"type":"text","data":"Census"}
+{"type":"text","data":" length"}
+{"type":"text","data":" "}
+{"type":"text","data":"4"}
+{"type":"text","data":" ("}
+{"type":"text","data":"phase"}
+{"type":"text","data":"-"}
+{"type":"text","data":"6"}
+{"type":"text","data":"b"}
+{"type":"text","data":"-"}
+{"type":"text","data":"d"}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"b"}
+{"type":"text","data":"1"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bounded"}
+{"type":"text","data":"-"}
+{"type":"text","data":"checkpoint"}
+{"type":"text","data":"-"}
+{"type":"text","data":"red"}
+{"type":"text","data":".test"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"105"}
+{"type":"text","data":"-"}
+{"type":"text","data":"107"}
+{"type":"text","data":")."}
+{"type":"text","data":" Na"}
+{"type":"text","data":"ively"}
+{"type":"text","data":" allowing"}
+{"type":"text","data":" extra"}
+{"type":"text","data":" candidates"}
+{"type":"text","data":" would"}
+{"type":"text","data":" weaken"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"→"}
+{"type":"text","data":"1"}
+{"type":"text","data":" exact"}
+{"type":"text","data":"ness"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"required"}
+{"type":"text","data":"_"}
+{"type":"text","data":"action"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Implement"}
+{"type":"text","data":" exact"}
+{"type":"text","data":"-"}
+{"type":"text","data":"one"}
+{"type":"text","data":" law"}
+{"type":"text","data":" only"}
+{"type":"text","data":" in"}
+{"type":"text","data":" inspect"}
+{"type":"text","data":"Creator"}
+{"type":"text","data":"Transition"}
+{"type":"text","data":"Advance"}
+{"type":"text","data":":"}
+{"type":"text","data":" strip"}
+{"type":"text","data":"/"}
+{"type":"text","data":"verify"}
+{"type":"text","data":" the"}
+{"type":"text","data":" one"}
+{"type":"text","data":" dr"}
+{"type":"text","data":"p"}
+{"type":"text","data":"-"}
+{"type":"text","data":"creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"issu"}
+{"type":"text","data":"ance"}
+{"type":"text","data":"-"}
+{"type":"text","data":"retirement"}
+{"type":"text","data":"-"}
+{"type":"text","data":"state"}
+{"type":"text","data":" candidate"}
+{"type":"text","data":","}
+{"type":"text","data":" then"}
+{"type":"text","data":" reuse"}
+{"type":"text","data":" the"}
+{"type":"text","data":" existing"}
+{"type":"text","data":" inner"}
+{"type":"text","data":" predicates"}
+{"type":"text","data":"."}
+{"type":"text","data":" Epoch"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":" is"}
+{"type":"text","data":" additive"}
+{"type":"text","data":";"}
+{"type":"text","data":" N"}
+{"type":"text","data":"≥"}
+{"type":"text","data":"1"}
+{"type":"text","data":" replaces"}
+{"type":"text","data":" the"}
+{"type":"text","data":" prior"}
+{"type":"text","data":" candidate"}
+{"type":"text","data":";"}
+{"type":"text","data":" unknown"}
+{"type":"text","data":" extra"}
+{"type":"text","data":" kinds"}
+{"type":"text","data":" stay"}
+{"type":"text","data":" TRUST"}
+{"type":"text","data":"_"}
+{"type":"text","data":"CLOSURE"}
+{"type":"text","data":"_"}
+{"type":"text","data":"INVALID"}
+{"type":"text","data":"."}
+{"type":"text","data":" Ret"}
+{"type":"text","data":"ained"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"b"}
+{"type":"text","data":"1"}
+{"type":"text","data":"/"}
+{"type":"text","data":"Phase"}
+{"type":"text","data":"-"}
+{"type":"text","data":"6"}
+{"type":"text","data":"a"}
+{"type":"text","data":" cens"}
+{"type":"text","data":"uses"}
+{"type":"text","data":" may"}
+{"type":"text","data":" grow"}
+{"type":"text","data":" by"}
+{"type":"text","data":" exactly"}
+{"type":"text","data":" that"}
+{"type":"text","data":" one"}
+{"type":"text","data":" kind"}
+{"type":"text","data":"."}
+{"type":"text","data":" Disposition"}
+{"type":"text","data":" in"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":";"}
+{"type":"text","data":" no"}
+{"type":"text","data":" confirmation"}
+{"type":"text","data":" round"}
+{"type":"text","data":".\""}
+{"type":"text","data":"},"}
+{"type":"text","data":"{\""}
+{"type":"text","data":"severity"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"P"}
+{"type":"text","data":"2"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"title"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Freeze"}
+{"type":"text","data":" the"}
+{"type":"text","data":" genesis"}
+{"type":"text","data":" prior"}
+{"type":"text","data":"-"}
+{"type":"text","data":"digest"}
+{"type":"text","data":" sentinel"}
+{"type":"text","data":" and"}
+{"type":"text","data":" sc"}
+{"type":"text","data":"ann"}
+{"type":"text","data":"able"}
+{"type":"text","data":"-"}
+{"type":"text","data":"size"}
+{"type":"text","data":" proof"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"path"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"docs"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"/"}
+{"type":"text","data":"production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"hardening"}
+{"type":"text","data":"-"}
+{"type":"text","data":"td"}
+{"type":"text","data":"d"}
+{"type":"text","data":"-"}
+{"type":"text","data":"plan"}
+{"type":"text","data":"-"}
+{"type":"text","data":"v"}
+{"type":"text","data":"2"}
+{"type":"text","data":".md"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"line"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"957"}
+{"type":"text","data":"08"}
+{"type":"text","data":",\""}
+{"type":"text","data":"evidence"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Prior"}
+{"type":"text","data":" digest"}
+{"type":"text","data":" is"}
+{"type":"text","data":" “"}
+{"type":"text","data":"the"}
+{"type":"text","data":" frozen"}
+{"type":"text","data":" genesis"}
+{"type":"text","data":" sentinel"}
+{"type":"text","data":"”"}
+{"type":"text","data":" with"}
+{"type":"text","data":" no"}
+{"type":"text","data":" constant"}
+{"type":"text","data":"."}
+{"type":"text","data":" Candidates"}
+{"type":"text","data":" with"}
+{"type":"text","data":" byte"}
+{"type":"text","data":"Length"}
+{"type":"text","data":">"}
+{"type":"text","data":"819"}
+{"type":"text","data":"2"}
+{"type":"text","data":" are"}
+{"type":"text","data":" dropped"}
+{"type":"text","data":" from"}
+{"type":"text","data":" sc"}
+{"type":"text","data":"ann"}
+{"type":"text","data":"able"}
+{"type":"text","data":" closure"}
+{"type":"text","data":" ("}
+{"type":"text","data":"anchor"}
+{"type":"text","data":"-"}
+{"type":"text","data":"trust"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"23"}
+{"type":"text","data":","}
+{"type":"text","data":"391"}
+{"type":"text","data":";"}
+{"type":"text","data":" creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"close"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"45"}
+{"type":"text","data":","}
+{"type":"text","data":"585"}
+{"type":"text","data":")."}
+{"type":"text","data":" The"}
+{"type":"text","data":" listed"}
+{"type":"text","data":" fields"}
+{"type":"text","data":" fit"}
+{"type":"text","data":","}
+{"type":"text","data":" but"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" must"}
+{"type":"text","data":" prove"}
+{"type":"text","data":" it"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"required"}
+{"type":"text","data":"_"}
+{"type":"text","data":"action"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Name"}
+{"type":"text","data":" one"}
+{"type":"text","data":" domain"}
+{"type":"text","data":"-"}
+{"type":"text","data":"separated"}
+{"type":"text","data":" sentinel"}
+{"type":"text","data":" constant"}
+{"type":"text","data":" and"}
+{"type":"text","data":" assert"}
+{"type":"text","data":" the"}
+{"type":"text","data":" canonical"}
+{"type":"text","data":" signed"}
+{"type":"text","data":" record"}
+{"type":"text","data":" is"}
+{"type":"text","data":" always"}
+{"type":"text","data":" ≤"}
+{"type":"text","data":"819"}
+{"type":"text","data":"2"}
+{"type":"text","data":" bytes"}
+{"type":"text","data":" in"}
+{"type":"text","data":" the"}
+{"type":"text","data":" census"}
+{"type":"text","data":" gate"}
+{"type":"text","data":"."}
+{"type":"text","data":" Book"}
+{"type":"text","data":"keeping"}
+{"type":"text","data":" only"}
+{"type":"text","data":".\""}
+{"type":"text","data":"}],"}
+{"type":"text","data":"\""}
+{"type":"text","data":"audit"}
+{"type":"text","data":"_"}
+{"type":"text","data":"correct"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"authority"}
+{"type":"text","data":"_"}
+{"type":"text","data":"design"}
+{"type":"text","data":"_"}
+{"type":"text","data":"sufficient"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"red"}
+{"type":"text","data":"_"}
+{"type":"text","data":"causal"}
+{"type":"text","data":"_"}
+{"type":"text","data":"and"}
+{"type":"text","data":"_"}
+{"type":"text","data":"feasible"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"scope"}
+{"type":"text","data":"_"}
+{"type":"text","data":"preserved"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"blocking"}
+{"type":"text","data":"_"}
+{"type":"text","data":"union"}
+{"type":"text","data":"_"}
+{"type":"text","data":"closed"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"false"}
+{"type":"text","data":",\""}
+{"type":"text","data":"next"}
+{"type":"text","data":"_"}
+{"type":"text","data":"state"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"D"}
+{"type":"text","data":"110"}
+{"type":"text","data":"C"}
+{"type":"text","data":"_"}
+{"type":"text","data":"0"}
+{"type":"text","data":"C"}
+{"type":"text","data":"1"}
+{"type":"text","data":"A"}
+{"type":"text","data":"_"}
+{"type":"text","data":"PLAN"}
+{"type":"text","data":"_"}
+{"type":"text","data":"COR"}
+{"type":"text","data":"RE"}
+{"type":"text","data":"CTION"}
+{"type":"text","data":"_"}
+{"type":"text","data":"REQUIRED"}
+{"type":"text","data":"\"}"}
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool","codex__codex","codex__codex-reply","railway__whoami","railway__list-workspaces","railway__list-projects","railway__create-project","railway__create-deployment","railway__create-service","railway__update-service","railway__list-services","railway__get-service-config","railway__get-service-metrics","railway__list-variables","railway__set-variables","railway__create-volume","railway__update-volume","railway__delete-volume","railway__create-bucket","railway__delete-bucket","railway__list-domains","railway__domain-status","railway__generate-domain","railway__search-docs","railway__fetch-docs","railway__list-feature-flags","railway__get-feature-flag","railway__set-feature-flag","railway__delete-feature-flag","railway__list-deployments","railway__get-status","railway__get-logs","railway__http-requests","railway__http-error-rate","railway__http-response-time","railway__redeploy","railway__restart-service","railway__get-deployment-diagnosis","railway__environment-status","railway__list-tcp-proxies","railway__create-tcp-proxy","railway__delete-tcp-proxy","railway__connect-service-source","railway__accept-deploy","railway__railway-agent","react-grab-mcp__get_element_context"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"usage","usage":{"input_tokens":2936,"output_tokens":1532,"cache_read_input_tokens":197248,"cache_creation_input_tokens":0,"reasoning_tokens":125},"signature":"Ayfm4CODMs5RBvPfmiPwyT23Le9Sl6C0Yv1nC4rjMVUdGh1gVEIY/KM39ybIa0fVBr4Tmh5Dy2mzKtTu17WcsJmXZI62NuAEluCvvLAXpUplsFl1+ME2PkK+xOPAhk7COvwYqHReJIzCkERjmqSG/OD19ZlvqYXkFS3qFALfqfVSHWc0IMBbWLLXO8yGB8N4QWb1zEy3tOYhjfnMQ1epSDDWzRTnfCEhoGuLqYWudmigseOyy7ASOaG8pfDehCAd4kQXUFDit8uhfWiOs7pINp+L51LfFcHaY/ix6jYCcc7x7vel75KP/BIDxjgHBYmlrKrKaNmNf46ht3SnGHkX1uTGW+tJcYnwWBVDEz3BMU7CrRPakqIZxE981DM4zg7ZLPzL67/qjiPVemYkQIGCB6i48rv6HXukIzC7p4PfKJb0eG3ZCxQI/7WCmPjbdHtDvTDJWUGr0hyjSzIUqKJX195PdmHeudWgKyTkoWSjq3Pli55q+IfNa7aMnaoWd/j0jWsrzVjv0izsfm7WZiwT/ZVS593MSxfe2y7y0XsYxpSfD1u+gL8UZmrExX4OcxGGfyh9w/jxwgTcCORjMquBAkGfcygNkum8BNv0Giv6ySaCT60bF/PiMz06t/9uXBBH2e/7aBor4Qv99bS2lyZ1fwVmmJsUyiUmxvi3pWXvorw85k4SfsdmotCIwk7upN9tMPUwhPF/enakvVAP6ntNp/Ufm1f3df0dEd1Zp+tbT1ulnllEbchAFCILUVVE2e9JAJyjDgee32OXBZB7"}
+{"type":"end","stopReason":"end_turn","sessionId":"01a0649a-9cee-7dd1-8241-41f673464078","requestId":"6c0d7143-f4e5-4dd5-85fd-c698f8ee16e4","usage":{"input_tokens":13829,"cache_read_input_tokens":383616,"cache_creation_input_tokens":0,"output_tokens":3593,"reasoning_tokens":2083,"total_tokens":401038},"num_turns":2,"total_cost_usd":0.06030104,"total_cost_usd_ticks":603010400,"modelUsage":{"grok-4.6-build":{"inputTokens":13829,"outputTokens":3593,"cacheReadInputTokens":383616,"cacheCreationInputTokens":0,"modelCalls":2,"costUSD":0.06030104}}}

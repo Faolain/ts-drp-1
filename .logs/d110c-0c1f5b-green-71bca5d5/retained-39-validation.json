@@ -1,0 +1,175 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-39/result.json",
+  "baselineSha256": "0bf65a884228fa3d71884f0175c5c672c3ee00e7bbd2ad471b39a8b11ec6b865",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract freezes the exact six methods, fifteen failures, three domains and closed input keys",
+      "status": "passed",
+      "title": "freezes the exact six methods, fifteen failures, three domains and closed input keys",
+      "duration": 2.037625000000048,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract executes every registry-v1 anchor, parameters and received-vertex constraint adversarially",
+      "status": "passed",
+      "title": "executes every registry-v1 anchor, parameters and received-vertex constraint adversarially",
+      "duration": 638.84175,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract pins the complete deterministic local duplicate/conflict precedence matrix",
+      "status": "passed",
+      "title": "pins the complete deterministic local duplicate/conflict precedence matrix",
+      "duration": 0.5005419999999958,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract compile-pins the public package and both exact adapter subpaths",
+      "status": "passed",
+      "title": "compile-pins the public package and both exact adapter subpaths",
+      "duration": 1324.57925,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract installs exact creator genesis and exposes only one frozen six-method capability",
+      "status": "passed",
+      "title": "installs exact creator genesis and exposes only one frozen six-method capability",
+      "duration": 5.755707999999686,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract retains the first received/local label and allocates no duplicate sequence",
+      "status": "passed",
+      "title": "retains the first received/local label and allocates no duplicate sequence",
+      "duration": 6.013707999999951,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract derives a durable-prefix token and keeps later appends invisible to capped pages",
+      "status": "passed",
+      "title": "derives a durable-prefix token and keeps later appends invisible to capped pages",
+      "duration": 6.948750000000018,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract copies retained evidence before the first await and returns fresh detached typed-array leaves",
+      "status": "passed",
+      "title": "copies retained evidence before the first await and returns fresh detached typed-array leaves",
+      "duration": 9.84512500000028,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract rejects hostile records and shared byte backing without dispatching accessors",
+      "status": "passed",
+      "title": "rejects hostile records and shared byte backing without dispatching accessors",
+      "duration": 6.388042000000041,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract requires exact plain page inputs and freezes scope precedence before received semantics",
+      "status": "passed",
+      "title": "requires exact plain page inputs and freezes scope precedence before received semantics",
+      "duration": 16.43220799999972,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract freezes wrong-scope, digest/evidence conflict and post-close precedence without allocating rows",
+      "status": "passed",
+      "title": "freezes wrong-scope, digest/evidence conflict and post-close precedence without allocating rows",
+      "duration": 9.647874999999658,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "ancestorTitles": [
+        "D.93.34 p4-a frozen shared contract"
+      ],
+      "fullName": "D.93.34 p4-a frozen shared contract freezes distinct Node and Browser durability matrices without borrowing either claim",
+      "status": "passed",
+      "title": "freezes distinct Node and Browser durability matrices without borrowing either claim",
+      "duration": 0.41237500000033833,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "6e0f3bff58a8f0b46ad5517cb05aac2268274fa2100b2ddb1b9afec1806c307d",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

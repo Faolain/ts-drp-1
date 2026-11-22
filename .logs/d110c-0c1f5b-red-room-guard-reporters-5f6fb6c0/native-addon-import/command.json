@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout",
+  "command": "node",
+  "args": [
+    "-e",
+    "const addon=require(process.argv[1]);if(typeof addon.PeerConnection!==\"function\")throw Error(\"Native addon missing\");console.log(JSON.stringify({peerConnection:true,node:process.version}));",
+    "/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout/node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/build/Release/node_datachannel.node"
+  ],
+  "start": "2026-09-06T02:53:58.996Z"
+}

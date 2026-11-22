@@ -1,0 +1,45 @@
+{
+  "run": "active-continued-play-common-06",
+  "configuration": {
+    "kind": "configuration",
+    "sourceHead": "296cedf7c4ff068b47273630b768d62c5e5e1084",
+    "sourceDiffSha256": "539027aa69ed10ab5d27cec6fd179e016206958e70409b154b27e935c39532b5",
+    "load": [
+      139.5390625,
+      125.609375,
+      123.19091796875
+    ],
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+    "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+    "tickIntervalMs": 10,
+    "successor": "signed native export over scripted chunk/material transport",
+    "epochs": 3,
+    "cpuProfiles": false
+  },
+  "terminalExitCode": 0,
+  "testPassed": true,
+  "sourcePatchSha256": "539027aa69ed10ab5d27cec6fd179e016206958e70409b154b27e935c39532b5",
+  "responsiveness": "RED: unprofiled seal/adopt have substantial own CPU and zero timer callbacks, no ephemeral receipts throughout transitions",
+  "sourcePatchCommittedAs": "0b62f984",
+  "limits": [
+    "shared host; not isolated latency",
+    "three transitions only",
+    "controlled raw datagrams, no real WebRTC or FPS"
+  ],
+  "filesSha256": {
+    "continued-play.jsonl.gz": "3c74f50ced2f0105bddf7b0928101b6e670209d2a664534201aa4e8f6dc077f3",
+    "samples.json.gz": "fa95929292ae245dd32429fc51a442cbcf454d8d984ef09feda6f85401b5a42d",
+    "source.diff.gz": "ea6764dbef3c77746b7b853b34101bc94069bd2d761290701c2781ed6e8c2810",
+    "summary.json": "0313efa93403edbcf658564a1dcded9736e2911b0986986633afbe5ae0b26337",
+    "test.log.gz": "9e1acce4d164364107dfb61c2c0443f037e25521373c035dcdbff8aa4acbf777"
+  },
+  "hardware": {
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "node": "v22.23.4",
+    "platform": "darwin",
+    "arch": "arm64"
+  }
+}

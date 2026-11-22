@@ -1,0 +1,49 @@
+{
+  "valid": true,
+  "selectedActivePass": 18,
+  "fullReporterTotal": 20,
+  "failed": 0,
+  "skipped": [
+    {
+      "ancestorTitles": [
+        "D.93.34 p4-b genuine Node SIGKILL roster"
+      ],
+      "fullName": "D.93.34 p4-b genuine Node SIGKILL roster kills every install/received/local edge before authority can escape",
+      "status": "skipped",
+      "title": "kills every install/received/local edge before authority can escape",
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.93.34 p4-b genuine Node SIGKILL roster"
+      ],
+      "fullName": "D.93.34 p4-b genuine Node SIGKILL roster kills five no-write repeat/race paths and reopens the byte-identical durable closure",
+      "status": "skipped",
+      "title": "kills five no-write repeat/race paths and reopens the byte-identical durable closure",
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "activeNames": [
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > classifies exact quoted and qualified SQLite journal tables without writer/readback conflation",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > classifies the bounded exact-old/new/mixed/unreadable readback seam without leaking authority",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > does not poison when a second facade legally commits a distinct row between target commit and readback",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > executes the full duplicate/local-reference/cross-kind precedence matrix against SQLite",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > falls back and poisons both received and local appends when prior corruption lands before or after target commit",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > freezes 18 genuine statement-boundary tuples and a private, production-unreachable preload",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > fully validates one reopened append, refreshes after external drift, then returns to addressed probes",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > invalidates addressed and full-fallback evidence when another facade commits between version reads",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > keeps independently validated scope watermarks when fast appends alternate",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > keeps validated monotonic append statement topology constant without accepted-row materialization",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > opens a genuine strict facade with six methods and an injective sidecar filename",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > pins the exact additive package subpath, dependency, filename and unchanged root bytes",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > reopens a nonempty WAL without deleting sidecars and observes the exact durable closure",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > round-trips the complete SQLite catalog and forbids permissive migration sediment",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > routes all four shared pure decisions through the real Node adapter build",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > serializes concurrent cross-kind writers to one immutable first label and sequence",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > uses exactly one readonly snapshot for readiness and each page and readbacks idempotent no-write paths",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts\u0000D.93.34 p4-b Node strict live-journal RED > uses only indexed addressed evidence for validated received and local monotonic appends"
+  ],
+  "disposition": "Existing optional long SIGKILL cases are intentionally disabled by unchanged environment gate. No campaign ran, no flag changed, no recollection/rerun. Exact18 frozen bounded cases pass;2skipped are separately recorded, never passes."
+}

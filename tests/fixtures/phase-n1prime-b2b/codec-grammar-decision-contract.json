@@ -1,0 +1,116 @@
+{
+	"slice": "phase-n1prime-b2b",
+	"status": "NONNORMATIVE-RED-CONTRACT",
+	"notice": "NONNORMATIVE falsification oracle. Normative authority remains the accepted grammar and the numbered v3 specification decision.",
+	"targets": {
+		"registry": "packages/protocol-v3/registry/registry-v1.json",
+		"specification": "docs/protocol/attested-hard-epochs-v5.md",
+		"amendments": "docs/protocol/amendments-v3.json",
+		"signoff": "packages/protocol-v3/formal/registry-model-signoff.json"
+	},
+	"decision": {
+		"decision": 7,
+		"id": "PH-N1P-D07",
+		"decisionType": "canonical-codec-grammar",
+		"normativeSource": "./attested-hard-epochs-v5.md#decision-v3-07",
+		"registryPaths": ["codec", "framing", "endianness"],
+		"requirements": {
+			"profile": "drp-canonical-profile-1",
+			"authoritativeGrammar": {
+				"path": "./canonical-tag-codec-v1.md",
+				"sha256": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036"
+			},
+			"machineCompanion": {
+				"path": "./canonical-tag-codec-v1.json",
+				"sha256": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e"
+			},
+			"registryValues": {
+				"codec": {
+					"id": "drp-canonical-profile-1",
+					"format": "reference-tag-codec",
+					"cbor": false,
+					"floatNegativeZero": {
+						"encode": "normalize-to-positive-zero",
+						"decode": "reject"
+					}
+				},
+				"framing": {
+					"magicHex": "44525000",
+					"domainEncoding": "utf8",
+					"domainLength": "U32BE",
+					"partLength": "U64BE",
+					"formula": "\"DRP\\0\" || U32BE(|domain|) || domain || (U64BE(|part|) || part)*"
+				},
+				"endianness": "big-endian"
+			},
+			"workedExamples": "binding-conformance-examples-never-override-production-rules"
+		},
+		"status": "normative"
+	},
+	"historicalDecisions": {
+		"idsInOrder": ["PH-N1P-D01", "PH-N1P-D02", "PH-N1P-D03", "PH-N1P-D04", "PH-N1P-D05", "PH-N1P-D06"],
+		"registryBindingSha256": [
+			"9db8e1b2143335c273db83a6fc4f48f7546f89aa5eee83c79ffd73195049982c",
+			"4b3609243122ab50840251c3f4da7ea69aaea2ed6206bd7620d10c0b61a03615",
+			"9749cd6666f154ccf0a058dc54250fdb0c23adaf7030ca796484928df7e5b71e",
+			"97b7747209b76e22e1f8c87736d1d2ccc1cd30b517344181970f4a57dac0da25",
+			"794c8ca858353fa9da99964619a213590c2ab1278d8b347e491bc6e11ed9ce72",
+			"3f055999f8b6df24e275ec34a8062124716a8a7de48486a781aa14e7bfffd06f"
+		],
+		"decisionRecordSha256": [
+			"9fe4bd7c1842de70cb1767532e6c52ec61c7962b7a801fb77986080d9eadba5c",
+			"60764abdfdfec70311aaf6e24afdf5f2aea4069e52f7d548cdef6d1a8342a355",
+			"debee0dfedf149d548caa1a5edfdc79b683582059b228d3f2e8684acbba46cc5",
+			"dc79cd376d7c11543a1f0ffc7a20cf7349f67915485fbdd9ec097a82487b08be",
+			"8134070ceb07e4981e356ae9468482adefa39ca8d45338386c802780d8f30e3e",
+			"df820f08a414f643502c1bf2c8057661c7027ecefee0aa0aeae59422c3fe9f7a"
+		]
+	},
+	"signoff": {
+		"nonHashContentSha256": "5dd441ff47ce677c443e17a1ffdfb90842e2debc09b54c5428eb1d1dcdf8c9d7",
+		"reviewedPathsInOrder": [
+			"packages/protocol-v3/registry/registry-v1.json",
+			"packages/protocol-v3/registry/registry-v1.schema.json",
+			"docs/protocol/attested-hard-epochs-v5.md",
+			"docs/protocol/amendments-v3.json",
+			"packages/protocol-v3/formal/registry-signed-envelope-variables.qnt"
+		],
+		"changedReviewedPaths": [
+			"packages/protocol-v3/registry/registry-v1.json",
+			"docs/protocol/attested-hard-epochs-v5.md",
+			"docs/protocol/amendments-v3.json"
+		],
+		"unchangedReviewedHashes": {
+			"packages/protocol-v3/registry/registry-v1.schema.json": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc",
+			"packages/protocol-v3/formal/registry-signed-envelope-variables.qnt": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13"
+		}
+	},
+	"preGreenTargetHashes": {
+		"packages/protocol-v3/registry/registry-v1.json": "7d8ecd8f7ab373018bff7200ba1c287dd3964735c8290491fa4f8a552cf22b9a",
+		"docs/protocol/attested-hard-epochs-v5.md": "ef94d314f9fb080b69051a80769326f43b412fcdaf36633f68fe3da5a1fdf085",
+		"docs/protocol/amendments-v3.json": "6cf8b6e25064227df7665aea37ca2bcfd049b570fcfe9d867172d967e39ffe44",
+		"packages/protocol-v3/formal/registry-model-signoff.json": "882b3ae23c5c65f10542dab961a154b94fc3ad55d16ebb421a974dcae83f56a4"
+	},
+	"protectedArtifacts": {
+		"tests/protocol-v3-formal-action-model-n1prime-a.test.ts": "affc5e439220e8ac6353c0795f591da3946a6aeb37d69a71a05763f229f34f6d",
+		"tests/fixtures/phase-n1prime-a/formal-action-contract.json": "474c83e7a3f130504e8dedc8ceb0843ee3413ca56c27003a354f6088b0f41dcf",
+		"packages/protocol-v3/formal/author-lineage-actions.qnt": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038",
+		"packages/protocol-v3/formal/signed-field-derivation.json": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346",
+		"tests/protocol-v3-registry-spec-n1prime-b.test.ts": "380cce1ad170422be6cab1c3ba316341b63700da2e9ef0588eed6f54897b4022",
+		"tests/fixtures/phase-n1prime-b/registry-spec-contract.json": "0f8e1d62a7eb75961addc07fcc32a6c228ca2c432a3bbafd11478c828c2fc324",
+		"packages/protocol-v3/registry/registry-v1.schema.json": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc",
+		"packages/protocol-v3/formal/registry-signed-envelope-variables.qnt": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13",
+		"tests/protocol-v3-canonical-grammar-n1prime-b2a.test.ts": "f2f25dd9ae70971ffe920c0ab653e46b15f090d8b4fe5a6ba4e9157abe4aed89",
+		"tests/fixtures/phase-n1prime-b2a/canonical-grammar-contract.json": "fd921870b36ddab56987b8bc21cc0ad9599884b43364ba45c10a9e1ba365c0cf",
+		"docs/protocol/canonical-tag-codec-v1.md": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036",
+		"docs/protocol/canonical-tag-codec-v1.json": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e",
+		"tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts": "10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2",
+		"tests/fixtures/phase-n1prime-c/reference-vector-contract.json": "1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840",
+		"packages/protocol-v2/conformance/freeze-policy.json": "e291babe6069f004a61378e9cf98a9984f3edbe0391b7674ea57a19c7db25e04",
+		"packages/protocol-v2/scripts/check-protocol-freeze.mjs": "d6900fd1a1b871a537dd7be0eefff7e3143a63f89dbe1bcedcb946273ee8f3d7",
+		"packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json": "2635989755ac300c1643f327ee7278d7aa0c72c67310b80ef56bb1eabe42b13e",
+		"packages/protocol-v2/registry/field-registry.json": "d073c5b01dc31c121de5fcd0925697a8a3f0839bf9fcf2c7ddde15489b49f724",
+		"packages/protocol-v2/conformance/reference.lock.json": "ada22a8aa8c5e190e41d5cd8de84ed288d5a0047b10ef579602c28e50f294ffd",
+		"packages/protocol-v2/conformance/reference-regen.lock.json": "511c9aff8a0144b3642f3e771ebf4c2178137fcfc90e224ba48b9d58c8a3e755"
+	}
+}

@@ -1,0 +1,15 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"types": ["node", "@playwright/test"]
+	},
+	"include": [
+		"browser-local-author-entry.ts",
+		"../../phase-3a1b-p5-local-author-browser.pw.ts",
+		"../../../playwright.phase-3a1b-p5-local-author.config.ts"
+	]
+}

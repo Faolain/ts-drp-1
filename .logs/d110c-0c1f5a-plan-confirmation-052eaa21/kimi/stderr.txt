@@ -1,0 +1,474 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+052eaa21 test: diagnose foreign frontier liveness red
+eeaaaca8 docs: split frontier liveness from settlement
+1b591cf2 test: preserve multi-author frontier evidence
+f3617a82 docs: amend rebase frontier liveness plan
+da3e7551 test: record isolated frontier recovery proof
+052eaa2151e57633485565ea5135f725e723183c
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+?? .logs/d108e4ab-campaign/
+?? .logs/d108e4ab-freeze/
+?? .logs/d108e4ab-plan-review/
+?? .logs/d108e4ac-green-review-correction/
+?? .logs/d108e4ac-green-review/
+?? .logs/d108e4ac-green/
+?? .logs/d108e4ac-plan-review/
+?? .logs/d108e4ac-red-review/
+?? .logs/d108e4ac-red/
+?? .logs/d108e4ad-campaign/
+command.txt
+diagnosis.md
+manifest.sha256
+result.json
+status.txt
+stderr.txt
+stdout.txt
+ .logs/d110c-0c1f5a-red-eeaaaca8/command.txt        |   1 +
+ .logs/d110c-0c1f5a-red-eeaaaca8/diagnosis.md       |  36 +++
+ .logs/d110c-0c1f5a-red-eeaaaca8/manifest.sha256    |   6 +
+ .logs/d110c-0c1f5a-red-eeaaaca8/result.json        |   1 +
+ .logs/d110c-0c1f5a-red-eeaaaca8/status.txt         |   1 +
+ .logs/d110c-0c1f5a-red-eeaaaca8/stderr.txt         |   2 +
+ .logs/d110c-0c1f5a-red-eeaaaca8/stdout.txt         |   1 +
+ .../production-hardening-tdd-plan-v2.md            |  90 ++++--
+ .../phase-6a-v3/creator-adoption-contract.ts       |  83 ++++--
+ .../foreign-author-close-liveness-contract.ts      | 328 +++++++++++++++++++++
+ .../phase-6b-d110c-a/repeat-close-contract.ts      |  50 +++-
+ ...0c1f5-foreign-author-close-liveness-red.test.ts |  15 +
+ 12 files changed, 554 insertions(+), 60 deletions(-)
+052eaa2151e57633485565ea5135f725e723183c 7887ad49fd1ce18a2cc04026dfa88dab07533f06 eeaaaca8d7a30a84fda321b37544d57b6cc1c1f4 test: diagnose foreign frontier liveness red
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index b8dd2e81..45ab4e17 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -98050,9 +98050,10 @@ not independently rederived by the transition closure.
+ 
+ ###### D.110c-0c1f5a foreign-author close-liveness prerequisite
+ 
+-**Status: reviewed scope frozen; tests-only RED is authorized immediately after
+-this correction is signed/pushed, but no production edit is authorized before
+-that RED is causal, recorded, signed, and pushed.** Owner:
++**Status: one authorized focused execution from signed anchor `eeaaaca8` was a
++useful but noncausal diagnostic; the corrected tests-only RED requires the one
++material plan confirmation below, and no production edit is authorized before
++that corrected RED is causal, recorded, signed, and pushed.** Owner:
+ `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
+ construction of `byAuthor`, duplicate detection, prior/null boundary checks,
+ regression checks, and per-author frontier advancement; the exact captured
+@@ -98067,9 +98068,13 @@ Phase-7 multi-author cold join.
+ F5a freezes the distinction between local corruption and a foreign-author
+ anomaly. Duplicate, regressed, missing-prefix, or noncontiguous identities for
+ the creator's own issuance scope retain the existing fail-closed close error.
+-The same shapes for another author—including an author no longer present in
+-the successor writer set—must not abort the creator's transition. For an
+-authorized successor writer, the close leaves that author's frontier exactly
++The same shapes for another author—including a currently authorized writer
++that is removed from the successor writer set by this close—must not abort the
++creator's transition. An author that was already unauthorized for current-epoch
++application writes is not an f5a treatment: the existing snapshot fold rejects
++such an application row before issuance-frontier construction, and f5a does
++not weaken that authorization boundary. For an authorized successor writer,
++the close leaves that author's frontier exactly
+ at its authenticated prior value, or null when no prior numeric boundary
+ exists; it does not advance through any anomalous row. For an author excluded
+ from the successor writer set, no frontier entry is emitted. Every other valid
+@@ -98077,19 +98082,23 @@ successor author advances under the unchanged adjacent-prefix rule. No public
+ per-author diagnostic field or alternate carrier is added.
+ 
+ The deterministic RED uses signed production vertices and the real close path,
+-not a fabricated aggregate or tests-only durable record. Its exact cases are:
+-
+-1. a genuinely offline noncreator has a null prior frontier, re-enters through
+-   ordinary rebase at first creator-observed sequence greater than one, and the
+-   next creator close currently throws the legacy-migration error;
+-2. a newly authorized/absent prior author is first observed above one and the
+-   close currently throws the author-reentry error;
+-3. a noncreator local rollback produces a current-anchor signed sequence at or
++not a fabricated aggregate or tests-only durable record. Its corrected exact
++cases are:
++
++1. a genuinely offline noncreator has a null prior frontier, resumes through
++   authenticated current-anchor ingress at first creator-observed sequence
++   greater than one, and the next creator close currently throws the
++   legacy-migration error; this f5a treatment does not claim that the existing
++   rebase protocol created or settled the gap;
++2. a noncreator local rollback produces a current-anchor signed sequence at or
+    below its numeric prior boundary and close currently throws
+    `creator issuance-frontier boundary regressed`;
+-4. two distinct admitted current-epoch vertices carry the same foreign
++3. two distinct admitted current-epoch vertices carry the same foreign
+    `(author, sequence)` and close currently throws
+    `creator issuance-frontier author slot is ambiguous`; and
++4. a currently authorized foreign writer has a duplicated current-epoch slot,
++   the same close validly removes that writer from the successor ACL, and the
++   pre-f5a duplicate scan still aborts before successor-writer filtering; and
+ 5. a no-gap two-writer control closes and opens the exact unchanged aggregate.
+ 
+ Each treatment must first assert the exact current product error and the
+@@ -98097,19 +98106,52 @@ creator's otherwise-valid transition inputs, then terminate only at
+ `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED`. Failure to reach close,
+ a different error, an invalid signature/anchor/ACL precondition, timing, or
+ transport is noncausal. RED also freezes controls proving the equivalent
+-creator-owned anomalies still fail closed and a deauthorized foreign author's
+-rows do not enter the successor vector or block close. Run the focused RED once
+-from the signed plan anchor, validate its exact complete result set, then sign
+-and push it. No separate model RED review is required; final GREEN review must
+-inspect RED causality.
++creator-owned anomalies still fail closed and a foreign writer removed by the
++current close does not enter the successor vector or block close. A row from an
++author already unauthorized in the current epoch remains an exact snapshot-fold
++refusal control. Run the corrected focused RED once from the signed amended-plan
++anchor, validate its exact complete result set, then sign and push it. No
++separate model RED review is required; final GREEN review must inspect RED
++causality.
++
++The first focused execution was consumed once from signed/pushed anchor
++`eeaaaca8d7a30a84fda321b37544d57b6cc1c1f4`; it is not accepted as RED and is
++never relabelled. The null-prior treatment reached its exact
++`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED` error, but the then-proposed
++absent-prior treatment stopped earlier at
++`creator snapshot export failed: not-active`. Source tracing establishes why:
++the writer had been revoked in the current epoch, a staged grant applied only
++to the successor ACL, and `foldBlueprintEpoch()` authorizes every current graph
++operation against the current latched ACL before
++`authorIssuanceFrontiersCandidate()` runs. Therefore this construction cannot
++exercise `D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED` through ordinary ingress
++and must not be counted as a close-frontier product defect. The exact command
++was `pnpm exec vitest run
++tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts
++--reporter=json --outputFile=.logs/d110c-0c1f5a-red-eeaaaca8/result.json`;
++runner status was `1`, selected file/title counts were exactly one/one, and the
++complete result SHA-256 is
++`f9253e4a15c14341dc240b49bf4ed08f191784cf8ce28fd56518f91d7e55b627`.
++The immutable diagnostic root is `.logs/d110c-0c1f5a-red-eeaaaca8/`.
++
++The author-reentry guard remains fail closed and unchanged. Whether a genuine
++membership lifecycle can make a currently authorized writer absent from the
++prior authenticated aggregate is now an f5b admitted-set/membership audit
++question, not an f5a behavior claim. Because this correction changes causal
++acceptance, sign/push the diagnostic and amended plan, then run exactly one
++material Grok/Kimi/Opus confirmation before the corrected RED. Do not review
++bookkeeping prose recursively.
+ 
+ GREEN changes only the close-side per-author classification. It must make all
+ foreign treatments close successfully, keep the affected frontier unchanged or
+ null, preserve all unaffected frontiers byte-for-byte, stage one valid
+-aggregate, and complete verified transition/adoption. The anomalous row must
+-remain outside authenticated historical coverage. Repeating close derivation
+-over the same captured graph must be deterministic. The no-gap aggregate bytes
+-and digest remain identical to the pre-f5a implementation. The former
++aggregate, and complete verified transition/adoption. The anomalous row remains
++an authenticated close-set/history member when it is a valid authorized
++application vertex, but it must remain outside the issuance sequence range
++claimed by the aggregate frontier; f5a does not rewrite application history.
++Repeating close derivation over the same captured graph must be deterministic.
++The no-gap aggregate bytes and digest remain identical to the pre-f5a
++implementation. The former
+ null-boundary diagnostic mismatch is closed by pinning the current RED error
+ and proving it is no longer exposed as a close-wide foreign-author failure;
+ existing legacy/local errors are not renamed without an independently retained
+98176:###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
+diff --git a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+index 79e7b6be..921e7ce8 100644
+--- a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+@@ -69,6 +69,7 @@ import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
+ import {
+ 	createGenuinePreparedV3Fixture,
+ 	type CreateSqliteAheDurableStoreForFixture,
++	type GenuinePreparedV3Fixture,
+ 	type PrepareV3LiveGenerationForFixture,
+ } from "../phase-3a1b-p3/live-fixture.js";
+ 
+@@ -389,6 +390,11 @@ export interface GenuineCreatorAdoptionFixture {
+ 		onAdmittedVertex(input: Readonly<Record<string, unknown>>): Promise<void> | void;
+ 	}>;
+ 	readonly scope: LiveJournalScope;
++	readonly createRegisteredVertex: GenuinePreparedV3Fixture["createRegisteredVertex"];
++	routeRegisteredVertex(
++		vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
++		transportSender?: string
++	): Promise<void>;
+ 	readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
+ 	close(): Promise<void>;
+ }
+@@ -1102,11 +1108,16 @@ export async function openGenuineCreatorAdoptionFixture(
+ 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
+ 	let establishedPeerAuthor: string | undefined;
+ 	let resolveEstablishedPeer: (() => void) | undefined;
++	const admittedVertexDigests = new Set<string>();
++	const admittedVertexWaiters = new Map<string, () => void>();
+ 	const establishedPeerAdmission = new Promise<void>((resolveAdmission) => {
+ 		resolveEstablishedPeer = resolveAdmission;
+ 	});
+ 	const onAdmittedVertex = (delivery: Parameters<V3AdmittedVertexSink>[0]): void => {
+ 		if (delivery.vertex.author === establishedPeerAuthor) resolveEstablishedPeer?.();
++		const digest = Buffer.from(delivery.vertex.digest).toString("hex");
++		admittedVertexDigests.add(digest);
++		admittedVertexWaiters.get(digest)?.();
+ 	};
+ 	const activation = activateV3LivePlane({
+ 		capability: recovered.capability,
+@@ -1115,6 +1126,47 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		onAdmittedVertex,
+ 	});
+ 	if (!activation.ok) throw new TypeError(`D.108b fixture activation failed: ${activation.kind}`);
++	Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
++	const routeRegisteredVertex = async (
++		vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
++		transportSender = "d110c-fixture-peer"
++	): Promise<void> => {
++		const digest = Buffer.from(vertex.digest).toString("hex");
++		if (admittedVertexDigests.has(digest)) return;
++		let admissionTimer: ReturnType<typeof setTimeout> | undefined;
++		let resolveAdmission: (() => void) | undefined;
++		const admission = new Promise<void>((resolvePromise) => {
++			resolveAdmission = resolvePromise;
++		});
++		admittedVertexWaiters.set(digest, () => resolveAdmission?.());
++		try {
++			const claimed = routeV3Ingress(
++				networkNode,
++				Message.create({
++					data: V3Envelope.encode({
++						canonicalPreimage: vertex.canonicalPreimageBytes,
++						signature: vertex.signature,
++					}).finish(),
++					objectId: activation.handle.topic,
++					sender: transportSender,
++					type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
++				})
++			);
++			if (!claimed) throw new TypeError("D110C_FIXTURE_REGISTERED_VERTEX_NOT_CLAIMED");
++			await Promise.race([
++				admission,
++				new Promise<never>((_resolve, reject) => {
++					admissionTimer = setTimeout(
++						() => reject(new TypeError(`D110C_FIXTURE_REGISTERED_VERTEX_ADMISSION_TIMEOUT:${digest}`)),
++						5_000
++					);
++				}),
++			]);
++		} finally {
++			admittedVertexWaiters.delete(digest);
++			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
++		}
++	};
+ 	const blueprint = bindV3BlueprintLivePlane({
+ 		exactCanonicalInitialStateBytes: encodeCanonical(0),
+ 		plane: activation.handle,
+@@ -1186,34 +1238,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 			privateKeySeedHex: options.establishedPeerPrivateKeySeedHex,
+ 		});
+ 		establishedPeerAuthor = carrier.author;
+-		Reflect.set(networkNode, "gossipTopicFor", () => activation.handle.topic);
+-		const claimed = routeV3Ingress(
+-			networkNode,
+-			Message.create({
+-				data: V3Envelope.encode({
+-					canonicalPreimage: carrier.canonicalPreimageBytes,
+-					signature: carrier.signature,
+-				}).finish(),
+-				objectId: activation.handle.topic,
+-				sender: "d108d1b-established-peer",
+-				type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+-			})
+-		);
+-		if (!claimed) throw new TypeError("D.108d1b established peer ingress was not claimed");
+-		let admissionTimer: ReturnType<typeof setTimeout> | undefined;
+-		try {
+-			await Promise.race([
+-				establishedPeerAdmission,
+-				new Promise<never>((_resolve, reject) => {
+-					admissionTimer = setTimeout(
+-						() => reject(new TypeError("D.108d1b established peer admission timed out")),
+-						5_000
+-					);
+-				}),
+-			]);
+-		} finally {
+-			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
+-		}
++		await Promise.all([routeRegisteredVertex(carrier, "d108d1b-established-peer"), establishedPeerAdmission]);
+ 		establishedPeer = Object.freeze({
+ 			author: carrier.author,
+ 			authorSequence: 0,
+@@ -1341,6 +1366,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 			await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+ 		},
+ 		controls,
++		createRegisteredVertex: fixture.createRegisteredVertex,
+ 		evidence: Object.freeze({
+ 			aheBackend,
+ 			aheStore,
+@@ -1372,6 +1398,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		modules,
+ 		runtimeBindings: Object.freeze({ messageQueueManager, networkNode, onAdmittedVertex }),
+ 		scope: journalScope,
++		routeRegisteredVertex,
+ 		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+ 	});
+ }
+diff --git a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+index 4f3ba231..c8ef7b28 100644
+--- a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+@@ -69,6 +69,11 @@ export interface D110cARepeatCloseEvidence {
+ 	readonly actorStatusBeforeClose: CreatorLiveCloseStatus;
+ 	readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+ 	readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
++	readonly authorIssuanceFrontiers: Readonly<{
++		readonly bytes: Uint8Array;
++		readonly record: Readonly<Record<string, unknown>>;
++		readonly ref: GenerationRef;
++	}>;
+ 	readonly closeAttempts: 1;
+ 	readonly closeResult: CreatorLiveCloseResult;
+ 	readonly closureBytes: Readonly<{ readonly after: number; readonly before: number; readonly delta: number }>;
+@@ -123,9 +128,14 @@ export interface D110cARepeatCloseOptions {
+ 	): Promise<void>;
+ 	beforeRepeatClose?(
+ 		input: Readonly<{
++			readonly createRegisteredVertex: GenuineCreatorAdoptionFixture["createRegisteredVertex"];
++			readonly currentAnchorDigest: string;
++			readonly currentEpoch: number;
+ 			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
+ 			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
++			readonly latestDependencyDigest: string;
+ 			readonly plane: V3PlaneHandle;
++			readonly routeRegisteredVertex: GenuineCreatorAdoptionFixture["routeRegisteredVertex"];
+ 			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
+ 		}>
+ 	): Promise<
+@@ -136,9 +146,14 @@ export interface D110cARepeatCloseOptions {
+ 	>;
+ 	beforeRepeatCloseBinding?(
+ 		input: Readonly<{
++			readonly createRegisteredVertex: GenuineCreatorAdoptionFixture["createRegisteredVertex"];
++			readonly currentAnchorDigest: string;
++			readonly currentEpoch: number;
+ 			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
+ 			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
++			readonly latestDependencyDigest: string;
+ 			readonly plane: V3PlaneHandle;
++			readonly routeRegisteredVertex: GenuineCreatorAdoptionFixture["routeRegisteredVertex"];
+ 			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
+ 		}>
+ 	): Promise<void>;
+@@ -587,13 +602,23 @@ export async function openD110cARepeatCloseFixture(
+ 		if (issued.ok !== true) throw new TypeError(`D110C_A_POST_ADOPTION_ISSUE_FAILED:${String(issued.kind)}`);
+ 		const published = await hot.successor.publishPending();
+ 		if (published.ok !== true) throw new TypeError(`D110C_A_POST_ADOPTION_PUBLISH_FAILED:${String(published.kind)}`);
+-		const previousHistory = copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes);
+-		await options.beforeRepeatCloseBinding?.({
++		const currentAuthority = plane.currentEphemeralAuthority();
++		if (currentAuthority === undefined || typeof issued.digest !== "string" || !/^[0-9a-f]{64}$/u.test(issued.digest)) {
++			throw new TypeError("D110C_A_REPEAT_CLOSE_MUTATION_CONTEXT_INVALID");
++		}
++		const repeatCloseMutationContext = Object.freeze({
++			createRegisteredVertex: hot.base.createRegisteredVertex,
++			currentAnchorDigest: currentAuthority.anchorDigest,
++			currentEpoch: currentAuthority.epoch,
+ 			issuanceScope: hot.base.evidence.issuanceScope,
+ 			issuanceStore: hot.base.evidence.issuanceStore,
++			latestDependencyDigest: issued.digest,
+ 			plane,
++			routeRegisteredVertex: hot.base.routeRegisteredVertex,
+ 			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+ 		});
++		const previousHistory = copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes);
++		await options.beforeRepeatCloseBinding?.(repeatCloseMutationContext);
+ 		const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+ 		const [vote, evidenceStore, snapshotStore] = await Promise.all([
+ 			hot.base.modules.openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
+@@ -627,12 +652,7 @@ export async function openD110cARepeatCloseFixture(
+ 		const roomHeadBefore = copiedRoomHead(plane);
+ 		const beforeHead = await closeHandle.inspectDurableHead();
+ 		const actorStatusBeforeClose = closeHandle.status();
+-		const inFlight = await options.beforeRepeatClose?.({
+-			issuanceScope: hot.base.evidence.issuanceScope,
+-			issuanceStore: hot.base.evidence.issuanceStore,
+-			plane,
+-			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+-		});
++		const inFlight = await options.beforeRepeatClose?.(repeatCloseMutationContext);
+ 		const closeTask = closeHandle.close();
+ 		inFlight?.release();
+ 		const inFlightIssue = await inFlight?.completed;
+@@ -648,6 +668,19 @@ export async function openD110cARepeatCloseFixture(
+ 		);
+ 		const afterHead = await closeHandle.inspectDurableHead();
+ 		const cutValue = canonicalRecord(await blobForRef(hot, closeResult.cutValueRef));
++		let authorIssuanceFrontiers: D110cARepeatCloseEvidence["authorIssuanceFrontiers"] | undefined;
++		for (const ref of afterHead.references) {
++			const bytes = await blobForRef(hot, ref);
++			const record = canonicalRecord(bytes);
++			if (record.kind !== "drp-creator-author-issuance-frontiers-state") continue;
++			if (authorIssuanceFrontiers !== undefined) {
++				throw new TypeError("D110C_A_AUTHOR_ISSUANCE_FRONTIERS_AMBIGUOUS");
++			}
++			authorIssuanceFrontiers = Object.freeze({ bytes: Uint8Array.from(bytes), record, ref });
++		}
++		if (authorIssuanceFrontiers === undefined) {
++			throw new TypeError("D110C_A_AUTHOR_ISSUANCE_FRONTIERS_UNAVAILABLE");
++		}
+ 		const independentlyDerived = await independentHistory(hot, previousHistory);
+ 		const beforeBytes = beforeHead.references.reduce((total, ref) => total + ref.byteLength, 0);
+ 		const afterBytes = afterHead.references.reduce((total, ref) => total + ref.byteLength, 0);
+@@ -657,6 +690,7 @@ export async function openD110cARepeatCloseFixture(
+ 				actorStatusAfterClose: closeHandle.status(),
+ 				actorStatusBeforeClose,
+ 				afterHead,
++				authorIssuanceFrontiers,
+ 				beforeHead,
+ 				closeAttempts: 1 as const,
+ 				closeResult,
+diff --git a/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts b/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts
+new file mode 100644
+index 00000000..c512c9ea
+--- /dev/null
++++ b/tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts
+@@ -0,0 +1,15 @@
++import "fake-indexeddb/auto";
++
++import { describe, it } from "vitest";
++
++import { proveD110c0c1f5ForeignAuthorCloseLivenessRequired } from "./fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.js";
++
++describe("D.110c-0c1f5 foreign-author close-liveness RED", () => {
++	it("requires foreign frontier anomalies to remain author-local while creator corruption stays fail closed", async () => {
++		Object.defineProperty(navigator, "storage", {
++			configurable: true,
++			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
++		});
++		await proveD110c0c1f5ForeignAuthorCloseLivenessRequired();
++	});
++});
+shasum: .logs/d110c-0c1f5a-red-eeaaaca8/command.txt: No such file or directory
+.logs/d110c-0c1f5a-red-eeaaaca8/command.txt: FAILED open or read
+.logs/d110c-0c1f5a-red-eeaaaca8/diagnosis.md: FAILED open or read
+.logs/d110c-0c1f5a-red-eeaaaca8/result.json: FAILED open or read
+.logs/d110c-0c1f5a-red-eeaaaca8/status.txt: FAILED open or read
+.logs/d110c-0c1f5a-red-eeaaaca8/stderr.txt: FAILED open or read
+.logs/d110c-0c1f5a-red-eeaaaca8/stdout.txt: FAILED open or read
+shasum: .logs/d110c-0c1f5a-red-eeaaaca8/diagnosis.md: No such file or directory
+shasum: .logs/d110c-0c1f5a-red-eeaaaca8/result.json: No such file or directory
+shasum: .logs/d110c-0c1f5a-red-eeaaaca8/status.txt: No such file or directory
+shasum: .logs/d110c-0c1f5a-red-eeaaaca8/stderr.txt: No such file or directory
+shasum: .logs/d110c-0c1f5a-red-eeaaaca8/stdout.txt: No such file or directory
+shasum: WARNING: 6 listed files could not be read
+.logs/d110c-0c1f5a-red-eeaaaca8/command.txt: OK
+.logs/d110c-0c1f5a-red-eeaaaca8/diagnosis.md: OK
+.logs/d110c-0c1f5a-red-eeaaaca8/result.json: OK
+.logs/d110c-0c1f5a-red-eeaaaca8/status.txt: OK
+.logs/d110c-0c1f5a-red-eeaaaca8/stderr.txt: OK
+.logs/d110c-0c1f5a-red-eeaaaca8/stdout.txt: OK

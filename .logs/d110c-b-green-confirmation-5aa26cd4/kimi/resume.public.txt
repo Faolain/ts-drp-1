@@ -1,0 +1,41 @@
+{
+  "verdict": "APPROVED",
+  "summary": "Correction commit 5aa26cd4 (signed, good RSA signature, parent f2066512, pushed on origin/codex/phase3a1b-p6-golden-path) closes all seven first-review blockers without touching wire/schema, public API, dependencies, thresholds, workload, or cold-reopen claims. The production diff is minimal and exactly scoped: `deactivateOwner()` in packages/node/src/creator-adoption-activate.ts:191 now deletes the owner and releases its shared lock only inside `if (currentOwner(owner))`, and the close-rebind failure path in examples/v3-room/src/index.ts:3619-3631 is refactored into `failCloseRebind()` which sets exact `D110C_B_CLOSE_REBIND_FAILED`, best-effort `await predecessorClose.stop().catch(() => undefined)`, then throws — for both the missing-bind and `!rebound.ok` branches. The tests-only `isD110cBSuccessorAuthority(value, expectedEpoch)` enforces the exact seven-key roster via Reflect.ownKeys/Object.hasOwn, rejects unsafe/non-positive epochs, and is applied at epochs 1 and 2 to both the visible authority and independently decoded raw AHE state (`rawAuthorityAtEpoch` filters decoded `drp-anchor-trust-state` on `currentEpoch === expectedEpoch`, so the epoch is genuinely raw-derived). Chromium Web Lock proof asserts 0 locks at genesis, 1 stable lock across epoch-1 and the epoch-2 replacement and pending 2→3 close, 2 distinct locks while the failed-rebind replacement stays active, and restoration to the sole main-room lock after shutdown. The behavioral `rejectCloseBind` injection runs after genuine adoption and proves the exact error, retained epoch-1 replacement authority, stalled/unavailable close custody, one predecessor deactivation, and refusal of a second close. D.110c counters are isolated behind `d110cBSnapshot()`, and the retained-page before/after snapshot equality proves D.108 instrumentation was not widened. Evidence is coherent: 24/24 accepted statuses zero, 17/17 source-shape predicates true, 138-entry manifest validates all-OK, the original 17-entry GREEN manifest validates all-OK with digest ce501e… matching the plan, focused Chromium passed 1/1 emitting D110C_B_PRODUCT_HOT_LOOP_COMPLETE, retained product 30/30 (Chromium+Firefox+WebKit), activation 24/24, live-close 9/9, node 6 suites/9 tests, and all five failed reporters are kept under diagnostic naming and never represented as passes. The three-reviewer first-review record matches the retained Grok/Kimi/Opus artifacts exactly, including Grok's disclosed NO_VERDICT-classification/APPROVED-terminal-JSON nuance.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "changed-paths manifest is feature-wide, not correction-scoped",
+      "path": ".logs/d110c-b-green-correction-f2066512/changed-paths.txt",
+      "line": 1,
+      "evidence": "The file lists 15 source paths equal to the whole D.110c-b feature diff (90147e3c^..5aa26cd4), not the 7-path correction diff, and omits the 127 .logs/ files the correction commit added. Spot-checked hashes (3/3) match `git show 5aa26cd4:<path>`, so it is accurate as a feature content manifest but misleading as a 'correction changed paths' artifact.",
+      "required_action": "No re-ceremony needed; relabel the artifact as the feature-wide source manifest (or add a correction-only listing) in a future bookkeeping touch-up."
+    },
+    {
+      "severity": "P2",
+      "title": "accepted-statuses.txt omits manifest-validation.status",
+      "path": ".logs/d110c-b-green-correction-f2066512/accepted-statuses.txt",
+      "line": 1,
+      "evidence": "24 statuses are listed, all 0, but manifest-validation.status (also 0, artifact written ~1 minute after accepted-statuses.txt) is absent from the list.",
+      "required_action": "Bookkeeping note only; the status artifact itself is present and passing in the same tracked root."
+    },
+    {
+      "severity": "P2",
+      "title": "Batch-1 completion marker not provable from retained reporter JSON",
+      "path": ".logs/d110c-b-green-90147e3c/green-ledger.md",
+      "line": 1,
+      "evidence": "The ledger claims batch1-vitest-isolated.json emitted D110C_B_HOT_ADOPTION_COMPLETE, but that string appears in zero retained JSON files (the Vitest JSON reporter does not capture stdout). The isolated run itself passes 2/2 suites, 1/1 test, so the claim is unverifiable rather than contradicted.",
+      "required_action": "None blocking; record stdout alongside JSON reporters for marker claims in future slices."
+    },
+    {
+      "severity": "P2",
+      "title": "state-audit protected-path values are ambiguous exit codes",
+      "path": ".logs/d110c-b-green-correction-f2066512/state-audit.txt",
+      "line": 5,
+      "evidence": "Entries `.agents=0`, `.claude=0`, `.pnpm-store=0` read as check exit codes while the ledger paraphrases them as 'paths remain present'; the TS_DRP_REVIEWER_TEST_PROFILER_PROCESSES line records no value.",
+      "required_action": "Clarify the audit format in the next custody checkpoint; HEAD/ORIGIN pin and stash/port facts are unambiguous and correct."
+    }
+  ],
+  "blocking_union_closed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true
+}

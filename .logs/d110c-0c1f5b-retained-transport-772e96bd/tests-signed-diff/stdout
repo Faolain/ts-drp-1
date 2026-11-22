@@ -1,0 +1,182 @@
+commit 772e96bdad4f1b881fd547e09e849c97226cb980
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Sat Sep 5 21:27:54 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Sat Sep 5 21:27:54 2026 -0400
+
+    test: restore retained live transport issuance fixtures
+
+diff --git a/tests/phase-3a1b-p3-live-transport-red.test.ts b/tests/phase-3a1b-p3-live-transport-red.test.ts
+index dab19613..7b7ea751 100644
+--- a/tests/phase-3a1b-p3-live-transport-red.test.ts
++++ b/tests/phase-3a1b-p3-live-transport-red.test.ts
+@@ -456 +456,5 @@ function fakeNetwork(
+-function fakeIssuanceStore(overrides: Partial<DurableIssuanceStore> = {}): DurableIssuanceStore {
++function fakeIssuanceStore(
++	overrides: Partial<DurableIssuanceStore> = {},
++	issuedRows: readonly DurableIssuanceOutboxRecord[] = Object.freeze([])
++): DurableIssuanceStore {
++	const issuedRoster = Object.freeze([...issuedRows]);
+@@ -460 +464,10 @@ function fakeIssuanceStore(overrides: Partial<DurableIssuanceStore> = {}): Durab
+-		readIssued: vi.fn(() => Promise.resolve(null)),
++		readIssued: vi.fn((scope, authorSequence) =>
++			Promise.resolve(
++				issuedRoster.find(
++					({ commit }) =>
++						commit.issuedRecord.scope.objectId === scope.objectId &&
++						commit.issuedRecord.scope.author === scope.author &&
++						commit.authorSequence === authorSequence
++				)?.commit ?? null
++			)
++		),
+@@ -667 +680,2 @@ function outboxRecord(
+-	publishState: "pending" | "published"
++	publishState: "pending" | "published",
++	carrier?: SignedScopeCarrier
+@@ -669,5 +683,4 @@ function outboxRecord(
+-	const canonicalPreimageBytes = encodeCanonical({
+-		author: scope.author,
+-		authorSequence,
+-		objectId: scope.objectId,
+-	});
++	const canonicalPreimageBytes =
++		carrier === undefined
++			? encodeCanonical({ author: scope.author, authorSequence, objectId: scope.objectId })
++			: new Uint8Array(carrier.canonicalPreimageBytes);
+@@ -676,2 +689,3 @@ function outboxRecord(
+-		digest: hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes),
+-		signature: Uint8Array.of(authorSequence, 3),
++		digest:
++			carrier === undefined ? hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes) : new Uint8Array(carrier.digest),
++		signature: carrier === undefined ? Uint8Array.of(authorSequence, 3) : new Uint8Array(carrier.signature),
+@@ -1033 +1047,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-			const rows = Object.freeze([outboxRecord(scope, 1, "published"), outboxRecord(scope, 2, "pending")]);
++			const recoveryCarrier = fixture.createRecoveryVertex(0, [fixture.descriptor.anchorDigest]);
++			const publishedCarrier = fixture.createRecoveryVertex(1, [lowerHex(recoveryCarrier.digest)]);
++			const pendingCarrier = fixture.createRecoveryVertex(2, [lowerHex(publishedCarrier.digest)]);
++			const rows = Object.freeze([
++				outboxRecord(scope, 1, "published", publishedCarrier),
++				outboxRecord(scope, 2, "pending", pendingCarrier),
++			]);
+@@ -1039 +1059 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-			const issuanceStore = fakeIssuanceStore({ readOutboxPage, compareAndMarkOutboxPublished });
++			const issuanceStore = fakeIssuanceStore({ readOutboxPage, compareAndMarkOutboxPublished }, rows);
+@@ -1137 +1157 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-			const ingressCarrier = fixture.createRecoveryVertex(1, [recovered.recoveryDigest]);
++			const ingressCarrier = publishedCarrier;
+@@ -1763 +1783,3 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-			const pending = outboxRecord(scope, 3, "pending");
++			const recoveryCarrier = fixture.createRecoveryVertex(0, [fixture.descriptor.anchorDigest]);
++			const pendingCarrier = fixture.createRecoveryVertex(3, [lowerHex(recoveryCarrier.digest)]);
++			const pending = outboxRecord(scope, 3, "pending", pendingCarrier);
+@@ -1778 +1800,6 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-			const secondPending = outboxRecord(scope, 4, "pending");
++			const secondPending = outboxRecord(
++				scope,
++				4,
++				"pending",
++				fixture.createRecoveryVertex(4, [lowerHex(pendingCarrier.digest)])
++			);
+@@ -1803 +1830 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({ compareAndMarkOutboxPublished: fifoMark, readOutboxPage: fifoRead }),
++				fakeIssuanceStore({ compareAndMarkOutboxPublished: fifoMark, readOutboxPage: fifoRead }, fifoRows),
+@@ -1848 +1875 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({ compareAndMarkOutboxPublished: pageMark, readOutboxPage: pageRead }),
++				fakeIssuanceStore({ compareAndMarkOutboxPublished: pageMark, readOutboxPage: pageRead }, fifoRows),
+@@ -1869,4 +1896,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({
+-					compareAndMarkOutboxPublished: publishMark,
+-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+-				}),
++				fakeIssuanceStore(
++					{
++						compareAndMarkOutboxPublished: publishMark,
++						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
++					},
++					fifoRows
++				),
+@@ -1896,4 +1926,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({
+-					compareAndMarkOutboxPublished: rejectedPublishMark,
+-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+-				}),
++				fakeIssuanceStore(
++					{
++						compareAndMarkOutboxPublished: rejectedPublishMark,
++						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
++					},
++					fifoRows
++				),
+@@ -1924,4 +1957,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({
+-					compareAndMarkOutboxPublished: markCalls,
+-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+-				}),
++				fakeIssuanceStore(
++					{
++						compareAndMarkOutboxPublished: markCalls,
++						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
++					},
++					fifoRows
++				),
+@@ -1988,4 +2024,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({
+-					compareAndMarkOutboxPublished: truthyMark,
+-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+-				}),
++				fakeIssuanceStore(
++					{
++						compareAndMarkOutboxPublished: truthyMark,
++						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
++					},
++					fifoRows
++				),
+@@ -2007,4 +2046,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({
+-					compareAndMarkOutboxPublished: rejectedMark,
+-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+-				}),
++				fakeIssuanceStore(
++					{
++						compareAndMarkOutboxPublished: rejectedMark,
++						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
++					},
++					fifoRows
++				),
+@@ -2026,4 +2068,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-				fakeIssuanceStore({
+-					compareAndMarkOutboxPublished: rejectedMarkCall,
+-					readOutboxPage: vi.fn(() => Promise.resolve([pending])),
+-				}),
++				fakeIssuanceStore(
++					{
++						compareAndMarkOutboxPublished: rejectedMarkCall,
++						readOutboxPage: vi.fn(() => Promise.resolve([pending])),
++					},
++					fifoRows
++				),
+@@ -2256,2 +2301,22 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+-		expect(count(liveSource, /extractAdmittedReceivedVertex\(/gu)).toBe(1);
+-		expect(liveSource).toMatch(
++		const unit = ts.createSourceFile("v3-live.ts", liveSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
++		const extractorOwners: string[] = [];
++		const visit = (node: ts.Node): void => {
++			if (
++				ts.isCallExpression(node) &&
++				ts.isIdentifier(node.expression) &&
++				node.expression.text === "extractAdmittedReceivedVertex"
++			) {
++				let owner: ts.Node | undefined = node.parent;
++				while (owner !== undefined && !ts.isFunctionDeclaration(owner)) owner = owner.parent;
++				extractorOwners.push(owner?.name?.text ?? "<unowned>");
++			}
++			ts.forEachChild(node, visit);
++		};
++		visit(unit);
++		expect(extractorOwners.sort()).toEqual([
++			"authenticatedCoveredHistoricalOutboxRow",
++			"authenticatedPinnedGenesisOutboxRow",
++			"extractAuthorizedV3Vertex",
++		]);
++		const ingressExtractor = functionText(liveSource, "extractAuthorizedV3Vertex");
++		expect(ingressExtractor).toMatch(

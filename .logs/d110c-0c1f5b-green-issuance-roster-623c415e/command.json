@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-3a1b-p2-outbox-publication-contract.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-issuance-roster-623c415e/focused.json"
+  ],
+  "head": "623c415ed3ac2814d071bae59720456a92c804c0",
+  "expected": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+  }
+}

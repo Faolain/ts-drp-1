@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),git=(...a)=>execFileSync('git',a,{cwd:root,encoding:'utf8',maxBuffer:32*1024*1024}).trim();
+const frozen=JSON.parse(fs.readFileSync(path.join(out,'source-freeze.json'))),head=git('rev-parse','HEAD'),signature=git('log','-1','--format=%G?'),ref='refs/heads/codex/phase3a1b-p6-golden-path',remote=git('ls-remote','origin',ref);
+assert.equal(head,'dc2f8dc2170936fc491701614ba938767445468b');assert.equal(signature,'G');assert.equal(remote,head+'\t'+ref);assert.equal(git('rev-parse','HEAD^'),'03acb4ac1135e81a16cf1067e18f75a5c6079dfb');
+assert.equal(git('diff-tree','--no-commit-id','--name-only','-r','HEAD'),frozen.file);assert.equal(git('diff','--cached','--name-only'),'');
+assert.equal(hash(fs.readFileSync(path.join(root,frozen.file))),frozen.sha256);assert.equal(hash(execFileSync('git',['show','HEAD:'+frozen.file],{cwd:root})),frozen.sha256);
+for(const gate of ['format-final','lint-final','source-freeze','typecheck-matrix','tests-staged-check','custody-presign','tests-commit','tests-push'])assert.equal(JSON.parse(fs.readFileSync(path.join(out,gate,'status.json'))).code,0,gate);
+fs.writeFileSync(path.join(out,'signed-source.json'),JSON.stringify({head,signature,ref,remote,onlyChangedFile:frozen.file,testSha256:frozen.sha256,staticGatesPassed:true,strictCompilerIsInheritedRed:true},null,2)+'\n',{flag:'wx'});
+fs.writeFileSync(path.join(out,'tests.patch'),execFileSync('git',['show','--format=','--binary','HEAD','--',frozen.file],{cwd:root}),{flag:'wx'});console.log(JSON.stringify({head,signature,remote,testSha256:frozen.sha256}));

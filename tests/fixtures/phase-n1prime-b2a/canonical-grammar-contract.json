@@ -1,0 +1,542 @@
+{
+	"slice": "phase-n1prime-b2a",
+	"profile": "drp-canonical-profile-1",
+	"status": "non-normative-falsification-contract",
+	"planSha256": "ea31bdd9760106efc27c743976ab16f19167a109522aab4e0f11378b7d1d2831",
+	"targets": {
+		"markdown": "docs/protocol/canonical-tag-codec-v1.md",
+		"grammar": "docs/protocol/canonical-tag-codec-v1.json"
+	},
+	"predecessorEvidence": {
+		"codecSource": {
+			"path": "packages/canonical/src/index.ts",
+			"sha256": "25ca038d45e6a334890e67b1fd8a5480132d44065b63572b88bc309b492c4a66"
+		},
+		"goldenVectors": {
+			"path": "packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json",
+			"sha256": "2635989755ac300c1643f327ee7278d7aa0c72c67310b80ef56bb1eabe42b13e"
+		},
+		"extractionTest": {
+			"path": "packages/canonical/tests/phase-0a-contract.test.ts",
+			"sha256": "a9aa068dca0fa4a66eaf69009a7a58ddd1bf1fd6b5e4fee437dfac11127beab6"
+		}
+	},
+	"expectedTags": [
+		{ "name": "null", "octet": 0, "payload": "unit" },
+		{ "name": "false", "octet": 1, "payload": "unit" },
+		{ "name": "true", "octet": 2, "payload": "unit" },
+		{ "name": "integer", "octet": 3, "payload": "zigzag-varuint" },
+		{ "name": "float64", "octet": 4, "payload": "fixed-float64" },
+		{ "name": "string", "octet": 5, "payload": "varuint-byte-length-utf8" },
+		{ "name": "bytes", "octet": 6, "payload": "varuint-byte-length-bytes" },
+		{ "name": "array", "octet": 7, "payload": "varuint-count-values" },
+		{ "name": "object", "octet": 8, "payload": "varuint-count-key-values" },
+		{ "name": "map", "octet": 9, "payload": "varuint-count-key-values" },
+		{ "name": "set", "octet": 10, "payload": "varuint-count-values" },
+		{ "name": "float32-array", "octet": 11, "payload": "varuint-count-float32" },
+		{ "name": "float64-array", "octet": 12, "payload": "varuint-count-float64" },
+		{ "name": "int32-array", "octet": 13, "payload": "varuint-count-int32" },
+		{ "name": "uint32-array", "octet": 14, "payload": "varuint-count-uint32" }
+	],
+	"requiredRuleIds": [
+		"TAG_TABLE_EXHAUSTIVE",
+		"VALUE_DISPATCH_EXACT",
+		"VARUINT_MINIMAL",
+		"VARUINT_RANGE",
+		"ZIGZAG_SAFE_INTEGER",
+		"LENGTHS_COUNTS_VARUINT",
+		"BIG_ENDIAN_NUMERICS",
+		"INTEGER_BEFORE_FLOAT",
+		"FLOAT_FINITE",
+		"NEGATIVE_ZERO_NORMALIZE",
+		"STRING_UTF8",
+		"STRING_UNPAIRED_SURROGATE",
+		"BYTES_LENGTH",
+		"ARRAY_DENSE",
+		"OBJECT_PLAIN_NULL_PROTOTYPE",
+		"OBJECT_STRING_KEYS",
+		"OBJECT_DATA_PROPERTIES",
+		"MAP_ENCODED_KEY_ORDER",
+		"SET_ENCODED_VALUE_ORDER",
+		"DUPLICATE_CANONICAL_REJECT",
+		"TYPED_ARRAY_WIDTH",
+		"TYPED_ARRAY_FINITE",
+		"TRAILING_REJECT",
+		"UNKNOWN_TAG_REJECT",
+		"NON_MINIMAL_REJECT",
+		"RESOURCE_LIMITS",
+		"CYCLE_REJECT",
+		"UNSUPPORTED_TYPE_REJECT",
+		"DECODE_REENCODE_IDENTITY",
+		"EXAMPLES_SUBORDINATE",
+		"UNSAFE_INTEGRAL_FLOAT_UNRESOLVED"
+	],
+	"expectedRejectionPrecedence": {
+		"outer": ["BYTE_LIMIT", "VALUE", "TRAILING_BYTES"],
+		"valueEntry": ["DEPTH_LIMIT", "ITEM_LIMIT", "TRUNCATED", "UNKNOWN_TAG"],
+		"varuint": ["TRUNCATED", "VARUINT_RANGE_OCTETS", "VARUINT_NON_MINIMAL", "VARUINT_RANGE_VALUE"],
+		"integer": ["VARUINT", "INTEGER_RANGE"],
+		"float": ["TRUNCATED", "FLOAT_NON_FINITE", "FLOAT_NEGATIVE_ZERO", "FLOAT_SAFE_INTEGRAL"],
+		"keyValueEntry": ["KEY", "KEY_ORDER_OR_DUPLICATE", "VALUE", "OBJECT_KEY_TYPE"],
+		"set": ["DECODE_ELEMENT", "SET_ORDER_OR_DUPLICATE", "NEXT_ELEMENT"],
+		"typedArray": ["TRUNCATED", "ELEMENT_ORDER", "TYPED_NON_FINITE", "TYPED_NEGATIVE_ZERO"],
+		"finish": ["TRAILING_BYTES"]
+	},
+	"expectedPayloadTruncation": {
+		"string": { "category": "UTF8_INVALID", "predecessorMessage": "invalid UTF-8 string" },
+		"bytesAndContainers": { "category": "TRUNCATED" }
+	},
+	"precedenceProbes": [
+		{
+			"id": "varuint-non-minimal-before-post-terminator-value-range",
+			"stage": "varuint",
+			"observations": [
+				{ "phase": "VARUINT_NON_MINIMAL", "category": "VARUINT_NON_MINIMAL" },
+				{ "phase": "VARUINT_RANGE_VALUE", "category": "VARUINT_RANGE" }
+			],
+			"expectedCategory": "VARUINT_NON_MINIMAL"
+		},
+		{
+			"id": "integer-varuint-stage-before-decoded-integer-range",
+			"stage": "integer",
+			"observations": [
+				{ "phase": "VARUINT", "category": "VARUINT_NON_MINIMAL" },
+				{ "phase": "INTEGER_RANGE", "category": "INTEGER_RANGE" }
+			],
+			"expectedCategory": "VARUINT_NON_MINIMAL"
+		},
+		{
+			"id": "float-negative-zero-before-safe-integral",
+			"stage": "float",
+			"observations": [
+				{ "phase": "FLOAT_NEGATIVE_ZERO", "category": "FLOAT_NEGATIVE_ZERO" },
+				{ "phase": "FLOAT_SAFE_INTEGRAL", "category": "FLOAT_SAFE_INTEGRAL" }
+			],
+			"expectedCategory": "FLOAT_NEGATIVE_ZERO"
+		},
+		{
+			"id": "set-order-before-later-element-defect",
+			"stage": "set",
+			"observations": [
+				{ "phase": "SET_ORDER_OR_DUPLICATE", "category": "SET_ORDER_OR_DUPLICATE" },
+				{ "phase": "NEXT_ELEMENT", "category": "UNKNOWN_TAG" }
+			],
+			"expectedCategory": "SET_ORDER_OR_DUPLICATE"
+		},
+		{
+			"id": "typed-truncation-before-observable-first-element-nonfinite",
+			"stage": "typedArray",
+			"observations": [
+				{ "phase": "TRUNCATED", "category": "TRUNCATED" },
+				{ "phase": "ELEMENT_ORDER", "elementIndex": 0, "category": "TYPED_NON_FINITE" }
+			],
+			"expectedCategory": "TRUNCATED"
+		},
+		{
+			"id": "typed-element-order-before-category-order",
+			"stage": "typedArray",
+			"observations": [
+				{ "phase": "ELEMENT_ORDER", "elementIndex": 0, "category": "TYPED_NEGATIVE_ZERO" },
+				{ "phase": "ELEMENT_ORDER", "elementIndex": 1, "category": "TYPED_NON_FINITE" }
+			],
+			"expectedCategory": "TYPED_NEGATIVE_ZERO"
+		}
+	],
+	"expectedLimitSemantics": {
+		"defaults": { "maxBytes": 268435456, "maxDepth": 128, "maxItems": 1000000 },
+		"depth": { "root": 0, "comparison": "greater-than" },
+		"items": {
+			"comparison": "greater-than",
+			"valueCharge": 1,
+			"containerPrecharge": true,
+			"arraySetMultiplier": 1,
+			"objectMapMultiplier": 2,
+			"typedArrayMultiplier": 1,
+			"encodeImmediateKinds": ["array", "map", "set"]
+		},
+		"bytes": { "comparison": "greater-than" }
+	},
+	"encodeLimitControls": [
+		{
+			"id": "object-immediate-count-not-limited",
+			"kind": "object",
+			"maxItems": 2,
+			"expectedHex": "080305026b30030005026b31030205026b320304"
+		},
+		{ "id": "array-immediate-count-limited", "kind": "array", "maxItems": 2, "expectedCategory": "ITEM_LIMIT" },
+		{ "id": "map-immediate-count-limited", "kind": "map", "maxItems": 2, "expectedCategory": "ITEM_LIMIT" },
+		{ "id": "set-immediate-count-limited", "kind": "set", "maxItems": 2, "expectedCategory": "ITEM_LIMIT" }
+	],
+	"positiveCorpus": [
+		{ "id": "tag-null", "value": null, "hex": "00", "workedExample": true },
+		{ "id": "tag-false", "value": false, "hex": "01", "workedExample": false },
+		{ "id": "tag-true", "value": true, "hex": "02", "workedExample": false },
+		{ "id": "integer-zero", "value": 0, "hex": "0300", "workedExample": false },
+		{
+			"id": "scalar-negative-zero-normalizes-to-integer-zero",
+			"value": { "$number": "-0" },
+			"hex": "0300",
+			"workedExample": false
+		},
+		{ "id": "integer-negative-one", "value": -1, "hex": "0301", "workedExample": true },
+		{
+			"id": "string-length-128-multi-octet-varuint",
+			"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"hex": "0580016161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+			"workedExample": false
+		},
+		{
+			"id": "integer-max-safe",
+			"value": 9007199254740991,
+			"hex": "03feffffffffffff1f",
+			"workedExample": false
+		},
+		{
+			"id": "integer-min-safe",
+			"value": -9007199254740991,
+			"hex": "03fdffffffffffff1f",
+			"workedExample": false
+		},
+		{ "id": "float64-fraction", "value": 1.5, "hex": "043ff8000000000000", "workedExample": true },
+		{ "id": "float64-negative", "value": -2.25, "hex": "04c002000000000000", "workedExample": false },
+		{ "id": "empty-string", "value": "", "hex": "0500", "workedExample": false },
+		{ "id": "string-astral", "value": "😀", "hex": "0504f09f9880", "workedExample": true },
+		{
+			"id": "bytes",
+			"value": { "$type": "bytes", "hex": "00ff10" },
+			"hex": "060300ff10",
+			"workedExample": false
+		},
+		{ "id": "empty-array", "value": [], "hex": "0700", "workedExample": false },
+		{
+			"id": "array-recursive",
+			"value": [null, 1, "a"],
+			"hex": "0703000302050161",
+			"workedExample": false
+		},
+		{ "id": "empty-object", "value": {}, "hex": "0800", "workedExample": false },
+		{
+			"id": "object-encoded-key-order",
+			"value": { "aa": 1, "z": 2 },
+			"hex": "080205017a0304050261610302",
+			"workedExample": true
+		},
+		{
+			"id": "null-prototype-proto-data",
+			"value": {
+				"$type": "null-prototype",
+				"entries": [
+					["__proto__", { "polluted": true }],
+					["a", 1]
+				]
+			},
+			"hex": "0802050161030205095f5f70726f746f5f5f08010508706f6c6c7574656402",
+			"workedExample": false
+		},
+		{
+			"id": "empty-map",
+			"value": { "$type": "map", "entries": [] },
+			"hex": "0900",
+			"workedExample": false
+		},
+		{
+			"id": "map-mixed-key-order",
+			"value": {
+				"$type": "map",
+				"entries": [
+					[1, "one"],
+					[null, "nil"],
+					["a", "text"]
+				]
+			},
+			"hex": "09030005036e696c030205036f6e65050161050474657874",
+			"workedExample": false
+		},
+		{
+			"id": "empty-set",
+			"value": { "$type": "set", "values": [] },
+			"hex": "0a00",
+			"workedExample": false
+		},
+		{
+			"id": "set-encoded-value-order",
+			"value": { "$type": "set", "values": ["a", null, 1] },
+			"hex": "0a03000302050161",
+			"workedExample": false
+		},
+		{
+			"id": "float32-array-big-endian-normalized-zero",
+			"value": { "$type": "typed-array", "name": "float32-array", "values": [1.5, -2.25, { "$number": "-0" }] },
+			"hex": "0b033fc00000c010000000000000",
+			"workedExample": true
+		},
+		{
+			"id": "float64-array-big-endian-normalized-zero",
+			"value": { "$type": "typed-array", "name": "float64-array", "values": [1.5, -2.25, { "$number": "-0" }] },
+			"hex": "0c033ff8000000000000c0020000000000000000000000000000",
+			"workedExample": false
+		},
+		{
+			"id": "int32-array-big-endian",
+			"value": { "$type": "typed-array", "name": "int32-array", "values": [-2147483648, 0, 2147483647] },
+			"hex": "0d0380000000000000007fffffff",
+			"workedExample": false
+		},
+		{
+			"id": "uint32-array-big-endian",
+			"value": { "$type": "typed-array", "name": "uint32-array", "values": [0, 305419896, 4294967295] },
+			"hex": "0e030000000012345678ffffffff",
+			"workedExample": false
+		},
+		{
+			"id": "novel-recursive-combination",
+			"value": {
+				"$type": "map",
+				"entries": [
+					[
+						{ "$type": "set", "values": [2, 1] },
+						{ "z": { "$type": "bytes", "hex": "0102" }, "aa": [true, -1] }
+					],
+					["k", { "$type": "typed-array", "name": "float32-array", "values": [1.25] }]
+				]
+			},
+			"hex": "090205016b0b013fa000000a0203020304080205017a06020102050261610702020301",
+			"workedExample": false
+		}
+	],
+	"decodeNegativeCorpus": [
+		{
+			"id": "scalar-negative-zero",
+			"hex": "048000000000000000",
+			"category": "FLOAT_NEGATIVE_ZERO",
+			"predecessorMessage": "negative zero is non-canonical"
+		},
+		{
+			"id": "scalar-nan",
+			"hex": "047ff8000000000000",
+			"category": "FLOAT_NON_FINITE",
+			"predecessorMessage": "non-finite float is outside the canonical domain"
+		},
+		{
+			"id": "scalar-positive-infinity",
+			"hex": "047ff0000000000000",
+			"category": "FLOAT_NON_FINITE",
+			"predecessorMessage": "non-finite float is outside the canonical domain"
+		},
+		{
+			"id": "safe-integral-float64",
+			"hex": "043ff0000000000000",
+			"category": "FLOAT_SAFE_INTEGRAL",
+			"predecessorMessage": "integral float must use the integer tag"
+		},
+		{
+			"id": "invalid-utf8",
+			"hex": "0503eda080",
+			"category": "UTF8_INVALID",
+			"predecessorMessage": "invalid UTF-8 string"
+		},
+		{
+			"id": "truncated-string",
+			"hex": "050561",
+			"category": "UTF8_INVALID",
+			"predecessorMessage": "invalid UTF-8 string"
+		},
+		{
+			"id": "duplicate-map-key",
+			"hex": "090205016103000501610302",
+			"category": "KEY_ORDER_OR_DUPLICATE",
+			"predecessorMessage": "map/object keys are not in canonical order or are duplicated"
+		},
+		{
+			"id": "out-of-order-map-key",
+			"hex": "090205016203000501610302",
+			"category": "KEY_ORDER_OR_DUPLICATE",
+			"predecessorMessage": "map/object keys are not in canonical order or are duplicated"
+		},
+		{
+			"id": "duplicate-object-key",
+			"hex": "080205016103000501610302",
+			"category": "KEY_ORDER_OR_DUPLICATE",
+			"predecessorMessage": "map/object keys are not in canonical order or are duplicated"
+		},
+		{
+			"id": "out-of-order-set-value",
+			"hex": "0a02050162050161",
+			"category": "SET_ORDER_OR_DUPLICATE",
+			"predecessorMessage": "set values are not in canonical order or are duplicated"
+		},
+		{
+			"id": "duplicate-set-value",
+			"hex": "0a02050161050161",
+			"category": "SET_ORDER_OR_DUPLICATE",
+			"predecessorMessage": "set values are not in canonical order or are duplicated"
+		},
+		{
+			"id": "set-order-before-later-unknown",
+			"hex": "0a030501620501610f",
+			"category": "SET_ORDER_OR_DUPLICATE",
+			"predecessorMessage": "set values are not in canonical order or are duplicated"
+		},
+		{
+			"id": "non-minimal-varuint",
+			"hex": "058000",
+			"category": "VARUINT_NON_MINIMAL",
+			"predecessorMessage": "non-minimal varuint"
+		},
+		{
+			"id": "varuint-non-minimal-beats-post-terminator-value-range",
+			"hex": "05ffffffffffffffff00",
+			"category": "VARUINT_NON_MINIMAL",
+			"predecessorMessage": "non-minimal varuint"
+		},
+		{
+			"id": "varuint-post-terminator-value-range",
+			"hex": "058080808080808020",
+			"category": "VARUINT_RANGE",
+			"predecessorMessage": "varuint exceeds safe range"
+		},
+		{
+			"id": "varuint-range",
+			"hex": "05ffffffffffffffffff00",
+			"category": "VARUINT_RANGE",
+			"predecessorMessage": "varuint exceeds safe range"
+		},
+		{
+			"id": "decoded-integer-range",
+			"hex": "03ffffffffffffff1f",
+			"category": "INTEGER_RANGE",
+			"predecessorMessage": "integer exceeds safe range"
+		},
+		{
+			"id": "trailing-byte",
+			"hex": "00ff",
+			"category": "TRAILING_BYTES",
+			"predecessorMessage": "trailing bytes after canonical value"
+		},
+		{
+			"id": "unknown-tag",
+			"hex": "0f",
+			"category": "UNKNOWN_TAG",
+			"predecessorMessage": "unknown canonical tag 0x0f"
+		},
+		{
+			"id": "truncated-bytes",
+			"hex": "060261",
+			"category": "TRUNCATED",
+			"predecessorMessage": "truncated canonical value"
+		},
+		{
+			"id": "object-key-not-string",
+			"hex": "0801030000",
+			"category": "OBJECT_KEY_TYPE",
+			"predecessorMessage": "object key must be a string"
+		},
+		{
+			"id": "float32-array-negative-zero",
+			"hex": "0b0180000000",
+			"category": "TYPED_NEGATIVE_ZERO",
+			"predecessorMessage": "typed array contains non-canonical negative zero"
+		},
+		{
+			"id": "float64-array-infinity",
+			"hex": "0c017ff0000000000000",
+			"category": "TYPED_NON_FINITE",
+			"predecessorMessage": "typed array contains a non-finite number"
+		},
+		{
+			"id": "typed-truncated-before-complete-nan-element",
+			"hex": "0b027fc00000",
+			"category": "TRUNCATED",
+			"predecessorMessage": "truncated canonical value"
+		},
+		{
+			"id": "typed-element-order-negative-zero-before-later-nan",
+			"hex": "0b02800000007fc00000",
+			"category": "TYPED_NEGATIVE_ZERO",
+			"predecessorMessage": "typed array contains non-canonical negative zero"
+		},
+		{
+			"id": "depth-limit",
+			"hex": "070107010300",
+			"limits": { "maxDepth": 1 },
+			"category": "DEPTH_LIMIT",
+			"predecessorMessage": "canonical value exceeds maximum nesting depth"
+		},
+		{
+			"id": "item-limit",
+			"hex": "07010300",
+			"limits": { "maxItems": 2 },
+			"category": "ITEM_LIMIT",
+			"predecessorMessage": "canonical value exceeds item limit"
+		},
+		{
+			"id": "byte-limit",
+			"hex": "060100",
+			"limits": { "maxBytes": 2 },
+			"category": "BYTE_LIMIT",
+			"predecessorMessage": "canonical value exceeds byte limit"
+		}
+	],
+	"encodeNegativeCorpus": [
+		{ "id": "nan", "case": "nan", "category": "NON_FINITE_SOURCE" },
+		{ "id": "infinity", "case": "positive-infinity", "category": "NON_FINITE_SOURCE" },
+		{ "id": "unsafe-integer", "case": "unsafe-integer", "category": "UNSAFE_INTEGER_SOURCE" },
+		{ "id": "unpaired-high-surrogate", "case": "unpaired-high-surrogate", "category": "UNPAIRED_SURROGATE" },
+		{ "id": "unpaired-low-surrogate", "case": "unpaired-low-surrogate", "category": "UNPAIRED_SURROGATE" },
+		{ "id": "bigint", "case": "bigint", "category": "UNSUPPORTED_SOURCE" },
+		{ "id": "sparse-array", "case": "sparse-array", "category": "SPARSE_ARRAY" },
+		{ "id": "cyclic-array", "case": "cyclic-array", "category": "CYCLIC_SOURCE" },
+		{ "id": "class-instance", "case": "class-instance", "category": "NON_PLAIN_OBJECT" },
+		{ "id": "date", "case": "date", "category": "UNSUPPORTED_SOURCE" },
+		{ "id": "symbol-key", "case": "symbol-key", "category": "SYMBOL_KEY" },
+		{ "id": "accessor", "case": "accessor", "category": "ACCESSOR_PROPERTY" },
+		{ "id": "duplicate-canonical-map-key", "case": "duplicate-canonical-map-key", "category": "DUPLICATE_KEY" },
+		{
+			"id": "duplicate-canonical-set-value",
+			"case": "duplicate-canonical-set-value",
+			"category": "DUPLICATE_SET_VALUE"
+		},
+		{ "id": "typed-array-nan", "case": "typed-array-nan", "category": "NON_FINITE_SOURCE" },
+		{ "id": "unsupported-data-view", "case": "data-view", "category": "UNSUPPORTED_SOURCE" }
+	],
+	"workedExampleIds": [
+		"tag-null",
+		"integer-negative-one",
+		"float64-fraction",
+		"string-astral",
+		"object-encoded-key-order",
+		"float32-array-big-endian-normalized-zero"
+	],
+	"workedExampleBindings": {
+		"tag-null": ["TAG_TABLE_EXHAUSTIVE", "VALUE_DISPATCH_EXACT"],
+		"integer-negative-one": ["INTEGER_BEFORE_FLOAT", "ZIGZAG_SAFE_INTEGER", "VARUINT_MINIMAL"],
+		"float64-fraction": ["BIG_ENDIAN_NUMERICS", "FLOAT_FINITE", "INTEGER_BEFORE_FLOAT"],
+		"string-astral": ["STRING_UTF8", "LENGTHS_COUNTS_VARUINT"],
+		"object-encoded-key-order": ["MAP_ENCODED_KEY_ORDER", "OBJECT_STRING_KEYS", "DUPLICATE_CANONICAL_REJECT"],
+		"float32-array-big-endian-normalized-zero": [
+			"TYPED_ARRAY_WIDTH",
+			"BIG_ENDIAN_NUMERICS",
+			"NEGATIVE_ZERO_NORMALIZE",
+			"TYPED_ARRAY_FINITE"
+		]
+	},
+	"novelRuleCombinationId": "novel-recursive-combination",
+	"excludedCases": [
+		{
+			"id": "unsafe-integral-scalar-float64-decode",
+			"disposition": "unresolved-outside-governed-corpus",
+			"reason": "D.25/D.26 and the Phase -1 prime table explicitly leave this decoder case unresolved"
+		}
+	],
+	"prRuntime": {
+		"positiveCases": 28,
+		"decodeNegativeCases": 28,
+		"encodeNegativeCases": 16,
+		"goldenVectorCases": 26,
+		"goldenVectorCanonicalBytes": 10490,
+		"goldenVectorExecution": "required-in-pr",
+		"goldenVectorMaxRuntimeMs": 1000,
+		"seededLargeDifferentialTier": "nightly-or-weekly",
+		"largeFuzzingInThisSlice": false
+	}
+}

@@ -1,0 +1,7 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/src/maintenance.ts
+  146:47  error  Replace `⏎↹store:·AheDurableStore,⏎↹maintenance:·AheReclamationMaintenance⏎` with `store:·AheDurableStore,·maintenance:·AheReclamationMaintenance`  prettier/prettier
+
+✖ 1 problem (1 error, 0 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+

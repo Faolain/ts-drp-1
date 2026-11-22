@@ -1,0 +1,331 @@
+{
+  "browser-collection/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:58:09.788Z",
+    "finish": "2026-09-06T09:58:12.267Z",
+    "pid": 8477
+  },
+  "browser-handoff/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:01:07.733Z",
+    "finish": "2026-09-06T10:01:07.850Z",
+    "pid": 13934
+  },
+  "capture-authorization/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:09:17.279Z",
+    "finish": "2026-09-06T10:09:17.403Z",
+    "pid": 25730
+  },
+  "collection/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:52:49.358Z",
+    "finish": "2026-09-06T09:52:59.505Z",
+    "pid": 1676
+  },
+  "collection-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:55:30.734Z",
+    "finish": "2026-09-06T09:55:38.016Z",
+    "pid": 4986
+  },
+  "consumers/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:51:16.949Z",
+    "finish": "2026-09-06T09:51:17.229Z",
+    "pid": 99975
+  },
+  "consumers-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:55:10.935Z",
+    "finish": "2026-09-06T09:55:11.628Z",
+    "pid": 4152
+  },
+  "control-observer-correction/collection-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:05:25.110Z",
+    "finish": "2026-09-06T10:05:33.385Z",
+    "pid": 20249
+  },
+  "control-observer-correction/consumers-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:04:33.138Z",
+    "finish": "2026-09-06T10:04:33.766Z",
+    "pid": 19112
+  },
+  "control-observer-correction/custody-after/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:05:27.852Z",
+    "finish": "2026-09-06T10:05:31.995Z",
+    "pid": 20463
+  },
+  "control-observer-correction/default-equivalence-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:04:33.884Z",
+    "finish": "2026-09-06T10:04:34.009Z",
+    "pid": 19177
+  },
+  "control-observer-correction/diff-check/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:05:27.579Z",
+    "finish": "2026-09-06T10:05:27.627Z",
+    "pid": 20427
+  },
+  "control-observer-correction/equivalence/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:05:24.826Z",
+    "finish": "2026-09-06T10:05:24.950Z",
+    "pid": 20212
+  },
+  "control-observer-correction/focused/status.json": {
+    "code": 0,
+    "signal": null,
+    "quiescent": true,
+    "elapsedMs": 29681,
+    "endedAt": "2026-09-06T10:08:00.739Z"
+  },
+  "control-observer-correction/focused-runtime/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:07:29.952Z",
+    "finish": "2026-09-06T10:08:00.746Z",
+    "pid": 23292
+  },
+  "control-observer-correction/format/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:04:32.365Z",
+    "finish": "2026-09-06T10:04:33.030Z",
+    "pid": 19052
+  },
+  "control-observer-correction/freeze-runtime/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:06:16.085Z",
+    "finish": "2026-09-06T10:06:17.164Z",
+    "pid": 21670
+  },
+  "control-observer-correction/lint-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:05:26.267Z",
+    "finish": "2026-09-06T10:06:01.447Z",
+    "pid": 20293
+  },
+  "control-observer-correction/retained/status.json": {
+    "code": 1,
+    "signal": null,
+    "quiescent": true,
+    "elapsedMs": 159623,
+    "endedAt": "2026-09-06T10:11:09.854Z"
+  },
+  "control-observer-correction/retained-runtime/status.json": {
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T10:08:28.828Z",
+    "finish": "2026-09-06T10:11:09.862Z",
+    "pid": 24517
+  },
+  "control-observer-correction/typecheck-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:04:34.125Z",
+    "finish": "2026-09-06T10:04:38.382Z",
+    "pid": 19214
+  },
+  "control-observer-correction/validate-focused/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:08:28.583Z",
+    "finish": "2026-09-06T10:08:28.701Z",
+    "pid": 24481
+  },
+  "control-observer-correction/validate-retained/status.json": {
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T10:11:20.907Z",
+    "finish": "2026-09-06T10:11:21.029Z",
+    "pid": 28461
+  },
+  "control-observer-correction/validate-retained-roster/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:12:08.477Z",
+    "finish": "2026-09-06T10:12:08.607Z",
+    "pid": 29385
+  },
+  "custody-after/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:56:26.104Z",
+    "finish": "2026-09-06T09:56:28.279Z",
+    "pid": 5990
+  },
+  "custody-before/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:47:05.364Z",
+    "finish": "2026-09-06T09:47:13.744Z",
+    "pid": 96326
+  },
+  "custody-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:14:26.661Z",
+    "finish": "2026-09-06T10:14:28.732Z",
+    "pid": 32627
+  },
+  "default-equivalence/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:55:11.748Z",
+    "finish": "2026-09-06T09:55:11.861Z",
+    "pid": 4274
+  },
+  "default-equivalence-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:58:09.384Z",
+    "finish": "2026-09-06T09:58:09.570Z",
+    "pid": 8424
+  },
+  "diagnose-fence-rows/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:02:50.010Z",
+    "finish": "2026-09-06T10:02:50.148Z",
+    "pid": 16567
+  },
+  "diagnose-fence-schema/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:02:19.436Z",
+    "finish": "2026-09-06T10:02:19.755Z",
+    "pid": 15677
+  },
+  "diff-check/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:55:49.289Z",
+    "finish": "2026-09-06T09:55:49.402Z",
+    "pid": 5365
+  },
+  "extract-observations/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:08:30.243Z",
+    "finish": "2026-09-06T10:08:30.792Z",
+    "pid": 24919
+  },
+  "focused/status.json": {
+    "code": 1,
+    "signal": null,
+    "quiescent": true,
+    "elapsedMs": 24725,
+    "endedAt": "2026-09-06T10:00:46.002Z"
+  },
+  "focused-runtime/status.json": {
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T10:00:18.881Z",
+    "finish": "2026-09-06T10:00:46.009Z",
+    "pid": 12582
+  },
+  "format/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:55:31.894Z",
+    "finish": "2026-09-06T09:55:33.088Z",
+    "pid": 5047
+  },
+  "format-write/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:50:44.665Z",
+    "finish": "2026-09-06T09:50:45.458Z",
+    "pid": 99423
+  },
+  "freeze-runtime/status.json": {
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T09:57:21.349Z",
+    "finish": "2026-09-06T09:57:22.270Z",
+    "pid": 6964
+  },
+  "freeze-runtime-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:58:52.941Z",
+    "finish": "2026-09-06T09:58:57.110Z",
+    "pid": 9962
+  },
+  "lint/status.json": {
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T09:51:39.242Z",
+    "finish": "2026-09-06T09:52:17.620Z",
+    "pid": 621
+  },
+  "lint-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:55:47.987Z",
+    "finish": "2026-09-06T09:56:22.389Z",
+    "pid": 5315
+  },
+  "preserve-failed-source/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:04:01.535Z",
+    "finish": "2026-09-06T10:04:01.729Z",
+    "pid": 18371
+  },
+  "quiescence-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T10:16:39.887Z",
+    "finish": "2026-09-06T10:16:40.951Z",
+    "pid": 35404
+  },
+  "typecheck-after/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:50:45.578Z",
+    "finish": "2026-09-06T09:50:51.313Z",
+    "pid": 99489
+  },
+  "typecheck-before/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:47:37.099Z",
+    "finish": "2026-09-06T09:47:41.686Z",
+    "pid": 97140
+  },
+  "typecheck-final/status.json": {
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T09:56:01.406Z",
+    "finish": "2026-09-06T09:56:06.785Z",
+    "pid": 5586
+  },
+  "validate-focused/status.json": {
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T10:01:38.682Z",
+    "finish": "2026-09-06T10:01:38.802Z",
+    "pid": 14630
+  }
+}

@@ -12,6 +12,9 @@ let enabled = false;
 let provider: WebTracerProvider | undefined;
 let exporter: OTLPTraceExporter | undefined;
 
+let tracingGeneration = 0;
+let initializing: Readonly<{ generation: number; task: Promise<void> }> | undefined;
+
 const DEFAULT_EXPORTER_URL = "http://127.0.0.1:4318/v1/traces";
 const DEFAULT_EXPORTER_HEADERS = {
 	"Content-Type": "application/json",
@@ -28,19 +31,40 @@ export type EnableTracingOptions = {
 };
 
 /**
- * Enables tracing with the given options.
+ * Enables tracing with the given options. Await before starting traced work;
+ * disabled imports never install a browser context manager or patch callbacks.
  * @param opts - The options for enabling tracing.
  */
-export const enableTracing = (opts: EnableTracingOptions = {}): void => {
-	enabled = true;
-	initContextManager();
-	initProvider(opts.provider);
+export const enableTracing = (opts: EnableTracingOptions = {}): Promise<void> => {
+	if (isTracingEnabled()) return Promise.resolve();
+	if (initializing?.generation === tracingGeneration) return initializing.task;
+	const generation = tracingGeneration;
+	const options = opts.provider === undefined ? undefined : {
+		...opts.provider,
+		...(opts.provider.exporterHeaders === undefined ? {} : {exporterHeaders: {...opts.provider.exporterHeaders}}),
+	};
+	const task = Promise.resolve().then(async () => {
+		await initContextManager();
+		if (generation !== tracingGeneration) return;
+		initProvider(options);
+		if (generation === tracingGeneration) enabled = true;
+	});
+	initializing = Object.freeze({generation, task});
+	void task.then(() => {
+		if (initializing?.task === task) initializing = undefined;
+	}, () => {
+		if (initializing?.task === task) initializing = undefined;
+		if (generation === tracingGeneration) {enabled = false; provider = undefined; exporter = undefined;}
+	});
+	return task;
 };
 
 /**
  * Disables tracing by resetting the tracer, provider, and exporter.
  */
 export const disableTracing = (): void => {
+	tracingGeneration++;
+	initializing = undefined;
 	enabled = false;
 	provider = undefined;
 	exporter = undefined;

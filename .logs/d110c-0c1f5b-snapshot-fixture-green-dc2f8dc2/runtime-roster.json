@@ -1,0 +1,1050 @@
+{
+  "head": "2f09a52ce58e81000850d73594ca1f3ab4c9309a",
+  "files": [
+    "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+    "tests/e5-01-v3-operation-admission-red.test.ts",
+    "tests/phase-4a-v3-live-blueprint-fold.test.ts",
+    "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+    "tests/phase-4c-snapshot-pull-red.test.ts",
+    "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+    "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+    "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+  ],
+  "entries": [
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 RED keeps the generic admission behavior dormant behind the missing outcome owner"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > rebuilds policy from authenticated recovery before activation effects"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > reserves before local issuance and commits after journal but before projection"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > returns duplicate and conflict before local issuance, journal or projection"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > releases a definitely pre-issuance failure and permits one clean retry"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > holds an uncertain post-journal reservation until a fresh recovery rebuilds it exactly once"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > rejects remote replay conflicts before journal and effect while accepting one fresh vertex"
+    },
+    {
+      "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+      "name": "E5-01 serialized v3 operation admission > preserves ordinary local issue when no policy is supplied"
+    },
+    {
+      "file": "tests/phase-4a-v3-live-blueprint-fold.test.ts",
+      "name": "Phase 4a live blueprint fold > binds signed genesis and converges two independent recovered peers"
+    },
+    {
+      "file": "tests/phase-4a-v3-live-blueprint-fold.test.ts",
+      "name": "Phase 4a live blueprint fold > rejects an authenticated latched member without application-writer authority"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > has one causal readiness failure for the absent snapshot activation and export surfaces"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > keeps package roots free of runtime/machine/snapshot authority and the v3-live roster unchanged"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > exports the adopted epoch, matches independent D.99 reconstruction, and activates a third replica"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > rejects live export before adoption, after deactivation, and from author-list authority while invalid next-ACL operations fail before retention"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > consumes the recovered capability once after snapshot success or failure"
+    },
+    {
+      "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+      "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > installs an already folded snapshot handle that rejects every effect-bearing method"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > pins the dedicated protocol, fixed limits, closed records and failure taxonomy"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > derives ordered unique non-prefix requests without a prefix watermark"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > has exactly one readiness failure for the dedicated network and node owners"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > adds only fixed non-root owners with exact types and unchanged roots"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > resumes a non-prefix durable subset, rejects corrupt and slow peers, and completes through 4c-a/4c-b"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > fails closed before transport for absent, disconnected, or unauthorized peers"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > captures manifest, descriptor and peer carriers before the first await"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > rejects mismatched response controls and an over-bound body before any durable write"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > serves only a verified scope to an exactly authorized peer with bound manifest and chunk frames"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > admits one scope-peer transfer and four global sessions, then aborts every live body without a write"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > closes each inactive attempt at ten seconds and exhausts exactly three attempts"
+    },
+    {
+      "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+      "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > terminates a progressing slow-drip session at the fixed 120-second total boundary"
+    },
+    {
+      "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+      "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > keeps composition dormant behind the same missing transfer owner"
+    },
+    {
+      "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+      "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > consumes and retains one recovered authority before transfer while exposing no live effect before completion"
+    },
+    {
+      "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+      "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > uses three genuine nodes to reject a corrupt source, switch to an honest source, and activate without dialing"
+    },
+    {
+      "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+      "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > folds, transfers, verifies and activates one fresh snapshot-closed replacement without mutating its source"
+    },
+    {
+      "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+      "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > consumes the verified transfer once and rejects substitution before live effects"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > accepts only the four frozen recovery key combinations"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > rejects malformed bounded policy bytes before consuming the prepared capability"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > freezes the one shared exact predicate and its custody boundaries"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+      "name": "D.110c-0c1f5b live snapshot fixture contract > rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy join structural retirement without exposing an application intent"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] keeps settlement join control-only"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] excludes an authenticated activation vertex while surfacing later source work"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] refuses a settlement issued/outbox mismatch with the existing corruption classification"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] latches terminal state when the terminal transaction outcome is unknown"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: non-array entries"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+      "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: top-level extra key"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [control] pins settlement-v3 ACL as required from genesis while legacy retains v1"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [control] accepts an adjacent settled predecessor above epoch zero and rejects a gap"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: top-level extra key"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: ACL member extra key"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: accessor-backed ACL"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: missing"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: manual-review"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: fence-already-set"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] issues the fence first and atomically links the complete durable plan"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] reopens SQLite issuance+journal truth and replays exactly one linked pending fence"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] links one replacement exactly once across same-epoch retry and restart"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] halts after outcome-unknown and reopens to the atomic row+link or neither"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] makes completeRebaseSource unreachable under settlement while keeping the callable legacy seam"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [control] keeps creator-trusted-v1 fence issuance rejected before plan or issuance work"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects a genuine legacy-profile fence at ingress without journaling it"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [control] admits a huge valid settlement fence, rejects m > f, and never calls the application sink"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [control] uses the current anchor as admission authority for stale same-key ingress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a published same-key displaced row under settlement"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [control] classifies signed same-key cross-anchor causalJoin without application intents"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] classifies signed same-key cross-anchor join without application intents"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a displaced ACL source before fence issuance"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes dedicated fence transaction + planEffect"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes anchor-agnostic any-older-epoch/old-incarnation classification"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes all own source rows regardless publication state"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes settlement-only completion gate"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes complete close graph and application/control split"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+      "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes legacy-profile fence admission guard"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress codec RED > keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress codec RED > accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress codec RED > pins 16 as accepted and 17 as rejected without treating 17 as a settlement source"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress codec RED > rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress codec RED > accepts only the exact five-key progress effect and copies its digest"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress codec RED > validates a progress effect as a closed commit instead of failing on a future export"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > memory atomically records a partial chunk, then only the final chunk projects replacementSequence"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > browser atomically records a partial chunk, then only the final chunk projects replacementSequence"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > node atomically records a partial chunk, then only the final chunk projects replacementSequence"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > uses exact error ownership for malformed commits, stale progress and corrupt stored values"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > round-trips nested progress through browser structured clone and Node JSON without changing schemas"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > browser reopens before/after partial and final chunks without losing exact progress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t settlement progress store RED > node reopens before/after partial and final chunks without losing exact progress"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > refuses malformed and stale progress before signing, while a valid exact prefix issues"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+      "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > pins the progress owners without confusing a source-shape diagnostic with runtime proof"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > pins a real Node-assembled sixteen-entry progress chunk to its final child logical time"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > ordinary entries fields do not impersonate an application batch"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > ordinary batch.entries fields do not impersonate an application batch"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > genuine nested applicationBatch derives the final child rather than outer time"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects negative child time without publishing a durable chunk"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects non-integer child time without publishing a durable chunk"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects duplicate child time without publishing a durable chunk"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects regressed child time without publishing a durable chunk"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u exact store logical-time owner > refuses a structurally batch-shaped carrier beyond the canonical operation ceiling"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u zero-chunk origination ownership > memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u zero-chunk origination ownership > browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append"
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+      "name": "D.110c-0c1f5b0u zero-chunk origination ownership > node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 latched ACL referee-role successor RED > keeps the version-1 carrier closed over its original three groups"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 latched ACL referee-role successor RED > has one readiness failure for the unsupported version-2 authenticated carrier"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 version-2 referee semantics > admits the canonical version-2 carrier and preserves its version across staging"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 version-2 referee semantics > treats a referee as an envelope member but never as an application writer or finality signer"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 version-2 referee semantics > keeps role administration with the latched admin and rejects staged escalation"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 version-2 referee semantics > requires version-specific canonical group order and finality-key ownership"
+    },
+    {
+      "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+      "name": "E5-02 version-2 referee semantics > routes referee grants through the genuine node ACL owner"
+    }
+  ],
+  "gates": [
+    {
+      "label": "focused",
+      "files": [
+        "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts"
+      ],
+      "entries": [
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+          "name": "D.110c-0c1f5b live snapshot fixture contract > rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings"
+        }
+      ],
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+        "run",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts",
+        "--no-file-parallelism",
+        "--coverage.enabled=false",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/focused/result.json"
+      ]
+    },
+    {
+      "label": "retained",
+      "files": [
+        "tests/e5-01-v3-operation-admission-red.test.ts",
+        "tests/phase-4a-v3-live-blueprint-fold.test.ts",
+        "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+        "tests/phase-4c-snapshot-pull-red.test.ts",
+        "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+        "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+        "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+        "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts"
+      ],
+      "entries": [
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 RED keeps the generic admission behavior dormant behind the missing outcome owner"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > rebuilds policy from authenticated recovery before activation effects"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > reserves before local issuance and commits after journal but before projection"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > returns duplicate and conflict before local issuance, journal or projection"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > releases a definitely pre-issuance failure and permits one clean retry"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > holds an uncertain post-journal reservation until a fresh recovery rebuilds it exactly once"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > rejects remote replay conflicts before journal and effect while accepting one fresh vertex"
+        },
+        {
+          "file": "tests/e5-01-v3-operation-admission-red.test.ts",
+          "name": "E5-01 serialized v3 operation admission > preserves ordinary local issue when no policy is supplied"
+        },
+        {
+          "file": "tests/phase-4a-v3-live-blueprint-fold.test.ts",
+          "name": "Phase 4a live blueprint fold > binds signed genesis and converges two independent recovered peers"
+        },
+        {
+          "file": "tests/phase-4a-v3-live-blueprint-fold.test.ts",
+          "name": "Phase 4a live blueprint fold > rejects an authenticated latched member without application-writer authority"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > has one causal readiness failure for the absent snapshot activation and export surfaces"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > keeps package roots free of runtime/machine/snapshot authority and the v3-live roster unchanged"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > exports the adopted epoch, matches independent D.99 reconstruction, and activates a third replica"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > rejects live export before adoption, after deactivation, and from author-list authority while invalid next-ACL operations fail before retention"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > fails closed on digest, identity, ACL, schema, oversize, and unsafe carriers before registration effects"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > consumes the recovered capability once after snapshot success or failure"
+        },
+        {
+          "file": "tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+          "name": "Phase 4b-b live snapshot replacement composition tests-only RED > Phase 4b-b GREEN live snapshot composition > installs an already folded snapshot handle that rejects every effect-bearing method"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > pins the dedicated protocol, fixed limits, closed records and failure taxonomy"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > derives ordered unique non-prefix requests without a prefix watermark"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > has exactly one readiness failure for the dedicated network and node owners"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > adds only fixed non-root owners with exact types and unchanged roots"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > resumes a non-prefix durable subset, rejects corrupt and slow peers, and completes through 4c-a/4c-b"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > fails closed before transport for absent, disconnected, or unauthorized peers"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > captures manifest, descriptor and peer carriers before the first await"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > rejects mismatched response controls and an over-bound body before any durable write"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > serves only a verified scope to an exactly authorized peer with bound manifest and chunk frames"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > admits one scope-peer transfer and four global sessions, then aborts every live body without a write"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > closes each inactive attempt at ten seconds and exhausts exactly three attempts"
+        },
+        {
+          "file": "tests/phase-4c-snapshot-pull-red.test.ts",
+          "name": "Phase 4c-c authenticated snapshot pull RED > dormant GREEN transfer owner > terminates a progressing slow-drip session at the fixed 120-second total boundary"
+        },
+        {
+          "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+          "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > keeps composition dormant behind the same missing transfer owner"
+        },
+        {
+          "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+          "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > consumes and retains one recovered authority before transfer while exposing no live effect before completion"
+        },
+        {
+          "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+          "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > uses three genuine nodes to reject a corrupt source, switch to an honest source, and activate without dialing"
+        },
+        {
+          "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+          "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > folds, transfers, verifies and activates one fresh snapshot-closed replacement without mutating its source"
+        },
+        {
+          "file": "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+          "name": "Phase 4c-c genuine D.100 snapshot transfer composition RED > dormant GREEN composition > consumes the verified transfer once and rejects substitution before live effects"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > accepts only the four frozen recovery key combinations"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > rejects malformed bounded policy bytes before consuming the prepared capability"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+          "name": "D.110c-0c1f4 exact pinned-genesis bootstrap policy > freezes the one shared exact predicate and its custody boundaries"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy join structural retirement without exposing an application intent"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] keeps settlement join control-only"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] excludes an authenticated activation vertex while surfacing later source work"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] refuses a settlement issued/outbox mismatch with the existing corruption classification"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] latches terminal state when the terminal transaction outcome is unknown"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: non-array entries"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+          "name": "D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: top-level extra key"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [control] pins settlement-v3 ACL as required from genesis while legacy retains v1"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [control] accepts an adjacent settled predecessor above epoch zero and rejects a gap"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: top-level extra key"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: ACL member extra key"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: accessor-backed ACL"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: missing"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: manual-review"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: fence-already-set"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] issues the fence first and atomically links the complete durable plan"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] reopens SQLite issuance+journal truth and replays exactly one linked pending fence"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] links one replacement exactly once across same-epoch retry and restart"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] halts after outcome-unknown and reopens to the atomic row+link or neither"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] makes completeRebaseSource unreachable under settlement while keeping the callable legacy seam"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [control] keeps creator-trusted-v1 fence issuance rejected before plan or issuance work"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] rejects a genuine legacy-profile fence at ingress without journaling it"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [control] admits a huge valid settlement fence, rejects m > f, and never calls the application sink"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [control] uses the current anchor as admission authority for stale same-key ingress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a published same-key displaced row under settlement"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [control] classifies signed same-key cross-anchor causalJoin without application intents"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] classifies signed same-key cross-anchor join without application intents"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a displaced ACL source before fence issuance"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes dedicated fence transaction + planEffect"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes anchor-agnostic any-older-epoch/old-incarnation classification"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes all own source rows regardless publication state"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes settlement-only completion gate"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes complete close graph and application/control split"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+          "name": "D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes legacy-profile fence admission guard"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress codec RED > keeps the four-key entry, two-key effect and one-chunk legacy path byte-for-byte"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress codec RED > accepts exact empty, partial and complete progress and deep-clones nested bytes and chunks"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress codec RED > pins 16 as accepted and 17 as rejected without treating 17 as a settlement source"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress codec RED > rejects malformed progress, nonmonotonic chunks, wrong projection and forbidden dispositions"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress codec RED > accepts only the exact five-key progress effect and copies its digest"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress codec RED > validates a progress effect as a closed commit instead of failing on a future export"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > memory atomically records a partial chunk, then only the final chunk projects replacementSequence"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > browser atomically records a partial chunk, then only the final chunk projects replacementSequence"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > node atomically records a partial chunk, then only the final chunk projects replacementSequence"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > memory rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > browser rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > node rolls back issued/outbox/lineage/plan state and preserves monotonic CAS progress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > memory resolves an ambiguous partial receipt only from the exact durable row, chunk and revision"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > browser resolves an ambiguous partial receipt only from the exact durable row, chunk and revision"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > node resolves an ambiguous partial receipt only from the exact durable row, chunk and revision"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > uses exact error ownership for malformed commits, stale progress and corrupt stored values"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > round-trips nested progress through browser structured clone and Node JSON without changing schemas"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > browser reopens before/after partial and final chunks without losing exact progress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t settlement progress store RED > node reopens before/after partial and final chunks without losing exact progress"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > keeps the real 16-operation Node batch bound independent and reports a nonmutating legal split"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > refuses malformed and stale progress before signing, while a valid exact prefix issues"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+          "name": "D.110c-0c1f5b0t Node pre-reservation and split RED > pins the progress owners without confusing a source-shape diagnostic with runtime proof"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > pins a real Node-assembled sixteen-entry progress chunk to its final child logical time"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > ordinary entries fields do not impersonate an application batch"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > ordinary batch.entries fields do not impersonate an application batch"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > genuine nested applicationBatch derives the final child rather than outer time"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects negative child time without publishing a durable chunk"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects non-integer child time without publishing a durable chunk"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects duplicate child time without publishing a durable chunk"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > rejects regressed child time without publishing a durable chunk"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u exact store logical-time owner > refuses a structurally batch-shaped carrier beyond the canonical operation ceiling"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u zero-chunk origination ownership > memory refuses a nonempty legacy CAS while retaining empty upgrade and atomic append"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u zero-chunk origination ownership > browser refuses a nonempty legacy CAS while retaining empty upgrade and atomic append"
+        },
+        {
+          "file": "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+          "name": "D.110c-0c1f5b0u zero-chunk origination ownership > node refuses a nonempty legacy CAS while retaining empty upgrade and atomic append"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 latched ACL referee-role successor RED > keeps the version-1 carrier closed over its original three groups"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 latched ACL referee-role successor RED > has one readiness failure for the unsupported version-2 authenticated carrier"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 version-2 referee semantics > admits the canonical version-2 carrier and preserves its version across staging"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 version-2 referee semantics > treats a referee as an envelope member but never as an application writer or finality signer"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 version-2 referee semantics > keeps role administration with the latched admin and rejects staged escalation"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 version-2 referee semantics > requires version-specific canonical group order and finality-key ownership"
+        },
+        {
+          "file": "tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+          "name": "E5-02 version-2 referee semantics > routes referee grants through the genuine node ACL owner"
+        }
+      ],
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+        "run",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4a-v3-live-blueprint-fold.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-pull-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/protocol-v3-latched-acl-referee-successor-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts",
+        "--no-file-parallelism",
+        "--coverage.enabled=false",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-green-dc2f8dc2/retained/result.json"
+      ]
+    }
+  ],
+  "testHashes": {
+    "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts": "24b7a57addf2b77ca6987cee6ac5f4d10586b63a23e0ed6c79d4dbdc78d28181",
+    "tests/e5-01-v3-operation-admission-red.test.ts": "0f64058530c2462b043c6855eb2a4b1f18ece7dfa431a9d5f3c0e822a03201ec",
+    "tests/phase-4a-v3-live-blueprint-fold.test.ts": "b10807280dae51e515811264c864e058258d984a692850c674923fe779860616",
+    "tests/phase-4b-v3-live-snapshot-composition-red.test.ts": "1eb9c86f08a828cc43fc571aa5241f3292c4cc0e5849225de60b21a8791cdaa2",
+    "tests/phase-4c-snapshot-pull-red.test.ts": "82a39be0ab771ec01b7ee5bf1539d4d043a8555634ee09dc1fc86e7837614247",
+    "tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts": "36bb8bba02c60f195462c319c07ffd9b18ac3148aa65b999973df4ea62034274",
+    "tests/protocol-v3-latched-acl-referee-successor-red.test.ts": "c642a8cc72f5d303f431a87e1e8235e8ce8b1dc06d8f976f13cc426476eeabcf",
+    "tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts": "1b3233c84954b9c24116110b4b44d8e4d26e73980dc5a248890a46c683a5e5a6",
+    "tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts": "12e1eabca1a200d440444753c81f00688bea6337e0e3ea6af3ba7c1e9356b770",
+    "tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts": "c6a75c8def11892544a32e146f7c4fa6173fb8b26618745aa1d7e90f4071047a",
+    "tests/phase-6b-d110c-0c1f5b0t-settlement-progress-red.test.ts": "633a14be104e34684c169cfc5b66f6e995ad84e75bdef0f3e5cded93b0c43394",
+    "tests/phase-6b-d110c-0c1f5b0u-store-red.test.ts": "0be06afdd35ab9c10e4d8cdd91138c930d5a3425005285211290ef4a2a41a922"
+  },
+  "node": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "vitest": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+  "nodeSha256": "6a1137a572bc6648411bfe51032173a535e010576cad6da87547f414daa11fdb",
+  "vitestSha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+  "noWideOrShadowAggregate": true
+}

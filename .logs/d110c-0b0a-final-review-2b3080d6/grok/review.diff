@@ -1,0 +1,1704 @@
+commit 2b3080d6562881ecd2a129dc3d896e9e9a86650d
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 04:29:52 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 04:29:52 2026 -0400
+
+    feat: close D.110c-0b0a staged adoption GREEN
+
+diff --git a/.logs/d110c-0b0a-green-c1e443fc/focused.json b/.logs/d110c-0b0a-green-c1e443fc/focused.json
+new file mode 100644
+index 00000000..fe126533
+--- /dev/null
++++ b/.logs/d110c-0b0a-green-c1e443fc/focused.json
+@@ -0,0 +1 @@
++{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":3,"numPassedTests":3,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788337035873,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0b0a staged adoption and pending recovery GREEN"],"fullName":"D.110c-0b0a staged adoption and pending recovery GREEN stages without a head swap and publishes through one owner-bound CAS","status":"passed","title":"stages without a head swap and publishes through one owner-bound CAS","duration":416.113959,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0b0a staged adoption and pending recovery GREEN"],"fullName":"D.110c-0b0a staged adoption and pending recovery GREEN recovers equivalent Complete retries deterministically across both AHE orderings","status":"passed","title":"recovers equivalent Complete retries deterministically across both AHE orderings","duration":197.33762500000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0b0a staged adoption and pending recovery GREEN"],"fullName":"D.110c-0b0a staged adoption and pending recovery GREEN fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates","status":"passed","title":"fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates","duration":343.27437499999996,"failureMessages":[],"meta":{}}],"startTime":1788337036711,"endTime":1788337037668.2744,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts"}]}
+\ No newline at end of file
+diff --git a/.logs/d110c-0b0a-green-c1e443fc/green-ledger.md b/.logs/d110c-0b0a-green-c1e443fc/green-ledger.md
+new file mode 100644
+index 00000000..3e98bb54
+--- /dev/null
++++ b/.logs/d110c-0b0a-green-c1e443fc/green-ledger.md
+@@ -0,0 +1,88 @@
++# D.110c-0b0a GREEN evidence ledger
++
++- RED base: `c1e443fc9676187c4b02dcd23459a23119de8146`
++- Scope: Node-only staged successor adoption, publication, and non-activating pending recovery.
++- Long or consuming invocations: none.
++- Product/provider orchestration, wire records, dependencies, thresholds, and existing root exports: unchanged.
++
++## Accepted runtime results
++
++The final focused command disabled the repository-wide coverage percentage gate because this is a single-file semantic execution:
++
++```text
++pnpm exec vitest run tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts --coverage.enabled=false --reporter=json --outputFile=.logs/d110c-0b0a-green-c1e443fc/focused.json
++```
++
++Result: status 0; JSON `success:true`; 3/3 tests passed; 0 failed; 0 pending.
++
++The retained command selected these exact eight files:
++
++```text
++tests/phase-3a1b-p3-live-transport-red.test.ts
++tests/phase-3h-v3-room-rehearsal-red.test.ts
++tests/phase-6a-creator-adoption-commit-red.test.ts
++tests/phase-6a-creator-adoption-red.test.ts
++tests/phase-6a-creator-successor-activation-red.test.ts
++tests/phase-6a-creator-successor-handle-identity-red.test.ts
++tests/phase-6b-cleanup-eligibility-red.test.ts
++tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
++```
++
++Result: status 0; JSON `success:true`; 86/86 tests passed; 0 failed; 0 pending. Vitest reports 14 suites for those eight result files.
++
++## Accepted static and build results
++
++All of the following exited 0:
++
++```text
++pnpm --filter @ts-drp/node build
++pnpm --filter @ts-drp/node exec tsc --noEmit -p tsconfig.build.json
++node_modules/.bin/tsc -p tests/fixtures/phase-3a1b-p3/tsconfig.test.json
++pnpm exec eslint <the exact twelve changed source/test paths>
++NODE_OPTIONS=--max-old-space-size=8192 pnpm exec prettier --check <the exact twelve changed source/test paths>
++git diff --check
++```
++
++The built self-reference probe was executed from `packages/node`, where the workspace package resolves itself, and observed the exact new non-root export rosters:
++
++```text
++@ts-drp/node/creator-adoption-recover => ["recoverPendingCreatorSuccessorAdoption"]
++@ts-drp/node/creator-adoption-stage => ["publishStagedCreatorSuccessorAdoption","stageCreatorSuccessorAdoption"]
++```
++
++The corrected source audit found no provider import, provider call, product source edit, protocol-v3 edit, dependency/lockfile edit, activation binding, or root-export widening in this slice. The existing examples and package root owners were unchanged.
++
++## Diagnostic corrections
++
++- The first focused GREEN run passed 2/3. The sole failure was tests-only: the fixture returned the raw AHE backend rather than its decorated swap-observing store. The fixture was corrected without changing product behavior.
++- The next focused report was semantically 3/3 but the command exited nonzero only because the repository's global 70% coverage threshold is inapplicable to one focused file. The final focused command disabled coverage and is the accepted result.
++- The first retained run passed 83/86. Its three failures identified: retained one-call commit-then-throw semantics, a no-mutation diagnostic that scanned a multi-owner file instead of the verifier function, and mixed source/dist unique-symbol storage types in the private exact compile fixture. Each was corrected narrowly; the next and final retained runs passed 86/86.
++- A first read-only provider source-shape regex searched every occurrence of the word `provider`, including documentation, and was corrected to inspect actual imports and calls. This was a faulty diagnostic, not a code failure.
++- A first built-export probe ran from the repository root, which does not link `@ts-drp/node`; rerunning from `packages/node` proved the intended package self-resolution. This was a wrong working directory, not an export failure.
++- The broad `pnpm --filter @ts-drp/node typecheck` command remains unsuitable as an exact slice gate because it includes inherited repository test/config errors (worker-host `rootDir`, retained WebRTC emit typing, and a compact-history helper). The exact production source typecheck and the affected private compile fixture both pass; this slice does not widen to those inherited owners.
++
++## Exact changed source/test roster and SHA-256
++
++```text
++39af3f8a7a9765d006acdd1b7969a4ba550ee6da9794189980f605bc627510c5  packages/node/package.json
++34c035497e7f052d8331b348aea5fa95287d6db090aed92a132e8855df1ca71f  packages/node/src/creator-adoption-commit.ts
++71d0026c76bcf9c88725757d5c062b27df7515da4d375d96216f28563c708735  packages/node/src/creator-adoption-recover.ts
++26bc75d921d48f41eb49f34dd556d4cac2f9dec1ebb56a8420026369fda2c52e  packages/node/src/creator-adoption-stage.ts
++07e8c680dfd520a1ce45e10081561a4014d4ce0003aa4ffba06c8aade4e5c7db  packages/node/src/creator-adoption.ts
++daedadf8236793dcdb5472b336bb9230bc480b806879113527785d2193019f82  packages/node/src/internal/creator-adoption-intent.ts
++01fb852eab12c8110075694bacbbddf20f8a6bf81321d3413ee7bab19337535e  packages/node/src/internal/creator-adoption-recover.ts
++8e5e6018e555e97bc1211914f76712abad623e442a509b8b23a0a4ffb0e56cd7  packages/node/src/internal/creator-adoption-stage.ts
++423fc5b34f931be24d9af73b60f293279b3febddfbb2b6f44794bd34226d9a93  tests/fixtures/phase-3a1b-p3/tsconfig.test.json
++e1236d4e13ab6c1c04854afe805e7a2d5820f02928c07e8fa223fe138e61ca02  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++af39a32b2aa4e1ad372c01e60d33aba8776197e36f63324f8d8c42c8869490b5  tests/phase-3a1b-p3-live-transport-red.test.ts
++c2815d6831837f7845e55479e560b266aa185dd441b3e1e4dfcc05a867cb122a  tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
++```
++
++Final report hashes:
++
++```text
++dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349  focused.json
++65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059  retained.json
++```
++
++Protected `.agents`, `.claude`, and `.pnpm-store` remain untracked and unstaged. All 27 stashes remain present, including the explicitly named recoverable `d110c-0b0 exploratory pre-0b0a` stash. No D.110a identity was invoked.
+diff --git a/.logs/d110c-0b0a-green-c1e443fc/manifest.sha256 b/.logs/d110c-0b0a-green-c1e443fc/manifest.sha256
+new file mode 100644
+index 00000000..a64d086e
+--- /dev/null
++++ b/.logs/d110c-0b0a-green-c1e443fc/manifest.sha256
+@@ -0,0 +1,16 @@
++c685681d3cd8e7f21837000ddb4b886a3048178422f869552d204e7adc45b292  docs/production-hardening/production-hardening-tdd-plan-v2.md
++96dbd687bd163d96cecd70bd4ebdf10a7fa8f2e7f397f50100826e4bb69ed3c6  .logs/d110c-0b0a-green-c1e443fc/green-ledger.md
++dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349  .logs/d110c-0b0a-green-c1e443fc/focused.json
++65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059  .logs/d110c-0b0a-green-c1e443fc/retained.json
++39af3f8a7a9765d006acdd1b7969a4ba550ee6da9794189980f605bc627510c5  packages/node/package.json
++34c035497e7f052d8331b348aea5fa95287d6db090aed92a132e8855df1ca71f  packages/node/src/creator-adoption-commit.ts
++71d0026c76bcf9c88725757d5c062b27df7515da4d375d96216f28563c708735  packages/node/src/creator-adoption-recover.ts
++26bc75d921d48f41eb49f34dd556d4cac2f9dec1ebb56a8420026369fda2c52e  packages/node/src/creator-adoption-stage.ts
++07e8c680dfd520a1ce45e10081561a4014d4ce0003aa4ffba06c8aade4e5c7db  packages/node/src/creator-adoption.ts
++daedadf8236793dcdb5472b336bb9230bc480b806879113527785d2193019f82  packages/node/src/internal/creator-adoption-intent.ts
++01fb852eab12c8110075694bacbbddf20f8a6bf81321d3413ee7bab19337535e  packages/node/src/internal/creator-adoption-recover.ts
++8e5e6018e555e97bc1211914f76712abad623e442a509b8b23a0a4ffb0e56cd7  packages/node/src/internal/creator-adoption-stage.ts
++423fc5b34f931be24d9af73b60f293279b3febddfbb2b6f44794bd34226d9a93  tests/fixtures/phase-3a1b-p3/tsconfig.test.json
++e1236d4e13ab6c1c04854afe805e7a2d5820f02928c07e8fa223fe138e61ca02  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++af39a32b2aa4e1ad372c01e60d33aba8776197e36f63324f8d8c42c8869490b5  tests/phase-3a1b-p3-live-transport-red.test.ts
++c2815d6831837f7845e55479e560b266aa185dd441b3e1e4dfcc05a867cb122a  tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+diff --git a/.logs/d110c-0b0a-green-c1e443fc/retained.json b/.logs/d110c-0b0a-green-c1e443fc/retained.json
+new file mode 100644
+index 00000000..9eaa284d
+--- /dev/null
++++ b/.logs/d110c-0b0a-green-c1e443fc/retained.json
+@@ -0,0 +1 @@
++{"numTotalTestSuites":14,"numPassedTestSuites":14,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":86,"numPassedTests":86,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788337165877,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED adds only the exact private activation, ingress, handle and error surface","status":"passed","title":"adds only the exact private activation, ingress, handle and error surface","duration":215.26591699999994,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED captures malformed outer input without consuming, then burns a genuine recovered token","status":"passed","title":"captures malformed outer input without consuming, then burns a genuine recovered token","duration":119.515083,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED rejects every hostile outer-record shape without invocation or authority and returns fresh frozen failures","status":"passed","title":"rejects every hostile outer-record shape without invocation or authority and returns fresh frozen failures","duration":2.201665999999932,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED pins every activation first-failure stage and zero effects under combined faults","status":"passed","title":"pins every activation first-failure stage and zero effects under combined faults","duration":143.95116600000006,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation","status":"passed","title":"reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation","duration":135.44516599999997,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED rejects genuine signed wrong-object and wrong-epoch live vertices before the journal boundary","status":"passed","title":"rejects genuine signed wrong-object and wrong-epoch live vertices before the journal boundary","duration":40.72416700000008,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED keeps wrong-scope evidence from consuming capacity needed by current-scope pending ingress","status":"passed","title":"keeps wrong-scope evidence from consuming capacity needed by current-scope pending ingress","duration":6818.826125,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED rejects genuine persisted wrong scope before graph replay while preserving current-scope recovery","status":"passed","title":"rejects genuine persisted wrong scope before graph replay while preserving current-scope recovery","duration":79.96404200000143,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED retires membership-lost registrations and requires a fresh token for one replacement handle","status":"passed","title":"retires membership-lost registrations and requires a fresh token for one replacement handle","duration":43.5082910000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED burns genuine tokens across foreign ownership and reverse-rolls a failed subscription","status":"passed","title":"burns genuine tokens across foreign ownership and reverse-rolls a failed subscription","duration":65.08208299999933,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED serializes genuine egress and classifies page, publish and mark deactivation races","status":"passed","title":"serializes genuine egress and classifies page, publish and mark deactivation races","duration":125.3797910000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED routes an unbound non-v3 message to legacy and claims unbound tag 11 without decode","status":"passed","title":"routes an unbound non-v3 message to legacy and claims unbound tag 11 without decode","duration":0.30095799999980954,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED derives only the exact stable-genesis topic and uses it as queue and wire identity","status":"passed","title":"derives only the exact stable-genesis topic and uses it as queue and wire identity","duration":714.3658749999995,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED binds activation to the sole existing token owner and exact effect sequence","status":"passed","title":"binds activation to the sole existing token owner and exact effect sequence","duration":32.74724999999853,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED owns reverse rollback, postcondition cleanup and dead-handle invalidation without touching legacy","status":"passed","title":"owns reverse rollback, postcondition cleanup and dead-handle invalidation without touching legacy","duration":0.8420419999984006,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED places the sole v3 routing decision before discovery and legacy, with true terminating dispatch","status":"passed","title":"places the sole v3 routing decision before discovery and legacy, with true terminating dispatch","duration":0.33395800000107556,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED decodes one canonical envelope then invokes only the genuine Seam-1 extractor with exact seven keys","status":"passed","title":"decodes one canonical envelope then invokes only the genuine Seam-1 extractor with exact seven keys","duration":15.229166999999507,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED walks one-record pages past published rows and publishes one durable pending row before exact mark","status":"passed","title":"walks one-record pages past published rows and publishes one durable pending row before exact mark","duration":13.825958999999784,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED pins same-row preimage/signature/scope/sequence/digest authority and no automatic drain claim","status":"passed","title":"pins same-row preimage/signature/scope/sequence/digest authority and no automatic drain claim","duration":1.2946669999982987,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED keeps the Seam3 owner private and excludes protocol-v2, B effects and extra authority","status":"passed","title":"keeps the Seam3 owner private and excludes protocol-v2, B effects and extra authority","duration":1075.5114169999997,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED pins the sole node dependency and forbids manifest, export-map and lock widening","status":"passed","title":"pins the sole node dependency and forbids manifest, export-map and lock widening","duration":2.4447499999987485,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED causally compiles the mutually exact A and Seam3 private type contracts","status":"passed","title":"causally compiles the mutually exact A and Seam3 private type contracts","duration":1993.2475830000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED keeps errors path-free and byte-free while freezing every result record","status":"passed","title":"keeps errors path-free and byte-free while freezing every result record","duration":0.9103749999994761,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3a-1B Seam 3 private live-plane RED"],"fullName":"Phase 3a-1B Seam 3 private live-plane RED retains generated and source ownership without a hand-written second envelope codec","status":"passed","title":"retains generated and source ownership without a hand-written second envelope codec","duration":503.8916250000002,"failureMessages":[],"meta":{}}],"startTime":1788337166827,"endTime":1788337178972.8916,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p3-live-transport-red.test.ts"},{"assertionResults":[{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED uses genuine trust, issuance and recovery, signs the record last, and reopens durable target state","status":"passed","title":"uses genuine trust, issuance and recovery, signs the record last, and reopens durable target state","duration":527.5272500000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED rejects a caller-selected target, a foreign creator, and hostile nonce views before target effects","status":"passed","title":"rejects a caller-selected target, a foreign creator, and hostile nonce views before target effects","duration":107.51008300000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED rejects duplicate source identity, unstable prepare, source substitution, and target-state divergence","status":"passed","title":"rejects duplicate source identity, unstable prepare, source substitution, and target-state divergence","duration":303.87374999999975,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED rejects oversized state and import descriptions before target reservation","status":"passed","title":"rejects oversized state and import descriptions before target reservation","duration":203.59787499999993,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED linearizes the source snapshot before a concurrently queued source write","status":"passed","title":"linearizes the source snapshot before a concurrently queued source write","duration":157.24595799999997,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED rejects a genuine target import failure and a foreign registered-vertex signature without poisoning the source","status":"passed","title":"rejects a genuine target import failure and a foreign registered-vertex signature without poisoning the source","duration":236.90937500000018,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED contains a malformed signed remote migration record before projection and keeps recovery usable","status":"passed","title":"contains a malformed signed remote migration record before projection and keeps recovery usable","duration":420.86816599999975,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED rejects noncreator and creator-signed malformed decisions before the exact creator activation","status":"passed","title":"rejects noncreator and creator-signed malformed decisions before the exact creator activation","duration":1040.399292,"failureMessages":[],"meta":{}},{"ancestorTitles":["Phase 3h shared-room reversible rehearsal RED"],"fullName":"Phase 3h shared-room reversible rehearsal RED recovers irreversible activation commits without reopening source authority","status":"passed","title":"recovers irreversible activation commits without reopening source authority","duration":3527.456,"failureMessages":[],"meta":{}}],"startTime":1788337167338,"endTime":1788337173864.456,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes exactly ten RED and four GREEN owners","status":"passed","title":"freezes exactly ten RED and four GREEN owners","duration":3.312999999999988,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes the closed public contract and finite fault vocabulary","status":"passed","title":"freezes the closed public contract and finite fault vocabulary","duration":0.6511669999999867,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED constructs one sorted generation-2 replacement without a manifest ref","status":"passed","title":"constructs one sorted generation-2 replacement without a manifest ref","duration":1.1525000000000318,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED classifies exact active-new independently of a retrying generation id","status":"passed","title":"classifies exact active-new independently of a retrying generation id","duration":1.1553330000000415,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED keeps root/product/transport/issuance/activation owners outside the GREEN roster","status":"passed","title":"keeps root/product/transport/issuance/activation owners outside the GREEN roster","duration":1.0470000000000255,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED [RED readiness] requires all four candidate owners and the non-root package export","status":"passed","title":"[RED readiness] requires all four candidate owners and the non-root package export","duration":0.0805000000000291,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED consumes only a genuine owner-bound intent and commits one exact successor","status":"passed","title":"consumes only a genuine owner-bound intent and commits one exact successor","duration":471.2913749999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED accepts a byte-identical second intent without a second head swap","status":"passed","title":"accepts a byte-identical second intent without a second head swap","duration":197.131167,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED reopens pending-old or exact active-new at every logical request fault","status":"passed","title":"reopens pending-old or exact active-new at every logical request fault","duration":3098.184041,"failureMessages":[],"meta":{}}],"startTime":1788337166820,"endTime":1788337170594.184,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED freezes the exact tests-only and GREEN owner rosters","status":"passed","title":"freezes the exact tests-only and GREEN owner rosters","duration":1.2714579999999387,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED freezes the exact v3-live-generation-2 grammar and compact-history carrier","status":"passed","title":"freezes the exact v3-live-generation-2 grammar and compact-history carrier","duration":0.9494999999999436,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED enumerates every registered CutValue field and every cross-owner causal mutant","status":"passed","title":"enumerates every registered CutValue field and every cross-owner causal mutant","duration":0.6976250000000164,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED pins owner-bound one-use intent behavior independently of serialization","status":"passed","title":"pins owner-bound one-use intent behavior independently of serialization","duration":0.16870799999992414,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership","status":"passed","title":"forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership","duration":0.660457999999835,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes every CutValue mutant against the genuine certified successor chain","status":"passed","title":"executes every CutValue mutant against the genuine certified successor chain","duration":87.70749999999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants","status":"passed","title":"executes swapped Cut/QC/trust, prepare-QC, duplicate-signer and pending-ref mutants","duration":20.976666999999907,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes predecessor-lineage, close-order and append-only history mutants","status":"passed","title":"executes predecessor-lineage, close-order and append-only history mutants","duration":0.4940840000001572,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED replays the genuine durable journal/issuance pair and rejects missing local-issued custody","status":"passed","title":"replays the genuine durable journal/issuance pair and rejects missing local-issued custody","duration":0.7807080000000042,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED executes manifest, chunk, payload, catalog and artifact cross-pair mutants","status":"passed","title":"executes manifest, chunk, payload, catalog and artifact cross-pair mutants","duration":3.8028750000000855,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED detects a durable vertex appended after the sealed journal snapshot","status":"passed","title":"detects a durable vertex appended after the sealed journal snapshot","duration":2.2845840000002227,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED derives the exact canonical generation-2 projection and reopens its compact history","status":"passed","title":"derives the exact canonical generation-2 projection and reopens its compact history","duration":3.471084000000019,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108b read-only creator-successor adoption RED"],"fullName":"D.108b read-only creator-successor adoption RED has one composite readiness gate for the genuine future verifier","status":"passed","title":"has one composite readiness gate for the genuine future verifier","duration":351.42258300000003,"failureMessages":[],"meta":{}}],"startTime":1788337167324,"endTime":1788337167799.4226,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner","status":"passed","title":"freezes the D.108e2a activation boundary and its single topic owner","duration":202.59450000000015,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect","status":"passed","title":"rejects a hostile cold authentication profile before every downstream effect","duration":5.022875000000113,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners","status":"passed","title":"freezes exactly seven RED and eight GREEN owners","duration":0.78512499999988,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","status":"passed","title":"retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","duration":0.27424999999993815,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently","status":"passed","title":"derives the exact epoch-one identity and pending epoch-zero lineage independently","duration":215.879416,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED keeps the root and products outside D.108d1","status":"passed","title":"keeps the root and products outside D.108d1","duration":1.075458000000026,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory","status":"passed","title":"pins the complete zero-skip GREEN inventory","duration":0.7148339999998825,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate","status":"passed","title":"imports the shipped successor activation owner without a source-pattern readiness gate","duration":0.2899999999999636,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation","status":"passed","title":"genuine successor imports its verified snapshot before epoch-one activation","duration":188.58887500000014,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED private custody alone selects installEpochAnchor","status":"passed","title":"private custody alone selects installEpochAnchor","duration":1514.224625,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED divergent genesis identity fails before every live effect","status":"passed","title":"divergent genesis identity fails before every live effect","duration":757.4245000000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one","status":"passed","title":"pending epoch-zero outbox is classified and never published as epoch one","duration":167.81883300000027,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal","status":"passed","title":"old handle registration author and prepared capability are terminal","duration":156.94308300000012,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim","status":"passed","title":"hot duplicate returns the same handle before a second source claim","duration":174.00495800000044,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed","status":"passed","title":"conflicting hot duplicate bindings fail closed","duration":171.69533299999966,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead","status":"passed","title":"post-adoption activation failure cleans up and fresh reverify performs no second swapHead","duration":186.99212499999976,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt","status":"passed","title":"TTL expiry performs one bounded full reverify attempt","duration":651.8235839999998,"failureMessages":[],"meta":{}}],"startTime":1788337167247,"endTime":1788337171643.8235,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface","status":"passed","title":"freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface","duration":3.0705830000001697,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED [RED readiness] requires the private one-shot handle-alias bridge","status":"passed","title":"[RED readiness] requires the private one-shot handle-alias bridge","duration":0.253041999999823,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1a successor handle registration identity RED"],"fullName":"D.108d1a successor handle registration identity RED returned hot wrapper retains route, admission, targeted replay and deactivation identity","status":"passed","title":"returned hot wrapper retains route, admission, targeted replay and deactivation identity","duration":356.74916699999994,"failureMessages":[],"meta":{}}],"startTime":1788337167254,"endTime":1788337167613.7493,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence","status":"passed","title":"freezes one tests-only RED owner, one internal GREEN owner, the policy vector, and refusal precedence","duration":1.2453749999999673,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED proves the dangling-parent mutant and exact local lineage-floor normalization","status":"passed","title":"proves the dangling-parent mutant and exact local lineage-floor normalization","duration":2.458708999999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED keeps the candidate package-internal and free of deletion effects","status":"passed","title":"keeps the candidate package-internal and free of deletion effects","duration":1.0637919999999212,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED [RED readiness] requires the sole closed-epoch cleanup planner","status":"passed","title":"[RED readiness] requires the sole closed-epoch cleanup planner","duration":0.08520899999996345,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED returns the exact immutable active/two-ancestor/floor plan","status":"passed","title":"returns the exact immutable active/two-ancestor/floor plan","duration":21.812667000000033,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED continues planning from a numeric pruning watermark across restart and a later epoch","status":"passed","title":"continues planning from a numeric pruning watermark across restart and a later epoch","duration":2.2828750000001037,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED rejects every causal mutant with the exact closed reason","status":"passed","title":"rejects every causal mutant with the exact closed reason","duration":1.4482080000000224,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED refuses gaps, surviving branches, wrong floor parents, and incomplete closures","status":"passed","title":"refuses gaps, surviving branches, wrong floor parents, and incomplete closures","duration":0.9914169999999558,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED applies exact refusal precedence","status":"passed","title":"applies exact refusal precedence","duration":0.5039590000000089,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED is permutation-invariant and returns detached output","status":"passed","title":"is permutation-invariant and returns detached output","duration":1.063874999999939,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109a closed-epoch cleanup eligibility RED"],"fullName":"D.109a closed-epoch cleanup eligibility RED accepts genuine Phase-6a close/adoption material without reopening verification","status":"passed","title":"accepts genuine Phase-6a close/adoption material without reopening verification","duration":438.79200000000014,"failureMessages":[],"meta":{}}],"startTime":1788337166819,"endTime":1788337167290.792,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts"}]}
+\ No newline at end of file
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 526a2659..2b8cd4ce 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -92983,6 +92983,43 @@ The causal matrix matches the frozen RED exactly; no production file changed,
+ no retained or long test ran, and GREEN may now implement only the accepted
+ Node seam.
+ 
++The D.110c-0b0a GREEN implementation now closes that exact causal seam. The
++new non-root `creator-adoption-stage` owner stages and authenticates a complete
++successor without moving the AHE head, then publishes it through one
++owner-bound, one-use opaque capability and one exact head CAS. The separate
++non-activating `creator-adoption-recover` owner authenticates a provider-selected
++pending candidate from pinned genesis and the copied exact previous/next room
++head tuples, deterministically selects equivalent retry leftovers, rejects a
++different authenticated closure as a true fork, and resolves old-head,
++already-new-head, and ambiguous-CAS recovery without deriving freshness from
++room storage or activating a live successor. The retained one-call commit API,
++its public roster and fault semantics, product/provider orchestration, existing
++activation owners, protocol records, dependencies, thresholds, and root exports
++remain unchanged.
++
++The accepted focused command disabled only the repository-wide coverage
++percentage gate and passed 3/3. The exact retained eight-file selection passed
++86/86 with zero failures or pending tests. Node build, exact production-source
++typecheck, the affected private compile fixture, exact-owner ESLint and
++Prettier, diff-check, source-shape audit, and built package self-reference
++export probe all exited zero. The broad Node package `typecheck` remains an
++inherited unsuitable aggregate because it includes unrelated worker-host
++`rootDir`, retained WebRTC emit-typing, and compact-history-helper errors; the
++exact affected source and private compile owners pass and this slice does not
++widen to those debts. A first provider grep that matched documentation and a
++first export probe run from the unlinked repository root were corrected as
++diagnostic mistakes, not code failures.
++
++Final focused and retained JSON SHA-256 values are
++`dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349`
++and `65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059`.
++The complete command/result, diagnostic, changed-path, source-hash, stash, and
++protected-path ledger is
++`.logs/d110c-0b0a-green-c1e443fc/green-ledger.md`. No D.110a identity or long
++campaign ran. GREEN is not closed until this signed/pushed implementation and
++evidence receive the one governing Grok/Kimi/Opus plan-to-RED-to-GREEN review;
++only P0/P1 blocks. No Fable result substitutes for that formal review.
++
+ This exact owner-selection design is signed and pushed before one bounded Grok
+ 4.6/high, standard direct Kimi K3 with
+ `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Only P0/P1 blocks;
+diff --git a/packages/node/package.json b/packages/node/package.json
+index ffd598bb..8c2e7fc5 100644
+--- a/packages/node/package.json
++++ b/packages/node/package.json
+@@ -47,6 +47,14 @@
+ 			"types": "./dist/src/creator-adoption-commit.d.ts",
+ 			"import": "./dist/src/creator-adoption-commit.js"
+ 		},
++		"./creator-adoption-stage": {
++			"types": "./dist/src/creator-adoption-stage.d.ts",
++			"import": "./dist/src/creator-adoption-stage.js"
++		},
++		"./creator-adoption-recover": {
++			"types": "./dist/src/creator-adoption-recover.d.ts",
++			"import": "./dist/src/creator-adoption-recover.js"
++		},
+ 		"./creator-adoption-activate": {
+ 			"types": "./dist/src/creator-adoption-activate.d.ts",
+ 			"import": "./dist/src/creator-adoption-activate.js"
+diff --git a/packages/node/src/creator-adoption-commit.ts b/packages/node/src/creator-adoption-commit.ts
+index 0a70736d..678edd90 100644
+--- a/packages/node/src/creator-adoption-commit.ts
++++ b/packages/node/src/creator-adoption-commit.ts
+@@ -15,11 +15,15 @@ import {
+ import type { CreatorLiveCloseResult } from "./creator-close.js";
+ import {
+ 	consumeCreatorAdoptionIntent,
++	consumeStagedCreatorSuccessorAdoption,
+ 	createPreparedCreatorSuccessorAdoption,
++	createStagedCreatorSuccessorAdoption,
+ 	type CreatorAdoptionIntentMaterial,
+ 	type PreparedCreatorSuccessorAdoption,
+ 	resolveCreatorAdoptionFacts,
++	type StagedCreatorSuccessorAdoption,
+ } from "./internal/creator-adoption-intent.js";
++import { installCreatorAdoptionPublish, installCreatorAdoptionStage } from "./internal/creator-adoption-stage.js";
+ import { completeCreatorSuccessorLiveMaterial } from "./internal/creator-successor-live.js";
+ 
+ type FailureKind =
+@@ -41,6 +45,14 @@ type CommitSuccess = Readonly<{
+ 	readonly ok: true;
+ 	readonly recovery: "active-new";
+ }>;
++type StageSuccess = Readonly<{
++	readonly capability: StagedCreatorSuccessorAdoption;
++	readonly descriptor: Readonly<Record<string, unknown>>;
++	readonly lifecycle: "successor-staged";
++	readonly ok: true;
++	readonly recovery: "pending-old";
++}>;
++type PublishSuccess = CommitSuccess;
+ 
+ interface SealedAdoptionFacts {
+ 	readonly closeResult: CreatorLiveCloseResult;
+@@ -62,6 +74,11 @@ interface CapturedInput {
+ 	readonly intent: object;
+ }
+ 
++interface CapturedPublishInput {
++	readonly capability: object;
++	readonly handle: object;
++}
++
+ type Candidate = Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>;
+ type Terminal =
+ 	| Readonly<{ readonly head: PresentHead; readonly kind: "active-new" }>
+@@ -69,6 +86,12 @@ type Terminal =
+ 	| Readonly<{ readonly kind: "stale-head" }>
+ 	| Readonly<{ readonly kind: "recovery-failed" }>
+ 	| Readonly<{ readonly kind: "chain-invalid" }>;
++type StagedTerminal =
++	| Readonly<{ readonly kind: "staged" }>
++	| Readonly<{ readonly kind: "pending-old" }>
++	| Readonly<{ readonly kind: "stale-head" }>
++	| Readonly<{ readonly kind: "recovery-failed" }>
++	| Readonly<{ readonly kind: "chain-invalid" }>;
+ 
+ function failure(kind: FailureKind, detail: string): CommitFailure {
+ 	return Object.freeze({ detail, kind, ok: false as const });
+@@ -96,6 +119,24 @@ function captureInput(value: unknown): CapturedInput | undefined {
+ 	}
+ }
+ 
++function capturePublishInput(value: unknown): CapturedPublishInput | undefined {
++	try {
++		if (!record(value) || Object.keys(value).sort().join(",") !== "capability,handle") return undefined;
++		const capability = Object.getOwnPropertyDescriptor(value, "capability");
++		const handle = Object.getOwnPropertyDescriptor(value, "handle");
++		return capability !== undefined &&
++			"value" in capability &&
++			record(capability.value) &&
++			handle !== undefined &&
++			"value" in handle &&
++			record(handle.value)
++			? Object.freeze({ capability: capability.value, handle: handle.value })
++			: undefined;
++	} catch {
++		return undefined;
++	}
++}
++
+ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+ 	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
+ }
+@@ -223,6 +264,47 @@ function validLineage(
+ 	return true;
+ }
+ 
++function validStagedLineage(
++	generations: readonly GenerationRecord[],
++	facts: SealedAdoptionFacts,
++	material: CreatorAdoptionIntentMaterial
++): boolean {
++	const byId = new Map(generations.map((generation) => [generation.generationId, generation]));
++	if (byId.size !== generations.length) return false;
++	const current = byId.get(facts.currentHead.generationId);
++	const pending = byId.get(facts.proposedHead.generationId);
++	const staged = byId.get(material.generationId);
++	if (
++		current === undefined ||
++		pending === undefined ||
++		staged === undefined ||
++		current.state !== "Superseded" ||
++		pending.state !== "Adopted" ||
++		staged.state !== "Complete" ||
++		!sameClosure(current.closure, facts.currentReferences) ||
++		pending.baseExpectedHead.kind !== "present" ||
++		!sameHead(pending.baseExpectedHead, facts.currentHead) ||
++		!sameClosure(pending.closure, facts.proposedReferences) ||
++		staged.baseExpectedHead.kind !== "present" ||
++		!sameHead(staged.baseExpectedHead, material.pendingHead) ||
++		!sameClosure(staged.closure, material.candidateReferences) ||
++		facts.proposedHead.revision !== facts.currentHead.revision + 1
++	) {
++		return false;
++	}
++	for (const generation of generations) {
++		if (new Set(generation.closure.map(({ digest }) => digest)).size !== generation.closure.length) return false;
++		if (
++			generation.baseExpectedHead.kind === "present" &&
++			(generation.baseExpectedHead.generationId === generation.generationId ||
++				!byId.has(generation.baseExpectedHead.generationId))
++		) {
++			return false;
++		}
++	}
++	return true;
++}
++
+ function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Record<string, unknown>> | undefined {
+ 	const descriptor = canonicalRecord(material.exactCanonicalProjectionBytes);
+ 	if (descriptor?.kind !== "v3-live-generation-2") return undefined;
+@@ -359,6 +441,63 @@ async function authenticatedTerminal(
+ 	}
+ }
+ 
++async function authenticatedStaged(
++	facts: SealedAdoptionFacts,
++	material: CreatorAdoptionIntentMaterial
++): Promise<StagedTerminal> {
++	try {
++		if (
++			!sameHead(material.pendingHead, facts.proposedHead) ||
++			!sameClosure(material.pendingReferences, facts.proposedReferences) ||
++			material.pendingHead.objectId !== facts.objectId
++		) {
++			return Object.freeze({ kind: "chain-invalid" });
++		}
++		const recovered = await facts.store.recoverActiveGeneration(facts.objectId);
++		if (!recovered.ok || recovered.value.kind !== "active") {
++			return Object.freeze({ kind: "recovery-failed" });
++		}
++		const active = recovered.value;
++		if (!sameHead(active.head, material.pendingHead)) return Object.freeze({ kind: "stale-head" });
++		if (
++			active.adoptedGeneration.state !== "Adopted" ||
++			!sameClosure(active.references, material.pendingReferences) ||
++			!sameClosure(active.adoptedGeneration.closure, material.pendingReferences) ||
++			!exactClosureDigest(active.references, active.head.closureDigest)
++		) {
++			return Object.freeze({ kind: "chain-invalid" });
++		}
++		const [generations, currentCandidates, pendingCandidates, stagedCandidates] = await Promise.all([
++			readLineage(facts.store, facts.objectId),
++			loadClosure(facts.store, facts.currentReferences),
++			loadClosure(facts.store, facts.proposedReferences),
++			loadClosure(facts.store, material.candidateReferences),
++		]);
++		const descriptor = validProjection(material);
++		if (
++			generations === undefined ||
++			currentCandidates === undefined ||
++			pendingCandidates === undefined ||
++			stagedCandidates === undefined ||
++			descriptor === undefined ||
++			!validStagedLineage(generations, facts, material) ||
++			!validTrustChain(facts, currentCandidates, pendingCandidates)
++		) {
++			return Object.freeze({ kind: "pending-old" });
++		}
++		const projection = stagedCandidates.filter(({ bytes }) => sameBytes(bytes, material.exactCanonicalProjectionBytes));
++		const predecessor = currentCandidates.filter(
++			({ bytes, ref }) =>
++				sameRef(ref, material.predecessorLiveRef) && canonicalRecord(bytes)?.kind === "v3-live-generation-1"
++		);
++		return projection.length === 1 && predecessor.length === 1
++			? Object.freeze({ kind: "staged" })
++			: Object.freeze({ kind: "chain-invalid" });
++	} catch {
++		return Object.freeze({ kind: "recovery-failed" });
++	}
++}
++
+ function successfulMutation(result: unknown): boolean {
+ 	return record(result) && result.ok === true && Object.hasOwn(result, "value");
+ }
+@@ -411,6 +550,10 @@ async function stageCandidate(facts: SealedAdoptionFacts, material: CreatorAdopt
+ 	if (!successfulMutation(await facts.store.completeGeneration(scope))) {
+ 		throw new TypeError("creator successor completion failed");
+ 	}
++}
++
++async function publishCandidate(facts: SealedAdoptionFacts, material: CreatorAdoptionIntentMaterial): Promise<void> {
++	const scope = Object.freeze({ generationId: material.generationId, objectId: facts.objectId });
+ 	if (
+ 		!successfulMutation(
+ 			await facts.store.swapHead({
+@@ -443,8 +586,87 @@ function success(
+ 	});
+ }
+ 
++function stagedSuccess(
++	handle: object,
++	material: CreatorAdoptionIntentMaterial,
++	descriptor: Readonly<Record<string, unknown>>
++): StageSuccess {
++	return Object.freeze({
++		capability: createStagedCreatorSuccessorAdoption(handle, { descriptor, intent: material }),
++		descriptor,
++		lifecycle: "successor-staged" as const,
++		ok: true as const,
++		recovery: "pending-old" as const,
++	});
++}
++
++async function stageCreatorSuccessorAdoptionKernel(input: unknown): Promise<CommitFailure | StageSuccess> {
++	const captured = captureInput(input);
++	if (captured === undefined) return failure("malformed-input", "creator adoption stage input is invalid");
++	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
++	const material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
++	if (facts === undefined || material === undefined) {
++		return failure("intent-unavailable", "creator adoption intent is unavailable");
++	}
++	const descriptor = validProjection(material);
++	if (descriptor === undefined) return failure("internal-invariant", "creator successor projection is invalid");
++	const terminal = await authenticatedTerminal(facts, material);
++	if (terminal.kind === "active-new") return failure("stale-head", "creator successor is already published");
++	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	try {
++		await stageCandidate(facts, material);
++	} catch {
++		// A fresh authenticated inspection below is the only authority after an ambiguous write.
++	}
++	const staged = await authenticatedStaged(facts, material);
++	if (staged.kind === "staged") return stagedSuccess(captured.handle, material, descriptor);
++	if (staged.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (staged.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	if (staged.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	return failure("pending-old", "creator successor is not durably complete");
++}
++
++async function publishStagedCreatorSuccessorAdoptionKernel(input: unknown): Promise<CommitFailure | PublishSuccess> {
++	const captured = capturePublishInput(input);
++	if (captured === undefined) return failure("malformed-input", "creator adoption publish input is invalid");
++	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
++	const staged = consumeStagedCreatorSuccessorAdoption(captured.capability, captured.handle);
++	if (facts === undefined || staged === undefined) {
++		return failure("intent-unavailable", "creator adoption staged capability is unavailable");
++	}
++	let terminal = await authenticatedTerminal(facts, staged.intent);
++	if (terminal.kind === "active-new") return success(captured.handle, staged.intent, staged.descriptor, terminal.head);
++	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	const authenticated = await authenticatedStaged(facts, staged.intent);
++	if (authenticated.kind !== "staged") {
++		return authenticated.kind === "recovery-failed"
++			? failure("recovery-failed", "creator successor recovery failed")
++			: authenticated.kind === "stale-head"
++				? failure("stale-head", "creator successor head is stale")
++				: failure("chain-invalid", "creator successor staged generation is invalid");
++	}
++	try {
++		await publishCandidate(facts, staged.intent);
++	} catch {
++		// A fresh authenticated reopen below is the only authority after an ambiguous CAS.
++	}
++	terminal = await authenticatedTerminal(facts, staged.intent);
++	if (terminal.kind === "active-new") return success(captured.handle, staged.intent, staged.descriptor, terminal.head);
++	if (terminal.kind === "pending-old") return failure("pending-old", "creator successor remains safely pending");
++	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	return failure("storage-failed", "creator successor storage failed");
++}
++
+ /**
+  * Commits a verified creator successor with one durable head comparison-and-swap.
++ * This retained one-call API does not publish provider freshness and must not
++ * advance a provider-scoped product room.
+  * @param input - Genuine close handle and its owner-bound, one-use intent.
+  * @returns Exact prepared successor or a closed failure.
+  */
+@@ -463,11 +685,21 @@ export async function commitCreatorSuccessorAdoption(input: unknown): Promise<Co
+ 	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
+ 	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
+ 	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	let stageRequestFailed = false;
+ 	try {
+ 		await stageCandidate(facts, material);
+ 	} catch {
++		stageRequestFailed = true;
+ 		// A fresh authenticated reopen below is the only authority after an ambiguous write.
+ 	}
++	const staged = stageRequestFailed ? undefined : await authenticatedStaged(facts, material);
++	if (staged?.kind === "staged") {
++		try {
++			await publishCandidate(facts, material);
++		} catch {
++			// A fresh authenticated reopen below is the only authority after an ambiguous CAS.
++		}
++	}
+ 	terminal = await authenticatedTerminal(facts, material);
+ 	if (terminal.kind === "active-new") return success(captured.handle, material, descriptor, terminal.head);
+ 	if (terminal.kind === "pending-old") return failure("pending-old", "creator successor remains safely pending");
+@@ -476,3 +708,10 @@ export async function commitCreatorSuccessorAdoption(input: unknown): Promise<Co
+ 	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
+ 	return failure("storage-failed", "creator successor storage failed");
+ }
++
++if (!installCreatorAdoptionStage(stageCreatorSuccessorAdoptionKernel)) {
++	throw new TypeError("creator adoption stage owner was already installed");
++}
++if (!installCreatorAdoptionPublish(publishStagedCreatorSuccessorAdoptionKernel)) {
++	throw new TypeError("creator adoption publish owner was already installed");
++}
+diff --git a/packages/node/src/creator-adoption-recover.ts b/packages/node/src/creator-adoption-recover.ts
+new file mode 100644
+index 00000000..555cd8af
+--- /dev/null
++++ b/packages/node/src/creator-adoption-recover.ts
+@@ -0,0 +1,59 @@
++import "./creator-adoption.js";
++
++import {
++	consumeCreatorAdoptionPendingRecovery,
++	type CreatorAdoptionPendingRecoveryInput,
++} from "./internal/creator-adoption-recover.js";
++
++const INPUT_KEYS = Object.freeze([
++	"authenticationProfile",
++	"catalog",
++	"detachedSignature",
++	"exactCanonicalAnchorPreimageBytes",
++	"exactCanonicalParametersCarrierBytes",
++	"expectedNextRoomHead",
++	"expectedPreviousRoomHead",
++	"pinnedGenesisAnchorDigest",
++	"snapshotDeclaration",
++	"snapshotStore",
++	"store",
++]);
++
++function capture(value: unknown): CreatorAdoptionPendingRecoveryInput | undefined {
++	try {
++		if (value === null || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) {
++			return undefined;
++		}
++		const keys = Reflect.ownKeys(value);
++		if (keys.length !== INPUT_KEYS.length || keys.some((key) => typeof key !== "string" || !INPUT_KEYS.includes(key))) {
++			return undefined;
++		}
++		const output: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
++		for (const key of INPUT_KEYS) {
++			const descriptor = Object.getOwnPropertyDescriptor(value, key);
++			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
++			output[key] = descriptor.value;
++		}
++		return output as unknown as CreatorAdoptionPendingRecoveryInput;
++	} catch {
++		return undefined;
++	}
++}
++
++/**
++ * Authenticates and publishes a provider-selected pending successor without live activation.
++ * @param input - Exact copied provider heads, genesis carriers, snapshot owners and AHE store.
++ * @returns Published stable room head or a typed fail-closed result.
++ */
++export function recoverPendingCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
++	const captured = capture(input);
++	return captured === undefined
++		? Promise.resolve(
++				Object.freeze({
++					detail: "creator adoption pending recovery input is invalid",
++					kind: "malformed-input",
++					ok: false,
++				})
++			)
++		: consumeCreatorAdoptionPendingRecovery(captured);
++}
+diff --git a/packages/node/src/creator-adoption-stage.ts b/packages/node/src/creator-adoption-stage.ts
+new file mode 100644
+index 00000000..dece61fd
+--- /dev/null
++++ b/packages/node/src/creator-adoption-stage.ts
+@@ -0,0 +1,21 @@
++import "./creator-adoption-commit.js";
++
++import { consumeCreatorAdoptionPublish, consumeCreatorAdoptionStage } from "./internal/creator-adoption-stage.js";
++
++/**
++ * Durably completes one authenticated successor without publishing its AHE head.
++ * @param input - Exact genuine close handle and owner-bound adoption intent.
++ * @returns Opaque staged custody or a typed fail-closed result.
++ */
++export function stageCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
++	return consumeCreatorAdoptionStage(input);
++}
++
++/**
++ * Publishes one owner-bound staged successor through the exact AHE head CAS.
++ * @param input - Exact staged capability and genuine close handle.
++ * @returns Existing prepared-activation custody or a typed fail-closed result.
++ */
++export function publishStagedCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
++	return consumeCreatorAdoptionPublish(input);
++}
+diff --git a/packages/node/src/creator-adoption.ts b/packages/node/src/creator-adoption.ts
+index 034f5202..277e0a5f 100644
+--- a/packages/node/src/creator-adoption.ts
++++ b/packages/node/src/creator-adoption.ts
+@@ -34,6 +34,12 @@ import {
+ 	type CreatorAdoptionIntent,
+ 	resolveCreatorAdoptionFacts,
+ } from "./internal/creator-adoption-intent.js";
++import {
++	type CreatorAdoptionPendingRecoveryInput,
++	type CreatorAdoptionPendingRecoveryResult,
++	type CreatorAdoptionRoomHead,
++	installCreatorAdoptionPendingRecovery,
++} from "./internal/creator-adoption-recover.js";
+ import {
+ 	type CreatorSuccessorLiveMaterial,
+ 	type CreatorSuccessorLiveSeed,
+@@ -1111,6 +1117,332 @@ async function reopenCreatorSuccessorMaterial(
+ 	}
+ }
+ 
++interface AuthenticatedPendingCandidate {
++	readonly closureDigest: string;
++	readonly generation: GenerationRecord;
++	readonly head: PresentHead;
++}
++
++function exactRoomHead(value: unknown): CreatorAdoptionRoomHead | undefined {
++	try {
++		if (
++			value === null ||
++			typeof value !== "object" ||
++			Object.getPrototypeOf(value) !== Object.prototype ||
++			Reflect.ownKeys(value).sort().join(",") !== "currentAnchorDigest,epoch,objectId"
++		) {
++			return undefined;
++		}
++		const anchor = Object.getOwnPropertyDescriptor(value, "currentAnchorDigest");
++		const epoch = Object.getOwnPropertyDescriptor(value, "epoch");
++		const objectId = Object.getOwnPropertyDescriptor(value, "objectId");
++		return anchor !== undefined &&
++			"value" in anchor &&
++			anchor.enumerable === true &&
++			typeof anchor.value === "string" &&
++			/^[0-9a-f]{64}$/u.test(anchor.value) &&
++			epoch !== undefined &&
++			"value" in epoch &&
++			epoch.enumerable === true &&
++			typeof epoch.value === "number" &&
++			Number.isSafeInteger(epoch.value) &&
++			epoch.value >= 0 &&
++			objectId !== undefined &&
++			"value" in objectId &&
++			objectId.enumerable === true &&
++			typeof objectId.value === "string"
++			? Object.freeze({
++					currentAnchorDigest: anchor.value,
++					epoch: epoch.value,
++					objectId: objectId.value,
++				})
++			: undefined;
++	} catch {
++		return undefined;
++	}
++}
++
++function sameRoomHead(left: CreatorAdoptionRoomHead, right: CreatorAdoptionRoomHead): boolean {
++	return (
++		left.currentAnchorDigest === right.currentAnchorDigest &&
++		left.epoch === right.epoch &&
++		left.objectId === right.objectId
++	);
++}
++
++function roomHeadFromTrust(trust: CurrentAnchorTrust): CreatorAdoptionRoomHead {
++	return Object.freeze({
++		currentAnchorDigest: trust.currentAnchorDigest,
++		epoch: trust.currentEpoch,
++		objectId: trust.objectId,
++	});
++}
++
++async function authenticatePendingCandidate(
++	input: CreatorAdoptionPendingRecoveryInput,
++	lineage: readonly GenerationRecord[],
++	candidate: GenerationRecord,
++	expectedPrevious: CreatorAdoptionRoomHead,
++	expectedNext: CreatorAdoptionRoomHead,
++	objectId: StorageObjectId
++): Promise<AuthenticatedPendingCandidate | undefined> {
++	try {
++		if (candidate.state !== "Complete" && candidate.state !== "Adopted") return undefined;
++		const proposedHead = presentBase(candidate);
++		const byId = new Map(lineage.map((generation) => [generation.generationId, generation]));
++		if (byId.size !== lineage.length || proposedHead === undefined) return undefined;
++		const proposedGeneration = byId.get(proposedHead.generationId);
++		const currentHead = proposedGeneration === undefined ? undefined : presentBase(proposedGeneration);
++		const currentGeneration = currentHead === undefined ? undefined : byId.get(currentHead.generationId);
++		if (
++			proposedGeneration === undefined ||
++			currentHead === undefined ||
++			currentGeneration === undefined ||
++			currentGeneration.state !== "Superseded" ||
++			(proposedGeneration.state !== "Adopted" && proposedGeneration.state !== "Superseded") ||
++			candidate.baseExpectedHead.kind !== "present" ||
++			proposedGeneration.baseExpectedHead.kind !== "present" ||
++			candidate.objectId !== objectId ||
++			proposedGeneration.objectId !== objectId ||
++			currentGeneration.objectId !== objectId ||
++			proposedHead.revision !== currentHead.revision + 1
++		) {
++			return undefined;
++		}
++		const closureDigest = digestClosure(candidate.closure);
++		if (!closureDigest.ok || candidate.closureDigest !== closureDigest.value) return undefined;
++		const candidateHead: PresentHead = Object.freeze({
++			closureDigest: closureDigest.value,
++			generationId: candidate.generationId,
++			kind: "present",
++			objectId,
++			revision: (proposedHead.revision + 1) as PresentHead["revision"],
++		});
++		const [currentCandidates, proposedCandidates, candidateCandidates] = await Promise.all([
++			loadClosure(input.store, currentGeneration.closure),
++			loadClosure(input.store, proposedGeneration.closure),
++			loadClosure(input.store, candidate.closure),
++		]);
++		if (currentCandidates === undefined || proposedCandidates === undefined || candidateCandidates === undefined) {
++			return undefined;
++		}
++		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
++		const successorProjection = uniqueCandidateByKind(candidateCandidates, "v3-live-generation-2");
++		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
++		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
++		const cutCandidate = uniqueCandidateByKind(proposedCandidates, "drp-hard-epoch-cut");
++		if (
++			currentProjection === undefined ||
++			successorProjection === undefined ||
++			currentTrustCandidate === undefined ||
++			successorTrustCandidate === undefined ||
++			cutCandidate === undefined
++		) {
++			return undefined;
++		}
++		const openedCurrent = openCurrentAnchorTrust({
++			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
++			expectedObjectId: objectId,
++			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
++		});
++		if (!openedCurrent.ok || !sameRoomHead(roomHeadFromTrust(openedCurrent.trust), expectedPrevious)) {
++			return undefined;
++		}
++		const qcs = proposedCandidates.flatMap((entry) =>
++			canonicalRecord(entry.bytes)?.kind === "drp-seal-qc" ? [entry] : []
++		);
++		const openedSuccessors = qcs.flatMap((entry) => {
++			const opened = openCreatorSuccessorTrust({
++				currentTrust: openedCurrent.trust,
++				exactCanonicalCommitQcBytes: entry.bytes,
++				exactCanonicalCutValueBytes: cutCandidate.bytes,
++				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
++			});
++			return opened.ok ? [Object.freeze({ qc: entry, trust: opened.trust })] : [];
++		});
++		if (openedSuccessors.length !== 1) return undefined;
++		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
++		if (
++			!sameRoomHead(roomHeadFromTrust(openedSuccessor.trust), expectedNext) ||
++			!inspectCreatorTrustAdvance({
++				current: { candidates: currentCandidates, closure: currentGeneration.closure },
++				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
++				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
++			}).ok
++		) {
++			return undefined;
++		}
++		const currentTrustRecord = currentTrustCandidate.record;
++		const successorTrustRecord = successorTrustCandidate.record;
++		if (
++			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
++			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
++			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
++			!sameBytes(
++				input.exactCanonicalAnchorPreimageBytes,
++				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
++			) ||
++			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
++		) {
++			return undefined;
++		}
++		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
++		const successorAnchor = canonicalRecord(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
++		if (currentAnchor === undefined || successorAnchor === undefined) return undefined;
++		const chain: VerifiedChain = Object.freeze({
++			currentAnchor,
++			currentCatalog: Object.freeze({
++				artifactDigest: String(currentProjection.record.artifactDigest),
++				artifactId: String(currentProjection.record.artifactId),
++				blueprintDigest: String(currentProjection.record.blueprintDigest),
++				catalogDigest: String(currentProjection.record.catalogDigest),
++				runtimeProfile: String(currentProjection.record.runtimeProfile),
++			}),
++			currentTrustRecord,
++			cut: cutCandidate.record,
++			successorAnchor,
++			successorAnchorBytes: Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
++			successorTrust: openedSuccessor.trust,
++			successorTrustRecord,
++		});
++		const snapshot = await verifySnapshot(input, chain);
++		if (snapshot === undefined) return undefined;
++		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
++		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
++		if (
++			resolved === undefined ||
++			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
++			successorProjection.record.epoch !== expectedNext.epoch ||
++			successorProjection.record.objectId !== objectId ||
++			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
++			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
++			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
++			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
++			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
++			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
++				successorAnchor.parametersDigest
++		) {
++			return undefined;
++		}
++		const predecessorAclCandidates = candidateCandidates.filter(
++			(entry) => hex(hashDomain("ts-drp/latched-acl/v3", entry.bytes)) === currentAnchor.aclDigest
++		);
++		if (predecessorAclCandidates.length !== 1) return undefined;
++		const openedPredecessorAcl = openCanonicalLatchedAclSnapshot({
++			exactCanonicalLatchedAclBytes: predecessorAclCandidates[0]?.bytes as Uint8Array,
++			expectedAclDigest: String(currentAnchor.aclDigest),
++			expectedEpoch: expectedPrevious.epoch,
++			expectedObjectId: objectId,
++		});
++		return openedPredecessorAcl.ok
++			? Object.freeze({ closureDigest: closureDigest.value, generation: candidate, head: candidateHead })
++			: undefined;
++	} catch {
++		return undefined;
++	}
++}
++
++function pendingRecoveryFailure(kind: string, detail: string): CreatorAdoptionPendingRecoveryResult {
++	return Object.freeze({ detail, kind, ok: false as const });
++}
++
++async function recoverPendingCreatorSuccessorMaterial(
++	input: CreatorAdoptionPendingRecoveryInput
++): Promise<CreatorAdoptionPendingRecoveryResult> {
++	try {
++		const expectedPrevious = exactRoomHead(input.expectedPreviousRoomHead);
++		const expectedNext = exactRoomHead(input.expectedNextRoomHead);
++		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
++		if (
++			input.authenticationProfile !== "creator-only" ||
++			expectedPrevious === undefined ||
++			expectedNext === undefined ||
++			!parsedObjectId.ok ||
++			expectedPrevious.objectId !== parsedObjectId.value ||
++			expectedNext.objectId !== parsedObjectId.value ||
++			expectedNext.epoch !== expectedPrevious.epoch + 1
++		) {
++			return pendingRecoveryFailure("chain-invalid", "creator pending room-head input is invalid");
++		}
++		const objectId = parsedObjectId.value;
++		const [headResult, lineage] = await Promise.all([
++			input.store.readHead(objectId),
++			readGenerationLineage(input.store, objectId),
++		]);
++		if (!headResult.ok || headResult.value.kind !== "present" || lineage === undefined) {
++			return pendingRecoveryFailure("storage-failed", "creator pending durable state is unavailable");
++		}
++		const durableHead = headResult.value;
++		const candidates: AuthenticatedPendingCandidate[] = [];
++		for (const generation of lineage) {
++			const candidate = await authenticatePendingCandidate(
++				input,
++				lineage,
++				generation,
++				expectedPrevious,
++				expectedNext,
++				objectId
++			);
++			if (candidate !== undefined) candidates.push(candidate);
++		}
++		if (candidates.length === 0) {
++			return pendingRecoveryFailure("pending-missing", "creator pending successor is unavailable");
++		}
++		const closureDigests = new Set(candidates.map(({ closureDigest }) => closureDigest));
++		if (closureDigests.size !== 1) {
++			return pendingRecoveryFailure("true-fork", "creator pending successors disagree");
++		}
++		const alreadyActive = candidates.find(({ head }) => sameHead(head, durableHead));
++		if (alreadyActive !== undefined) {
++			return Object.freeze({
++				head: Object.freeze({ ...expectedNext }),
++				lifecycle: "successor-published" as const,
++				ok: true as const,
++				recovery: "active-new" as const,
++			});
++		}
++		const selected = [...candidates].sort((left, right) =>
++			left.generation.generationId < right.generation.generationId
++				? -1
++				: left.generation.generationId > right.generation.generationId
++					? 1
++					: 0
++		)[0] as AuthenticatedPendingCandidate;
++		const previous = presentBase(selected.generation);
++		if (previous === undefined || !sameHead(previous, durableHead)) {
++			return pendingRecoveryFailure("stale-head", "creator pending head is stale");
++		}
++		try {
++			await input.store.swapHead({
++				expectedHead: previous,
++				generationId: selected.generation.generationId,
++				objectId,
++			});
++		} catch {
++			// The authenticated reread below is the only authority after an ambiguous CAS.
++		}
++		const recovered = await input.store.recoverActiveGeneration(objectId);
++		if (!recovered.ok || recovered.value.kind !== "active") {
++			return pendingRecoveryFailure("pending-old", "creator pending successor remains unpublished");
++		}
++		const recoveredHead = recovered.value.head;
++		if (!candidates.some(({ head }) => sameHead(head, recoveredHead))) {
++			return pendingRecoveryFailure("pending-old", "creator pending successor remains unpublished");
++		}
++		return Object.freeze({
++			head: Object.freeze({ ...expectedNext }),
++			lifecycle: "successor-published" as const,
++			ok: true as const,
++			recovery: "active-new" as const,
++		});
++	} catch {
++		return pendingRecoveryFailure("internal-invariant", "creator pending recovery failed unexpectedly");
++	}
++}
++
+ if (!installCreatorSuccessorReopen(reopenCreatorSuccessorMaterial)) {
+ 	throw new TypeError("creator successor reopen owner was already installed");
+ }
++if (!installCreatorAdoptionPendingRecovery(recoverPendingCreatorSuccessorMaterial)) {
++	throw new TypeError("creator adoption pending recovery owner was already installed");
++}
+diff --git a/packages/node/src/internal/creator-adoption-intent.ts b/packages/node/src/internal/creator-adoption-intent.ts
+index d327d310..c5179004 100644
+--- a/packages/node/src/internal/creator-adoption-intent.ts
++++ b/packages/node/src/internal/creator-adoption-intent.ts
+@@ -5,6 +5,7 @@ import type { CreatorSuccessorLiveMaterial, CreatorSuccessorLiveSeed } from "./c
+ 
+ export type CreatorAdoptionIntent = Readonly<Record<never, never>>;
+ export type PreparedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
++export type StagedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
+ 
+ export interface CreatorAdoptionIntentMaterial {
+ 	readonly activation: CreatorSuccessorLiveSeed;
+@@ -25,6 +26,11 @@ export interface PreparedCreatorSuccessorAdoptionMaterial {
+ 
+ export type PreparedCreatorSuccessorAdoptionInput = Omit<PreparedCreatorSuccessorAdoptionMaterial, "descriptor">;
+ 
++export interface StagedCreatorSuccessorAdoptionMaterial {
++	readonly descriptor: Readonly<Record<string, unknown>>;
++	readonly intent: CreatorAdoptionIntentMaterial;
++}
++
+ const custody = new WeakMap<
+ 	object,
+ 	Readonly<{ readonly material: CreatorAdoptionIntentMaterial; readonly owner: object }>
+@@ -34,6 +40,10 @@ const preparedCustody = new WeakMap<
+ 	object,
+ 	Readonly<{ readonly material: PreparedCreatorSuccessorAdoptionInput; readonly owner: object }>
+ >();
++const stagedCustody = new WeakMap<
++	object,
++	Readonly<{ readonly material: StagedCreatorSuccessorAdoptionMaterial; readonly owner: object }>
++>();
+ 
+ function copiedRef(ref: GenerationRef): GenerationRef {
+ 	return Object.freeze({ byteLength: ref.byteLength, digest: ref.digest });
+@@ -184,3 +194,49 @@ export function consumePreparedCreatorSuccessorAdoption(
+ 		head: copiedHead(retained.material.head),
+ 	});
+ }
++
++/**
++ * Creates one opaque owner-bound capability for a complete unpublished successor.
++ * @param owner - Genuine sealed close handle.
++ * @param material - Authenticated staged successor material.
++ * @returns Opaque process-local staged capability.
++ */
++export function createStagedCreatorSuccessorAdoption(
++	owner: object,
++	material: StagedCreatorSuccessorAdoptionMaterial
++): StagedCreatorSuccessorAdoption {
++	const capability = Object.freeze({}) as StagedCreatorSuccessorAdoption;
++	stagedCustody.set(
++		capability,
++		Object.freeze({
++			material: Object.freeze({
++				descriptor: Object.freeze({ ...material.descriptor }),
++				intent: material.intent,
++			}),
++			owner,
++		})
++	);
++	return capability;
++}
++
++/**
++ * Destructively consumes one genuine staged capability for its bound close handle.
++ * @param capability - Opaque staged capability candidate.
++ * @param owner - Expected genuine close handle.
++ * @returns Authenticated staged material, or undefined.
++ */
++export function consumeStagedCreatorSuccessorAdoption(
++	capability: unknown,
++	owner: unknown
++): StagedCreatorSuccessorAdoptionMaterial | undefined {
++	if (capability === null || typeof capability !== "object" || owner === null || typeof owner !== "object") {
++		return undefined;
++	}
++	const retained = stagedCustody.get(capability);
++	if (retained === undefined || retained.owner !== owner) return undefined;
++	stagedCustody.delete(capability);
++	return Object.freeze({
++		descriptor: Object.freeze({ ...retained.material.descriptor }),
++		intent: retained.material.intent,
++	});
++}
+diff --git a/packages/node/src/internal/creator-adoption-recover.ts b/packages/node/src/internal/creator-adoption-recover.ts
+new file mode 100644
+index 00000000..7934bdf4
+--- /dev/null
++++ b/packages/node/src/internal/creator-adoption-recover.ts
+@@ -0,0 +1,70 @@
++import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
++import type { AheDurableStore } from "@ts-drp/storage";
++import type {
++	SnapshotQuarantineDeclaration,
++	SnapshotQuarantineStore,
++	SnapshotVerificationReceipt,
++} from "@ts-drp/storage/snapshot-transfer";
++
++export interface CreatorAdoptionRoomHead {
++	readonly currentAnchorDigest: string;
++	readonly epoch: number;
++	readonly objectId: string;
++}
++
++export interface CreatorAdoptionPendingRecoveryInput {
++	readonly authenticationProfile: "creator-only";
++	readonly catalog: TrustedBlueprintCatalog;
++	readonly detachedSignature: Uint8Array;
++	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
++	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
++	readonly expectedNextRoomHead: CreatorAdoptionRoomHead;
++	readonly expectedPreviousRoomHead: CreatorAdoptionRoomHead;
++	readonly pinnedGenesisAnchorDigest: string;
++	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
++	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
++	readonly store: AheDurableStore;
++}
++
++export type CreatorAdoptionPendingRecoveryResult =
++	| Readonly<{
++			readonly head: CreatorAdoptionRoomHead;
++			readonly lifecycle: "successor-published";
++			readonly ok: true;
++			readonly recovery: "active-new";
++	  }>
++	| Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }>;
++
++type RecoveryOwner = (input: CreatorAdoptionPendingRecoveryInput) => Promise<CreatorAdoptionPendingRecoveryResult>;
++
++let owner: RecoveryOwner | undefined;
++
++/**
++ * Installs the sole private non-activating pending-recovery owner.
++ * @param candidate - Authenticated durable recovery kernel.
++ * @returns Whether the owner was installed.
++ */
++export function installCreatorAdoptionPendingRecovery(candidate: RecoveryOwner): boolean {
++	if (owner !== undefined) return false;
++	owner = candidate;
++	return true;
++}
++
++/**
++ * Executes the installed private non-activating recovery owner.
++ * @param input - Exact copied provider heads and durable authentication carriers.
++ * @returns Published room head or typed fail-closed result.
++ */
++export function consumeCreatorAdoptionPendingRecovery(
++	input: CreatorAdoptionPendingRecoveryInput
++): Promise<CreatorAdoptionPendingRecoveryResult> {
++	return owner === undefined
++		? Promise.resolve(
++				Object.freeze({
++					detail: "creator adoption pending recovery owner is unavailable",
++					kind: "internal-invariant",
++					ok: false,
++				})
++			)
++		: owner(input);
++}
+diff --git a/packages/node/src/internal/creator-adoption-stage.ts b/packages/node/src/internal/creator-adoption-stage.ts
+new file mode 100644
+index 00000000..6c75c12c
+--- /dev/null
++++ b/packages/node/src/internal/creator-adoption-stage.ts
+@@ -0,0 +1,61 @@
++type Result = Readonly<Record<string, unknown>>;
++type StageOwner = (input: unknown) => Promise<Result>;
++
++let publishOwner: StageOwner | undefined;
++let stageOwner: StageOwner | undefined;
++
++/**
++ * Installs the sole private durable-stage owner.
++ * @param owner - Authenticated stage kernel.
++ * @returns Whether the owner was installed.
++ */
++export function installCreatorAdoptionStage(owner: StageOwner): boolean {
++	if (stageOwner !== undefined) return false;
++	stageOwner = owner;
++	return true;
++}
++
++/**
++ * Installs the sole private staged-publication owner.
++ * @param owner - Authenticated head-publication kernel.
++ * @returns Whether the owner was installed.
++ */
++export function installCreatorAdoptionPublish(owner: StageOwner): boolean {
++	if (publishOwner !== undefined) return false;
++	publishOwner = owner;
++	return true;
++}
++
++/**
++ * Executes the installed private durable-stage owner.
++ * @param input - Exact public stage input.
++ * @returns Frozen stage result.
++ */
++export function consumeCreatorAdoptionStage(input: unknown): Promise<Result> {
++	return stageOwner === undefined
++		? Promise.resolve(
++				Object.freeze({
++					detail: "creator adoption stage owner is unavailable",
++					kind: "internal-invariant",
++					ok: false,
++				})
++			)
++		: stageOwner(input);
++}
++
++/**
++ * Executes the installed private staged-publication owner.
++ * @param input - Exact public publication input.
++ * @returns Frozen publication result.
++ */
++export function consumeCreatorAdoptionPublish(input: unknown): Promise<Result> {
++	return publishOwner === undefined
++		? Promise.resolve(
++				Object.freeze({
++					detail: "creator adoption publish owner is unavailable",
++					kind: "internal-invariant",
++					ok: false,
++				})
++			)
++		: publishOwner(input);
++}
+diff --git a/tests/fixtures/phase-3a1b-p3/tsconfig.test.json b/tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+index 6e040860..b24e0e48 100644
+--- a/tests/fixtures/phase-3a1b-p3/tsconfig.test.json
++++ b/tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+@@ -13,6 +13,8 @@
+ 			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+ 			"@ts-drp/protocol-v3/registry/registry-v1.json": ["packages/protocol-v3/registry/registry-v1.json"],
+ 			"@ts-drp/storage": ["packages/storage/src/index.ts"],
++			"@ts-drp/storage/maintenance": ["packages/storage/src/maintenance.ts"],
++			"@ts-drp/storage/snapshot-transfer": ["packages/storage/src/snapshot-transfer.ts"],
+ 			"@ts-drp/types": ["packages/types/src/index.ts"]
+ 		},
+ 		"rootDir": "../../.."
+diff --git a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+index 4f803776..8b07e67b 100644
+--- a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+@@ -337,6 +337,7 @@ export interface GenuineCreatorAdoptionFixture {
+ 	readonly catalog: TrustedBlueprintCatalog;
+ 	readonly evidence: Readonly<{
+ 		readonly aheBackend: AheDurableStore;
++		readonly aheStore: AheDurableStore;
+ 		readonly chunks: readonly Uint8Array[];
+ 		readonly closeResult: CreatorLiveCloseResult;
+ 		readonly current: DetachedHeadEvidence;
+@@ -361,6 +362,7 @@ export interface GenuineCreatorAdoptionFixture {
+ 		readonly localIssued: Readonly<{ readonly authorSequence: number; readonly digest: string }>;
+ 		readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
+ 		readonly proposed: DetachedHeadEvidence;
++		readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+ 	}>;
+ 	readonly controls: {
+ 		activeRefMutation?: "digest" | "length";
+@@ -1043,6 +1045,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 	const primaryDatabaseName = `d108b-seal-${crypto.randomUUID()}`;
+ 	const snapshotDatabaseName = `d108b-snapshot-${crypto.randomUUID()}`;
+ 	let aheBackend: AheDurableStore | undefined;
++	let aheStore: AheDurableStore | undefined;
+ 	let declaration: SnapshotQuarantineDeclaration | undefined;
+ 	const fixture = await createGenuinePreparedV3Fixture({
+ 		applicationBatch: options.applicationBatch === true,
+@@ -1058,10 +1061,12 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
+ 		storeDecorator: (backend) => {
+ 			aheBackend = backend;
+-			return decoratedAheStore(backend, controls);
++			aheStore = decoratedAheStore(backend, controls);
++			return aheStore;
+ 		},
+ 	});
+-	if (aheBackend === undefined) throw new TypeError("D.108b fixture AHE backend capture failed");
++	if (aheBackend === undefined || aheStore === undefined)
++		throw new TypeError("D.108b fixture AHE store capture failed");
+ 	const openedCurrentTrust = await createCurrentAnchorTrustStore({
+ 		objectId: fixture.objectId as Parameters<typeof createCurrentAnchorTrustStore>[0]["objectId"],
+ 		pinnedGenesisAnchorDigest: fixture.anchorDigest,
+@@ -1315,6 +1320,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		controls,
+ 		evidence: Object.freeze({
+ 			aheBackend,
++			aheStore,
+ 			chunks: Object.freeze(chunks),
+ 			closeResult,
+ 			current,
+@@ -1336,6 +1342,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 			}),
+ 			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
+ 			proposed,
++			snapshotStore,
+ 		}),
+ 		handle: bound.handle,
+ 		journal: recovered.journal,
+@@ -1409,11 +1416,15 @@ export function sourceGovernance(): Readonly<{
+ 	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
+ 	const roomConsumesVerifier =
+ 		/@ts-drp\/node\/creator-adoption/u.test(room) && /verifyCreatorSuccessorAdoption/u.test(room);
++	const verifierStart = verifier.indexOf("export async function verifyCreatorSuccessorAdoption");
++	const verifierEnd = verifier.indexOf("\nfunction coldFailure", verifierStart);
++	const verifierOwner =
++		verifierStart >= 0 && verifierEnd > verifierStart ? verifier.slice(verifierStart, verifierEnd) : verifier;
+ 	return Object.freeze({
+ 		forbiddenRootExport: /creator-adoption|verifyCreatorSuccessorAdoption/u.test(root),
+ 		noAheMutationInVerifier:
+ 			!/\.(?:beginGeneration|putCachedBlob|promoteReference|completeGeneration|swapHead|discardGeneration)\s*\(/u.test(
+-				verifier
++				verifierOwner
+ 			),
+ 		noDirectChatVerifierConsumer: !/verifyCreatorSuccessorAdoption|CreatorAdoptionIntent|creator-adoption/u.test(chat),
+ 		roomOwnsVerifierWhenProductExists: !productExists || roomConsumesVerifier,
+diff --git a/tests/phase-3a1b-p3-live-transport-red.test.ts b/tests/phase-3a1b-p3-live-transport-red.test.ts
+index a7670472..dab19613 100644
+--- a/tests/phase-3a1b-p3-live-transport-red.test.ts
++++ b/tests/phase-3a1b-p3-live-transport-red.test.ts
+@@ -251,6 +251,14 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
+ 				types: "./dist/src/creator-adoption-commit.d.ts",
+ 				import: "./dist/src/creator-adoption-commit.js",
+ 			},
++			"./creator-adoption-stage": {
++				types: "./dist/src/creator-adoption-stage.d.ts",
++				import: "./dist/src/creator-adoption-stage.js",
++			},
++			"./creator-adoption-recover": {
++				types: "./dist/src/creator-adoption-recover.d.ts",
++				import: "./dist/src/creator-adoption-recover.js",
++			},
+ 			"./creator-adoption-activate": {
+ 				types: "./dist/src/creator-adoption-activate.d.ts",
+ 				import: "./dist/src/creator-adoption-activate.js",
+@@ -2375,6 +2383,14 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				types: "./dist/src/creator-adoption-commit.d.ts",
+ 				import: "./dist/src/creator-adoption-commit.js",
+ 			},
++			"./creator-adoption-stage": {
++				types: "./dist/src/creator-adoption-stage.d.ts",
++				import: "./dist/src/creator-adoption-stage.js",
++			},
++			"./creator-adoption-recover": {
++				types: "./dist/src/creator-adoption-recover.d.ts",
++				import: "./dist/src/creator-adoption-recover.js",
++			},
+ 			"./creator-adoption-activate": {
+ 				types: "./dist/src/creator-adoption-activate.d.ts",
+ 				import: "./dist/src/creator-adoption-activate.js",
+diff --git a/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts b/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+index 3317b9fe..b0c44260 100644
+--- a/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
++++ b/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+@@ -1,14 +1,50 @@
+ import "fake-indexeddb/auto";
+ 
+-import type { PresentHead } from "@ts-drp/storage";
+-import { readFileSync } from "node:fs";
+-import { resolve } from "node:path";
+-import { describe, expect, it } from "vitest";
++import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
++import {
++	digestBlob,
++	type GenerationRecord,
++	type GenerationRef,
++	parseGenerationId,
++	type PresentHead,
++} from "@ts-drp/storage";
++import { beforeAll, describe, expect, it } from "vitest";
+ 
+ import {
++	type GenuineCreatorAdoptionFixture,
+ 	openGenuineCreatorAdoptionFixture,
+-	REPOSITORY_ROOT,
+ } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
++import { activateCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-activate.js";
++import { commitCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-commit.js";
++import * as recoverSurface from "../packages/node/src/creator-adoption-recover.js";
++import * as stageSurface from "../packages/node/src/creator-adoption-stage.js";
++
++const { recoverPendingCreatorSuccessorAdoption } = recoverSurface;
++const { publishStagedCreatorSuccessorAdoption, stageCreatorSuccessorAdoption } = stageSurface;
++
++const PARAMETERS = Object.freeze({
++	maxDependencies: 16,
++	maxEpochBytes: 8_388_608,
++	maxEpochVertices: 8192,
++	maxPendingBytes: 16_777_216,
++	maxPendingEntries: 4096,
++	maxSnapshotBytes: 268_435_456,
++	snapshotChunkBytes: 131_072,
++});
++
++beforeAll(() => {
++	Object.defineProperty(navigator, "storage", {
++		configurable: true,
++		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
++	});
++});
++
++function record(value: unknown): Readonly<Record<string, unknown>> {
++	if (value === null || typeof value !== "object" || Array.isArray(value)) {
++		throw new TypeError("D.110c-0b0a canonical record is invalid");
++	}
++	return value as Readonly<Record<string, unknown>>;
++}
+ 
+ function sameHead(left: PresentHead, right: PresentHead): boolean {
+ 	return (
+@@ -19,51 +55,282 @@ function sameHead(left: PresentHead, right: PresentHead): boolean {
+ 	);
+ }
+ 
+-describe("D.110c-0b0a staged adoption and pending recovery causal RED", () => {
+-	it("requires a durable-complete/no-head-swap stage and a non-activating recovery owner", async () => {
+-		Object.defineProperty(navigator, "storage", {
+-			configurable: true,
+-			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+-		});
++async function verifiedIntent(fixture: GenuineCreatorAdoptionFixture): Promise<unknown> {
++	const verified = await fixture.modules.verifyCreatorSuccessorAdoption({
++		catalog: fixture.catalog,
++		handle: fixture.handle,
++	});
++	if (verified.ok !== true) throw new TypeError(`D.110c-0b0a verification failed: ${String(verified.kind)}`);
++	return verified.intent;
++}
++
++function recoveryInput(fixture: GenuineCreatorAdoptionFixture): Readonly<Record<string, unknown>> {
++	const candidate = fixture.evidence.current.candidates.find(
++		({ ref }) =>
++			ref.byteLength === fixture.evidence.closeResult.currentTrustRef.byteLength &&
++			ref.digest === fixture.evidence.closeResult.currentTrustRef.digest
++	);
++	if (candidate === undefined) throw new TypeError("D.110c-0b0a current trust carrier is unavailable");
++	const trust = record(decodeCanonical(candidate.bytes));
++	if (
++		!(trust.detachedCurrentAnchorSignature instanceof Uint8Array) ||
++		!(trust.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
++	) {
++		throw new TypeError("D.110c-0b0a current trust carrier is malformed");
++	}
++	return Object.freeze({
++		authenticationProfile: "creator-only",
++		catalog: fixture.catalog,
++		detachedSignature: Uint8Array.from(trust.detachedCurrentAnchorSignature),
++		exactCanonicalAnchorPreimageBytes: Uint8Array.from(trust.exactCanonicalCurrentAnchorPreimageBytes),
++		exactCanonicalParametersCarrierBytes: encodeCanonical(PARAMETERS),
++		expectedNextRoomHead: Object.freeze({
++			currentAnchorDigest: fixture.evidence.closeResult.successorAnchorDigest,
++			epoch: fixture.evidence.closeResult.successorEpoch,
++			objectId: fixture.evidence.currentTrust.objectId,
++		}),
++		expectedPreviousRoomHead: Object.freeze({
++			currentAnchorDigest: fixture.evidence.currentTrust.currentAnchorDigest,
++			epoch: fixture.evidence.currentTrust.currentEpoch,
++			objectId: fixture.evidence.currentTrust.objectId,
++		}),
++		pinnedGenesisAnchorDigest: fixture.evidence.currentTrust.genesisAnchorDigest,
++		snapshotDeclaration: fixture.evidence.declaration,
++		snapshotStore: fixture.evidence.snapshotStore,
++		store: fixture.evidence.aheStore,
++	});
++}
++
++async function generations(fixture: GenuineCreatorAdoptionFixture): Promise<readonly GenerationRecord[]> {
++	const page = await fixture.evidence.aheBackend.readGenerationPage({
++		limit: 128,
++		objectId: fixture.evidence.proposed.head.objectId,
++	});
++	if (!page.ok || page.value.nextCursor !== null) throw new TypeError("D.110c-0b0a lineage is unavailable");
++	return page.value.generations;
++}
++
++async function installDifferentClosureCandidate(fixture: GenuineCreatorAdoptionFixture): Promise<void> {
++	const complete = (await generations(fixture)).filter(({ state }) => state === "Complete");
++	if (complete.length !== 1) throw new TypeError("D.110c-0b0a fork control requires one complete candidate");
++	const original = complete[0] as GenerationRecord;
++	const originalProjectionDigest = digestBlob(fixture.evidence.exactCanonicalProjectionBytes);
++	if (!originalProjectionDigest.ok) throw new TypeError("D.110c-0b0a projection digest is invalid");
++	const variantBytes = encodeCanonical({
++		...record(decodeCanonical(fixture.evidence.exactCanonicalProjectionBytes)),
++		forkControl: "different-authenticated-closure",
++	});
++	const variantDigest = digestBlob(variantBytes);
++	if (!variantDigest.ok) throw new TypeError("D.110c-0b0a fork projection digest is invalid");
++	const variantRef: GenerationRef = Object.freeze({
++		byteLength: variantBytes.byteLength,
++		digest: variantDigest.value,
++	});
++	const closure = Object.freeze(
++		original.closure
++			.map((ref) => (ref.digest === originalProjectionDigest.value ? variantRef : ref))
++			.sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
++	);
++	const random = new Uint8Array(32);
++	crypto.getRandomValues(random);
++	const generationId = parseGenerationId(Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join(""));
++	if (!generationId.ok || original.baseExpectedHead.kind !== "present") {
++		throw new TypeError("D.110c-0b0a fork generation identity is invalid");
++	}
++	const scope = Object.freeze({ generationId: generationId.value, objectId: original.objectId });
++	const begun = await fixture.evidence.aheBackend.beginGeneration({
++		...scope,
++		baseExpectedHead: original.baseExpectedHead,
++		closure,
++	});
++	if (!begun.ok) throw new TypeError(`D.110c-0b0a fork begin failed: ${begun.reason}`);
++	const cached = await fixture.evidence.aheBackend.putCachedBlob({
++		...scope,
++		bytes: variantBytes,
++		digest: variantDigest.value,
++	});
++	if (!cached.ok) throw new TypeError(`D.110c-0b0a fork cache failed: ${cached.reason}`);
++	for (const ref of closure) {
++		const promoted = await fixture.evidence.aheBackend.promoteReference({ ...scope, digest: ref.digest });
++		if (!promoted.ok) throw new TypeError(`D.110c-0b0a fork promotion failed: ${promoted.reason}`);
++	}
++	const completed = await fixture.evidence.aheBackend.completeGeneration(scope);
++	if (!completed.ok) throw new TypeError(`D.110c-0b0a fork completion failed: ${completed.reason}`);
++}
++
++describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
++	it("stages without a head swap and publishes through one owner-bound CAS", async () => {
+ 		const fixture = await openGenuineCreatorAdoptionFixture();
++		const foreign = await openGenuineCreatorAdoptionFixture();
+ 		try {
+-			const objectId = fixture.evidence.proposed.head.objectId;
+-			const before = await fixture.evidence.aheBackend.readHead(objectId);
+-			expect(before.ok).toBe(true);
+-			if (!before.ok || before.value.kind !== "present") {
+-				throw new TypeError("D.110c-0b0a genuine predecessor head is unavailable");
++			expect(Object.keys(stageSurface).sort()).toEqual([
++				"publishStagedCreatorSuccessorAdoption",
++				"stageCreatorSuccessorAdoption",
++			]);
++			expect(Object.keys(recoverSurface)).toEqual(["recoverPendingCreatorSuccessorAdoption"]);
++			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle })).toMatchObject({
++				kind: "malformed-input",
++				ok: false,
++			});
++			const before = await fixture.evidence.aheBackend.readHead(fixture.evidence.proposed.head.objectId);
++			if (!before.ok || before.value.kind !== "present") throw new TypeError("D.110c-0b0a head is unavailable");
++			fixture.controls.aheOperationCounts.clear();
++			const staged = await stageCreatorSuccessorAdoption({
++				handle: fixture.handle,
++				intent: await verifiedIntent(fixture),
++			});
++			expect(Object.keys(staged).sort()).toEqual(["capability", "descriptor", "lifecycle", "ok", "recovery"]);
++			expect(staged).toMatchObject({ lifecycle: "successor-staged", ok: true, recovery: "pending-old" });
++			const afterStage = await fixture.evidence.aheBackend.readHead(fixture.evidence.proposed.head.objectId);
++			if (!afterStage.ok || afterStage.value.kind !== "present") {
++				throw new TypeError("D.110c-0b0a staged head is unavailable");
+ 			}
++			expect(sameHead(before.value, afterStage.value)).toBe(true);
++			expect(fixture.controls.aheOperationCounts.get("swapHead") ?? 0).toBe(0);
++			expect((await generations(fixture)).filter(({ state }) => state === "Complete")).toHaveLength(1);
++
++			expect(await commitCreatorSuccessorAdoption({ handle: fixture.handle, intent: staged.capability })).toMatchObject(
++				{ kind: "intent-unavailable", ok: false }
++			);
++			expect(
++				await activateCreatorSuccessorAdoption({
++					capability: staged.capability,
++					handle: fixture.handle,
++					...fixture.runtimeBindings,
++				})
++			).toMatchObject({ kind: "capability-unavailable", ok: false });
++			expect(
++				await publishStagedCreatorSuccessorAdoption({ capability: staged.capability, handle: foreign.handle })
++			).toMatchObject({ kind: "intent-unavailable", ok: false });
++			expect(
++				await publishStagedCreatorSuccessorAdoption({
++					capability: { ...record(staged.capability) },
++					handle: fixture.handle,
++				})
++			).toMatchObject({ kind: "intent-unavailable", ok: false });
++			expect(
++				await publishStagedCreatorSuccessorAdoption({
++					capability: staged.capability,
++					extra: true,
++					handle: fixture.handle,
++				})
++			).toMatchObject({ kind: "malformed-input", ok: false });
+ 
+-			const verified = await fixture.modules.verifyCreatorSuccessorAdoption({
+-				catalog: fixture.catalog,
++			const published = await publishStagedCreatorSuccessorAdoption({
++				capability: staged.capability,
+ 				handle: fixture.handle,
+ 			});
+-			expect(verified.ok).toBe(true);
+-			if (verified.ok !== true) throw new TypeError(`D.110c-0b0a verification failed: ${String(verified.kind)}`);
++			expect(Object.keys(published).sort()).toEqual([
++				"capability",
++				"descriptor",
++				"head",
++				"lifecycle",
++				"ok",
++				"recovery",
++			]);
++			expect(published).toMatchObject({ lifecycle: "successor-prepared", ok: true, recovery: "active-new" });
++			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
++			expect(
++				await publishStagedCreatorSuccessorAdoption({ capability: staged.capability, handle: fixture.handle })
++			).toMatchObject({ kind: "intent-unavailable", ok: false });
++		} finally {
++			await Promise.all([fixture.close(), foreign.close()]);
++		}
++	});
+ 
++	it("recovers equivalent Complete retries deterministically across both AHE orderings", async () => {
++		const fixture = await openGenuineCreatorAdoptionFixture();
++		try {
++			const first = await verifiedIntent(fixture);
++			const second = await verifiedIntent(fixture);
++			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle, intent: first })).toMatchObject({
++				ok: true,
++			});
++			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle, intent: second })).toMatchObject({
++				ok: true,
++			});
++			const completeIds = (await generations(fixture))
++				.filter(({ state }) => state === "Complete")
++				.map(({ generationId }) => generationId)
++				.sort();
++			expect(completeIds).toHaveLength(2);
+ 			fixture.controls.aheOperationCounts.clear();
+-			const committed = await fixture.modules.commitCreatorSuccessorAdoption({
+-				handle: fixture.handle,
+-				intent: verified.intent,
++			fixture.controls.aheMutationHook = ({ edge, operation }): void => {
++				if (edge === "after-request" && operation === "swapHead") {
++					throw new TypeError("D.110c-0b0a committed CAS response lost");
++				}
++			};
++			const input = recoveryInput(fixture);
++			const recovered = await recoverPendingCreatorSuccessorAdoption(input);
++			expect(Object.keys(recovered).sort()).toEqual(["head", "lifecycle", "ok", "recovery"]);
++			expect(recovered).toMatchObject({
++				head: input.expectedNextRoomHead,
++				lifecycle: "successor-published",
++				ok: true,
++				recovery: "active-new",
+ 			});
+-			expect(committed).toMatchObject({ ok: true, recovery: "active-new" });
+-			const after = await fixture.evidence.aheBackend.readHead(objectId);
+-			expect(after.ok).toBe(true);
+-			if (!after.ok || after.value.kind !== "present") {
+-				throw new TypeError("D.110c-0b0a committed successor head is unavailable");
+-			}
+-			expect(sameHead(before.value, after.value)).toBe(false);
+ 			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
++			const active = await fixture.evidence.aheBackend.readHead(fixture.evidence.proposed.head.objectId);
++			if (!active.ok || active.value.kind !== "present") throw new TypeError("D.110c-0b0a active head is unavailable");
++			expect(active.value.generationId).toBe(completeIds[0]);
+ 
+-			const packageJson = JSON.parse(
+-				readFileSync(resolve(REPOSITORY_ROOT, "packages/node/package.json"), "utf8")
+-			) as Readonly<{ readonly exports?: Readonly<Record<string, unknown>> }>;
+-			expect(packageJson.exports?.["./creator-adoption-stage"]).toBeUndefined();
+-			expect(packageJson.exports?.["./creator-adoption-recover"]).toBeUndefined();
+-
+-			throw new TypeError("D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING");
++			fixture.controls.aheMutationHook = undefined;
++			const swapCount = fixture.controls.aheOperationCounts.get("swapHead");
++			expect(await recoverPendingCreatorSuccessorAdoption(input)).toMatchObject({ ok: true, recovery: "active-new" });
++			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(swapCount);
+ 		} finally {
+ 			await fixture.close();
+ 		}
+ 	});
++
++	it("fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates", async () => {
++		const absent = await openGenuineCreatorAdoptionFixture();
++		const incomplete = await openGenuineCreatorAdoptionFixture();
++		const forked = await openGenuineCreatorAdoptionFixture();
++		try {
++			const absentInput = recoveryInput(absent);
++			expect(await recoverPendingCreatorSuccessorAdoption(absentInput)).toMatchObject({
++				kind: "pending-missing",
++				ok: false,
++			});
++			expect(
++				await recoverPendingCreatorSuccessorAdoption({
++					...absentInput,
++					expectedNextRoomHead: {
++						...(absentInput.expectedNextRoomHead as Readonly<Record<string, unknown>>),
++						currentAnchorDigest: "f".repeat(64),
++					},
++				})
++			).toMatchObject({ ok: false });
++			expect(await recoverPendingCreatorSuccessorAdoption({ ...absentInput, extra: true })).toMatchObject({
++				kind: "malformed-input",
++				ok: false,
++			});
++
++			incomplete.controls.aheMutationHook = ({ edge, operation }): void => {
++				if (edge === "before-request" && operation === "completeGeneration") {
++					throw new TypeError("D.110c-0b0a controlled incomplete candidate");
++				}
++			};
++			expect(
++				await stageCreatorSuccessorAdoption({ handle: incomplete.handle, intent: await verifiedIntent(incomplete) })
++			).toMatchObject({ kind: "pending-old", ok: false });
++			incomplete.controls.aheMutationHook = undefined;
++			expect(await recoverPendingCreatorSuccessorAdoption(recoveryInput(incomplete))).toMatchObject({
++				kind: "pending-missing",
++				ok: false,
++			});
++
++			expect(
++				await stageCreatorSuccessorAdoption({ handle: forked.handle, intent: await verifiedIntent(forked) })
++			).toMatchObject({ ok: true });
++			await installDifferentClosureCandidate(forked);
++			expect(await recoverPendingCreatorSuccessorAdoption(recoveryInput(forked))).toMatchObject({
++				kind: "true-fork",
++				ok: false,
++			});
++		} finally {
++			await Promise.all([absent.close(), incomplete.close(), forked.close()]);
++		}
++	});
+ });

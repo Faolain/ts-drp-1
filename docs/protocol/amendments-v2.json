@@ -1,0 +1,233 @@
+{
+	"amendmentLogVersion": "2.0.0",
+	"effectiveDate": "2026-07-26",
+	"normativeDocument": "./attested-hard-epochs-v4.md",
+	"protocolMajor": 2,
+	"registryVersion": 5,
+	"status": "normative",
+	"entries": [
+		{
+			"decision": 1,
+			"id": "PH-N1-D01",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-01",
+			"registryPaths": ["framing"],
+			"requirements": {
+				"domainEncoding": "utf8",
+				"domainLength": "U32BE",
+				"formula": "\"DRP\\0\" || U32BE(|domain|) || domain || (U64BE(|part|) || part)*",
+				"magicHex": "44525000",
+				"partLength": "U64BE"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 2,
+			"id": "PH-N1-D02",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-02",
+			"registryPaths": ["endianness"],
+			"requirements": {
+				"framingIntegerEndianness": "big-endian",
+				"typedArrayEndianness": "big-endian"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 3,
+			"id": "PH-N1-D03",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-03",
+			"registryPaths": ["codec"],
+			"requirements": {
+				"cbor": false,
+				"codecId": "drp-canonical-profile-1",
+				"decoderRejectionScope": "only-registry-v5-or-amendment-explicitly-forbidden-forms",
+				"format": "reference-tag-codec",
+				"unsafeIntegralFloat64": "unresolved-neither-accept-nor-reject-ratified"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 4,
+			"id": "PH-N1-D04",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-04",
+			"registryPaths": ["codec.floatNegativeZero"],
+			"requirements": {
+				"decodeNegativeZero": "reject",
+				"encodeNegativeZero": "normalize-to-positive-zero",
+				"includesFloat32Array": true
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 5,
+			"id": "PH-N1-D05",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-05",
+			"registryPaths": [
+				"kinds.cutValue.fields",
+				"kinds.epochAnchor.fields",
+				"kinds.snapshotPayload.fields",
+				"kinds.sealProposal.fields",
+				"kinds.sealVote.fields",
+				"kinds.sealQC.fields"
+			],
+			"requirements": {
+				"addedPreimageFields": {
+					"cutValue": ["archiveIndexRoot", "availabilityPolicyDigest"],
+					"epochAnchor": ["archiveIndexRoot", "blueprintDigest"],
+					"snapshotPayload": ["blueprintDigest", "archiveIndexRoot"]
+				},
+				"cutValueFieldsExclude": ["round"],
+				"sealProposalFieldsInclude": ["round", "valueDigest"],
+				"valueDigestPreimage": "CutValue",
+				"proposalHashPreimage": "SealProposal",
+				"voteProposalBindings": {
+					"lockAndCommitKey": "proposalDigest",
+					"proposalDigest": "round-free-cut-value-digest-equal-to-seal-proposal.valueDigest",
+					"proposalHash": "round-bearing-seal-proposal-digest",
+					"registeredFieldMembership": {
+						"sealQC": ["proposalDigest", "proposalHash"],
+						"sealVote": ["proposalDigest", "proposalHash"]
+					}
+				}
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 6,
+			"id": "PH-N1-D06",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-06",
+			"registryPaths": ["kinds.sealVote.fields", "kinds.sealQC.fields", "kinds.roundChange.fields"],
+			"requirements": {
+				"highestPrepareQC": {
+					"roundChange": true,
+					"sealQC": false,
+					"sealVote": false
+				},
+				"roundChangePhase": "round-change"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 7,
+			"id": "PH-N1-D07",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-07",
+			"registryPaths": ["quorum"],
+			"requirements": {
+				"q": "ceil(2*n/3)",
+				"f": "floor((n-1)/3)",
+				"callerSuppliedMaxByzantine": false
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 8,
+			"id": "PH-N1-D08",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-08",
+			"registryPaths": ["kinds.signerSet.fields"],
+			"requirements": {
+				"protocolOrdering": "utf8-byte-order",
+				"registrySortRule": "codepoint",
+				"signerIdCharset": "unicode-scalar-excluding-controls"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 9,
+			"id": "PH-N1-D09",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-09",
+			"registryPaths": ["actions"],
+			"requirements": {
+				"actions": ["Nop", "DropLeft", "DropRight", "Swap", "Drop"],
+				"dropSemantics": "drop-both-vertices"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 10,
+			"id": "PH-N1-D10",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-10",
+			"registryPaths": ["trustProfiles", "kinds.epochAnchor.fields", "kinds.profile.fields"],
+			"requirements": {
+				"policyAxes": {
+					"authorityAndQuorum": "trust-profile",
+					"custody": "voter-storage-class"
+				},
+				"profileDigestAndCryptoSuiteIdSignedIn": ["genesis", "epochAnchor"],
+				"profiles": ["creator-trusted-v1", "delegated-trusted-v1", "attested-bft-v1"],
+				"delegatedProfile": {
+					"minimumQuorum": 2,
+					"semantics": "k-of-n-not-bft"
+				},
+				"voterStoragePolicy": {
+					"admittedStorageClassesByProfile": {
+						"attested-bft-v1": ["detectable-loss-durable-class", "browser-local-eviction-prone"],
+						"delegated-trusted-v1": ["detectable-loss-durable-class", "browser-local-eviction-prone"]
+					},
+					"singleVoter": {
+						"custody": "recoverable-seed-derived-plus-network-relearn",
+						"fateSharedCustody": false,
+						"n": 1,
+						"q": 1
+					},
+					"quorumAtLeast2": {
+						"antiEquivocationContinuity": "exact-slot",
+						"externalExactSlotWitness": {
+							"continuity": "exact-slot",
+							"validMode": true
+						},
+						"minimumQuorum": 2,
+						"setComposition": {
+							"evictionProneSafeguard": "at-least-one-durable-class-voter-or-declared-stall-acceptance",
+							"stallTriggeredQuorumReduction": false
+						},
+						"storageClasses": {
+							"browserLocalEvictionProne": {
+								"custodyWithoutExternalExactSlotWitness": "fate-shared-non-extractable"
+							},
+							"detectableLossDurableClass": {
+								"durableCasOutboxRequired": true,
+								"incarnationBinding": "required",
+								"onIncarnationMismatch": "refuse-permanently"
+							}
+						}
+					}
+				}
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 11,
+			"id": "PH-N1-D11",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-11",
+			"registryPaths": ["protocolMajor", "packageName", "domains"],
+			"requirements": {
+				"domainPattern": "ts-drp/*/v2",
+				"packageName": "protocol-v2",
+				"protocolMajor": 2,
+				"specTitleException": "Attested Hard Epochs v4"
+			},
+			"status": "normative"
+		},
+		{
+			"decision": 12,
+			"id": "PH-N1-D12",
+			"normativeSource": "./attested-hard-epochs-v4.md#decision-12",
+			"registryPaths": ["kinds.epochAnchor.fields", "kinds.profile.fields"],
+			"requirements": {
+				"activeSuiteCount": 2,
+				"activeSuiteIds": ["ed25519-sha256-v1", "ed25519-seal-v1"],
+				"activeSuites": {
+					"identityAndVertex": "ed25519-sha256-v1",
+					"sealVote": "ed25519-seal-v1"
+				},
+				"ed25519Message": "raw-32-byte-registered-digest",
+				"p256Reactivation": {
+					"digestMode": "pin-raw-registered-digest-or-rehash",
+					"lowSNormalization": "pin",
+					"sameAmendment": true
+				},
+				"reservedSuites": ["p256-sha256-v1"]
+			},
+			"status": "normative"
+		}
+	]
+}

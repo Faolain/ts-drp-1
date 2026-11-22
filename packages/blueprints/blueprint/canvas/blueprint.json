@@ -1,0 +1,300 @@
+{
+	"schemaVersion": 2,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "v3-additive-rgb-canvas.v1",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "action",
+	"workBudgetProfile": "blueprint-work-budget-v1",
+	"operations": [
+		{
+			"name": "acl",
+			"reducerBinding": "aclReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "group",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "kind",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "target",
+						"required": true,
+						"type": "string"
+					}
+				]
+			}
+		},
+		{
+			"name": "applicationBatch",
+			"reducerBinding": "applicationBatchReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "batch",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "causalJoin",
+			"reducerBinding": "causalJoinReducer",
+			"maxCanonicalOperationBytes": 192,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": []
+			}
+		},
+		{
+			"name": "migrationActivation",
+			"reducerBinding": "migrationActivationReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "decision",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationRecord",
+			"reducerBinding": "migrationRecordReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "record",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "paint",
+			"reducerBinding": "paintReducer",
+			"maxCanonicalOperationBytes": 384,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "clientOperationId",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "payload",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "splash",
+			"reducerBinding": "splashReducer",
+			"maxCanonicalOperationBytes": 384,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "clientOperationId",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "payload",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "v3-additive-canvas-flat-v1",
+		"seed": "v3-additive-canvas-conformance-2026-10-10",
+		"initialState": {
+			"version": 1,
+			"width": 2,
+			"height": 2,
+			"counters": [
+				[
+					0,
+					0,
+					0
+				],
+				[
+					0,
+					0,
+					0
+				],
+				[
+					0,
+					0,
+					0
+				],
+				[
+					0,
+					0,
+					0
+				]
+			]
+		},
+		"prCases": [
+			{
+				"id": "paint-negative-zero",
+				"action": "paint",
+				"arguments": {
+					"payload": {
+						"offset": [
+							-0,
+							0
+						],
+						"rgb": [
+							255,
+							7,
+							1
+						]
+					},
+					"clientOperationId": "paint-negative-zero"
+				}
+			},
+			{
+				"id": "overlapping-splash",
+				"action": "splash",
+				"arguments": {
+					"payload": {
+						"offset": [
+							0,
+							0
+						],
+						"rgb": [
+							2,
+							250,
+							3
+						],
+						"size": [
+							2,
+							2
+						]
+					},
+					"clientOperationId": "overlapping-splash"
+				}
+			}
+		],
+		"nightlyAdditionalCases": [
+			{
+				"id": "paint-modulo-wrap",
+				"action": "paint",
+				"arguments": {
+					"payload": {
+						"offset": [
+							0,
+							0
+						],
+						"rgb": [
+							255,
+							255,
+							255
+						]
+					},
+					"clientOperationId": "paint-modulo-wrap"
+				}
+			},
+			{
+				"id": "splash-zero-increment",
+				"action": "splash",
+				"arguments": {
+					"payload": {
+						"offset": [
+							1,
+							1
+						],
+						"rgb": [
+							0,
+							0,
+							0
+						],
+						"size": [
+							1,
+							1
+						]
+					},
+					"clientOperationId": "splash-zero-increment"
+				}
+			},
+			{
+				"id": "causal-bootstrap",
+				"action": "causalJoin",
+				"arguments": {}
+			},
+			{
+				"id": "batch-overlap",
+				"action": "applicationBatch",
+				"arguments": {
+					"batch": {
+						"version": 1,
+						"entries": [
+							{
+								"logicalTime": 1,
+								"operation": {
+									"action": "paint",
+									"payload": {
+										"offset": [
+											0,
+											1
+										],
+										"rgb": [
+											1,
+											2,
+											3
+										]
+									},
+									"clientOperationId": "batch-overlap-0"
+								}
+							},
+							{
+								"logicalTime": 2,
+								"operation": {
+									"action": "splash",
+									"payload": {
+										"offset": [
+											0,
+											1
+										],
+										"rgb": [
+											3,
+											2,
+											1
+										],
+										"size": [
+											2,
+											1
+										]
+									},
+									"clientOperationId": "batch-overlap-1"
+								}
+							}
+						]
+					}
+				}
+			}
+		]
+	}
+}

@@ -1,0 +1,93 @@
+[
+  {
+    "name": "format",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "prettier",
+      "--check",
+      "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "expectedStatus": 0,
+    "startedAt": "2026-09-05T08:23:54.782Z",
+    "finishedAt": "2026-09-05T08:23:55.519Z"
+  },
+  {
+    "name": "lint",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "eslint",
+      "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "expectedStatus": 0,
+    "startedAt": "2026-09-05T08:23:55.519Z",
+    "finishedAt": "2026-09-05T08:24:17.181Z"
+  },
+  {
+    "name": "diff",
+    "bin": "git",
+    "args": [
+      "-C",
+      "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "diff",
+      "e8e7b027629a647a068d51395f88b51e8391c2eb^",
+      "e8e7b027629a647a068d51395f88b51e8391c2eb",
+      "--check",
+      "--",
+      "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "expectedStatus": 0,
+    "startedAt": "2026-09-05T08:24:17.182Z",
+    "finishedAt": "2026-09-05T08:24:17.211Z"
+  },
+  {
+    "name": "list",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "list",
+      "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "-t",
+      "documents both existing callback surfaces without changing their type shapes"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 0,
+    "signal": null,
+    "expectedStatus": 0,
+    "startedAt": "2026-09-05T08:24:17.211Z",
+    "finishedAt": "2026-09-05T08:24:19.135Z"
+  },
+  {
+    "name": "red",
+    "bin": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "run",
+      "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+      "-t",
+      "documents both existing callback surfaces without changing their type shapes",
+      "--no-file-parallelism",
+      "--coverage.enabled=false",
+      "--reporter=json",
+      "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0v-node-wording-red-e8e7b027/reporter.json"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "status": 1,
+    "signal": null,
+    "expectedStatus": 1,
+    "startedAt": "2026-09-05T08:24:19.135Z",
+    "finishedAt": "2026-09-05T08:24:20.588Z"
+  }
+]

@@ -1,0 +1,75 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-terminal-transition-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 3h-b node-owned terminal transition RED"
+      ],
+      "fullName": "Phase 3h-b node-owned terminal transition RED reserves the genuine live-plane gate through one handle-bound capability",
+      "status": "passed",
+      "title": "reserves the genuine live-plane gate through one handle-bound capability",
+      "duration": 479.97795900000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h-b node-owned terminal transition RED"
+      ],
+      "fullName": "Phase 3h-b node-owned terminal transition RED enumerates pending and published source work across the authenticated activation cut",
+      "status": "passed",
+      "title": "enumerates pending and published source work across the authenticated activation cut",
+      "duration": 170.67316700000015,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h-b node-owned terminal transition RED"
+      ],
+      "fullName": "Phase 3h-b node-owned terminal transition RED rejects oversized and irreducible multi-tip activation before signer or store effects",
+      "status": "passed",
+      "title": "rejects oversized and irreducible multi-tip activation before signer or store effects",
+      "duration": 7048.820542,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h-b node-owned terminal transition RED"
+      ],
+      "fullName": "Phase 3h-b node-owned terminal transition RED holds an empty redirected target until the authenticated migration prefix is retained",
+      "status": "passed",
+      "title": "holds an empty redirected target until the authenticated migration prefix is retained",
+      "duration": 278.53079100000105,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h-b node-owned terminal transition RED"
+      ],
+      "fullName": "Phase 3h-b node-owned terminal transition RED fails closed on wrong cross-object store, scope, target, or activation closure evidence",
+      "status": "passed",
+      "title": "fails closed on wrong cross-object store, scope, target, or activation closure evidence",
+      "duration": 476.2997919999998,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

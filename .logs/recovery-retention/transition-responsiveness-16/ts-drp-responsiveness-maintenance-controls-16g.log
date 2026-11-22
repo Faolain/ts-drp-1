@@ -1,0 +1,10 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+ ✓ packages/node/tests/closed-epoch-retirement-sequencing.test.ts (18 tests) 89ms
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  12:35:02
+   Duration  1.94s (transform 257ms, setup 0ms, collect 1.14s, tests 89ms, environment 0ms, prepare 157ms)
+

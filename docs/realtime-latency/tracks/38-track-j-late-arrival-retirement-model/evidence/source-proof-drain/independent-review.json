@@ -1,0 +1,21 @@
+{
+  "status": "No actionable defects found",
+  "reviewSession": "01a169bd-9348-7b11-a567-ab49e5144219",
+  "exitCode": 0,
+  "command": "codex review --uncommitted",
+  "log": "independent-review.log.gz",
+  "logSha256": "4ec680070a9ed25a58486067e79ab69cfaceec794e9fddf3292aee4875b9f0b4",
+  "logGzipSha256": "200962bb7da16df65e027450b7ce7ef89629505e44a0339c6fd4be8b37725beb",
+  "modelSha256": "af9374f32417a1ea2cc5cac8ed0b41c25ab6940f0c4e45969c9a8c47efe220dd",
+  "freshVerification": {
+    "allRegisteredChecks": 16,
+    "directedDeclarations": 17,
+    "expectedVerdictsMatched": true,
+    "sourceAndFinalAndSupersededLogHashes": true,
+    "manifest": "independent-rerun.json.gz",
+    "manifestSha256": "0ddc5448894eb53b5a7d8d0369d6a89ac99e9ef2b35036101db1eefdc64812a4",
+    "manifestGzipSha256": "a41f9bdb3f3ffc31c8972cc20246104dc9ecc7cd67e9421f44635c194f818406"
+  },
+  "limits": "Independent repetition of the same bounded source-proof and target-currency checks, not a larger theorem, TypeScript/native refinement, or final production-source correspondence.",
+  "processAudit": "Review exited successfully. All known reviewer/MCP/checker descendants were absent and no listener remained on checker port 8931 before lane handoff."
+}

@@ -19,6 +19,7 @@ import type { DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
+import type { NodeRoomNetworkPort } from "../src/room-network.js";
 
 const NAMESPACE = `drp-network:v1:${"t".repeat(43)}`;
 const INVITE = "targeted-connect-object-fixture-invite";
@@ -39,7 +40,7 @@ interface NodeFixture {
 	readonly node: DRPNode;
 }
 
-describe("connectObject targeted creator rendezvous", () => {
+describe("current room targeted creator rendezvous", () => {
 	const nodes: DRPNode[] = [];
 	const pending: Array<Promise<unknown>> = [];
 	let unhandledRejections: unknown[] = [];
@@ -67,7 +68,7 @@ describe("connectObject targeted creator rendezvous", () => {
 		const fixture = await startedNode(directory.ensemble);
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id: objectId(directory.target, "eligible") }));
+		pending.push(connectRoom(fixture.node, objectId(directory.target, "eligible")));
 
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledWith([...directory.target.addresses]), {
 			timeout: 500,
@@ -83,13 +84,13 @@ describe("connectObject targeted creator rendezvous", () => {
 		fixture.getAllPeers.mockReturnValue([directory.target.peerId]);
 		const discoverSpies = directory.endpoints.map((endpoint) => vi.spyOn(endpoint, "discover"));
 
-		pending.push(fixture.node.connectObject({ id: objectId(directory.target, "already-connected") }));
+		pending.push(connectRoom(fixture.node, objectId(directory.target, "already-connected")));
 		await flushMicrotasks();
 		expect(discoverSpies.every((discover) => discover.mock.calls.length === 0)).toBe(true);
 		expect(fixture.connect).not.toHaveBeenCalled();
 
 		fixture.getAllPeers.mockReturnValue([]);
-		pending.push(fixture.node.connectObject({ id: objectId(directory.target, "now-absent") }));
+		pending.push(connectRoom(fixture.node, objectId(directory.target, "now-absent")));
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledTimes(1), { timeout: 500 });
 		expect(fixture.connect).toHaveBeenCalledWith([...directory.target.addresses]);
 	});
@@ -101,7 +102,7 @@ describe("connectObject targeted creator rendezvous", () => {
 		const discoverSpies = directory.endpoints.map((endpoint) => vi.spyOn(endpoint, "discover"));
 		const registryDiscover = vi.spyOn(directory.registries, "discover");
 
-		pending.push(fixture.node.connectObject({ id: "legacy-object-without-creator" }));
+		pending.push(connectRoom(fixture.node, "legacy-object-without-creator"));
 		await flushMicrotasks();
 		expect(discoverSpies.flatMap((discover) => discover.mock.calls).map(([request]) => request.namespace)).toEqual([
 			roomNamespace("legacy-object-without-creator"),
@@ -110,11 +111,11 @@ describe("connectObject targeted creator rendezvous", () => {
 		expect(registryDiscover.mock.calls.every(([, , selection]) => selection?.targetPeerId === undefined)).toBe(true);
 		expect(fixture.connect).not.toHaveBeenCalled();
 
-		pending.push(fixture.node.connectObject({ id: objectId(directory.target, "bound-control") }));
+		pending.push(connectRoom(fixture.node, objectId(directory.target, "bound-control")));
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledTimes(1), { timeout: 500 });
 	});
 
-	it("keeps connectObject non-fatal when every targeted registry lookup fails", async () => {
+	it("keeps creator dialing non-fatal when every targeted registry lookup fails", async () => {
 		const directory = await directoryFixture();
 		for (const endpoint of directory.endpoints) endpoint.setAvailable(false);
 		const discoverSpies = directory.endpoints.map((endpoint) => vi.spyOn(endpoint, "discover"));
@@ -123,27 +124,27 @@ describe("connectObject targeted creator rendezvous", () => {
 		vi.useFakeTimers();
 		const id = objectId(directory.target, "lookup-failure");
 
-		const connecting = fixture.node.connectObject({ id });
+		const connecting = connectRoom(fixture.node, id);
 		await vi.advanceTimersByTimeAsync(5_000);
 
 		expect(discoverSpies.reduce((count, discover) => count + discover.mock.calls.length, 0)).toBeGreaterThan(0);
-		await expect(connecting).resolves.toMatchObject({ id });
+		await expect(connecting).resolves.toBeUndefined();
 		expect(fixture.connect).not.toHaveBeenCalled();
 	});
 
-	it("a second connectObject aborts the first targeted bootstrap and leaves one controller", async () => {
+	it("a second owned creator dial aborts the first targeted bootstrap and leaves one controller", async () => {
 		const directory = await directoryFixture();
 		const bootstrap = blockingEnsemble();
 		const fixture = await startedNode(bootstrap.ensemble);
 		nodes.push(fixture.node);
 		const id = objectId(directory.target, "superseded");
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 		await vi.waitFor(() => expect(bootstrap.signals).toHaveLength(1));
 		const firstSignal = bootstrap.signals[0];
 		if (firstSignal === undefined) throw new Error("first targeted bootstrap signal was not captured");
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 		await vi.waitFor(() => expect(bootstrap.signals).toHaveLength(2));
 		const secondSignal = bootstrap.signals[1];
 		if (secondSignal === undefined) throw new Error("second targeted bootstrap signal was not captured");
@@ -155,19 +156,19 @@ describe("connectObject targeted creator rendezvous", () => {
 		bootstrap.releaseAll();
 	});
 
-	it("unsubscribeObject aborts an in-flight targeted bootstrap and prevents a later dial", async () => {
+	it("room close aborts an in-flight targeted bootstrap and prevents a later dial", async () => {
 		const directory = await directoryFixture();
 		const bootstrap = blockingEnsemble();
 		const fixture = await startedNode(bootstrap.ensemble);
 		nodes.push(fixture.node);
 		const id = objectId(directory.target, "unsubscribe");
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 		await vi.waitFor(() => expect(bootstrap.signals).toHaveLength(1));
 		const operationSignal = bootstrap.signals[0];
 		if (operationSignal === undefined) throw new Error("targeted bootstrap signal was not captured");
 
-		fixture.node.unsubscribeObject(id);
+		closeRoom(fixture.node, id);
 		expect(operationSignal.aborted).toBe(true);
 		expect(fixture.node["_connectRendezvousControllers"].size).toBe(0);
 		bootstrap.releaseAll();
@@ -182,7 +183,7 @@ describe("connectObject targeted creator rendezvous", () => {
 		nodes.push(fixture.node);
 		const id = objectId(directory.target, "stop");
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 		await vi.waitFor(() => expect(bootstrap.signals).toHaveLength(1));
 		const operationSignal = bootstrap.signals[0];
 		if (operationSignal === undefined) throw new Error("targeted bootstrap signal was not captured");
@@ -213,9 +214,9 @@ describe("connectObject targeted creator rendezvous", () => {
 		nodes.push(fixture.node);
 		const id = objectId(directory.target, "abort-mid-dial");
 
-		pending.push(fixture.node.connectObject({ id }));
+		pending.push(connectRoom(fixture.node, id));
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledTimes(1));
-		fixture.node.unsubscribeObject(id);
+		closeRoom(fixture.node, id);
 		finishFirstDial?.();
 		await flushMicrotasks();
 
@@ -240,7 +241,7 @@ describe("connectObject targeted creator rendezvous", () => {
 		const fixture = await startedNode(bootstrap);
 		nodes.push(fixture.node);
 
-		pending.push(fixture.node.connectObject({ id: objectId(directory.target, "defense-and-dedupe") }));
+		pending.push(connectRoom(fixture.node, objectId(directory.target, "defense-and-dedupe")));
 		await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledTimes(2));
 
 		expect(fixture.connect.mock.calls).toEqual([[[targetAddress, alternateAddress]], [[alternateAddress]]]);
@@ -257,8 +258,14 @@ function blockingEnsemble(): BlockingEnsemble {
 	const releases: Array<() => void> = [];
 	const signals: AbortSignal[] = [];
 	const ensemble: RendezvousEnsemble = {
-		bootstrap: (_namespace, operationSignal): AsyncIterable<AddressFilteredDrpRecord> => ({
+		bootstrap: (namespace, operationSignal): AsyncIterable<AddressFilteredDrpRecord> => ({
 			[Symbol.asyncIterator]: (): AsyncIterator<AddressFilteredDrpRecord> => {
+				if (namespace !== NAMESPACE) {
+					return {
+						next: (): Promise<IteratorResult<AddressFilteredDrpRecord>> =>
+							Promise.resolve({ done: true, value: undefined }),
+					};
+				}
 				signals.push(operationSignal);
 				return {
 					next: (): Promise<IteratorResult<AddressFilteredDrpRecord>> =>
@@ -408,6 +415,8 @@ function fakeNetwork(connect: ReturnType<typeof vi.fn>, getAllPeers: ReturnType<
 		getAllPeers,
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn((): Promise<void> => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn((): Promise<void> => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((): void => undefined),
@@ -446,4 +455,24 @@ async function flushMicrotasks(): Promise<void> {
 
 function signal(): AbortSignal {
 	return new AbortController().signal;
+}
+
+// Register the current transport lifecycle, then drive its existing creator-dial
+// owner directly to preserve exact attempt timing. Routing grants no app authority.
+const currentRoomPorts = new WeakMap<DRPNode, Map<string, NodeRoomNetworkPort>>();
+
+function connectRoom(node: DRPNode, id: string): Promise<void> {
+	let rooms = currentRoomPorts.get(node);
+	if (rooms === undefined) {
+		rooms = new Map();
+		currentRoomPorts.set(node, rooms);
+	}
+	if (!rooms.has(id)) rooms.set(id, node.openRoomNetwork(id));
+	return node["_connectRoomCreator"](id);
+}
+
+function closeRoom(node: DRPNode, id: string): void {
+	const rooms = currentRoomPorts.get(node);
+	rooms?.get(id)?.close();
+	rooms?.delete(id);
 }

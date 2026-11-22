@@ -1,0 +1,23 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"module": "NodeNext",
+		"noEmit": true,
+		"target": "ES2023",
+		"types": ["node", "vitest/globals", "@playwright/test"]
+	},
+	"include": [
+		"phase-3a1b-p2-outbox-publication-contract.ts",
+		"../phase-3a1b-p2-outbox-publication-contract.test.ts",
+		"../../packages/storage-node/tests/phase-3a1b-p2-node-outbox-publication-red.test.ts",
+		"../../packages/storage-node/tests/phase-3a1b-p2-node-outbox-publication-death-red.test.ts",
+		"../../packages/storage-browser/tests/phase-3a1b-p2-browser-outbox-publication-death-red.pw.ts",
+		"../../packages/storage-browser/tests/phase-3a1b-p2-global-setup.ts",
+		"../../packages/storage-browser/tests/assets/phase-3a1b-p2-browser-publication-entry.ts",
+		"../../packages/storage-browser/tests/assets/phase-3a1b-p2-browser-publication-worker.ts",
+		"../../packages/storage-browser/tests/process/phase-3a1b-p2-browser-publication-crash-child.ts"
+	]
+}

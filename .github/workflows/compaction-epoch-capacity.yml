@@ -1,0 +1,38 @@
+name: Compaction epoch capacity freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  compaction-epoch-capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Freeze provenance
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node packages/compaction/conformance/epoch-capacity-v1/check-freeze.mjs "$BASE_SHA"
+      - name: Controlled and production contract serially
+        run: |
+          PHASE_0P1_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p1-v3/controlled-epoch-capacity.ts pnpm exec vitest run tests/compaction-epoch-capacity-0p1.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/compaction-epoch-capacity-0p1.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Preserve Phase 0e exact ancestry serially
+        run: pnpm exec vitest run packages/compaction/tests/causality-append-0e.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit public types
+        run: |
+          pnpm --filter @ts-drp/compaction build
+          pnpm exec tsc -p tests/fixtures/phase-0p1-v3/tsconfig.public-entry-audit.json
+          pnpm exec tsc -p tests/fixtures/phase-0p1-v3/tsconfig.built-package-audit.json

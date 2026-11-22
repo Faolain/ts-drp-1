@@ -1,0 +1,25 @@
+{
+  "status": "No actionable defects found after both prior model assertion findings were corrected",
+  "reviewSession": "01a1694d-6191-79f3-931a-d2005a8979b1",
+  "exitCode": 0,
+  "command": "codex review --uncommitted",
+  "log": "independent-review.log.gz",
+  "logSha256": "0a4c0d13e7273d776114bdcd316d9ad0d29896bdc0276c5c620b7a226db69f63",
+  "logGzipSha256": "4d7e25e435c0ef5baeb717d36cfc9feab78e09255f22cfbb03b35eaf58e5a37f",
+  "modelSha256": "3c6743339bdcf14fc1fa55d19f0237824d0626d907fef2468eeafbcc1403fb2e",
+  "priorReview": "review1-prior-inputs/independent-review.json",
+  "freshVerification": {
+    "typecheck": true,
+    "directedDeclarations": 30,
+    "verifierChecks": [
+      "installed-safe",
+      "suspension-safe",
+      "owner-safe",
+      "owner-base",
+      "owner-step"
+    ],
+    "sourceAndRawLogHashes": true
+  },
+  "limits": "Fresh review checks are the selected subset above; complete 24-case evidence remains final-results.json. No TypeScript/native refinement or application-projection atomicity claim.",
+  "reviewProcessNote": "An unrelated parent-directory AGENTS scan reached its own timeout; all scoped checks completed. Final process audit found no reviewer or owned descendants."
+}

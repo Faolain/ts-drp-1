@@ -1,0 +1,35 @@
+{
+	"profileId": "equivocation-author-projection-v1",
+	"baseProfileId": "equivocation-evidence-projection-v1",
+	"authorProjection": {
+		"slotUpdate": "monotone-union",
+		"pairExpansion": "newDigests × postUnionDigests",
+		"pairIdentity": "scope-plus-canonical-unordered-distinct-digest-pair",
+		"lifetimeEnqueueCountPerIdentity": 1
+	},
+	"authoritativeRead": {
+		"operation": "readCommittedSlotState",
+		"shape": "full-slot-current-witnesses",
+		"authenticateBeforeCommit": true
+	},
+	"durability": {
+		"projectionAndPendingCoCommit": true,
+		"authorScopedRecoveryEnumeration": true,
+		"recoveryOperation": "enumerateCommittedAuthorSlots",
+		"externalHandoffExactlyOnceClaimed": false
+	},
+	"pendingRow": {
+		"scopeOnly": true,
+		"digestPairAndIdentityOnly": true,
+		"proofBodyCopies": 0,
+		"payloadCopies": 0,
+		"uint8ArrayValues": 0
+	},
+	"retention": {
+		"baseWitnessesPersist": true,
+		"baseProofBodiesPersist": true,
+		"digestSetDedupFactsPersistAfterDrain": true,
+		"pendingRemovalOnlyCompaction": true,
+		"globalEvidenceBoundClaimed": false
+	}
+}

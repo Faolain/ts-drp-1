@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "--check",
+    "43141513",
+    "97c0836b",
+    "--",
+    "tests/fixtures/phase-6b-d110c-0c1f5b/snapshot-state-oracle.ts",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts"
+  ],
+  "start": "2026-09-05T17:46:20.969Z"
+}

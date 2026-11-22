@@ -1,0 +1,297 @@
+{
+  "records": [
+    {
+      "file": "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+      "beforeSha256": "754606d13a3f9961680172b4be38cab96f366860fe8f9fcd8974871a58d7d8b5",
+      "afterSha256": "2486ee5e05f9f6cfcda21e7c268145a4ed16c23b768ada0b6783bd37673255a0",
+      "normalizedSha256": "595efd9d49bd277e8063f1fd27f6227265781f20b57855f20c54099a198cd142",
+      "baselineNormalizedSha256": "595efd9d49bd277e8063f1fd27f6227265781f20b57855f20c54099a198cd142",
+      "equal": true,
+      "reversals": [
+        {
+          "kind": "FunctionDeclaration",
+          "reason": "new observational/test helper observePublicStore",
+          "sha256": "eae37469adeebbd11ee4233996e572ee4a23a1bb38210a30ebcb50b8c4c764b4"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable publicStoreContract",
+          "sha256": "924ac22944ec720ecc44588efe057ce0d6256a7f15031b0d9312b36be65df2cc"
+        },
+        {
+          "kind": "ShorthandPropertyAssignment",
+          "reason": "new detached observation field",
+          "sha256": "50f73a1efba0025aafffeaae49b55fa4b785a95177c4c49be235aeed8dede694"
+        }
+      ]
+    },
+    {
+      "file": "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+      "beforeSha256": "fda968fccfe8b66f274181e46d376cfb65d34afb05a16e34d3d20480238c334b",
+      "afterSha256": "f3d177abf638aa1711c4f63ebfe37e5196f98c5aefda6a59041e5c802e1d5de9",
+      "normalizedSha256": "b938131bc12d1b4c2fe8fa2ecf2162d6ad720f58c6ea57f9165ef52a3ceb1432",
+      "baselineNormalizedSha256": "b938131bc12d1b4c2fe8fa2ecf2162d6ad720f58c6ea57f9165ef52a3ceb1432",
+      "equal": true,
+      "reversals": [
+        {
+          "kind": "PropertySignature",
+          "reason": "new detached observation field",
+          "sha256": "819632eb8a8ca7fae8d6b3ff82884e42afff87325d1f1ea88fb192496b3c96d7"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable publicKeys",
+          "sha256": "2df9bf966d0929167dbec66174256f4884ce7926111f01855fb99fd620b82d04"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable publicSurface",
+          "sha256": "506b15a26388495d9a5ee79f8ac08a977ddb68b389a102d38a6f43a1506e894f"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "public surface assertion",
+          "sha256": "60e178ecea2ea23ebaa6a0635b14d8cf45b83f909dc3536f20a587d51de4a49a"
+        }
+      ]
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+      "beforeSha256": "9ab132da3829e2e97c94bcf62c9f31d1ecd0edd6ebdd06d243226c0ef613c787",
+      "afterSha256": "44dc8f6ab301bbb2474a5e058e69e55546d99e6182e87a83e47958c7b64fcef5",
+      "normalizedSha256": "9d73ed9d774fa87c2ad58544bac6db5e6927fb36273053cf87912f46e630b85a",
+      "baselineNormalizedSha256": "9d73ed9d774fa87c2ad58544bac6db5e6927fb36273053cf87912f46e630b85a",
+      "equal": true,
+      "reversals": [
+        {
+          "kind": "PropertySignature",
+          "reason": "new detached observation field",
+          "sha256": "d0af65fb53d39cd57a7172f8423f185360a2145151815b8a2ea8241e916fb484"
+        },
+        {
+          "kind": "PropertyAssignment",
+          "reason": "new detached observation field",
+          "sha256": "ba761e536b08576beac2bdcd94779921a4883441e119d6666f45c7bb6ecce382"
+        }
+      ]
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-boundaries.test.ts",
+      "beforeSha256": "36212d946602d0905cfdbeb1491249972dc98f6392bad0f35b0b49cb191b6afc",
+      "afterSha256": "5f0803176121ef6af6d3bf250fb992ab6bca3801b0e770cc2aa04b53b59be266",
+      "normalizedSha256": "be897d9339a32fbe5282ee398d2d1823d424e948c2e32994b93bbaf38960baa5",
+      "baselineNormalizedSha256": "be897d9339a32fbe5282ee398d2d1823d424e948c2e32994b93bbaf38960baa5",
+      "equal": true,
+      "reversals": [
+        {
+          "kind": "ImportSpecifier",
+          "reason": "new observation/assertion imports",
+          "names": [
+            "hashDomain"
+          ]
+        },
+        {
+          "kind": "ImportDeclaration",
+          "reason": "new assertion-only real authority import",
+          "sha256": "af418296629862aaa7c35830ee3bc0063dfa3388475ebd19bf032b49e30639fa"
+        },
+        {
+          "kind": "ImportDeclaration",
+          "reason": "new assertion-only real authority import",
+          "sha256": "27715d5c24499c9d132935e4191e7350830088f02c71ec81eaceb1867e4233de"
+        },
+        {
+          "kind": "FunctionDeclaration",
+          "reason": "new observational/test helper aggregateCandidate",
+          "sha256": "c865652f15d33e6ce35b3ac7f6aa7abf222120f8c61b63ae6a62457ffa4d6e94"
+        },
+        {
+          "kind": "FunctionDeclaration",
+          "reason": "new observational/test helper checkpointAnchorAclDigest",
+          "sha256": "a49ec4c7d561945fcdd0d26cb3081496d167be6788d407dff50ea85b8eea6d13"
+        },
+        {
+          "kind": "FunctionDeclaration",
+          "reason": "new observational/test helper fullTransition",
+          "sha256": "8980b49dbf947125a59ab70fe8a87525dfa61f6d76b56d4683db5c9d0b201088"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bounded authority test case",
+          "sha256": "cb28d5a24250a535a6207f6574159bb4198743b8d5c351c3763cce71dbd32dae"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bounded authority test case",
+          "sha256": "e58f0f118ad57007de42b490c00c21a9b196f3337b77a389d67b52ebaaad3421"
+        }
+      ]
+    },
+    {
+      "file": "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts",
+      "beforeSha256": "b35262231fffe9383bf053a66801b9e21492aa57d0024dab672824ff1bbc66b2",
+      "afterSha256": "5f7db7d9539acabefcdbd842f5833f5e41f790349f56c5045aa785b0ffdac1de",
+      "normalizedSha256": "d8289284f91459819a26e7df7f8d7a077674650d1a14ad7112d192569fcac17c",
+      "baselineNormalizedSha256": "d8289284f91459819a26e7df7f8d7a077674650d1a14ad7112d192569fcac17c",
+      "equal": true,
+      "reversals": [
+        {
+          "kind": "PropertyAssignment",
+          "reason": "new detached observation field",
+          "sha256": "a853efba8ee3b28c0cf3d2cb315559617852bce00bd8275cdc312963ae901a66"
+        },
+        {
+          "kind": "NumericLiteral",
+          "reason": "current-contract census assertion",
+          "from": 7,
+          "to": 6
+        },
+        {
+          "kind": "NumericLiteral",
+          "reason": "current-contract census assertion",
+          "from": 6,
+          "to": 5
+        },
+        {
+          "kind": "NumericLiteral",
+          "reason": "current-contract census assertion",
+          "from": 7,
+          "to": 6
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "0c13f680d12684618118418a44485c72a54ef4008dac8db3c71c6fdf20c3d88a"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "19bb24f6eafaf21002600c441d5f0a3ce134ae7906e4583544ea0e2c24482197"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "7317ee5a61f0f9fc9d3c2bafb1a172f1b0629abcd40a518c67ff2b1475bda15e"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable bootstrap",
+          "sha256": "c4b6041fda42856e0f77e9904b966b3a42480b3a207bced9f2638e9c26bf5d85"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "51189f1c88a76fa1a41d9c83255d5bdda2a560a34e60ade8bd08904a1a658a24"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "02b1384802f91d4b8b74b23aa2c7a76b64a38b89015e2831922e9ea1913d5c52"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "c086d35f5750f76495fb413171c1eed83fcfa10c05b57375a8f78e300df43535"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "c01644643267393b9a88514282d3f66ae333bb7b80ece3fb6b225f7e5ee284f2"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "5fb682fbab63f451d67162be8add02ba3e416ccdf00ef4021caa80b92a4bdc73"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "new bootstrap or aggregate observation assertion",
+          "sha256": "dd3d5dc8793c4d6f7d7df0d4dc2a90e6ce7edb37c213c4e073cdaffec8dc1dfc"
+        }
+      ]
+    },
+    {
+      "file": "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts",
+      "beforeSha256": "65f304e0455f7eacf47da66635532bbbd4753d354c1e3abad3b3853edc37db58",
+      "afterSha256": "99e97911dada4795819dca5423f4d6bd4b851de6ee17b8e077c1766a8d6c01d8",
+      "normalizedSha256": "9ca316060eb214c9da056c04ece106570bb2ead8a90b17f75333498cac9dee01",
+      "baselineNormalizedSha256": "9ca316060eb214c9da056c04ece106570bb2ead8a90b17f75333498cac9dee01",
+      "equal": true,
+      "reversals": [
+        {
+          "kind": "ImportSpecifier",
+          "reason": "new observation/assertion imports",
+          "names": [
+            "compareBytes",
+            "hashDomain"
+          ]
+        },
+        {
+          "kind": "PropertySignature",
+          "reason": "new detached observation field",
+          "sha256": "45a6191a9943405ec79edb8ab237a90f442b3e7d7f2d204241e658bb85579c37"
+        },
+        {
+          "kind": "FunctionDeclaration",
+          "reason": "new observational/test helper originalBootstrapOperation",
+          "sha256": "02ab76f137b63b36484c1df306f0037127a319103a63b3f072c514a34001abcd"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable originalBootstrap",
+          "sha256": "5c230cb83b12e5a76fd8c23d6e7aaffc06729cbefed48d6108a4fadb66d8aff8"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable coldBootstrapInputs",
+          "sha256": "3f342b0154061f1466080210a2c54caf723bc4060f5e659442f1f9eea6e252e4"
+        },
+        {
+          "kind": "FirstStatement",
+          "reason": "new observation/assertion variable observeColdInput",
+          "sha256": "46cea7db5344e5e43f81f92053af6fd24904ca1afddaf1ecc8c78c118784d769"
+        },
+        {
+          "kind": "CallExpression",
+          "reason": "same-input cold observation wrapper",
+          "site": "current-successor"
+        },
+        {
+          "kind": "ExpressionStatement",
+          "reason": "one original bootstrap observation derivation",
+          "sha256": "6451b59008af198714a5592c82dbbf09cfe1e827a8a3fc712d88d00578310cc3"
+        },
+        {
+          "kind": "CallExpression",
+          "reason": "same-input cold observation wrapper",
+          "site": "epoch-two"
+        },
+        {
+          "kind": "BinaryExpression",
+          "reason": "observer availability guard"
+        },
+        {
+          "kind": "PropertyAssignment",
+          "reason": "new detached observation field",
+          "sha256": "03c1e5da7c1699209e31782d6eecef5b254bbae7a8bbb9c221ef1b62d98026c8"
+        }
+      ]
+    }
+  ],
+  "normalizedAstEquivalentOutsideEnumeratedRedHunks": true,
+  "commentsAndFormattingExcludedFromAstComparison": true,
+  "childImplementationByteIdentical": [
+    "sameStoreShape",
+    "boundedRecoveryStore"
+  ],
+  "bothColdInputsUnchanged": true,
+  "coldPinAssignments": 0,
+  "observedSites": [
+    "current-successor",
+    "epoch-two"
+  ],
+  "currentSuccessorProvenance": "static-only; no runtime observation or new callback API claimed",
+  "epochTwoProvenance": "dynamic assertion written but not yet executed",
+  "testExecutions": 0,
+  "productionEdits": 0
+}

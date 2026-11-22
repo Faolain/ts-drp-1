@@ -1,0 +1,12 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS",
+  "command": "git",
+  "args": [
+    "clone",
+    "--shared",
+    "--no-checkout",
+    "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "/private/tmp/d110c-f5b-snapshot-fixture-green-YoEBmS/checkout"
+  ],
+  "start": "2026-09-06T08:37:32.280Z"
+}

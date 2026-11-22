@@ -1,0 +1,11 @@
+{
+  "checks": {
+    "allThreeEpochsIssueThroughProductPath": true,
+    "coldReopenFailureExact": true,
+    "currentFilterIsSuccessorRelative": true,
+    "floorCommittedEpoch3": true,
+    "genesisHasSeparateFilter": true,
+    "pendingRecoverySucceeded": true
+  },
+  "conclusion": "The intended pending authenticator is GREEN through durable commit. The first downstream blocker is epoch-3 predecessor recovery admission. The successor-relative/genesis-only issuance filter is the exact candidate seam; a new causal RED must prove whether an authenticated epoch-1 row is the rejected input before v3-live production edits."
+}

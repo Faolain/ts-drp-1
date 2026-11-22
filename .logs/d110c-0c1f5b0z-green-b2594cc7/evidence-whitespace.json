@@ -1,0 +1,1415 @@
+{
+  "results": [
+    {
+      "file": "accepted-manifests.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "assessment.md",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "audit.mjs",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-build/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-build/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-build/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-build/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-source-check/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-source-check/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-source-check/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-source-check/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-browser/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-browser/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-browser/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-browser/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-node/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-node/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-node/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage-node/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "baseline-typecheck-storage/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/baseline-typecheck-storage/stdout:4: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "browser-port-preflight/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-port-preflight/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-port-preflight/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-port-preflight/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-process-preflight/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-process-preflight/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-process-preflight/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "browser-process-preflight/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:423: trailing whitespace.\n+30721 30562       02:36 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:425: trailing whitespace.\n+30723 30562       02:36 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:428: trailing whitespace.\n+31093 30562       02:36 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:429: trailing whitespace.\n+31095 30562       02:36 npm exec @react-grab/mcp --stdio    \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:430: trailing whitespace.\n+31096 30562       02:36 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:516: trailing whitespace.\n+37127 37084       00:01 node (vitest)      \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:519: trailing whitespace.\n+37156 37127       00:00 node (vitest 1)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:520: trailing whitespace.\n+37157 37127       00:00 node (vitest 2)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:521: trailing whitespace.\n+37158 37127       00:00 node (vitest 3)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:522: trailing whitespace.\n+37159 37127       00:00 node (vitest 4)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:523: trailing whitespace.\n+37160 37127       00:00 node (vitest 5)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:524: trailing whitespace.\n+37162 37127       00:00 node (vitest 6)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:525: trailing whitespace.\n+37163 37127       00:00 node (vitest 7)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:526: trailing whitespace.\n+37164 37127       00:00 node (vitest 8)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:527: trailing whitespace.\n+37165 37127       00:00 node (vitest 9)     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:551: trailing whitespace.\n+38334 38292 01-00:53:51 next-server (v16.2.3) \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:586: trailing whitespace.\n+43691 43684    12:43:27 next-server (v16.2.3) \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:804: trailing whitespace.\n+22583 62189       07:11 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:809: trailing whitespace.\n+23057 62189       06:22 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:811: trailing whitespace.\n+39760 62189    05:22:34 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:814: trailing whitespace.\n+39763 62189    05:22:34 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:820: trailing whitespace.\n+62554 62189 01-00:31:51 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:822: trailing whitespace.\n+62556 62189 01-00:31:51 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:829: trailing whitespace.\n+93369 62189       37:17 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:832: trailing whitespace.\n+93394 62189       37:17 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:838: trailing whitespace.\n+45316 50611    17:21:34 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:848: trailing whitespace.\n+50700 50611 01-00:41:19 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:850: trailing whitespace.\n+50703 50611 01-00:41:19 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:859: trailing whitespace.\n+88636 50611    17:51:42 chrome-devtools-mcp  \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:861: trailing whitespace.\n+88935 50611    17:51:34 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/browser-process-preflight/stdout:862: trailing whitespace.\n+88977 50611    17:51:31 npm exec @upstash/context7-mcp --api-key ctx7sk-***     \n",
+      "stderr": ""
+    },
+    {
+      "file": "custody-after-gates.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "custody-before-production-sign.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "custody-before.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "finalize.mjs",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-browser/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-browser/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-browser/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-browser/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-checkout/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-checkout/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-checkout/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-checkout/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-clone/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-clone/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-clone/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-clone/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-frozen.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-revalidation/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-revalidation/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-revalidation/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-revalidation/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-validation-corrected.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused-validation.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-focused/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-green-build/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-green-build/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-green-build/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-green-build/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-install/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-install/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-install/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-install/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance-frozen.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance-validation.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-issuance/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-patch-check/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-patch-check/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-patch-check/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-patch-check/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained-frozen.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained-validation.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-retained/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-source-check/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-source-check/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-source-check/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-source-check/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-sparse/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-sparse/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-sparse/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-sparse/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-type-delta/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-type-delta/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-type-delta/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-type-delta/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-browser/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-browser/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-browser/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-browser/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-node/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-node/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-node/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage-node/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "initial-typecheck-storage/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/initial-typecheck-storage/stdout:4: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "isolation-baseline.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "isolation-initial-patched-after.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "isolation-initial-patched-before.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "isolation-signed-after.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "isolation-signed-before.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-diff-check/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-diff-check/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-diff-check/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-diff-check/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint-corrected/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint-corrected/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint-corrected/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint-corrected/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-eslint/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/main-eslint/stdout:7: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier-corrected/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier-corrected/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier-corrected/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier-corrected/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "main-prettier/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-changed-paths/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-changed-paths/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-changed-paths/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-changed-paths/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-commit/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-commit/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-commit/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-commit/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-push/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-push/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-push/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-push/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-remote/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-remote/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-remote/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-remote/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-signature/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-signature/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-signature/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production-signature/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "production.patch",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:6: space before tab in indent.\n+ \ttype AheReclamationPromotion,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:7: space before tab in indent.\n+ \ttype AheReclamationReceipt,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:8: space before tab in indent.\n+ \ttype AheReclamationSnapshot,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:10: space before tab in indent.\n+ \tcaptureAheReclamationInput,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:11: space before tab in indent.\n+ \tclassifyAheReclamation,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:12: space before tab in indent.\n+ \tcreateAheReclamationError,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:14: space before tab in indent.\n+ \tlifecycle: BrowserAheReclamationLifecycle,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:15: space before tab in indent.\n+ \tdatabaseName: string\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:24: trailing whitespace.\n+ \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:31: space before tab in indent.\n+ \ttype AheReclamationPromotion,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:32: space before tab in indent.\n+ \ttype AheReclamationReceipt,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:33: space before tab in indent.\n+ \ttype AheReclamationSnapshot,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:35: space before tab in indent.\n+ \tcaptureAheReclamationInput,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:36: space before tab in indent.\n+ \tclassifyAheReclamation,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:37: space before tab in indent.\n+ \tcreateAheReclamationError,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:39: space before tab in indent.\n+ \tconnection: DatabaseSync,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:40: space before tab in indent.\n+ \tlifecycle: Lifecycle\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:49: trailing whitespace.\n+ \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:56: space before tab in indent.\n+ \tisStorageObjectId,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:60: space before tab in indent.\n+ \tBlobDigest,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:61: space before tab in indent.\n+ \tExpectedHead,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:62: space before tab in indent.\n+ \tGenerationId,\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:64: space before tab in indent.\n+ \treclaimClosedEpoch(input: unknown): Promise<AheReclamationReceipt>;\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:66: trailing whitespace.\n+ \n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:152: space before tab in indent.\n+ \tdigest: BlobDigest;\n/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/production.patch:153: space before tab in indent.\n+ \tgenerationId: GenerationId;\n",
+      "stderr": ""
+    },
+    {
+      "file": "run.mjs",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-build/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-build/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-build/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-build/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-checkout/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-checkout/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-checkout/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-checkout/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-clone/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-clone/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-clone/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-clone/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused-frozen.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused-gate/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused-gate/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused-gate/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused-gate/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused-validation.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-focused/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-install/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-install/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-install/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-install/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-accessor/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-accessor/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-accessor/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-accessor/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-descriptor/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-descriptor/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-descriptor/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-descriptor/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-duplicate/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-duplicate/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-duplicate/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-duplicate/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-value/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-value/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-value/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-native-value/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-source-check/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-source-check/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-source-check/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-source-check/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-sparse/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-sparse/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-sparse/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-sparse/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-type-delta/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-type-delta/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-type-delta/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-type-delta/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-browser/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-browser/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-browser/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-browser/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-node/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-node/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-node/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage-node/stdout",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage/command.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage/status.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage/stderr",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "signed-typecheck-storage/stdout",
+      "status": 3,
+      "stdout": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/signed-typecheck-storage/stdout:4: new blank line at EOF.\n",
+      "stderr": ""
+    },
+    {
+      "file": "source-check-baseline.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "source-check-initial-green.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "source-check-signed.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "source-check.mjs",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "suite.mjs",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "type-delta-initial.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "type-delta-signed.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "type-delta.mjs",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "typecheck-baseline.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "typecheck-initial-green.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "typecheck-signed.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "validation.json",
+      "status": 1,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "disposition": "Raw stdout and exact production.patch are retained byte-for-byte; no source whitespace waiver. All other artifact whitespace must pass."
+}

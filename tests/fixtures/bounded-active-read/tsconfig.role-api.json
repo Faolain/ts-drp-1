@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.role.json", "files": ["role-api-contract.ts"], "include": [] }

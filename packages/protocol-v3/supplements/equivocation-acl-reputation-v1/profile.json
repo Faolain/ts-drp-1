@@ -1,0 +1,34 @@
+{
+	"profileId": "equivocation-acl-reputation-v1",
+	"baseProfileId": "equivocation-author-projection-v1",
+	"input": {
+		"detachedDigestSetsOnly": true,
+		"gossipBudgetSelection": false,
+		"gossipBudgetSaturation": false,
+		"pendingRows": false,
+		"proofBodies": false,
+		"callerCounts": false
+	},
+	"reputation": {
+		"policyField": "maxReputationPenalty",
+		"policyDomain": "nonnegative-safe-integer",
+		"unit": "canonical-unordered-distinct-digest-pair",
+		"formula": "min(sum-per-normalized-scope-C(n,2),maxReputationPenalty)",
+		"higherPenalty": "worse-reputation",
+		"capEffect": "composition-output-only"
+	},
+	"output": {
+		"fields": ["author", "equivocatingSlotCount", "totalCanonicalPairCount", "reputationPenalty", "saturated"],
+		"pairIdentity": "existing-scope-plus-canonical-unordered-distinct-digest-pair-only",
+		"perSlotDetailExposed": false
+	},
+	"claims": {
+		"aclMutation": false,
+		"admissionAuthority": false,
+		"durableMutation": false,
+		"transportRateLimit": false,
+		"globalEvidenceBound": false,
+		"globalComputationBound": false,
+		"expectedNormalizationWork": "O(total-captured-digest-entries)"
+	}
+}

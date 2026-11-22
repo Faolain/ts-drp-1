@@ -1,0 +1,137 @@
+{
+  "stopped": true,
+  "diagnosticValid": true,
+  "semanticPass": false,
+  "parentClosed": false,
+  "sourceHead": "e68c6223bb7a93e79d3fd21e9c12c8eaa575272a",
+  "sourceSha256": "c63f9cb4c8bfda07a631de56382180147af01e9c062b7099a39a4632d9f16f0e",
+  "total": 24,
+  "passed": 0,
+  "failed": 1,
+  "filtered": 23,
+  "reporterSha256": "b0250ff85969f1392fa2097df33e52439c17fe38c7d60907e184c5d0ee71ec06",
+  "records": 3546,
+  "fulfilledOrdinaryIssues": 256,
+  "callbackSettled": false,
+  "cleanupCompleted": true,
+  "incompletePhases": [
+    {
+      "kind": "F5B_WIDE_DIAGNOSTIC",
+      "sequence": 1,
+      "phase": "callback",
+      "edge": "begin",
+      "epoch": null,
+      "peer": null,
+      "completed": null,
+      "completedOrdinaryIssues": 0,
+      "elapsedMs": 0,
+      "cpuScope": "process-aggregate-including-overlapping-work",
+      "cpuUserMicros": 460500,
+      "cpuSystemMicros": 144324,
+      "eventLoopIdleMs": 1373.019871,
+      "eventLoopActiveMs": 600.9660041296997,
+      "eventLoopUtilization": 0.3044429100032003,
+      "deltaUserMicros": 0,
+      "deltaSystemMicros": 0,
+      "writeFailures": 0
+    },
+    {
+      "kind": "F5B_WIDE_DIAGNOSTIC",
+      "sequence": 3539,
+      "phase": "reopen",
+      "edge": "begin",
+      "epoch": 3,
+      "peer": "d110c-f5b-parent-1-peer-0",
+      "completed": null,
+      "completedOrdinaryIssues": 256,
+      "elapsedMs": 68773.495667,
+      "cpuScope": "process-aggregate-including-overlapping-work",
+      "cpuUserMicros": 58460764,
+      "cpuSystemMicros": 3303946,
+      "eventLoopIdleMs": 1682.74541,
+      "eventLoopActiveMs": 69064.68859001526,
+      "eventLoopUtilization": 0.9762147499229493,
+      "deltaUserMicros": 11,
+      "deltaSystemMicros": 15,
+      "writeFailures": 0
+    },
+    {
+      "kind": "F5B_WIDE_DIAGNOSTIC",
+      "sequence": 3544,
+      "phase": "reopen-session",
+      "edge": "begin",
+      "epoch": 3,
+      "peer": "d110c-f5b-parent-1-peer-0",
+      "completed": null,
+      "completedOrdinaryIssues": 256,
+      "elapsedMs": 68774.601084,
+      "cpuScope": "process-aggregate-including-overlapping-work",
+      "cpuUserMicros": 58461912,
+      "cpuSystemMicros": 3304232,
+      "eventLoopIdleMs": 1682.74541,
+      "eventLoopActiveMs": 69065.79425712951,
+      "eventLoopUtilization": 0.9762151216418419,
+      "deltaUserMicros": 93,
+      "deltaSystemMicros": 8,
+      "writeFailures": 0
+    },
+    {
+      "kind": "F5B_WIDE_DIAGNOSTIC",
+      "sequence": 3538,
+      "phase": "final-reopen",
+      "edge": "begin",
+      "epoch": 3,
+      "peer": "d110c-f5b-parent-1-peer-0",
+      "completed": null,
+      "completedOrdinaryIssues": 256,
+      "elapsedMs": 68773.470334,
+      "cpuScope": "process-aggregate-including-overlapping-work",
+      "cpuUserMicros": 58460753,
+      "cpuSystemMicros": 3303931,
+      "eventLoopIdleMs": 1682.74541,
+      "eventLoopActiveMs": 69064.66950699218,
+      "eventLoopUtilization": 0.9762147435072452,
+      "deltaUserMicros": 34,
+      "deltaSystemMicros": 17,
+      "writeFailures": 0
+    }
+  ],
+  "commands": 22,
+  "nonzero": [
+    {
+      "file": "diagnostic-runtime/status.json",
+      "status": 1
+    },
+    {
+      "file": "equivalence/status.json",
+      "status": 1
+    },
+    {
+      "file": "typecheck-final/status.json",
+      "status": 1
+    },
+    {
+      "file": "typecheck/status.json",
+      "status": 1
+    },
+    {
+      "file": "wide-only/status.json",
+      "status": 1
+    }
+  ],
+  "noRetry": true,
+  "noFull45": true,
+  "noIsolation": true,
+  "wholeProgramStaticPass": false,
+  "externalSnapshotDiagnostics": 3,
+  "gridAndFourRegistryW0FailuresRemainOpen": true,
+  "custody": "custody-final.json",
+  "effectiveHashes": 85,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "ownedRuntimePidsAbsent": [
+    20514,
+    20795
+  ]
+}

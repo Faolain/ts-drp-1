@@ -1,0 +1,13 @@
+PASS pnpm exec eslint tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+PASS pnpm exec prettier --check tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+PASS git diff --check -- tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+PASS zero production diff in packages/node, protocol-v3, keychain, control-plane, issuance-store, live-journal, storage-node, and storage-browser
+PASS protected .agents, .claude and .pnpm-store paths present
+PASS 27 existing stashes preserved
+PASS fixed ports 4174, 4175, 51000 and 51002 clear
+
+DIAGNOSTIC ONLY: a temporary standalone test tsconfig exposed the inherited root
+NodeNext workspace-resolution limitation because root node_modules has no
+@ts-drp workspace links. The same package-local typecheck pattern passes from
+packages/node. The diagnostic tsconfig was removed before collection and the
+focused run; this was not a source or test failure.

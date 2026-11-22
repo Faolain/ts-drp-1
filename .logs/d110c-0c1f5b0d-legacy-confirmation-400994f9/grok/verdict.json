@@ -1,0 +1,13 @@
+{
+  "verdict": "PASS",
+  "summary": "Rejected 508d700a P1s are closed. Tests-only RED 7d037ed8 is 19 listed cases, 18 pass, one failure D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW: AST selects the single top-level countHistoricalIssuanceRow, transpiles/executes that exact body, accepts 8,192 distinct rows, keeps duplicate 8,191 idempotent, and shows the live * 3 body accepting row 8,193. The three invalid oracles are gone; retained totals are recalculated 134/122, not 136/124. GREEN b384c7d9 changes only v3-live.ts from maxEpochVertices * 3 to context.count <= context.maxEpochVertices; RED tests are byte-identical. Gates: focused 19/19, backend 12/12, Chromium 1/1, store 134/134, settlement 122/122, isolated 19+134+122, Node build, exact-owner lint/format/diff, typecheck SHA-256 a5fd26b3…f39e190. Parent f5b remains blocking for genuine 8,192/8,193 hot/restart/cold-reopen, settlement rollback-window, every-peer first deletion, no-legacy-first, and checkpoint/terminal authority. The 120,004 ms Chromium 8,193 attempt and small-limit fixture are plan-recorded rejected diagnostics, not evidence. Prior P2s stay parent/inherited and are not elevated.",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "findings": [],
+  "p1s_closed": true,
+  "causal_red_confirmed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true,
+  "parent_gates_preserved": true
+}

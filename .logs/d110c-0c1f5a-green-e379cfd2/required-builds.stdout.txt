@@ -1,0 +1,32 @@
+
+> @ts-drp/protocol-v3@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+> tsc -b tsconfig.build.json
+
+
+> @ts-drp/protocol-v3@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+> tsc --noEmit && pnpm typecheck:public-entry-audit
+
+
+> @ts-drp/protocol-v3@0.11.0 typecheck:public-entry-audit /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+> tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.public-entry-audit.json
+
+
+> @ts-drp/node@0.11.0 prebuild /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
+
+
+> @ts-drp/node@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> tsc -b tsconfig.build.json && node build.mjs
+
+
+> @ts-drp/example-v3-room@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room
+> tsc --noEmit -p tsconfig.build.json
+
+
+> @ts-drp/example-v3-room@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room
+> tsc --noEmit
+
+
+> @ts-drp/storage-browser@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser
+> tsc -b tsconfig.build.json
+

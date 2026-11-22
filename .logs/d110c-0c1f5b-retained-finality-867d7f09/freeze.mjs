@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync,execFileSync} from 'node:child_process';
+import ts from '/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/node_modules/typescript/lib/typescript.js';
+import {loadConfigFromFile} from '/tmp/d110c-f5b-retained-finality-RkJzXV/checkout/node_modules/vite/dist/node/index.js';
+const root=process.cwd(),out=path.dirname(new URL(import.meta.url).pathname),files=['tests/phase-5a-c-seal-safety-red.test.ts','tests/phase-5e-creator-actor-red.test.ts'],checkedFiles=[...files,...["tests/fixtures/phase-5-v3/seal-types.ts","tests/fixtures/phase-5e-v3/creator-actor-contract.ts"]];
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const write=(name,data)=>fs.writeFileSync(path.join(out,name),JSON.stringify(data,null,2)+'\n',{flag:'wx'});
+
+const selected=JSON.parse(fs.readFileSync(path.join(out,'list.json'),'utf8')),diagnostics=JSON.parse(fs.readFileSync(path.join(out,'typecheck.json'),'utf8')).targetDiagnostics;
+const attribution=JSON.parse(fs.readFileSync(path.join(out,'typecheck-inherited-attribution.json'),'utf8'));
+if(!attribution.identical||attribution.baseline.targetDiagnostics.length!==4||attribution.baseline.externalDiagnostics.length||attribution.editedFileDiagnostics.length)throw Error('Inherited diagnostic attribution differs');
+const stopped=['31','32'].flatMap(gate=>JSON.parse(fs.readFileSync('/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-ab98cce6/retained-'+gate+'/result.json','utf8')).testResults);
+const expected=stopped.flatMap(s=>s.assertionResults.map(r=>({file:path.basename(s.name),name:[...r.ancestorTitles,r.title].join(' > ')}))).sort((a,b)=>a.name.localeCompare(b.name));
+const actual=selected.map(r=>({file:path.basename(r.file),name:r.name})).sort((a,b)=>a.name.localeCompare(b.name));
+if(selected.length!==19||JSON.stringify(expected)!==JSON.stringify(actual))throw Error('Exact retained19 names differ');
+for(const command of JSON.parse(fs.readFileSync(path.join(out,'preflight-commands.json'),'utf8')))if(command.status!==0)throw Error('Collection/static process failed');
+const matrix={frozenAt:new Date().toISOString(),base:'867d7f09a78bb106cae10419b636bfa3638b11d6',files,selected:19,expectedPassed:19,expectedFailed:0,intentionallyFiltered:0,executionCount:1,classification:'RETAINED_BASELINE_PRESERVATION_NOT_CAUSAL_RED',fileHashes:Object.fromEntries([...checkedFiles,'packages/seal/formal/seal-safety.qnt','tests/fixtures/phase-5-v3/seal-safety-contract.json'].map(f=>[f,hash(fs.readFileSync(f))])),entries:selected.map(r=>({file:path.relative(root,r.file),name:r.name,expectedStatus:'passed',token:null}))};
+write('matrix.json',matrix);
+write('focused-command.json',{cwd:root,command:['pnpm','exec','vitest','run',...files,'--no-file-parallelism','--coverage.enabled=false','--reporter=json','--outputFile='+path.join(out,'focused.json')],executionCount:1});
+console.log(JSON.stringify({selected:19,expectedPassed:19,expectedFailed:0,inheritedTargetDiagnostics:4,editedOwnerDiagnostics:0,externalDiagnostics:0,matrixSha256:hash(fs.readFileSync(path.join(out,'matrix.json')))}));

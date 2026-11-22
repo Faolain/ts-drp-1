@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-room-hsBT3J/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-06T00:15:53.573Z"
+}

@@ -1,0 +1,15 @@
+{
+  "record": "D.110c-0c1k-W0",
+  "checkpoint": "RED-authoritative",
+  "commit": "8860b4321938512180444ba0aa6adfbffbfdf810",
+  "agentSourceCommit": "6609bda4f7d11e552e07d4a331021e3cbcf86ecc",
+  "files": 2,
+  "tests": 10,
+  "passed": 0,
+  "failed": 10,
+  "skipped": 0,
+  "causal": true,
+  "legacyMaxBytes": 8192,
+  "moduleResolutionFailure": false,
+  "fixtureFailure": false
+}

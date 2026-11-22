@@ -1,0 +1,67 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 3,
+  "passed": 3,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-54/result.json",
+  "baselineSha256": "36a0a4245b3949d6d4bec44e059ca8f00d8c97e8e4a26a1b729437ecf76cdc15",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1a creator issuance-retirement checkpoint RED"
+      ],
+      "fullName": "D.110c-0c1a creator issuance-retirement checkpoint RED requires one authenticated retirement carrier after a genuine dense creator close",
+      "status": "passed",
+      "title": "requires one authenticated retirement carrier after a genuine dense creator close",
+      "duration": 395.03025,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1a creator issuance-retirement checkpoint RED"
+      ],
+      "fullName": "D.110c-0c1a creator issuance-retirement checkpoint RED replaces the authenticated epoch-one carrier when the admitted boundary does not advance",
+      "status": "passed",
+      "title": "replaces the authenticated epoch-one carrier when the admitted boundary does not advance",
+      "duration": 1131.947833,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1a creator issuance-retirement checkpoint RED"
+      ],
+      "fullName": "D.110c-0c1a creator issuance-retirement checkpoint RED fails closed for every frozen issuance-boundary derivation mutant",
+      "status": "passed",
+      "title": "fails closed for every frozen issuance-boundary derivation mutant",
+      "duration": 151.5680000000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "74860c618120309d78e2595a16dcbcf95ca7bf620155619f52c4f5c81d0e466b",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

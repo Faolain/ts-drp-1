@@ -1,0 +1,51 @@
+accepted_plan_anchor 7113f762daad7392878fea529c01dc9a6729ab04
+upstream_anchor_before_red 7113f762daad7392878fea529c01dc9a6729ab04
+new_red_paths 9
+modified_live_census_paths 4
+production_source_manifest_lock_diffs 0
+
+focused_vitest_files 2
+focused_vitest_tests 38
+focused_vitest_passed 6
+focused_vitest_failed 2
+focused_vitest_skipped 30
+focused_vitest_failure_1 D109C_SHARED_MAINTENANCE_MISSING
+focused_vitest_failure_2 D109C_NODE_MAINTENANCE_MISSING
+
+focused_browser_files 1
+focused_browser_tests 4
+focused_browser_expected 0
+focused_browser_unexpected 1
+focused_browser_skipped 3
+focused_browser_flaky 0
+focused_browser_top_level_errors 0
+focused_browser_failure D109C_BROWSER_MAINTENANCE_MISSING
+
+retained_files 5
+retained_discovered 53
+retained_selected_passed 15
+retained_filtered 38
+retained_failed 0
+
+eslint_status 0
+prettier_status 0
+node_child_syntax_status 0
+diff_check_status 0
+product_diff_status 0
+stash_count 26
+ports_4174_4175_51000_51002 clear
+conflicting_ts_drp_processes none
+
+tests/fixtures/phase-6b/ahe-reclamation-contract.ts
+tests/phase-6b-ahe-reclamation-red.test.ts
+packages/storage-node/tests/fixtures/phase-6b-ahe-reclamation-child.mjs
+packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts
+packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts
+packages/storage-browser/tests/phase-6b-ahe-reclamation-global-setup.ts
+packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-entry.ts
+packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-worker.ts
+packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts
+packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts
+packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts
+tests/phase-2l-d-parity-governance-red.test.ts
+tests/phase-3a1b-p2-outbox-publication-contract.test.ts

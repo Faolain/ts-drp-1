@@ -1,0 +1,44 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://drp.tech/schema/protocol-v3/seal-digest-identity-v1.json",
+	"title": "Protocol v3 seal digest identity profile",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"decisionId",
+		"digestIdentities",
+		"lockIdentity",
+		"profileId",
+		"protocolMajor",
+		"registryVersion",
+		"roundChangeDisposition",
+		"sameValueRoundCarryover"
+	],
+	"properties": {
+		"decisionId": { "const": "PH-P5-D01" },
+		"digestIdentities": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"cutValueDigest",
+				"proposalHash",
+				"qcProposalDigest",
+				"sealProposalValueDigest",
+				"sealVoteProposalDigest"
+			],
+			"properties": {
+				"cutValueDigest": { "const": "hash-domain-exact-cut-value-bytes" },
+				"proposalHash": { "const": "hash-domain-exact-seal-proposal-bytes" },
+				"qcProposalDigest": { "const": "valueDigest" },
+				"sealProposalValueDigest": { "const": "valueDigest" },
+				"sealVoteProposalDigest": { "const": "valueDigest" }
+			}
+		},
+		"lockIdentity": { "const": "valueDigest" },
+		"profileId": { "const": "seal-digest-identity-v1" },
+		"protocolMajor": { "const": 3 },
+		"registryVersion": { "const": 1 },
+		"roundChangeDisposition": { "const": "separate-kind-deferred-phase-5d" },
+		"sameValueRoundCarryover": { "const": true }
+	}
+}

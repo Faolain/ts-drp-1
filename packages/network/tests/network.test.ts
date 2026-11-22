@@ -7,6 +7,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import rawConfig from "../../../configs/local-bootstrap.json" with { type: "json" };
 import { DRPNetworkNode } from "../src/node.js";
 
+const selectorRuntimeInstalled =
+	typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value === "function";
+
 describe("DRPNetworkNode can connect & send messages", () => {
 	const controller = new AbortController();
 	let node1: DRPNetworkNode;
@@ -207,4 +210,31 @@ describe("DRPNetworkNode safeDial", () => {
 		const conn = await node.safeDial([nodes[1].getMultiaddrs()[0], nodes[2].getMultiaddrs()[0]]);
 		expect(conn).toBeDefined();
 	});
+
+	test.skipIf(!selectorRuntimeInstalled)(
+		"partitions valid remote groups while peerless and malformed records remain outside explicit headroom",
+		async () => {
+			const node = nodes[0];
+			await expect(
+				node.connect([
+					nodes[1].getMultiaddrs()[0],
+					nodes[2].getMultiaddrs()[0],
+					"/ip4/127.0.0.1/tcp/65530",
+					"/ip4/127.0.0.1/tcp/65531/p2p/not-a-peer-id",
+				])
+			).resolves.toBeUndefined();
+			const snapshot = (
+				node as unknown as {
+					getPeerSelectionSnapshot(): Readonly<{
+						charged: number;
+						denied: number;
+						live: number;
+						selected: number;
+					}>;
+				}
+			).getPeerSelectionSnapshot?.();
+			expect(snapshot, "T3_REMOTE_RECORD_CENSUS_ABSENT").toMatchObject({ charged: 0, live: 2, selected: 0 });
+			expect(snapshot?.denied).toBeGreaterThan(0);
+		}
+	);
 });

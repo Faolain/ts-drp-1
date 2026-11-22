@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-reporters-L8TTrA/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-06T02:53:59.520Z"
+}

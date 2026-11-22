@@ -1,0 +1,79 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-29/result.json",
+  "baselineSha256": "eac49e9ca48255f1e409a3cebe59580175fc907e8cab2b9214af50e84c970430",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract keeps the current grid production entry independently bundleable",
+      "status": "passed",
+      "title": "keeps the current grid production entry independently bundleable",
+      "duration": 4.486125000000129,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract requires deterministic projection, a signed transport roster, and room-bound E1",
+      "status": "passed",
+      "title": "requires deterministic projection, a signed transport roster, and room-bound E1",
+      "duration": 2229.987833,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract routes the grid production bundle through the public shared-room owner",
+      "status": "passed",
+      "title": "routes the grid production bundle through the public shared-room owner",
+      "duration": 15.599916000000121,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-d9346-shared-v3-room-red.test.ts",
+      "ancestorTitles": [
+        "D.93.46b shared room contract"
+      ],
+      "fullName": "D.93.46b shared room contract retires the legacy durable-object composition from the grid product bundle",
+      "status": "passed",
+      "title": "retires the legacy durable-object composition from the grid product bundle",
+      "duration": 5.839541000000281,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "413861f28c01d80531f165174620a037a8c50eac1d8aa16322dbe622d0261aef",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}
